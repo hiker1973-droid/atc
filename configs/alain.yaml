@@ -1,0 +1,14 @@
+# vsfg7-atc — Al Ain Tower (OMAL)
+# Training VM: 192.168.1.220
+
+airfield: OMAL
+callsign: "Al Ain Tower"
+freq_mhz: 250.700          # Tower freq per AFD-3351
+
+srs_addr: "localhost:5008"
+grpc_addr: "localhost:50051"
+
+log_level: info
+weather_interval_sec: 30
+stale_threshold_min: 10
+pattern_alt_ft: 2000       # Higher due to 814 ft field elevation

@@ -1,0 +1,375 @@
+// Command launcher is the vSFG-7 ops panel — a tiny HTTP app that discovers
+// every run_*.bat / start_*.bat next to it, parses the roles each spawns,
+// and gives you start / stop / restart / log-tail / health via a browser.
+//
+// Built portable on purpose: the launcher resolves its root from os.Executable
+// so it can be dropped into training-1 (or any box) without path edits. All
+// external endpoints are flags, not constants.
+package main
+
+import (
+	"context"
+	"embed"
+	"encoding/csv"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+)
+
+//go:embed ui.html
+var uiFS embed.FS
+
+var (
+	flagListen      = flag.String("listen", ":7000", "HTTP listen address (avoid 6000 — blocked by Chrome as X11)")
+	flagRoot        = flag.String("root", "", "SkyeyeATC root dir (default: directory of this binary)")
+	flagSRSAddr     = flag.String("srs-addr", "192.168.1.221:5004", "SRS address for health probe")
+	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
+)
+
+// Role is one spawned vSFG-7 process: a single `start "Title" cmd /k "..."`
+// line inside a .bat file. Multi-role bats (start_towers.bat) produce several
+// Role entries, all pointing back at the same Bat.
+type Role struct {
+	Name          string `json:"name"`
+	Bat           string `json:"bat"`
+	Airfield      string `json:"airfield"`
+	LogFile       string `json:"logFile"`
+	DashboardPort int    `json:"dashboardPort,omitempty"`
+	Status        string `json:"status"`
+	PID           int    `json:"pid,omitempty"`
+}
+
+type Health struct {
+	SRS     bool      `json:"srs"`
+	Tacview bool      `json:"tacview"`
+	OpenAI  bool      `json:"openai"`
+	At      time.Time `json:"at"`
+}
+
+var (
+	rootDir      string
+	roles        []Role
+	rolesMu      sync.Mutex
+	cachedHealth Health
+	healthMu     sync.Mutex
+)
+
+func main() {
+	flag.Parse()
+
+	if *flagRoot != "" {
+		rootDir = *flagRoot
+	} else if exe, err := os.Executable(); err == nil {
+		rootDir = filepath.Dir(exe)
+	} else {
+		rootDir, _ = os.Getwd()
+	}
+	fmt.Printf("vSFG-7 Launcher — root=%s listen=%s\n", rootDir, *flagListen)
+	fmt.Printf("Open http://localhost%s/ in a browser.\n", *flagListen)
+
+	discoverRoles()
+	go healthLoop()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", serveUI)
+	mux.HandleFunc("/api/roles", handleRoles)
+	mux.HandleFunc("/api/health", handleHealth)
+	mux.HandleFunc("/api/start", handleStart)
+	mux.HandleFunc("/api/stop", handleStop)
+	mux.HandleFunc("/api/restart", handleRestart)
+	mux.HandleFunc("/api/log", handleLog)
+	mux.HandleFunc("/api/rescan", handleRescan)
+
+	if err := http.ListenAndServe(*flagListen, mux); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+// ── Bat discovery ─────────────────────────────────────────────────────────────
+
+var (
+	reStart         = regexp.MustCompile(`(?i)start\s+"([^"]+)"\s+cmd\s+/k\s+"([^"]+)"`)
+	reAirfield      = regexp.MustCompile(`--airfield\s+(\S+)`)
+	reDashboardPort = regexp.MustCompile(`--dashboard-port\s+(\d+)`)
+)
+
+// discoverRoles scans rootDir for bats that use the `start "Title" cmd /k`
+// pattern and builds a flat Role list. Old-style bats with a direct atc.exe
+// call (no start wrapper) are skipped — they're unmanageable by title-match
+// and were flagged for deletion anyway.
+func discoverRoles() {
+	rolesMu.Lock()
+	defer rolesMu.Unlock()
+	roles = nil
+
+	ignore := map[string]bool{
+		"build.bat":          true,
+		"launcher.bat":       true,
+		"start_launcher.bat": true,
+	}
+
+	entries, err := os.ReadDir(rootDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		lower := strings.ToLower(name)
+		if !strings.HasSuffix(lower, ".bat") || ignore[lower] {
+			continue
+		}
+		if !strings.HasPrefix(lower, "run_") && !strings.HasPrefix(lower, "start_") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(rootDir, name))
+		if err != nil {
+			continue
+		}
+		for _, m := range reStart.FindAllStringSubmatch(string(data), -1) {
+			roles = append(roles, roleFromCmd(name, m[1], m[2]))
+		}
+	}
+}
+
+func roleFromCmd(bat, title, cmd string) Role {
+	r := Role{Name: title, Bat: bat, Airfield: "OMDM"} // atc.exe default
+	if m := reAirfield.FindStringSubmatch(cmd); m != nil {
+		r.Airfield = strings.ToUpper(m[1])
+	}
+	if m := reDashboardPort.FindStringSubmatch(cmd); m != nil {
+		fmt.Sscanf(m[1], "%d", &r.DashboardPort)
+	}
+	r.LogFile = "atc-" + strings.ToLower(r.Airfield) + ".log"
+	return r
+}
+
+// ── Process detection (Windows tasklist) ─────────────────────────────────────
+
+// enumerateCmdWindows returns a map of lowercased window title → PID for
+// every cmd.exe instance currently showing a window. One tasklist call per
+// /api/roles request — much cheaper than one per role.
+func enumerateCmdWindows() map[string]int {
+	out, err := exec.Command("tasklist", "/v", "/fi", "IMAGENAME eq cmd.exe", "/fo", "csv", "/nh").Output()
+	if err != nil {
+		return nil
+	}
+	m := make(map[string]int)
+	r := csv.NewReader(strings.NewReader(string(out)))
+	r.FieldsPerRecord = -1
+	for {
+		rec, err := r.Read()
+		if err != nil {
+			break
+		}
+		if len(rec) < 9 {
+			continue
+		}
+		title := strings.TrimSpace(rec[len(rec)-1])
+		var pid int
+		fmt.Sscanf(rec[1], "%d", &pid)
+		m[strings.ToLower(title)] = pid
+	}
+	return m
+}
+
+// killTree force-kills pid and any descendants. Needed because each .bat
+// window owns a child atc.exe process — /t walks the tree.
+func killTree(pid int) error {
+	return exec.Command("taskkill", "/f", "/t", "/pid", fmt.Sprintf("%d", pid)).Run()
+}
+
+// ── Health probes ─────────────────────────────────────────────────────────────
+
+func healthLoop() {
+	for {
+		updateHealth()
+		time.Sleep(15 * time.Second)
+	}
+}
+
+func updateHealth() {
+	h := Health{
+		At:      time.Now(),
+		SRS:     tcpProbe(*flagSRSAddr, 2*time.Second),
+		Tacview: tcpProbe(*flagTacviewAddr, 2*time.Second),
+		OpenAI:  openaiProbe(3 * time.Second),
+	}
+	healthMu.Lock()
+	cachedHealth = h
+	healthMu.Unlock()
+}
+
+func tcpProbe(addr string, timeout time.Duration) bool {
+	c, err := net.DialTimeout("tcp", addr, timeout)
+	if err != nil {
+		return false
+	}
+	c.Close()
+	return true
+}
+
+// openaiProbe treats any sub-500 response as "up" — 401 (no key) still means
+// the API is reachable, which is what the health dot is really asking.
+func openaiProbe(timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.openai.com/v1/models", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode < 500
+}
+
+// ── Role actions ──────────────────────────────────────────────────────────────
+
+func findRole(name string) *Role {
+	rolesMu.Lock()
+	defer rolesMu.Unlock()
+	for i := range roles {
+		if roles[i].Name == name {
+			return &roles[i]
+		}
+	}
+	return nil
+}
+
+// startRole shells out to `cmd /c start "" <bat>` so the bat opens in a new
+// console window (inherits normal behavior — the bat's own `start "Title"`
+// lines create the actual role windows).
+func startRole(name string) error {
+	r := findRole(name)
+	if r == nil {
+		return fmt.Errorf("unknown role: %s", name)
+	}
+	cmd := exec.Command("cmd", "/c", "start", "", filepath.Join(rootDir, r.Bat))
+	cmd.Dir = rootDir
+	return cmd.Start()
+}
+
+func stopRole(name string) error {
+	wins := enumerateCmdWindows()
+	pid, ok := wins[strings.ToLower(name)]
+	if !ok {
+		return fmt.Errorf("not running: %s", name)
+	}
+	return killTree(pid)
+}
+
+// ── HTTP handlers ─────────────────────────────────────────────────────────────
+
+func serveUI(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := uiFS.ReadFile("ui.html")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
+func handleRoles(w http.ResponseWriter, _ *http.Request) {
+	rolesMu.Lock()
+	out := make([]Role, len(roles))
+	copy(out, roles)
+	rolesMu.Unlock()
+
+	wins := enumerateCmdWindows()
+	for i := range out {
+		if pid, ok := wins[strings.ToLower(out[i].Name)]; ok {
+			out[i].Status = "running"
+			out[i].PID = pid
+		} else {
+			out[i].Status = "stopped"
+		}
+	}
+	writeJSON(w, out)
+}
+
+func handleHealth(w http.ResponseWriter, _ *http.Request) {
+	healthMu.Lock()
+	h := cachedHealth
+	healthMu.Unlock()
+	writeJSON(w, h)
+}
+
+func handleStart(w http.ResponseWriter, r *http.Request) {
+	if err := startRole(r.URL.Query().Get("name")); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "started"})
+}
+
+func handleStop(w http.ResponseWriter, r *http.Request) {
+	if err := stopRole(r.URL.Query().Get("name")); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "stopped"})
+}
+
+func handleRestart(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	_ = stopRole(name) // best-effort — may already be down
+	time.Sleep(1 * time.Second)
+	if err := startRole(name); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "restarted"})
+}
+
+func handleLog(w http.ResponseWriter, r *http.Request) {
+	role := findRole(r.URL.Query().Get("name"))
+	if role == nil {
+		http.Error(w, "unknown role", 404)
+		return
+	}
+	path := filepath.Join(rootDir, "logs", role.LogFile)
+	f, err := os.Open(path)
+	if err != nil {
+		http.Error(w, err.Error(), 404)
+		return
+	}
+	defer f.Close()
+	info, _ := f.Stat()
+	const tailBytes = 32 * 1024
+	if start := info.Size() - tailBytes; start > 0 {
+		f.Seek(start, io.SeekStart)
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	io.Copy(w, f)
+}
+
+func handleRescan(w http.ResponseWriter, _ *http.Request) {
+	discoverRoles()
+	rolesMu.Lock()
+	n := len(roles)
+	rolesMu.Unlock()
+	writeJSON(w, map[string]int{"roles": n})
+}
+
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}

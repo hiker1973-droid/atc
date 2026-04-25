@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vSFG-7 Launcher</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 0; background: #0d1117; color: #c9d1d9; }
+  header { padding: 1rem 1.5rem; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 1.1rem; }
+  .health { display: flex; gap: 1.2rem; font-size: 0.85rem; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle; }
+  .dot.up { background: #3fb950; box-shadow: 0 0 8px rgba(63,185,80,0.6); }
+  .dot.down { background: #f85149; box-shadow: 0 0 8px rgba(248,81,73,0.5); }
+  .dot.pending { background: #6e7681; }
+  .ctrls { margin-left: auto; display: flex; gap: 0.4rem; }
+  main { padding: 1rem 1.5rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid #30363d; }
+  th { background: #161b22; font-weight: 500; font-size: 0.8rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+  .status { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.03em; }
+  .status.running { background: #0f3d1e; color: #3fb950; }
+  .status.stopped { background: #262d34; color: #8b949e; }
+  button { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.8rem; font-family: inherit; }
+  button:hover { background: #30363d; }
+  button.primary { background: #238636; border-color: #2ea043; color: #fff; }
+  button.primary:hover { background: #2ea043; }
+  button.danger { background: #5d1a1a; border-color: #8b1e1e; color: #ffb3b3; }
+  button.danger:hover { background: #8b1e1e; color: #fff; }
+  .actions { white-space: nowrap; }
+  .actions button { margin-right: 4px; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .sub { font-size: 0.73rem; color: #6e7681; margin-top: 2px; }
+  #logModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10; }
+  #logModal.open { display: flex; align-items: center; justify-content: center; }
+  #logInner { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
+  #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+  #logTitle { font-weight: 500; }
+  #logBody { flex: 1; overflow: auto; padding: 0.8rem 1rem; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; color: #b1bac4; }
+  .empty { padding: 3rem; text-align: center; color: #6e7681; }
+</style>
+</head>
+<body>
+<header>
+  <h1>vSFG-7 Launcher</h1>
+  <div class="health">
+    <span><span id="dot-srs" class="dot pending"></span>SRS</span>
+    <span><span id="dot-tacview" class="dot pending"></span>Tacview</span>
+    <span><span id="dot-openai" class="dot pending"></span>OpenAI</span>
+  </div>
+  <div class="ctrls">
+    <button class="primary" onclick="startAll()">Start all</button>
+    <button class="danger" onclick="stopAll()">Stop all</button>
+    <button onclick="rescan()">Rescan bats</button>
+  </div>
+</header>
+<main>
+<table id="roleTable">
+  <thead>
+    <tr>
+      <th>Role</th>
+      <th>Status</th>
+      <th>Bat</th>
+      <th>Log</th>
+      <th>Dashboard</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="roleBody">
+    <tr><td colspan="6" class="empty">Loading…</td></tr>
+  </tbody>
+</table>
+</main>
+
+<div id="logModal" onclick="if(event.target===this)closeLog()">
+  <div id="logInner">
+    <div id="logHead">
+      <span id="logTitle"></span>
+      <button onclick="closeLog()">Close</button>
+    </div>
+    <div id="logBody"></div>
+  </div>
+</div>
+
+<script>
+let roles = [];
+let currentLogRole = null;
+
+async function refresh() {
+  try {
+    const [r, h] = await Promise.all([
+      fetch('/api/roles').then(r => r.json()),
+      fetch('/api/health').then(r => r.json())
+    ]);
+    roles = r;
+    renderRoles();
+    renderHealth(h);
+    if (currentLogRole) loadLog();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderHealth(h) {
+  setDot('dot-srs', h.srs);
+  setDot('dot-tacview', h.tacview);
+  setDot('dot-openai', h.openai);
+}
+function setDot(id, up) {
+  document.getElementById(id).className = 'dot ' + (up ? 'up' : 'down');
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderRoles() {
+  const body = document.getElementById('roleBody');
+  if (!roles.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">No roles discovered. Add a run_*.bat or start_*.bat alongside launcher.exe.</td></tr>';
+    return;
+  }
+  body.innerHTML = roles.map(r => `
+    <tr>
+      <td>${esc(r.name)}<div class="sub">${esc(r.airfield || '')}</div></td>
+      <td><span class="status ${r.status}">${r.status.toUpperCase()}</span></td>
+      <td class="sub">${esc(r.bat)}</td>
+      <td><a href="#" onclick="openLog('${esc(r.name)}');return false">${esc(r.logFile)}</a></td>
+      <td>${r.dashboardPort ? `<a target="_blank" href="http://localhost:${r.dashboardPort}/">:${r.dashboardPort}</a>` : '<span class="sub">—</span>'}</td>
+      <td class="actions">
+        ${r.status === 'running'
+          ? `<button class="danger" onclick="act('stop','${esc(r.name)}')">Stop</button>
+             <button onclick="act('restart','${esc(r.name)}')">Restart</button>`
+          : `<button class="primary" onclick="act('start','${esc(r.name)}')">Start</button>`}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function act(kind, name) {
+  await fetch('/api/' + kind + '?name=' + encodeURIComponent(name), { method: 'POST' });
+  setTimeout(refresh, 600);
+}
+
+async function startAll() {
+  for (const r of roles) {
+    if (r.status !== 'running') {
+      await fetch('/api/start?name=' + encodeURIComponent(r.name), { method: 'POST' });
+      await new Promise(res => setTimeout(res, 1000));
+    }
+  }
+  refresh();
+}
+
+async function stopAll() {
+  if (!confirm('Stop every running role?')) return;
+  await Promise.all(roles.filter(r => r.status === 'running').map(r =>
+    fetch('/api/stop?name=' + encodeURIComponent(r.name), { method: 'POST' })));
+  setTimeout(refresh, 600);
+}
+
+async function rescan() {
+  await fetch('/api/rescan', { method: 'POST' });
+  refresh();
+}
+
+function openLog(name) {
+  currentLogRole = name;
+  document.getElementById('logTitle').textContent = 'Log — ' + name;
+  document.getElementById('logModal').classList.add('open');
+  loadLog();
+}
+
+function closeLog() {
+  currentLogRole = null;
+  document.getElementById('logModal').classList.remove('open');
+}
+
+async function loadLog() {
+  if (!currentLogRole) return;
+  try {
+    const res = await fetch('/api/log?name=' + encodeURIComponent(currentLogRole));
+    const body = document.getElementById('logBody');
+    body.textContent = res.ok ? await res.text() : 'Log file not available yet.';
+    body.scrollTop = body.scrollHeight;
+  } catch (e) {
+    document.getElementById('logBody').textContent = 'Error: ' + e.message;
+  }
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

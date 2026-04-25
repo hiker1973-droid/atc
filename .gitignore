@@ -1,0 +1,17 @@
+# Build artifacts
+*.exe
+*.exe~
+
+# Runtime artifacts
+logs/
+atis_cache/
+launcher.log
+
+# Editor / OS junk
+New Text Document.txt
+*~
+.DS_Store
+Thumbs.db
+
+# Claude Code per-machine state
+.claude/settings.local.json

@@ -1,0 +1,14 @@
+# vsfg7-atc — Al Minhad Tower (OMDM)
+# Training VM: 192.168.1.220
+
+airfield: OMDM
+callsign: "Minhad Tower"
+freq_mhz: 250.100          # Tower freq per AFD-3351
+
+srs_addr: "localhost:5008"
+grpc_addr: "localhost:50051"
+
+log_level: info
+weather_interval_sec: 30
+stale_threshold_min: 10
+pattern_alt_ft: 1500
