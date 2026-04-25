@@ -19,9 +19,11 @@ import (
 	"strings"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -79,6 +81,7 @@ var (
 	flagScudwatchCallsign   string
 	flagScudwatchBullseye   string
 	flagMarshalOnly         bool
+	flagPprofPort           int
 )
 
 func main() {
@@ -156,6 +159,8 @@ func main() {
 		"Bullseye reference for Scudwatch announcements as 'lat,lon' (default: airfield center)")
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
+	f.IntVar(&flagPprofPort, "pprof-port", 0,
+		"Run net/http/pprof on this localhost port for goroutine/heap debugging (0=disabled)")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -178,6 +183,16 @@ func run(cmd *cobra.Command, args []string) error {
 		)
 		log.Logger = zerolog.New(multiWriter).With().Timestamp().Logger().Level(level)
 		log.Info().Str("logFile", logPath).Msg("logging to file")
+	}
+
+	if flagPprofPort > 0 {
+		addr := fmt.Sprintf("localhost:%d", flagPprofPort)
+		go func() {
+			log.Info().Str("addr", addr).Int("goroutines", runtime.NumGoroutine()).Msg("pprof debug server starting")
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				log.Warn().Err(err).Msg("pprof server exited")
+			}
+		}()
 	}
 
 	var af *airfield.Airfield

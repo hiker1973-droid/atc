@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -124,6 +125,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		tcpConn.Write(buildSync(guid, channelName, freqHz))
 		log.Info().Float64("freq", freqMHz).Str("name", channelName).Msg("Command channel registered on SRS")
 
+		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: spawning keepalive goroutine")
 		pingStop := make(chan struct{})
 		go func() {
 			tk := time.NewTicker(10 * time.Second)
@@ -147,6 +149,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		// inner loop below exits and we reconnect. Without this, a silently
 		// dropped SRS connection leaves commandLoop zombied: the 10s keepalive
 		// keeps writing to a dead socket and no voice is ever processed.
+		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: spawning TCP reader goroutine")
 		tcpDone := make(chan struct{})
 		syncMsg := buildSync(guid, channelName, freqHz)
 		go func() {
@@ -171,6 +174,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		udpBuf := make([]byte, 4096)
 		flushTicker := time.NewTicker(500 * time.Millisecond)
 
+		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: entering main UDP read loop")
 		connDone := false
 		for !connDone {
 			select {
