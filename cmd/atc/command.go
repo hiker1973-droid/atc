@@ -195,12 +195,15 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 						}
 						frames := tx.opusFrames
 						delete(transmissions, origin)
+						log.Info().Str("origin", origin).Int("frames", len(frames)).Str("channel", channelName).Msg("Command: flushing transmission to Whisper")
 						go func(f [][]byte) {
 							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, "Command, Raider, Venom")
 							if err != nil || text == "" {
+								log.Info().Err(err).Str("channel", channelName).Msg("Command: empty/error transcription")
 								return
 							}
 							if isWhisperHallucination(text) {
+								log.Info().Str("text", text).Str("channel", channelName).Msg("Command: hallucination filtered")
 								return
 							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
