@@ -374,6 +374,29 @@ func (c *ATCComposer) AltimeterCheck(callsign string, altimeterInHg float64) str
 	})
 }
 
+// RadarCheck reads back the pilot's Tacview-derived position: angels (alt/1000),
+// range from tower in nm, and true bearing from tower (0..359 degrees).
+func (c *ATCComposer) RadarCheck(callsign string, angels, distNm, bearingDeg int) string {
+	ang := numberWord(angels)
+	dist := milesToWord(distNm)
+	brg := bearingWord(bearingDeg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, you are at angels %s and %s from tower on a bearing of %s.", callsign, c.towerCallsign, ang, dist, brg),
+		fmt.Sprintf("%s, %s, radar contact, angels %s, %s, bearing %s from the field.", callsign, c.towerCallsign, ang, dist, brg),
+		fmt.Sprintf("%s, %s, I have you angels %s, range %s, bearing %s.", callsign, c.towerCallsign, ang, dist, brg),
+	})
+}
+
+// RadarCheckNoContact responds to a radar check when no Tacview track exists
+// for the calling aircraft.
+func (c *ATCComposer) RadarCheckNoContact(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, negative radar contact, say position.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, no radar contact at this time, say position and altitude.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, unable radar contact, say your position.", callsign, c.towerCallsign),
+	})
+}
+
 // SequencedInitialAck — Tacview-aware initial ack with named traffic ahead.
 func (c *ATCComposer) SequencedInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, altimeterInHg float64, seqNum int, leadCallsign string, leadDistNm int) string {
 	rwy := spellRunway(activeRunway)
@@ -842,6 +865,17 @@ func milesToWord(nm int) string {
 		return "1 mile"
 	}
 	return fmt.Sprintf("%s miles", numberWord(nm))
+}
+
+// bearingWord spells a 0..359 bearing as three digits (e.g. 270 → "two seven zero").
+func bearingWord(deg int) string {
+	deg = ((deg % 360) + 360) % 360
+	digits := fmt.Sprintf("%03d", deg)
+	parts := make([]string, 0, 3)
+	for _, d := range digits {
+		parts = append(parts, digitWords[d])
+	}
+	return strings.Join(parts, " ")
 }
 
 // spellAltitudeFt converts an altitude in feet to spoken form.

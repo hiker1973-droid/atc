@@ -58,6 +58,7 @@ const (
 	RequestStraightIn               // "straight in" / "ILS" / "approach" — IFR straight-in
 	RequestRunwayVacated            // "runway vacated" / "clear of runway" — closes landing sequence
 	RequestEmergency                // "mayday" / "pan pan" / "emergency" — priority handling
+	RequestRadarCheck               // "radar check" — read back Tacview-derived angels/range/bearing
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -314,6 +315,31 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestAltitude:
 		return // basic mode — not active
+
+	case RequestRadarCheck:
+		c.allPositionsMu.RLock()
+		contact := c.allPositions[req.Callsign]
+		var lon, lat, altFt float64
+		hasContact := false
+		if contact != nil && !contact.UpdatedAt.IsZero() {
+			lon, lat, altFt = contact.Lon, contact.Lat, contact.AltFt
+			hasContact = true
+		}
+		c.allPositionsMu.RUnlock()
+		if !hasContact {
+			response = c.composer.RadarCheckNoContact(req.Callsign)
+			break
+		}
+		fieldCenter := s.Airfield.Center
+		aircraftPt := orb.Point{lon, lat}
+		distNm := int(math.Round(haversineNm(aircraftPt, fieldCenter)))
+		bearingDeg := int(math.Round(bearingDegFromTo(fieldCenter, aircraftPt)))
+		bearingDeg = ((bearingDeg % 360) + 360) % 360
+		angels := int(math.Round(altFt / 1000.0))
+		if angels < 0 {
+			angels = 0
+		}
+		response = c.composer.RadarCheck(req.Callsign, angels, distNm, bearingDeg)
 
 	case RequestRadioCheck:
 		response = c.composer.RadioCheck(req.Callsign)
@@ -798,6 +824,8 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestLandingClear
 	case containsAny(lower, "going around", "go around", "missed approach"):
 		req.Type = RequestGoAround
+	case containsAny(lower, "radar check", "radar contact", "request radar", "radar service"):
+		req.Type = RequestRadarCheck
 	case containsAny(lower, "request altitude", "altitude check", "altitude request", "what altitude", "assigned altitude"):
 		req.Type = RequestAltitude
 
@@ -1294,4 +1322,19 @@ func haversineNm(a, b orb.Point) float64 {
 	x := math.Sin(dLat/2)*math.Sin(dLat/2) +
 		math.Cos(lat1)*math.Cos(lat2)*math.Sin(dLon/2)*math.Sin(dLon/2)
 	return 2 * R * math.Atan2(math.Sqrt(x), math.Sqrt(1-x))
+}
+
+// bearingDegFromTo returns the initial true bearing in degrees from point a
+// to point b. Output is normalized to [0, 360). Both points are [lon, lat].
+func bearingDegFromTo(a, b orb.Point) float64 {
+	lat1 := a[1] * math.Pi / 180
+	lat2 := b[1] * math.Pi / 180
+	dLon := (b[0] - a[0]) * math.Pi / 180
+	y := math.Sin(dLon) * math.Cos(lat2)
+	x := math.Cos(lat1)*math.Sin(lat2) - math.Sin(lat1)*math.Cos(lat2)*math.Cos(dLon)
+	deg := math.Atan2(y, x) * 180 / math.Pi
+	if deg < 0 {
+		deg += 360
+	}
+	return deg
 }
