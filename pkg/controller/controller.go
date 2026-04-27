@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -903,16 +904,18 @@ var numberWords = map[string]int{
 	"fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
 }
 
+// distanceMilesRe matches "3 mile", "12 miles", "8 nm", "30 nautical" etc.
+// The digit must immediately precede a miles/nm token so unrelated numbers
+// (altitudes, channels, callsign suffixes) don't trigger a false positive.
+var distanceMilesRe = regexp.MustCompile(`\b(\d{1,3})\s*(?:miles?|nm|nautical)\b`)
+
 // containsDistanceMiles returns true if the text contains a numeric or word distance.
 func containsDistanceMiles(lower string) bool {
+	if distanceMilesRe.MatchString(lower) {
+		return true
+	}
 	for word := range numberWords {
 		if strings.Contains(lower, word) {
-			return true
-		}
-	}
-	// Check for digit patterns like "30 mile" or "10 miles"
-	for _, n := range []string{"10", "15", "20", "25", "30", "40", "50"} {
-		if strings.Contains(lower, n) {
 			return true
 		}
 	}
@@ -928,17 +931,13 @@ func extractDistanceMilesInt(text string) int {
 // Returns 0 if none found.
 func extractDistanceMiles(text string) int {
 	lower := strings.ToLower(text)
-	// Try word numbers first
+	if m := distanceMilesRe.FindStringSubmatch(lower); m != nil {
+		val := 0
+		fmt.Sscanf(m[1], "%d", &val)
+		return val
+	}
 	for word, val := range numberWords {
 		if strings.Contains(lower, word) {
-			return val
-		}
-	}
-	// Try digit strings
-	for _, n := range []string{"50", "40", "30", "25", "20", "15", "10"} {
-		if strings.Contains(lower, n) {
-			val := 0
-			fmt.Sscanf(n, "%d", &val)
 			return val
 		}
 	}
