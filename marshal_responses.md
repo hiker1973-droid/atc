@@ -121,26 +121,23 @@ Composed but not wired. Per the Case 1 Recovery comms (07.png) the "contact" cal
 
 ---
 
-## 8. Stack step-down (auto, after a peer commences)
+## 8. Internal stack collapse (no radio call)
 
-Not pilot-triggered. When an aircraft commences and `MarshalStack.Remove` fires, the handler immediately calls `MarshalStack.CollapseStack(marshalMinAngels)`. Remaining aircraft are sorted by their current angels and reassigned to consecutive altitudes starting at `marshalMinAngels`, preserving relative order. For each aircraft whose altitude actually changes, Marshal transmits a step-down clearance.
+Not pilot-triggered, **not transmitted**. Per the Case 1 Recovery comms (07.png) Marshal does not call step-downs on the radio — it just keeps an accurate internal model so the next inbound's altitude assignment is correct.
+
+When an aircraft commences and `MarshalStack.Remove` fires, the handler calls `MarshalStack.CollapseStack(marshalMinAngels)`. Remaining aircraft are sorted by their current angels and reassigned to consecutive altitudes starting at `marshalMinAngels`, preserving relative order. The reassignment is logged at info level (`Marshal: stack step-down (internal, no TX)`) but no audio is generated.
 
 **Example:** F1 at angels 2, F2 at angels 3, F3 at angels 4. F1 commences →
 - copy commencing transmitted to F1.
-- F2 reassigned 3 → 2; Marshal transmits step-down to F2.
-- F3 reassigned 4 → 3; Marshal transmits step-down to F3.
-- Next aircraft to call `marking moms` gets angels 4 from `AssignMarshalAngels`.
-
-**Responses (`MarshalStepDown`):**
-1. `{CALLSIGN}, Marshal, descend, new angels {ANGELS}.`
-2. `{CALLSIGN}, Marshal, your new angels are {ANGELS}, descend.`
-3. `{CALLSIGN}, Marshal, step down to angels {ANGELS}.`
+- F2 reassigned 3 → 2 in state (no radio call).
+- F3 reassigned 4 → 3 in state (no radio call).
+- Next aircraft to call `marking moms` gets angels 4 from `AssignMarshalAngels` (slots 2 and 3 are now reserved).
 
 ---
 
 ## Notes
 
-- Marshal handles 6 pilot-triggered intents (Marking mom, See you at 10, State, Established, Commencing, 3NM Initial) plus one auto-fired event (stack step-down on a peer commencing — Section 8). `MarshalContact` is the one composer method intentionally left unwired; it belongs to the LSO/Paddles role on a separate SRS button (Section 7).
+- Marshal handles 6 pilot-triggered intents (Marking mom, See you at 10, State, Established, Commencing, 3NM Initial). The internal stack collapse on a peer commencing (Section 8) updates state silently — no transmission. `MarshalContact` is the one composer method intentionally left unwired; it belongs to the LSO/Paddles role on a separate SRS button (Section 7).
 
 ### Stack altitude assignment (Tacview-aware)
 
@@ -150,7 +147,7 @@ On `marking moms`, the marshal handler calls `atcCtrl.AssignMarshalAngels(min, m
 
 Range is configured by `marshalMinAngels` / `marshalMaxAngels` in `cmd/atc/marshal.go` — currently **2k–9k**. If every slot is taken the function falls back to `marshalMaxAngels` (9). Tweak the constants there to widen or shift the band.
 
-When an aircraft commences, its slot frees and the rest of the stack **collapses down**: aircraft are sorted by their current angels and reassigned to `marshalMinAngels`, `marshalMinAngels+1`, … in order. The handler then transmits a step-down clearance to each aircraft that actually moved (see Section 8). The next inbound to call `marking moms` lands on the lowest free slot above the collapsed stack.
+When an aircraft commences, its slot frees and the rest of the stack **collapses down internally** (see Section 8): aircraft are sorted by their current angels and reassigned to `marshalMinAngels`, `marshalMinAngels+1`, … in order. The reassignment is state-only — no radio call goes out. The next inbound to call `marking moms` lands on the lowest free slot above the collapsed stack.
 
 ## Case 1 Recovery comms coverage (vSFG-7 07.png)
 
@@ -160,6 +157,6 @@ When an aircraft commences, its slot frees and the rest of the stack **collapses
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |
-| Commencing | `commencing, state [XX]` | copy commencing + auto step-down to peers below the gap | ✅ §5, §8 |
+| Commencing | `commencing, state [XX]` | copy commencing (state collapses silently — see §8) | ✅ §5, §8 |
 | 3NM Initial | `initial` | push button [XX], check in | ✅ §6 |
 | Push freq | `pushing button [XX]` / `checking in` | LSO `contact` (separate role/freq) | ⏳ LSO not implemented |

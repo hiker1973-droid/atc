@@ -215,11 +215,11 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		stack.SetPhase(callsign, "commencing")
 		stack.Remove(callsign)
 		transmit(comp.MarshalCopyCommencing(callsign, fuelState))
-		// Collapse the remaining stack down to fill the vacated slot, then
-		// announce the new altitude to each aircraft that moved.
+		// Internal stack collapse only — pack remaining aircraft down to fill
+		// the vacated slot so the next "marking moms" gets the correct angels.
+		// Per 07.png Marshal does not transmit step-down clearances.
 		for _, sd := range stack.CollapseStack(marshalMinAngels) {
-			log.Info().Str("callsign", sd.Callsign).Int("from", sd.OldAngels).Int("to", sd.NewAngels).Msg("Marshal: stack step-down")
-			transmit(comp.MarshalStepDown(sd.Callsign, sd.NewAngels))
+			log.Info().Str("callsign", sd.Callsign).Int("from", sd.OldAngels).Int("to", sd.NewAngels).Msg("Marshal: stack step-down (internal, no TX)")
 		}
 
 	case containsAny(lower, "initial"):

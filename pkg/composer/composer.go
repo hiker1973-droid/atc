@@ -661,17 +661,6 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 	})
 }
 
-// MarshalStepDown — instructs an in-stack aircraft to descend into a freed
-// slot after the aircraft below them commenced. Used during stack collapse.
-func (c *ATCComposer) MarshalStepDown(callsign string, newAngels int) string {
-	ang := numberWord(newAngels)
-	return pick([]string{
-		fmt.Sprintf("%s, Marshal, descend, new angels %s.", callsign, ang),
-		fmt.Sprintf("%s, Marshal, your new angels are %s, descend.", callsign, ang),
-		fmt.Sprintf("%s, Marshal, step down to angels %s.", callsign, ang),
-	})
-}
-
 // MarshalPushButton — at 3nm initial, tells pilot to push to TACAN.
 func (c *ATCComposer) MarshalPushButton(callsign string, tacanChannel int) string {
 	ch := numberWord(tacanChannel)
