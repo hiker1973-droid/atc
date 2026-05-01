@@ -58,10 +58,23 @@ Triggers from `pkg/controller/controller.go`. Responses from `pkg/composer/compo
 
 **Triggers:** `overhead` · `over the field` · `initial overhead` · `[≤3] mile initial`
 
-**Standard pattern entry:**
-1. `{CALLSIGN}, {TOWER}, enter left downwind runway {RUNWAY}, number {SEQ}, report downwind.`
-2. `{CALLSIGN}, {TOWER}, number {SEQ}, enter the pattern runway {RUNWAY}, report downwind.`
-3. `{CALLSIGN}, {TOWER}, roger overhead, you are number {SEQ}, enter downwind runway {RUNWAY}.`
+**Standard pattern entry** (runway-aware break direction):
+
+`{BREAK}` is read from `Airfield.BreakDirections[activeRunway]` — `"left"` or `"right"` per the table below. Composer falls back to `"left"` if the active runway has no entry.
+
+| ICAO | Runway | Break | Reasoning |
+|---|---|---|---|
+| OMDM | 27 | left | Ramp on south side; heading west, south is on the left |
+| OMDM | 09 | right | Reverse heading, south is now on the right |
+| OMAM | 31L / 31R | left | Ramp on south/east; heading NW, south is on the left |
+| OMAM | 13L / 13R | right | Reverse heading, south is now on the right |
+| OMAL | 19 | right | Terminal on west side; heading south, west is on the right |
+| OMAL | 01 | left | Reverse heading, west is now on the left |
+
+Variants:
+1. `{CALLSIGN}, {TOWER}, approved {BREAK} break runway {RUNWAY}, number {SEQ}, report base, final.`
+2. `{CALLSIGN}, {TOWER}, number {SEQ}, runway {RUNWAY}, {BREAK} break approved, report base, final.`
+3. `{CALLSIGN}, {TOWER}, roger initial, {BREAK} break approved runway {RUNWAY}, number {SEQ}, report base, final.`
 
 **Overhead break (no traffic ahead):**
 1. `{CALLSIGN}, {TOWER}, number {SEQ}, report break.`

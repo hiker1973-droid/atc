@@ -244,7 +244,8 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestOverhead:
 		seqNum := s.EnqueueLanding(ac)
-		response = c.composer.OverheadAck(req.Callsign, s.ActiveRunway, seqNum-1)
+		brk := s.Airfield.BreakDirections[s.ActiveRunway]
+		response = c.composer.OverheadAck(req.Callsign, s.ActiveRunway, brk, seqNum-1)
 
 
 	case RequestDownwind:

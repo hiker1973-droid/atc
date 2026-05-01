@@ -22,6 +22,14 @@ var OMAM = &Airfield{
 	HandoffCallsign:  "command",
 	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",
+	BreakDirections: map[string]string{
+		// Ramp on south/east side. Both 31 ends have ramp on the left side
+		// of approach; both 13 ends have it on the right.
+		"31L": "left",
+		"31R": "left",
+		"13L": "right",
+		"13R": "right",
+	},
 	RunwayPairs: []RunwayPair{
 		{
 			// Upper parallel: 13L / 31R — 11,403 x 150 ft

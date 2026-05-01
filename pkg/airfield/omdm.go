@@ -20,6 +20,12 @@ var OMDM = &Airfield{
 	HandoffCallsign:  "command",
 	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",
+	BreakDirections: map[string]string{
+		// Ramp on south side. Heading west on 27 → south is on the left.
+		// Heading east on 09 → south is on the right.
+		"27": "left",
+		"09": "right",
+	},
 	RunwayPairs: []RunwayPair{
 		{
 			// Single runway 09/27 — 11,865 ft long

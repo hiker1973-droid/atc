@@ -132,13 +132,17 @@ func (c *ATCComposer) DistanceInitialAck(callsign string, distNm int, activeRunw
 }
 
 // OverheadAck sequences a pilot overhead — 3 variations.
-func (c *ATCComposer) OverheadAck(callsign, activeRunway string, trafficAhead int) string {
+func (c *ATCComposer) OverheadAck(callsign, activeRunway, breakDirection string, trafficAhead int) string {
 	rwy := spellRunway(activeRunway)
 	seq := numberWord(trafficAhead + 1)
+	brk := breakDirection
+	if brk != "left" && brk != "right" {
+		brk = "left"
+	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, enter left downwind runway %s, number %s, report downwind.", callsign, c.towerCallsign, rwy, seq),
-		fmt.Sprintf("%s, %s, number %s, enter the pattern runway %s, report downwind.", callsign, c.towerCallsign, seq, rwy),
-		fmt.Sprintf("%s, %s, roger overhead, you are number %s, enter downwind runway %s.", callsign, c.towerCallsign, seq, rwy),
+		fmt.Sprintf("%s, %s, approved %s break runway %s, number %s, report base, final.", callsign, c.towerCallsign, brk, rwy, seq),
+		fmt.Sprintf("%s, %s, number %s, runway %s, %s break approved, report base, final.", callsign, c.towerCallsign, seq, rwy, brk),
+		fmt.Sprintf("%s, %s, roger initial, %s break approved runway %s, number %s, report base, final.", callsign, c.towerCallsign, brk, rwy, seq),
 	})
 }
 

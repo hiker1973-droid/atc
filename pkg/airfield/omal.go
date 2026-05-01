@@ -21,6 +21,12 @@ var OMAL = &Airfield{
 	HandoffCallsign:  "command",
 	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",
+	BreakDirections: map[string]string{
+		// Terminal on west side. Heading south on 19 → west is on the right.
+		// Heading north on 01 → west is on the left.
+		"19": "right",
+		"01": "left",
+	},
 	RunwayPairs: []RunwayPair{
 		{
 			// Single runway 01/19 — 11,267 x 197 ft

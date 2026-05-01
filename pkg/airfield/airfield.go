@@ -54,6 +54,11 @@ type Airfield struct {
 	HandoffPreset string
 	// RunwayPairs lists all runway pairs at the airfield.
 	RunwayPairs []RunwayPair
+	// BreakDirections maps a runway designator (e.g. "27") to the overhead-break
+	// direction ("left" or "right") used at the 3-mile initial call. Determined
+	// by the ramp/terminal location relative to that runway's approach heading.
+	// Missing key → composer falls back to "left".
+	BreakDirections map[string]string
 }
 
 // ActiveRunway returns the runway end most into-wind given a magnetic wind-from
