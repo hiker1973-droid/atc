@@ -215,6 +215,12 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		stack.SetPhase(callsign, "commencing")
 		stack.Remove(callsign)
 		transmit(comp.MarshalCopyCommencing(callsign, fuelState))
+		// Collapse the remaining stack down to fill the vacated slot, then
+		// announce the new altitude to each aircraft that moved.
+		for _, sd := range stack.CollapseStack(marshalMinAngels) {
+			log.Info().Str("callsign", sd.Callsign).Int("from", sd.OldAngels).Int("to", sd.NewAngels).Msg("Marshal: stack step-down")
+			transmit(comp.MarshalStepDown(sd.Callsign, sd.NewAngels))
+		}
 
 	case containsAny(lower, "initial"):
 		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.

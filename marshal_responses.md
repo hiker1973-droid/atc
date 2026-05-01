@@ -121,9 +121,26 @@ Composed but not wired. Per the Case 1 Recovery comms (07.png) the "contact" cal
 
 ---
 
+## 8. Stack step-down (auto, after a peer commences)
+
+Not pilot-triggered. When an aircraft commences and `MarshalStack.Remove` fires, the handler immediately calls `MarshalStack.CollapseStack(marshalMinAngels)`. Remaining aircraft are sorted by their current angels and reassigned to consecutive altitudes starting at `marshalMinAngels`, preserving relative order. For each aircraft whose altitude actually changes, Marshal transmits a step-down clearance.
+
+**Example:** F1 at angels 2, F2 at angels 3, F3 at angels 4. F1 commences →
+- copy commencing transmitted to F1.
+- F2 reassigned 3 → 2; Marshal transmits step-down to F2.
+- F3 reassigned 4 → 3; Marshal transmits step-down to F3.
+- Next aircraft to call `marking moms` gets angels 4 from `AssignMarshalAngels`.
+
+**Responses (`MarshalStepDown`):**
+1. `{CALLSIGN}, Marshal, descend, new angels {ANGELS}.`
+2. `{CALLSIGN}, Marshal, your new angels are {ANGELS}, descend.`
+3. `{CALLSIGN}, Marshal, step down to angels {ANGELS}.`
+
+---
+
 ## Notes
 
-- Marshal handles 6 intents now: Marking mom, See you at 10, State, Established, Commencing, 3NM Initial. The composer has 8 methods total — `MarshalContact` is intentionally unwired (it belongs to the LSO/Paddles role on a separate SRS button, see Section 7).
+- Marshal handles 6 pilot-triggered intents (Marking mom, See you at 10, State, Established, Commencing, 3NM Initial) plus one auto-fired event (stack step-down on a peer commencing — Section 8). `MarshalContact` is the one composer method intentionally left unwired; it belongs to the LSO/Paddles role on a separate SRS button (Section 7).
 
 ### Stack altitude assignment (Tacview-aware)
 
@@ -133,7 +150,7 @@ On `marking moms`, the marshal handler calls `atcCtrl.AssignMarshalAngels(min, m
 
 Range is configured by `marshalMinAngels` / `marshalMaxAngels` in `cmd/atc/marshal.go` — currently **2k–9k**. If every slot is taken the function falls back to `marshalMaxAngels` (9). Tweak the constants there to widen or shift the band.
 
-When an aircraft commences (`MarshalStack.Remove`), its slot frees up and the next inbound takes it — remaining stack aircraft hold their original assigned angels and are not reshuffled.
+When an aircraft commences, its slot frees and the rest of the stack **collapses down**: aircraft are sorted by their current angels and reassigned to `marshalMinAngels`, `marshalMinAngels+1`, … in order. The handler then transmits a step-down clearance to each aircraft that actually moved (see Section 8). The next inbound to call `marking moms` lands on the lowest free slot above the collapsed stack.
 
 ## Case 1 Recovery comms coverage (vSFG-7 07.png)
 
@@ -143,6 +160,6 @@ When an aircraft commences (`MarshalStack.Remove`), its slot frees up and the ne
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |
-| Commencing | `commencing, state [XX]` | copy commencing | ✅ §5 |
+| Commencing | `commencing, state [XX]` | copy commencing + auto step-down to peers below the gap | ✅ §5, §8 |
 | 3NM Initial | `initial` | push button [XX], check in | ✅ §6 |
 | Push freq | `pushing button [XX]` / `checking in` | LSO `contact` (separate role/freq) | ⏳ LSO not implemented |

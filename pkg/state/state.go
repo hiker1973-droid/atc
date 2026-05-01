@@ -3,6 +3,7 @@ package state
 
 import (
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -399,18 +400,13 @@ func (s *MarshalStack) SetPhase(callsign, phase string) {
 	}
 }
 
-// Remove removes an aircraft from the stack and resequences positions only.
-// Remaining aircraft keep their assigned angels — they are physically holding
-// at that altitude and must not be reassigned mid-pattern.
+// Remove deletes an aircraft from the stack. Position resequencing and stack
+// collapse (step-downs into the freed slot) happen separately via CollapseStack
+// so the caller can announce the new altitudes on the radio.
 func (s *MarshalStack) Remove(callsign string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.aircraft, callsign)
-	pos := 1
-	for _, ac := range s.aircraft {
-		ac.Position = pos
-		pos++
-	}
 }
 
 // ReservedAngels returns the currently-assigned stack altitudes for all aircraft,
@@ -429,6 +425,50 @@ func (s *MarshalStack) ReservedAngels(excludeCallsign string) []int {
 		}
 	}
 	return out
+}
+
+// StepDown describes a stack altitude reassignment produced by CollapseStack.
+type StepDown struct {
+	Callsign  string
+	OldAngels int
+	NewAngels int
+}
+
+// CollapseStack packs remaining aircraft into consecutive altitudes starting at
+// minAngels, ordered by their current Angels ascending so relative order is
+// preserved. Returns the list of aircraft whose assigned altitude changed —
+// caller is expected to transmit a step-down clearance for each.
+//
+// Aircraft with Angels == 0 (not yet assigned) are ignored. Position numbers
+// are also resequenced 1..N to match the new ordering.
+func (s *MarshalStack) CollapseStack(minAngels int) []StepDown {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sorted := make([]*MarshalAircraft, 0, len(s.aircraft))
+	for _, ac := range s.aircraft {
+		if ac.Angels <= 0 {
+			continue
+		}
+		sorted = append(sorted, ac)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Angels < sorted[j].Angels
+	})
+	var changes []StepDown
+	target := minAngels
+	for i, ac := range sorted {
+		ac.Position = i + 1
+		if ac.Angels != target {
+			changes = append(changes, StepDown{
+				Callsign:  ac.Callsign,
+				OldAngels: ac.Angels,
+				NewAngels: target,
+			})
+			ac.Angels = target
+		}
+		target++
+	}
+	return changes
 }
 
 // SetAngels updates the assigned angels for an aircraft already in the stack.
