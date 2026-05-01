@@ -1209,8 +1209,10 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
-// 14 chars/sec rate is empirical for tts-1 at our 0.88 speed setting; the 1.5s
-// margin covers ExternalAudio.exe startup and the playback tail.
+// 14 chars/sec rate is empirical for the legacy tts-1 model at our 0.88 speed
+// setting and is close enough for gpt-4o-mini-tts at the same speed; the 1.5s
+// margin covers ExternalAudio.exe startup, the playback tail, and the ~250ms
+// added by the mic-click splice in addMicClicks.
 func estimateTTSDuration(text string) time.Duration {
 	d := time.Duration(len(text))*time.Second/14 + 1500*time.Millisecond
 	if d < 3*time.Second {
@@ -1234,9 +1236,12 @@ func synthesizeSpeech(ctx context.Context, apiKey, text, voice string) ([]byte, 
 }
 
 // synthesizeSpeechAPI calls OpenAI TTS API directly — bypasses cache.
+// Uses gpt-4o-mini-tts for more natural cadence than the legacy tts-1 model.
+// Voice list is unchanged: alloy, ash, ballad, coral, echo, fable, onyx, nova,
+// sage, shimmer, verse.
 func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string) ([]byte, error) {
 	body := map[string]interface{}{
-		"model": "tts-1",
+		"model": "gpt-4o-mini-tts",
 		"input": text,
 		"voice": voice,
 		"speed": 0.88,
@@ -1540,6 +1545,58 @@ func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
 	return processed
 }
 
+// addMicClicks splices a synthetic PTT key-up click (~70ms white-noise
+// transient bandpassed to 1500–4500 Hz) onto the start of the voice and a
+// squelch-tail noise burst (~180ms pink noise with fade-out) onto the end.
+// Both clicks are generated entirely by ffmpeg's anoisesrc so no audio assets
+// need bundling. Returns the original bytes on any ffmpeg failure so live
+// broadcasts never drop to silence.
+func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
+	tmpIn, err := os.CreateTemp("", "atc-clicks-in-*.mp3")
+	if err != nil {
+		return mp3
+	}
+	defer os.Remove(tmpIn.Name())
+	if _, err := tmpIn.Write(mp3); err != nil {
+		tmpIn.Close()
+		return mp3
+	}
+	tmpIn.Close()
+
+	tmpOut := tmpIn.Name() + ".out.mp3"
+	defer os.Remove(tmpOut)
+
+	// Normalize voice to 44100/mono so concat can match the synthetic clicks.
+	filter :=
+		"[0:a]aresample=44100,aformat=channel_layouts=mono[voice];" +
+			"anoisesrc=color=white:amplitude=0.55:duration=0.07:sample_rate=44100," +
+			"highpass=f=1500,lowpass=f=4500," +
+			"afade=t=in:st=0:d=0.005,afade=t=out:st=0.05:d=0.02[click_up];" +
+			"anoisesrc=color=pink:amplitude=0.4:duration=0.18:sample_rate=44100," +
+			"highpass=f=300,lowpass=f=4000," +
+			"afade=t=out:st=0.02:d=0.16[click_dn];" +
+			"[click_up][voice][click_dn]concat=n=3:v=0:a=1[out]"
+
+	cmd := exec.Command(ffmpegPath,
+		"-y",
+		"-i", tmpIn.Name(),
+		"-filter_complex", filter,
+		"-map", "[out]",
+		"-c:a", "libmp3lame",
+		"-q:a", "4",
+		tmpOut,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Warn().Err(err).Str("output", string(out)).Msg("mic-click splice ffmpeg failed — using clean audio")
+		return mp3
+	}
+	processed, err := os.ReadFile(tmpOut)
+	if err != nil || len(processed) == 0 {
+		return mp3
+	}
+	return processed
+}
+
 // transmitExternalAudioFile injects a pre-generated MP3 file via ExternalAudio.
 func transmitExternalAudioFile(mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
 	if flagRadioEffect {
@@ -1551,6 +1608,7 @@ func transmitExternalAudioFile(mp3 []byte, freqMHz float64, callsign, srsHost, s
 			intensity = flagTowerRadioIntensity
 		}
 		mp3 = applyRadioEffect(mp3, flagFFmpeg, intensity)
+		mp3 = addMicClicks(mp3, flagFFmpeg)
 	}
 	// Write MP3 to temp file
 	tmp, err := os.CreateTemp("", "atc-tts-*.mp3")
