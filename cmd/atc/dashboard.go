@@ -121,6 +121,8 @@ type StatusSnapshot struct {
 	TacviewContacts int           `json:"tacviewContacts"`
 	TTSCacheHits    int64         `json:"ttsCacheHits"`
 	TTSCacheMisses  int64         `json:"ttsCacheMisses"`
+	IntentMissCount  int64                  `json:"intentMissCount"`
+	IntentMissRecent []controller.IntentMiss `json:"intentMissRecent"`
 }
 
 // ── Dashboard server ───────────────────────────────────────────────────────
@@ -262,17 +264,20 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	hits, misses := globalTTSCache.stats()
+	recentMisses, missCount := ds.atcCtrl.GetIntentMisses()
 
 	snap := StatusSnapshot{
-		Timestamp:       time.Now().UTC().Format("15:04:05"),
-		Tower:           tower,
-		Pattern:         pattern,
-		Marshal:         marshal,
-		Cats:            cats,
-		CongaLine:       conga,
-		TacviewContacts: ds.atcCtrl.TacviewContactCount(),
-		TTSCacheHits:    hits,
-		TTSCacheMisses:  misses,
+		Timestamp:        time.Now().UTC().Format("15:04:05"),
+		Tower:            tower,
+		Pattern:          pattern,
+		Marshal:          marshal,
+		Cats:             cats,
+		CongaLine:        conga,
+		TacviewContacts:  ds.atcCtrl.TacviewContactCount(),
+		TTSCacheHits:     hits,
+		TTSCacheMisses:   misses,
+		IntentMissCount:  missCount,
+		IntentMissRecent: recentMisses,
 	}
 
 	json.NewEncoder(w).Encode(snap)

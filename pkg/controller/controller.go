@@ -86,6 +86,17 @@ type TacviewContact struct {
 	PhaseWarnedAt time.Time
 }
 
+// IntentMiss records a single transmission that fell through to RequestUnknown,
+// i.e. a pilot call we transcribed but couldn't classify. Surfaced via the
+// dashboard so silent fall-throughs are visible without grepping the log.
+type IntentMiss struct {
+	At       time.Time `json:"at"`
+	Callsign string    `json:"callsign"`
+	Raw      string    `json:"raw"`
+}
+
+const intentMissBufferSize = 50
+
 // ATCController manages ATC for one airfield — state, conflict detection,
 // clearance logic, and proactive monitoring.
 type ATCController struct {
@@ -103,6 +114,12 @@ type ATCController struct {
 	// transmitFn is set by the application layer to send text through TTS → SRS.
 	// When nil, responses are logged only (useful for testing).
 	transmitFn func(ctx context.Context, text string)
+
+	// intentMisses keeps the last intentMissBufferSize unrecognized transmissions.
+	// Total miss count is unbounded and tracked separately.
+	intentMissMu    sync.Mutex
+	intentMisses    []IntentMiss
+	intentMissCount int64
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -349,6 +366,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		return // Silent acknowledge
 
 	default:
+		c.recordIntentMiss(req.Callsign, req.Raw)
 		response = c.composer.UnableToUnderstand(req.Callsign)
 	}
 
@@ -1308,6 +1326,40 @@ func detectAircraftPhase(c *TacviewContact, fieldCenter orb.Point, fieldElevFt f
 		return "holding"
 	}
 	return ""
+}
+
+// recordIntentMiss appends an unrecognized transmission to the ring buffer,
+// bumps the lifetime counter, and writes a warn-level log line so the silent
+// fall-through is visible without dashboard access. Callsign may be empty.
+func (c *ATCController) recordIntentMiss(callsign, raw string) {
+	if raw == "" {
+		return
+	}
+	miss := IntentMiss{At: time.Now(), Callsign: callsign, Raw: raw}
+	c.intentMissMu.Lock()
+	c.intentMisses = append(c.intentMisses, miss)
+	if len(c.intentMisses) > intentMissBufferSize {
+		c.intentMisses = c.intentMisses[len(c.intentMisses)-intentMissBufferSize:]
+	}
+	c.intentMissCount++
+	count := c.intentMissCount
+	c.intentMissMu.Unlock()
+	log.Warn().
+		Str("airfield", c.airfieldState.Airfield.ICAO).
+		Str("callsign", callsign).
+		Str("raw", raw).
+		Int64("total", count).
+		Msg("intent miss — pilot transmission not recognized")
+}
+
+// GetIntentMisses returns a copy of the recent unrecognized transmissions
+// (newest last) along with the lifetime miss count.
+func (c *ATCController) GetIntentMisses() ([]IntentMiss, int64) {
+	c.intentMissMu.Lock()
+	defer c.intentMissMu.Unlock()
+	out := make([]IntentMiss, len(c.intentMisses))
+	copy(out, c.intentMisses)
+	return out, c.intentMissCount
 }
 
 // haversineNm returns great-circle distance in nm between two [lon,lat] points.
