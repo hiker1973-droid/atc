@@ -15,15 +15,16 @@ import (
 	"github.com/vsfg7/atc/pkg/state"
 )
 
+const (
+	marshalCallsign     = "Marshal"
+	marshalVoice        = "onyx"
+	marshalTacanChannel = 72
+)
+
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
 func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword string,
 	txCooldown *int64, atcCtrl *controller.ATCController, stack *state.MarshalStack) {
 
-	const (
-		marshalCallsign = "Marshal"
-		marshalVoice    = "onyx"
-		tacanChannel    = 72
-	)
 	comp := composer.NewATCComposer(marshalCallsign)
 
 	transmit := func(text string) {
@@ -209,6 +210,12 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		stack.SetPhase(callsign, "commencing")
 		stack.Remove(callsign)
 		transmit(comp.MarshalCopyCommencing(callsign, fuelState))
+
+	case containsAny(lower, "initial"):
+		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.
+		// Marshal's last call before pilot pushes to the LSO freq.
+		log.Info().Str("callsign", callsign).Int("button", marshalTacanChannel).Msg("Marshal: 3nm initial, handing off to LSO")
+		transmit(comp.MarshalPushButton(callsign, marshalTacanChannel))
 
 	}
 }
