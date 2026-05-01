@@ -703,6 +703,19 @@ func (c *ATCComposer) SpeedWarning(callsign string) string {
 	})
 }
 
+// WindShift announces a runway change to all aircraft on tower freq when the
+// wind shifts enough to make a different runway most-into-wind. Proactive
+// broadcast — no addressed callsign.
+func (c *ATCComposer) WindShift(activeRunway string, windFromMag, windKts float64) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	return pick([]string{
+		fmt.Sprintf("All aircraft, %s, wind shift, runway in use is now %s, wind %s.", c.towerCallsign, rwy, wind),
+		fmt.Sprintf("Notice all stations, %s advises runway change, runway in use is %s, wind %s.", c.towerCallsign, rwy, wind),
+		fmt.Sprintf("Attention all aircraft, %s, runway in use is now %s, wind %s.", c.towerCallsign, rwy, wind),
+	})
+}
+
 // ── Mode-aware responses ──────────────────────────────────────────────────────
 
 // RedirectToStraightIn tells a VFR pilot to execute straight-in instead (IMC) — 3 var.

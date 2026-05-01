@@ -196,14 +196,28 @@ func (c *ATCController) UpdateFlightConditions(ceilingFt, visNm float64, isNight
 
 // UpdateWeather updates wind and altimeter for all managed airfields.
 // windFromTrue is the true wind direction in degrees, windKts in knots,
-// altimeterInHg in inches of mercury, visNm in nautical miles.
+// altimeterInHg in inches of mercury, visNm in nautical miles. If the new
+// wind makes a different runway most-into-wind, the controller transmits a
+// proactive wind-shift / runway-change announcement on the tower freq.
 func (c *ATCController) UpdateWeather(windFromTrue, windKts, altimeterInHg, visNm float64) {
+	prev := c.airfieldState.ActiveRunway
 	c.airfieldState.UpdateWeather(windFromTrue, windKts, altimeterInHg, visNm)
+	now := c.airfieldState.ActiveRunway
 	log.Debug().
 		Str("airfield", c.airfieldState.Airfield.ICAO).
-		Str("activeRunway", c.airfieldState.ActiveRunway).
+		Str("activeRunway", now).
 		Float64("windKts", windKts).
 		Msg("weather updated — active runway set")
+	if prev != "" && now != "" && prev != now {
+		log.Info().
+			Str("airfield", c.airfieldState.Airfield.ICAO).
+			Str("from", prev).
+			Str("to", now).
+			Float64("windKts", windKts).
+			Msg("wind shift — active runway changed, broadcasting to tower")
+		text := c.composer.WindShift(now, c.airfieldState.WindFromMag, windKts)
+		c.transmit(context.Background(), text)
+	}
 }
 
 // UpdatePosition feeds a telemetry position update into the airfield state.
@@ -1014,14 +1028,10 @@ func (c *ATCController) String() string {
 // UpdateWeatherFromLua updates airfield weather from the ATCWeather.lua UDP export.
 // windFromTrue is degrees true; MagVar is applied internally.
 // windKts is in knots. altimeterInHg is in inches of mercury.
+// Routes through UpdateWeather so wind-shift / runway-change detection fires
+// on mid-mission weather updates too.
 func (c *ATCController) UpdateWeatherFromLua(windFromTrue, windKts, altimeterInHg float64) {
-	c.airfieldState.UpdateWeather(windFromTrue, windKts, altimeterInHg, 10.0)
-	log.Debug().
-		Float64("windFromTrue", windFromTrue).
-		Float64("windKts", windKts).
-		Float64("altimeterInHg", altimeterInHg).
-		Str("activeRunway", c.airfieldState.ActiveRunway).
-		Msg("weather updated")
+	c.UpdateWeather(windFromTrue, windKts, altimeterInHg, 10.0)
 }
 
 // SortedInboundsByDistance returns callsigns of current inbounds sorted by
