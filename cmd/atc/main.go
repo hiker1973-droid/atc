@@ -169,12 +169,33 @@ func main() {
 	}
 }
 
+// rotateLogIfNeeded inspects logPath at startup and, if it exceeds 50 MB,
+// rolls it: existing .4 is dropped, .3 -> .4, .2 -> .3, .1 -> .2, current
+// -> .1, and a fresh empty file is created on the next OpenFile. Errors are
+// swallowed silently — rotation is best-effort housekeeping, never worth
+// blocking startup over.
+func rotateLogIfNeeded(logPath string) {
+	const maxBytes = 50 * 1024 * 1024
+	info, err := os.Stat(logPath)
+	if err != nil || info.Size() < maxBytes {
+		return
+	}
+	const keep = 4
+	// Drop the oldest, then shift each remaining backup one slot older.
+	_ = os.Remove(fmt.Sprintf("%s.%d", logPath, keep))
+	for i := keep - 1; i >= 1; i-- {
+		_ = os.Rename(fmt.Sprintf("%s.%d", logPath, i), fmt.Sprintf("%s.%d", logPath, i+1))
+	}
+	_ = os.Rename(logPath, logPath+".1")
+}
+
 func run(cmd *cobra.Command, args []string) error {
 	level, _ := zerolog.ParseLevel(flagLogLevel)
 	// Write logs to both stderr (console) and a rotating log file
 	logDir := "C:\\SkyeyeATC\\logs"
 	os.MkdirAll(logDir, 0755)
 	logPath := filepath.Join(logDir, fmt.Sprintf("atc-%s.log", strings.ToLower(flagAirfield)))
+	rotateLogIfNeeded(logPath)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(level)
