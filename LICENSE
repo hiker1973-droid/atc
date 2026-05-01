@@ -1,0 +1,43 @@
+SkyeyeATC — Proprietary License
+================================
+
+Copyright (c) 2026 vSFG-7. All rights reserved.
+
+This software, including its source code, binaries, configuration files,
+phraseology specifications, comms diagrams, and accompanying documentation
+(collectively, the "Software"), is the exclusive property of vSFG-7.
+
+NO LICENSE GRANTED.
+The Software is made available solely for vSFG-7 internal operational and
+training use. No license, express or implied, is granted to any other party
+under any patent, copyright, trademark, or trade-secret right held by vSFG-7,
+its members, or its contributors.
+
+Without prior written permission from vSFG-7, no person or entity may:
+
+  1. Copy, reproduce, fork, mirror, publish, or redistribute the Software
+     or any substantial portion of it, in source or binary form;
+  2. Modify, adapt, translate, or create derivative works based on the
+     Software;
+  3. Use the Software, or any of its design elements, in any product,
+     service, or system intended for or made available to third parties;
+  4. Remove or alter any copyright, trademark, or proprietary notice
+     present in the Software;
+  5. Reverse-engineer, disassemble, or decompile the binaries except to the
+     limited extent expressly permitted by applicable law that cannot be
+     contractually waived.
+
+Third-party components (Go modules and other dependencies referenced in
+`go.mod` and `go.sum`) remain subject to their own respective licenses,
+which are not modified by this notice.
+
+NO WARRANTY.
+THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+vSFG-7, ITS MEMBERS, OR ITS CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing inquiries, contact vSFG-7 leadership directly.

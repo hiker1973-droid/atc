@@ -3,6 +3,8 @@
 AI-powered Tower ATC for DCS World — Al Minhad, Al Dhafra, Al Ain.
 Built on SkyEye's infrastructure (SRS, Whisper STT, Piper TTS, Tacview telemetry).
 
+**Copyright © 2026 vSFG-7. All rights reserved.** Proprietary — see [`LICENSE`](LICENSE) for terms. Internal vSFG-7 use only; no external redistribution or reuse without written permission.
+
 ---
 
 ## Prerequisites
