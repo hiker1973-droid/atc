@@ -124,7 +124,16 @@ Composed but not wired. Per the Case 1 Recovery comms (07.png) the "contact" cal
 ## Notes
 
 - Marshal handles 6 intents now: Marking mom, See you at 10, State, Established, Commencing, 3NM Initial. The composer has 8 methods total — `MarshalContact` is intentionally unwired (it belongs to the LSO/Paddles role on a separate SRS button, see Section 7).
-- Marshal stack altitude assignment is auto-deconflicted via `atcCtrl.GetDeconflictedAngels(baseAngels)` — base angels = 5 + position in stack, then atcCtrl checks Tacview for collisions and bumps if needed. Stack altitude logic is *not* in this responses file; that lives in `pkg/state/state.go` and `pkg/controller/controller.go`.
+
+### Stack altitude assignment (Tacview-aware)
+
+On `marking moms`, the marshal handler calls `atcCtrl.AssignMarshalAngels(min, max, reserved)` which returns the **lowest unoccupied angel in `[min, max]`**. A slot is "occupied" if either:
+1. It's reserved by another aircraft already in the stack (`MarshalStack.ReservedAngels` excluding self), or
+2. Tacview shows any contact within 50nm of the carrier at that rounded altitude (1000-ft buckets).
+
+Range is configured by `marshalMinAngels` / `marshalMaxAngels` in `cmd/atc/marshal.go` — currently **2k–9k**. If every slot is taken the function falls back to `marshalMaxAngels` (9). Tweak the constants there to widen or shift the band.
+
+When an aircraft commences (`MarshalStack.Remove`), its slot frees up and the next inbound takes it — remaining stack aircraft hold their original assigned angels and are not reshuffled.
 
 ## Case 1 Recovery comms coverage (vSFG-7 07.png)
 

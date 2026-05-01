@@ -399,18 +399,36 @@ func (s *MarshalStack) SetPhase(callsign, phase string) {
 	}
 }
 
-// Remove removes an aircraft from the stack and resequences.
+// Remove removes an aircraft from the stack and resequences positions only.
+// Remaining aircraft keep their assigned angels — they are physically holding
+// at that altitude and must not be reassigned mid-pattern.
 func (s *MarshalStack) Remove(callsign string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.aircraft, callsign)
-	// Resequence remaining
 	pos := 1
 	for _, ac := range s.aircraft {
 		ac.Position = pos
-		ac.Angels = StackAngels(pos)
 		pos++
 	}
+}
+
+// ReservedAngels returns the currently-assigned stack altitudes for all aircraft,
+// excluding excludeCallsign (typically the caller's own slot when re-checking).
+// Slots with Angels == 0 (not yet assigned) are skipped.
+func (s *MarshalStack) ReservedAngels(excludeCallsign string) []int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]int, 0, len(s.aircraft))
+	for cs, ac := range s.aircraft {
+		if cs == excludeCallsign {
+			continue
+		}
+		if ac.Angels > 0 {
+			out = append(out, ac.Angels)
+		}
+	}
+	return out
 }
 
 // SetAngels updates the assigned angels for an aircraft already in the stack.

@@ -1162,42 +1162,39 @@ func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 	return 0, 0, false
 }
 
-// GetDeconflictedAngels returns the lowest available stack altitude that does not
-// conflict with any currently tracked aircraft near the carrier.
-// Base altitude is angels 6, increments by 1000ft until clear.
-func (c *ATCController) GetDeconflictedAngels(baseAngels int) int {
-	// Get carrier position
-	carLon, carLat, found := c.GetCarrierPosition()
-	if !found {
-		// No carrier — use base
-		return baseAngels
+// AssignMarshalAngels picks the lowest unoccupied stack altitude in [minAngels, maxAngels].
+// A slot is "occupied" if it appears in reservedAngels (already-assigned stack slots,
+// passed in by the caller) or if Tacview shows any aircraft within 50nm of the carrier
+// at that rounded altitude. Falls back to maxAngels when every slot is taken.
+func (c *ATCController) AssignMarshalAngels(minAngels, maxAngels int, reservedAngels []int) int {
+	if minAngels > maxAngels {
+		return maxAngels
 	}
-	carrierPt := orb.Point{carLon, carLat}
-
-	// Build set of occupied altitudes within 50nm of carrier
 	occupied := make(map[int]bool)
-	c.allPositionsMu.RLock()
-	for _, contact := range c.allPositions {
-		if time.Since(contact.UpdatedAt) > 30*time.Second {
-			continue
-		}
-		dist := haversineNm(orb.Point{contact.Lon, contact.Lat}, carrierPt)
-		if dist > 50 {
-			continue
-		}
-		// Round to nearest 1000ft angels
-		angels := int(math.Round(contact.AltFt/1000.0))
-		occupied[angels] = true
+	for _, a := range reservedAngels {
+		occupied[a] = true
 	}
-	c.allPositionsMu.RUnlock()
-
-	// Find first free altitude starting from baseAngels
-	for a := baseAngels; a <= 12; a++ {
+	if carLon, carLat, found := c.GetCarrierPosition(); found {
+		carrierPt := orb.Point{carLon, carLat}
+		c.allPositionsMu.RLock()
+		for _, contact := range c.allPositions {
+			if time.Since(contact.UpdatedAt) > 30*time.Second {
+				continue
+			}
+			if haversineNm(orb.Point{contact.Lon, contact.Lat}, carrierPt) > 50 {
+				continue
+			}
+			angels := int(math.Round(contact.AltFt / 1000.0))
+			occupied[angels] = true
+		}
+		c.allPositionsMu.RUnlock()
+	}
+	for a := minAngels; a <= maxAngels; a++ {
 		if !occupied[a] {
 			return a
 		}
 	}
-	return 12 // fallback
+	return maxAngels
 }
 
 // IsDeckClear returns true if no aircraft are on final or the runway at the carrier.

@@ -19,6 +19,11 @@ const (
 	marshalCallsign     = "Marshal"
 	marshalVoice        = "onyx"
 	marshalTacanChannel = 72
+	// Stack altitude band — Marshal assigns the lowest unoccupied angel in
+	// [marshalMinAngels, marshalMaxAngels]. "Unoccupied" considers both stack
+	// reservations and any Tacview contact within 50nm of the carrier.
+	marshalMinAngels = 2
+	marshalMaxAngels = 9
 )
 
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
@@ -174,11 +179,11 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	switch {
 	case containsAny(lower, "marking mom", "marking moms"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
-		baseAngels := 5 + pos
-		angels := atcCtrl.GetDeconflictedAngels(baseAngels)
+		reserved := stack.ReservedAngels(callsign)
+		angels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
 		stack.SetAngels(callsign, angels)
 		brc := atcCtrl.GetCarrierBRC()
-		log.Info().Str("callsign", callsign).Int("position", pos).Int("angels", angels).Float64("brc", brc).Msg("Marshal: aircraft checking in")
+		log.Info().Str("callsign", callsign).Int("position", pos).Int("angels", angels).Ints("reserved", reserved).Float64("brc", brc).Msg("Marshal: aircraft checking in")
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
