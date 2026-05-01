@@ -34,7 +34,7 @@ Skippable: `logs\`, `atis_cache\`, `*.exe~`, `New Text Document.txt`, `atc-prev.
 ## 3. Post-Transfer Config (on Training 1)
 
 ### 3a. Centralize the OpenAI key
-Today the key is duplicated in `start_atis.bat`, `start_towers.bat`, `start_command and deckboss.bat`, `start_marshal.bat`, `run_scudwatch.bat`. Set it once as a Windows user env var instead:
+Today the key is duplicated in `start_atis.bat`, `start_towers.bat`, and the parked bats under `dev_only/`. Set it once as a Windows user env var instead:
 
 ```bat
 setx OPENAI_API_KEY "sk-proj-..."
@@ -72,13 +72,18 @@ Requires Go 1.26+ and SkyEye cloned at `C:\Skyeye`.
 
 All scripts live in `C:\SkyeyeATC\` and are double-clickable. Each opens its own console window with `cmd /k` so you can read it.
 
-### Recommended start order
+### Recommended start order (Training 1)
+Only Tower + ATIS run on Training 1 — they're stable and battle-tested. Carrier ops, Command, and Scudwatch are parked under `dev_only/` for iteration on the dev rig.
+
 1. **`start_launcher.bat`** — opens browser dashboard at http://localhost:7000/. Use this to start/stop the rest from a UI instead of running each `.bat` by hand.
 2. **`start_atis.bat`** — all 5 ATIS stations (Dhafra, Minhad, Liwa, Al Ain, Khasab) on their own freqs. Now broadcasts every **45 seconds per station** (was 120s).
 3. **`start_towers.bat`** — Al Minhad / Al Dhafra / Al Ain Tower instances. Each binds dashboard ports 6001 / 6002 / 6003.
-4. **`start_command and deckboss.bat`** — Command channel (282.0 MHz) + Deckboss carrier ops (306.2 MHz, OMDM-anchored).
-5. **`start_marshal.bat`** — Marshal stack (306.3 MHz, OMDM).
-6. **`run_scudwatch.bat`** — Scudwatch / Darkstar-1-1 threat broadcaster (264.0 MHz). Optional.
+
+### Parked roles (do not launch on Training 1)
+These bats live in `dev_only/` and are intended for the dev rig only:
+- `dev_only/start_command and deckboss.bat` — Command (282.0) + Deckboss (306.2)
+- `dev_only/start_marshal.bat` — Marshal stack (306.3)
+- `dev_only/run_scudwatch.bat` — Scudwatch / Darkstar-1-1 (264.0)
 
 ### Frequency cheat sheet
 | Role | Freq MHz | Site |

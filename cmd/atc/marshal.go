@@ -44,6 +44,25 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		transmitExternalAudioFile(mp3, freqMHz, "OMDM-MSH", srsHost, srsPort, flagExternalAudio)
 	}
 
+	// DEBUG: with --marshal-test-tx, transmit "test" every 30s to verify the
+	// outbound SRS path independently of pilot audio. Leave the flag off in
+	// production — every tick blocks the cooldown window for a few seconds.
+	if flagMarshalTestTx {
+		log.Warn().Msg("Marshal: --marshal-test-tx enabled, transmitting test every 30s")
+		go func() {
+			tk := time.NewTicker(30 * time.Second)
+			defer tk.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-tk.C:
+					transmit("test")
+				}
+			}
+		}()
+	}
+
 	for {
 		select {
 		case <-ctx.Done():

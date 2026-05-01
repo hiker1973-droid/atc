@@ -11,7 +11,7 @@ set GOMEMLIMIT=512MiB
 echo [vSFG-7] Starting ATC system...
 
 :: Command Channel
-start "vSFG-7 Command" cmd /k "%~dp0atc.exe --command-only --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --srs-addr %SRS% --eam-password %EAM% --log-level %LOG%"
+start "vSFG-7 Command" cmd /k "%~dp0atc.exe --command-only --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --srs-addr %SRS% --eam-password %EAM% --pprof-port 7770 --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
 :: Deckboss (carrier ops)

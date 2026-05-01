@@ -44,11 +44,18 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 1. `start_launcher.bat` — opens dashboard at http://localhost:7000/
 2. `start_atis.bat` — all 5 ATIS stations
 3. `start_towers.bat` — Minhad / Dhafra / Al Ain (dashboards on 6001 / 6002 / 6003)
-4. `start_command and deckboss.bat` — Command channel (282.0) + Deckboss (306.2)
-5. `start_marshal.bat` — Marshal stack (306.3)
-6. `run_scudwatch.bat` — optional, Scudwatch / Darkstar-1-1 threat broadcaster (264.0)
 
 Stop: close the console window, or use launcher dashboard buttons.
+
+### Training 1 active roles (2026-05-01)
+Only **Tower** and **ATIS** run on Training 1 — both are stable and battle-tested. Marshal, Command, Deckboss, and Scudwatch are parked here while we iterate on them from the dev rig (vsfg7-atc); their bat files have been moved to `dev_only/` so they don't get launched accidentally during a live mission.
+
+Parked role bats (do not launch on Training 1):
+- `dev_only/start_command and deckboss.bat` — Command 282.0 + Deckboss 306.2
+- `dev_only/start_marshal.bat` — Marshal stack 306.3
+- `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
+
+The role *code* (`cmd/atc/{command,marshal,deckboss,scudwatch}.go`, the supporting state, and the `--marshal-test-tx` debug flag) stays on `main` — only the launch scripts moved. Pull `main` on dev and run the parked bats from `dev_only/` there to keep iterating.
 
 ## Gotchas
 - **`--grpc-addr` is not a valid flag.** It was removed from `atc.exe`. Old `run_alain.bat` / `run_dhafra.bat` / `run_minhad.bat` files still pass it and will fail at launch — delete them if they are still present.
@@ -61,7 +68,13 @@ Stop: close the console window, or use launcher dashboard buttons.
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
-## Recent context (2026-04-25)
+## Recent context (2026-05-01)
+- Training 1 narrowed to Tower + ATIS only. Marshal/Command/Deckboss/Scudwatch bats moved to `dev_only/` for iteration on the dev rig.
+- Marshal: 3-mile-initial regex fix, Tacview-aware stack assignment in 2k–9k band, internal-only stack collapse on commence (no step-down radio call per 07.png), 3NM Initial → push-button-XX handoff. New `--marshal-test-tx` debug flag transmits "test" every 30s for SRS path verification.
+- Tower: new `radar check` intent reads back angels/range/bearing from Tacview.
+- Diagnosed: SRS server is not routing 306.3 (Marshal) or 282.0 (Command) audio to/from the DCS pilot client. Outbound TX path through `transmitExternalAudioFile` works (verified via `--marshal-test-tx` log lines). Issue is on the SRS/DCS side — see `feedback_only_spec_phraseology.md` and `command_channel_freeze_bug.md` memories.
+
+## Older context (2026-04-25)
 - ATIS interval changed 120s → 45s in both call sites; rebuilt `atc.exe`.
 - `README_TRAINING1.md` written with transfer prep + operator commands.
 - Pre-transfer cleanup recommended: delete the three `run_alain/dhafra/minhad.bat` (broken `--grpc-addr` flag), clear stale `atis_cache/` and `logs/`.

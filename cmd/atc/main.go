@@ -81,6 +81,7 @@ var (
 	flagScudwatchCallsign   string
 	flagScudwatchBullseye   string
 	flagMarshalOnly         bool
+	flagMarshalTestTx       bool
 	flagPprofPort           int
 )
 
@@ -159,6 +160,8 @@ func main() {
 		"Bullseye reference for Scudwatch announcements as 'lat,lon' (default: airfield center)")
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
+	f.BoolVar(&flagMarshalTestTx, "marshal-test-tx", false,
+		"DEBUG: have Marshal transmit \"test\" every 30s (used to verify SRS routing — leave off in production)")
 	f.IntVar(&flagPprofPort, "pprof-port", 0,
 		"Run net/http/pprof on this localhost port for goroutine/heap debugging (0=disabled)")
 	if err := root.Execute(); err != nil {
