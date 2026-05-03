@@ -418,17 +418,18 @@ func (c *ATCController) handleTakeoffRequest(
 		)
 	}
 
-	// No conflict — clear for takeoff.
+	// No conflict — clear for takeoff. If this is the first call and the
+	// aircraft was never in the departure queue, enqueue then immediately
+	// clear: an empty runway with no inbound conflict means no reason to
+	// make them hold short.
 	trafficOnFinal := s.LandingQueueLen()
-	cleared := s.ClearForTakeoff(callsign)
-	if cleared != nil {
-		return c.composer.ClearedForTakeoff(
-			callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal,
-		)
+	if s.ClearForTakeoff(callsign) == nil {
+		s.EnqueueDeparture(ac)
+		s.ClearForTakeoff(callsign)
 	}
-	// Not in queue — add and hold short (no conflict, but wait for sequence)
-	s.EnqueueDeparture(ac)
-	return c.composer.HoldShort(callsign, s.ActiveRunway)
+	return c.composer.ClearedForTakeoff(
+		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal,
+	)
 }
 
 // LineUpWaitRadiusNm — inbound within this distance: enter runway but wait, do not take off.
