@@ -247,8 +247,8 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	switch req.Type {
 
 	case RequestInbound:
-		s.EnqueueLanding(ac)
-		response = c.composer.InboundAck(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, 0)
+		seqNum := s.EnqueueLanding(ac)
+		response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
 
 
 	case RequestLandingClear:
@@ -269,8 +269,8 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		response = c.handleHoldingShortRequest(ctx, req.Callsign, ac, s)
 
 	case RequestDistanceInitial:
-		s.EnqueueLanding(ac)
-		response = c.composer.InboundAck(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, 0)
+		seqNum := s.EnqueueLanding(ac)
+		response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
 
 
 	case RequestOverhead:
@@ -1101,6 +1101,20 @@ func (c *ATCController) NearestInboundAhead(callsign string) (string, float64) {
 		}
 	}
 	return "", 0
+}
+
+// sequencedArrivalResponse builds the inbound/3-mile-initial reply with traffic
+// awareness. When seqNum > 1 and Tacview can identify the lead, name them and
+// give the in-trail distance. Otherwise fall back to a generic count.
+func (c *ATCController) sequencedArrivalResponse(callsign string, s *state.AirfieldState, seqNum int) string {
+	if seqNum <= 1 {
+		return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, 0)
+	}
+	leadCS, leadDist := c.NearestInboundAhead(callsign)
+	if leadCS != "" {
+		return c.composer.SequencedInitialAck(callsign, 0, s.ActiveRunway, 0, s.AltimeterInHg, seqNum, leadCS, int(leadDist+0.5))
+	}
+	return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, seqNum-1)
 }
 
 // UpdateAnyPosition records position for ANY Tacview aircraft and updates ATC state.
