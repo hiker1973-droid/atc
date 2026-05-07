@@ -885,7 +885,7 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 		// Flush goroutine — check for completed transmissions every 500ms
 		flushStop := make(chan struct{})
 		go func() {
-			ticker := time.NewTicker(500 * time.Millisecond)
+			ticker := time.NewTicker(200 * time.Millisecond)
 			defer ticker.Stop()
 			for {
 				select {
@@ -1425,7 +1425,7 @@ func whisperTranscribeWithPrompt(ctx context.Context, apiKey string, audio []byt
 	if _, err := fw.Write(audio); err != nil {
 		return "", err
 	}
-	w.WriteField("model", "whisper-1")
+	w.WriteField("model", "gpt-4o-mini-transcribe")
 	w.WriteField("language", "en")
 	w.WriteField("prompt", prompt)
 	w.Close()
@@ -1465,7 +1465,7 @@ func whisperTranscribe(ctx context.Context, apiKey string, audio []byte, filenam
 	if _, err := fw.Write(audio); err != nil {
 		return "", err
 	}
-	w.WriteField("model", "whisper-1")
+	w.WriteField("model", "gpt-4o-mini-transcribe")
 	w.WriteField("language", "en")
 	w.WriteField("prompt", "Marshal, Raider, Venom, marking mom, angels, state, established, commencing, pushing, checking in, see you at ten, signal Charlie, BRC, altimeter, radio check, five by five")
 	w.Close()
