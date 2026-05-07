@@ -793,8 +793,8 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		Airframe: extractAirframe(lower),
 	}
 	switch {
-	case isCTAF && containsAny(lower, "clear traffic", "clear of traffic", "airborne", "departing"):
-		// CTAF departure call — pilot is clear of the pattern
+	case containsAny(lower, "clear traffic", "clear of traffic", "airborne", "departing"):
+		// Departure release — pilot is clear of the pattern (works on tower or CTAF)
 		req.Type = RequestClearTraffic
 	case containsAny(lower, "seven dme", "7 dme", "seven miles", "7 miles", "cleared airspace", "five miles", "5 miles") ||
 		(containsAny(lower, "dme", "d.m.e", "d m e") && !containsAny(lower, "initial", "inbound")):
