@@ -96,11 +96,11 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		}
 
 		freqHz := freqMHz * 1e6
-		eamMsg := buildEAM(guid, marshalCallsign, freqHz, eamPassword)
-		tcpConn.Write(eamMsg)
-		time.Sleep(200 * time.Millisecond)
 		syncMsg := buildSync(guid, marshalCallsign, freqHz)
 		tcpConn.Write(syncMsg)
+		time.Sleep(200 * time.Millisecond)
+		eamMsg := buildEAM(guid, marshalCallsign, freqHz, eamPassword)
+		tcpConn.Write(eamMsg)
 		log.Info().Float64("freq", freqMHz).Msg("Marshal registered on SRS")
 
 		// UDP keepalive

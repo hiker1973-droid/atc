@@ -170,10 +170,10 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		}
 
 		freqHz := freqMHz * 1e6
-		tcpConn.Write(buildEAM(guid, deckCallsign, freqHz, eamPassword))
-		time.Sleep(200 * time.Millisecond)
 		syncMsg := buildSync(guid, deckCallsign, freqHz)
 		tcpConn.Write(syncMsg)
+		time.Sleep(200 * time.Millisecond)
+		tcpConn.Write(buildEAM(guid, deckCallsign, freqHz, eamPassword))
 		log.Info().Float64("freq", freqMHz).Msg("Deckboss registered on SRS")
 
 		pingStop := make(chan struct{})

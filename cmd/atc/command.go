@@ -120,9 +120,9 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 			continue
 		}
 
-		tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
-		time.Sleep(200 * time.Millisecond)
 		tcpConn.Write(buildSync(guid, channelName, freqHz))
+		time.Sleep(200 * time.Millisecond)
+		tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
 		log.Info().Float64("freq", freqMHz).Str("name", channelName).Msg("Command channel registered on SRS")
 
 		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: spawning keepalive goroutine")
@@ -138,9 +138,9 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 					return
 				case <-tk.C:
 					udpConn.Write([]byte(guid))
-					tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
-					time.Sleep(200 * time.Millisecond)
 					tcpConn.Write(buildSync(guid, channelName, freqHz))
+					time.Sleep(200 * time.Millisecond)
+					tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
 				}
 			}
 		}()
