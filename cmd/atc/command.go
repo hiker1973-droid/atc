@@ -125,6 +125,34 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
 		log.Info().Float64("freq", freqMHz).Str("name", channelName).Msg("Command channel registered on SRS")
 
+		// DEBUG: with --command-test-tx, transmit "command test" every 30s to
+		// verify the outbound SRS path independently of pilot audio.
+		if flagCommandTestTx {
+			log.Warn().Msg("Command: --command-test-tx enabled, transmitting test every 30s")
+			go func() {
+				tk := time.NewTicker(30 * time.Second)
+				defer tk.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-tk.C:
+						if until := atomic.LoadInt64(&txCooldown); until > 0 && time.Now().UnixNano() < until {
+							continue
+						}
+						atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration("command test")).UnixNano())
+						mp3, err := synthesizeSpeech(ctx, apiKey, "command test", voice)
+						if err != nil {
+							log.Error().Err(err).Msg("Command test TTS failed")
+							continue
+						}
+						log.Info().Float64("freq", freqMHz).Msg("Command test TX")
+						transmitExternalAudioFile(mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
+					}
+				}
+			}()
+		}
+
 		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: spawning keepalive goroutine")
 		pingStop := make(chan struct{})
 		go func() {
