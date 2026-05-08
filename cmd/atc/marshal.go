@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
@@ -120,6 +122,29 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 			}
 		}()
 
+		// TCP reader — responds to server pings and detects disconnect.
+		// Without this Marshal silently zombies on a dead socket and the
+		// SRS server removes it from the client list after first missed
+		// ping, even though the goroutine keeps writing keepalives.
+		tcpDone := make(chan struct{})
+		go func() {
+			defer close(tcpDone)
+			reader := bufio.NewReader(tcpConn)
+			for {
+				tcpConn.SetReadDeadline(time.Now().Add(90 * time.Second))
+				line, err := reader.ReadBytes('\n')
+				if err != nil {
+					return
+				}
+				var msg map[string]interface{}
+				if json.Unmarshal(line, &msg) == nil {
+					if msgType, ok := msg["MsgType"].(float64); ok && int(msgType) == 1 {
+						tcpConn.Write(syncMsg)
+					}
+				}
+			}
+		}()
+
 		transmissions := make(map[string]*transmission)
 		udpBuf := make([]byte, 4096)
 		flushTicker := time.NewTicker(500 * time.Millisecond)
@@ -132,6 +157,9 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 				udpConn.Close()
 				flushTicker.Stop()
 				return
+			case <-tcpDone:
+				log.Warn().Msg("Marshal: SRS disconnected — reconnecting")
+				connDone = true
 			case <-flushTicker.C:
 				now := time.Now()
 				for origin, tx := range transmissions {
