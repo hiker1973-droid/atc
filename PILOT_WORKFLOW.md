@@ -103,18 +103,40 @@ Mission-level coordination — fence checks, on/off-station, RTB.
 
 ## Carrier ops (Marshal)
 
-Marshal handles inbound stack to the boat. Deckboss (cat/conga line on deck) is parked on Training 1.
+Marshal handles the inbound stack to the boat — case recovery info, BRC, stack angels assignment, and final push to LSO. Six pilot calls, in order:
 
-1. **Inbound to the boat** — tune Marshal **306.3**.
-   - Pilot: *"Marshal, Raider 1, inbound"* → assigned angels stack (lowest unoccupied between 2k and 9k).
+1. **Marking mom** — initial check-in. Tune Marshal **306.3**.
+   - Pilot: *"Marshal, Raider 1, marking mom, 25 miles, angels 12, state 6.5"*
+   - ATC: *"…Case One recovery, BRC 088, altimeter 29.92, Marshal angels 3, report see me at ten"*
+   - **Case** is computed from weather ceiling (Case 1 ≥3000 ft, Case 2 ≥1000 ft, Case 3 below).
+   - **BRC** is the carrier's current heading from Tacview (3-digit, e.g. `088`); the BRC clause is dropped if Tacview can't see the carrier.
+   - **Stack angels** = lowest unoccupied slot between angels 2 and 9.
+   - Triggers: `marking mom` · `marking moms`
 
-2. **Commence** — at the commence point:
-   - Pilot: *"Marshal, Raider 1, commencing"*
-   - Stack collapse is internal-only — no step-down radio call.
+2. **See me at ten** — visual on the boat at 10 nm.
+   - Pilot: *"Marshal, Raider 1, see you at ten"*
+   - ATC: *"…radar contact, ten miles, say state"*
+   - Triggers: `see you at 10` · `see you at ten`
 
-3. **3-mile initial** → handoff to Deckboss:
-   - Pilot: *"Marshal, Raider 1, 3 mile initial"*
-   - ATC: *"…push button XX"* (preset for Deckboss freq).
+3. **State** — fuel report.
+   - Pilot: *"Marshal, Raider 1, state 4.2"*
+   - ATC: *"…copy state 4.2"* (or *"…expedite recovery"* / *"you are priority"* if state < 2.0)
+
+4. **Established in stack.**
+   - Pilot: *"Marshal, Raider 1, established angels 3"*
+   - ATC, deck clear: *"…signal Charlie"* (cleared to commence)
+   - ATC, deck busy: *"…roger, hold angels 3"*
+   - Triggers: `established angels` · `established at angels`
+
+5. **Commencing** — pushing from the stack.
+   - Pilot: *"Marshal, Raider 1, commencing"* (optionally with state)
+   - ATC: *"…copy commencing"*
+   - Internal: stack collapses silently — no step-down radio call.
+
+6. **3-mile initial → LSO handoff** (Marshal's last call to you).
+   - Pilot: *"Marshal, Raider 1, initial"*
+   - ATC: *"…push button 72, check in"* — switch to the LSO/Paddles freq.
+   - Trigger: `initial`
 
 ---
 
