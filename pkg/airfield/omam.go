@@ -32,6 +32,20 @@ var OMAM = &Airfield{
 	},
 	RunwayPairs: []RunwayPair{
 		{
+			// Lower parallel: 13R / 31L — 11,403 x 150 ft (preferred — operator request)
+			// ILS 31L: 111.10 MHz Chan 48 | ILS 13R: 114.90 MHz Chan 24
+			Primary: Runway{
+				Designator:      "31L",
+				MagneticHeading: 308.0,
+				ThresholdLatLon: orb.Point{54.5633, 24.2250}, // SE threshold
+			},
+			Reciprocal: Runway{
+				Designator:      "13R",
+				MagneticHeading: 128.0,
+				ThresholdLatLon: orb.Point{54.5333, 24.2417}, // NW threshold
+			},
+		},
+		{
 			// Upper parallel: 13L / 31R — 11,403 x 150 ft
 			// ILS 31R: 109.1 MHz Chan 28 | ILS 13L: 108.7 MHz Chan 24
 			Primary: Runway{
@@ -43,20 +57,6 @@ var OMAM = &Airfield{
 				Designator:      "13L",
 				MagneticHeading: 128.0,
 				ThresholdLatLon: orb.Point{54.5333, 24.2667}, // SW threshold
-			},
-		},
-		{
-			// Lower parallel: 13R / 31L — 11,403 x 150 ft
-			// ILS 31L: 111.10 MHz Chan 48 | ILS 13R: 114.90 MHz Chan 24
-			Primary: Runway{
-				Designator:      "31L",
-				MagneticHeading: 308.0,
-				ThresholdLatLon: orb.Point{54.5633, 24.2250}, // SE threshold
-			},
-			Reciprocal: Runway{
-				Designator:      "13R",
-				MagneticHeading: 128.0,
-				ThresholdLatLon: orb.Point{54.5333, 24.2417}, // NW threshold
 			},
 		},
 	},
