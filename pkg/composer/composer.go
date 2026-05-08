@@ -25,6 +25,18 @@ func pick(opts []string) string {
 	return opts[rand.Intn(len(opts))]
 }
 
+// StartupApproval approves engine start — 3 variations. Uses Ground callsign
+// (derived from tower) since startup is conventionally a ground-control task.
+func (c *ATCComposer) StartupApproval(callsign string, altimeterInHg float64) string {
+	ground := strings.Replace(c.towerCallsign, "Tower", "Ground", 1)
+	alt := formatAltimeter(altimeterInHg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, startup approved.", callsign, ground),
+		fmt.Sprintf("%s, %s, startup approved, altimeter %s, advise ready to taxi.", callsign, ground, alt),
+		fmt.Sprintf("%s, %s, startup at your discretion, advise when ready to taxi.", callsign, ground),
+	})
+}
+
 // RadioCheck responds to a radio check — 3 variations.
 func (c *ATCComposer) RadioCheck(callsign string) string {
 	return pick([]string{

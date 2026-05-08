@@ -59,6 +59,7 @@ const (
 	RequestRunwayVacated            // "runway vacated" / "clear of runway" — closes landing sequence
 	RequestEmergency                // "mayday" / "pan pan" / "emergency" — priority handling
 	RequestRadarCheck               // "radar check" — read back Tacview-derived angels/range/bearing
+	RequestStartup                  // "request startup" / "ready for startup" — engine-start approval (Ground)
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -254,6 +255,9 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	case RequestLandingClear:
 		response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts)
 
+
+	case RequestStartup:
+		response = c.composer.StartupApproval(req.Callsign, s.AltimeterInHg)
 
 	case RequestTaxiClear:
 		s.EnqueueDeparture(ac)
@@ -850,8 +854,10 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestDistanceInitial
 	case containsAny(lower, "holding short", "hold short", "short of runway", "at the hold"):
 		req.Type = RequestHoldingShort
-	case containsAny(lower, "request takeoff", "ready for departure", "ready for takeoff", "lineup"):
+	case containsAny(lower, "request takeoff", "request departure", "ready for departure", "ready for takeoff", "lineup"):
 		req.Type = RequestTakeoffClear
+	case containsAny(lower, "request startup", "ready for startup", "ready to start", "request start"):
+		req.Type = RequestStartup
 	case containsAny(lower, "request taxi", "request ground", "taxi to", "ready to taxi"):
 		req.Type = RequestTaxiClear
 	case containsAny(lower, "on final", "final", "request landing", "cleared to land"):
@@ -864,7 +870,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestAltitude
 
 
-	case containsAny(lower, "radio check", "comm check", "comms check", "how copy"):
+	case containsAny(lower, "radio check", "comm check", "comms check", "comcheck", "comp check", "how copy"):
 		req.Type = RequestRadioCheck
 	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative"):
 		req.Type = RequestReadback
