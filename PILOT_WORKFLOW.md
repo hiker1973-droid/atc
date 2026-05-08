@@ -84,10 +84,10 @@ Mission-level coordination — fence checks, on/off-station, RTB.
    - Also accepted: `inbound` · `30 mile initial` · any `XX mile initial`
    - ATC: gives runway, may report lead/traffic, instructs pattern entry.
 
-4. **Overhead break** at 3 nm:
-   - Pilot: *"Al Minhad Tower, Raider 1, in the break"* (or *"3 mile initial"*)
-   - ATC: assigns break direction based on field's ramp side.
-   - Triggers: `in the break` · `3 mile initial` · `overhead` · `over the field`
+4. **3-mile initial → break clearance.** No separate "in the break" call needed.
+   - Pilot: *"Al Minhad Tower, Raider 1, 3 mile initial"*
+   - ATC: *"…runway 27, approved for left break"* (direction picked from the field's ramp side)
+   - Triggers: any `XX mile initial` where distance ≤ 3
 
 5. **Pattern reports** — call each leg.
    - *"…downwind"* → traffic call / continue
