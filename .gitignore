@@ -13,5 +13,10 @@ New Text Document.txt
 .DS_Store
 Thumbs.db
 
+# Operator-local artifacts (per-rig SRS client settings, Windows shortcuts)
+*.lnk
+default.cfg
+global.cfg
+
 # Claude Code per-machine state
 .claude/settings.local.json
