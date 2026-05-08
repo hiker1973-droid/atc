@@ -47,15 +47,14 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 
 Stop: close the console window, or use launcher dashboard buttons.
 
-### Training 1 active roles (2026-05-01)
-Only **Tower** and **ATIS** run on Training 1 — both are stable and battle-tested. Marshal, Command, Deckboss, and Scudwatch are parked here while we iterate on them from the dev rig (vsfg7-atc); their bat files have been moved to `dev_only/` so they don't get launched accidentally during a live mission.
+### Training 1 active roles (2026-05-08)
+**Tower**, **ATIS**, **Marshal** (306.3), and **Command** (282.0) all run live on Training 1. Bat files at repo root: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat`.
 
-Parked role bats (do not launch on Training 1):
-- `dev_only/start_command and deckboss.bat` — Command 282.0 + Deckboss 306.2
-- `dev_only/start_marshal.bat` — Marshal stack 306.3
+Still parked under `dev_only/` (do not launch on Training 1):
+- `dev_only/start_deckboss.bat` — Deckboss 306.2 (carrier ops)
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
 
-The role *code* (`cmd/atc/{command,marshal,deckboss,scudwatch}.go`, the supporting state, and the `--marshal-test-tx` debug flag) stays on `main` — only the launch scripts moved. Pull `main` on dev and run the parked bats from `dev_only/` there to keep iterating.
+The role *code* for all parked roles stays on `main`; only the launch scripts are gated. Pull `main` on dev and run the parked bats from `dev_only/` there.
 
 ## Gotchas
 - **`--grpc-addr` is not a valid flag.** It was removed from `atc.exe`. Old `run_alain.bat` / `run_dhafra.bat` / `run_minhad.bat` files still pass it and will fail at launch — delete them if they are still present.
@@ -68,11 +67,13 @@ The role *code* (`cmd/atc/{command,marshal,deckboss,scudwatch}.go`, the supporti
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
-## Recent context (2026-05-01)
-- Training 1 narrowed to Tower + ATIS only. Marshal/Command/Deckboss/Scudwatch bats moved to `dev_only/` for iteration on the dev rig.
-- Marshal: 3-mile-initial regex fix, Tacview-aware stack assignment in 2k–9k band, internal-only stack collapse on commence (no step-down radio call per 07.png), 3NM Initial → push-button-XX handoff. New `--marshal-test-tx` debug flag transmits "test" every 30s for SRS path verification.
-- Tower: new `radar check` intent reads back angels/range/bearing from Tacview.
-- Diagnosed: SRS server is not routing 306.3 (Marshal) or 282.0 (Command) audio to/from the DCS pilot client. Outbound TX path through `transmitExternalAudioFile` works (verified via `--marshal-test-tx` log lines). Issue is on the SRS/DCS side — see `feedback_only_spec_phraseology.md` and `command_channel_freeze_bug.md` memories.
+## Recent context (2026-05-08)
+- **Marshal/Command 282.0 routing bug fixed.** Root cause was the SRS handshake order in `command.go`/`marshal.go`/`deckboss.go`: they sent EAM before Sync, while Tower's `srsLoop` sent Sync before EAM. SRS only adds clients to the audio routing table on Sync — broken roles authenticated but never received UDP voice. Commit `924784f`. Marshal and Command both deploying live on Training 1 as of 2026-05-08.
+- Audio perf: STT switched to `gpt-4o-mini-transcribe`, flush ticker tightened from 500ms → 200ms in `srsLoop` (commit `461299f`).
+- New `RequestStartup` intent (`request startup` / `ready for startup` / `ready to start`) — Ground-callsign approval before taxi (commit `dafad18`). Trigger additions: `request departure`, `comcheck`, `comp check`.
+- Departure release distance bumped 5 → 7 nm across all three towers (commit `eb9803a`).
+- `controller.go` airborne fix: dropped `isCTAF` guard so `airborne`/`departing`/`clear traffic` triggers fire on direct tower address (commit `d78f5c8`).
+- OMAM runway pair order swapped — lower parallel `31L/13R` is now the default over upper `31R/13L` (commit `f83b9d7`).
 
 ## Older context (2026-04-25)
 - ATIS interval changed 120s → 45s in both call sites; rebuilt `atc.exe`.
