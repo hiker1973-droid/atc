@@ -1263,6 +1263,52 @@ func synthesizeSpeech(ctx context.Context, apiKey, text, voice string) ([]byte, 
 // Uses gpt-4o-mini-tts for more natural cadence than the legacy tts-1 model.
 // Voice list is unchanged: alloy, ash, ballad, coral, echo, fable, onyx, nova,
 // sage, shimmer, verse.
+// translateToArabic asks OpenAI to translate aviation ATIS text to Arabic.
+// Returns the translated string, or an error if the API call fails. Caller is
+// responsible for falling back gracefully (e.g. broadcast English only).
+func translateToArabic(ctx context.Context, apiKey, text string) (string, error) {
+	body := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]string{
+			{"role": "system", "content": "Translate the following aviation ATIS broadcast to modern standard Arabic. Use ICAO phraseology conventions where applicable. Numbers should be spelled out as Arabic words for clear TTS pronunciation. Return ONLY the Arabic translation, no preamble or explanation."},
+			{"role": "user", "content": text},
+		},
+		"temperature": 0.2,
+	}
+	data, _ := json.Marshal(body)
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		"https://api.openai.com/v1/chat/completions",
+		bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		errBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("translate API error %d: %s", resp.StatusCode, string(errBody))
+	}
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no translation returned")
+	}
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+}
+
 func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string) ([]byte, error) {
 	body := map[string]interface{}{
 		"model": "gpt-4o-mini-tts",

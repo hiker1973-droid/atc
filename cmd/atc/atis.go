@@ -81,7 +81,10 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 	os.MkdirAll(cacheDir, 0755)
 
 	state := &atisState{
-		cachePath: filepath.Join(cacheDir, fmt.Sprintf("atis_%s.mp3", station.ICAO)),
+		// Bilingual cache file — different from old "atis_<ICAO>.mp3" so the
+		// English-only caches from before the EN+AR change get superseded
+		// on first run instead of replayed indefinitely.
+		cachePath: filepath.Join(cacheDir, fmt.Sprintf("atis_%s_bilingual.mp3", station.ICAO)),
 	}
 
 	// Load cached MP3 from disk if exists
@@ -118,17 +121,37 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 
 		// Regenerate TTS if weather changed or no cache yet
 		if weatherChanged || state.cachedMP3 == nil {
-			text := buildATISText(station, state)
+			enText := buildATISText(station, state)
 			log.Info().Str("station", station.Name).Str("ident", identWord(state.ident)).
-				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio")
-			mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, station.Voice)
+				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio (EN+AR)")
+
+			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, station.Voice)
 			if err != nil {
-				log.Error().Err(err).Str("station", station.Name).Msg("ATIS TTS failed")
+				log.Error().Err(err).Str("station", station.Name).Msg("ATIS English TTS failed")
 				state.mu.Unlock()
 				return
 			}
-			state.cachedMP3 = mp3
-			_ = os.WriteFile(state.cachePath, mp3, 0644)
+
+			// Translate to Arabic and synthesize. Failures degrade gracefully
+			// to English-only — no broadcast disruption.
+			var arMP3 []byte
+			if arText, terr := translateToArabic(ctx, apiKey, enText); terr != nil {
+				log.Warn().Err(terr).Str("station", station.Name).Msg("ATIS Arabic translate failed — broadcasting English only")
+			} else if mp3, mErr := synthesizeSpeechAPI(ctx, apiKey, arText, station.Voice); mErr != nil {
+				log.Warn().Err(mErr).Str("station", station.Name).Msg("ATIS Arabic TTS failed — broadcasting English only")
+			} else {
+				arMP3 = mp3
+			}
+
+			// MP3 frames are independent so byte-concat plays back as one
+			// continuous stream in DCS-SR-ExternalAudio's decoder.
+			combined := enMP3
+			if arMP3 != nil {
+				combined = append(append([]byte{}, enMP3...), arMP3...)
+			}
+
+			state.cachedMP3 = combined
+			_ = os.WriteFile(state.cachePath, combined, 0644)
 			if weatherChanged {
 				state.ident = (state.ident + 1) % 26
 				lastKey = currentKey
