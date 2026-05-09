@@ -1784,9 +1784,20 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			id := parts[0]
 			props := parts[1]
 
-			// Extract Name (callsign)
-			if name := extractACMIProp(props, "Name"); name != "" {
-				objects[id] = name
+			// Extract Pilot first (real callsign in DCS) and fall back to
+			// Name (aircraft type) only if Pilot isn't reported. Without this,
+			// allPositions is keyed by aircraft type ("F-14B") instead of
+			// pilot callsign ("Raider 032"), which breaks radar-check lookup,
+			// speed warnings, and conflict detection.
+			if pilot := extractACMIProp(props, "Pilot"); pilot != "" {
+				objects[id] = pilot
+				if positions[id] == nil {
+					positions[id] = &objData{}
+				}
+			} else if name := extractACMIProp(props, "Name"); name != "" {
+				if _, alreadyHasPilot := objects[id]; !alreadyHasPilot {
+					objects[id] = name
+				}
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
