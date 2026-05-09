@@ -23,9 +23,44 @@ You do **not** need DCS-gRPC for ATIS-only/Tower-only deployment — it's only u
 
 ---
 
-## 2. What to copy to Foothold
+## 2. Install via git (recommended)
 
-Copy `C:\SkyeyeATC\` from Training 1 (or `git clone https://github.com/hiker1973-droid/atc.git` and run `build.bat`).
+On the Foothold VM, open a shell where `git` and `go` are on PATH:
+
+```bat
+cd C:\
+git clone https://github.com/hiker1973-droid/atc.git SkyeyeATC
+cd C:\SkyeyeATC
+build.bat
+```
+
+`build.bat` produces `atc.exe` and `launcher.exe`. Requires Go 1.26+ and SkyEye cloned at `C:\Skyeye` (build.bat references it for vendored deps).
+
+### Pulling updates later
+
+When dev pushes changes (most code lives on `main`):
+
+```bat
+cd C:\SkyeyeATC
+taskkill /IM atc.exe /F
+git pull origin main
+build.bat
+```
+
+Then relaunch the bats (section 4). The `taskkill` is required before `build.bat` — Windows won't overwrite a loaded `.exe`. Alternatively, do the rename trick:
+
+```bat
+move atc.exe atc.exe.old
+build.bat
+:: kill + relaunch atc.exe processes when ready
+del atc.exe.old
+```
+
+This lets you build the new binary while the old one is still running, then bounce processes on your own schedule.
+
+### Alt: copy from Training 1
+
+If you don't want git on Foothold, copy `C:\SkyeyeATC\` wholesale from Training 1.
 
 Required:
 
