@@ -160,3 +160,57 @@ Marshal handles the inbound stack to the boat — case recovery info, BRC, stack
 - **Speak full callsigns once per call.** *"Raider 1"* not just *"1"*. ATC needs a callsign to respond.
 - **If ATC didn't respond,** it likely missed the intent. Try a different phrasing from the trigger lists above. Common gotcha: *"requesting landing on runway 27"* misses; *"on final"* or *"request landing"* hits.
 - **One radio per role** — encryption **off**, modulation **AM** for all SkyeyeATC freqs.
+
+---
+
+## Glossary
+
+| Term | Meaning |
+|---|---|
+| **Angels N** | Altitude in thousands of feet. *"Angels 5"* = 5,000 ft. |
+| **BRC** | Base Recovery Course. The carrier's current magnetic heading; pilots use it to intercept the recovery pattern. |
+| **Bingo** | Fuel state at which you must RTB. Marshal flags state < 2.0 as priority. |
+| **Case 1 / 2 / 3** | Carrier recovery procedure based on weather. Case 1 = visual day (ceiling ≥ 3000 ft). Case 2 = marginal day. Case 3 = night or hard IFR. Marshal auto-derives this from weather ceiling. |
+| **CTAF** | Common Traffic Advisory Frequency. The shared traffic freq when no controlled tower is active. |
+| **DME** | Distance Measuring Equipment. *"7 DME"* = 7 nautical miles by DME. |
+| **EAM** | External AWACS Mode — how SkyeyeATC's atc.exe roles register with SRS as headless clients. |
+| **Fence in / out** | Crossing into or out of the combat area; arm/disarm systems. |
+| **Marking mom** | "Marking on Mother" — initial inbound check-in to Marshal. *Mom* = Mother = the carrier. |
+| **PTT** | Push-to-talk. |
+| **Signal Charlie** | Cleared to commence approach to the carrier. |
+| **Tally / Visual / No joy** | Tally = visual on bandit; Visual = visual on friendly; No joy = no visual contact. |
+| **TX / RX** | Transmit / Receive. |
+
+---
+
+## Troubleshooting "ATC didn't respond"
+
+If you make a call and Tower stays silent, work down this list:
+
+1. **Wait 2-3 seconds.** STT + intent matching + TTS round-trip is ~1.5-2.5s under normal load.
+2. **Did you address the field?** *"Tower, Raider 1, …"* on the field's freq is fine. *"Raider 1, …"* with no addressee may be ignored.
+3. **Re-key with a different phrasing.** The trigger lists above show what hits. Common misses:
+   - *"requesting landing on runway 27"* → use *"on final"* or *"request landing"*
+   - *"wheels down"* / *"touchdown"* → use *"runway vacated"* or *"clear active"*
+   - *"ready to roll"* → use *"request takeoff"* or *"ready for departure"*
+4. **Did you say a callsign?** Tower needs one to respond. If you forgot it, repeat the call with *"Raider 1"* (or your callsign).
+5. **Check your SRS overlay** — does the radio's TX indicator light up when you PTT? If no light:
+   - Wrong radio selected for transmit (see Tips section)
+   - Encryption stuck on that freq — toggle off
+   - Frequency outside the radio's TX band
+
+If still silent on Tower freq but other pilots are getting responses, message the operator — Whisper STT may be hung or the role is offline.
+
+---
+
+## Test-your-setup checklist
+
+When you join a new mission, do this once before you matter:
+
+- [ ] **SRS standalone client** is connected to the squadron server (address bar shows correct host:port).
+- [ ] **Radios tuned and set to AM**, encryption off.
+- [ ] **PTT bind** working — push and watch the SRS overlay TX indicator light up.
+- [ ] **Mic test**: tune your Tower freq, key up, say *"Tower, [callsign], radio check"*. Expect *"loud and clear"* / *"five by five"* in 2-3s.
+- [ ] **ATIS check**: tune your destination's ATIS, listen for the current runway and altimeter. If you hear the broadcast clearly you're hearing OK; if pilots' radio chatter overlaps it, you may have stuck/squelched encryption.
+
+If radio check fails, see Troubleshooting above before pushing to taxi.
