@@ -103,12 +103,12 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 
 **Triggers:** `clear traffic` · `clear of traffic` · `airborne` · `departing` · `seven dme` · `7 dme` · `seven miles` · `cleared airspace` · `five miles`
 
-**Extra placeholders:** `{DIST}` (e.g. `five miles`), `{ANGELS}` (e.g. `five`)
+**Extra placeholders:** `{DIST}` (word form, e.g. `seven`), `{ANGELS}` (e.g. `five`)
 
 **Responses:**
-1. `{CALLSIGN}, {TOWER}, proceed {DIST}, climb angels {ANGELS}, frequency change approved, good day.`
-2. `{CALLSIGN}, {TOWER}, clear, proceed {DIST} at angels {ANGELS}, navigate at will, freq change approved.`
-3. `{CALLSIGN}, {TOWER}, roger airborne, proceed {DIST}, angels {ANGELS}, then on your own. Frequency change approved, safe flight.`
+1. `{CALLSIGN}, {TOWER}, proceed to angels {ANGELS}, {DIST} DME, frequency change approved, good day.`
+2. `{CALLSIGN}, {TOWER}, climb angels {ANGELS}, {DIST} DME, freq change approved, navigate at will.`
+3. `{CALLSIGN}, {TOWER}, roger airborne, angels {ANGELS} at {DIST} DME, then on your own. Frequency change approved, safe flight.`
 
 ---
 

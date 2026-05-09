@@ -18,7 +18,7 @@ var OMAM = &Airfield{
 	ApproachFreqMHz: 251.100,
 	ATISFreqMHz:     248.2,
 	DepartureDistNm:  7,
-	DepartureAngels:   3,
+	DepartureAngels:   5,
 	HandoffCallsign:  "command",
 	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",
