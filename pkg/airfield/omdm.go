@@ -16,7 +16,7 @@ var OMDM = &Airfield{
 	ApproachFreqMHz: 250.100, // No separate approach freq on diagram — use tower
 	ATISFreqMHz:     248.3,
 	DepartureDistNm:  7,
-	DepartureAngels:   5,
+	DepartureAngels:   3,
 	HandoffCallsign:  "command",
 	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",

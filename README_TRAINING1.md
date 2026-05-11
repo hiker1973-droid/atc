@@ -33,24 +33,21 @@ Skippable: `logs\`, `atis_cache\`, `*.exe~`, `New Text Document.txt`, `atc-prev.
 
 ## 3. Post-Transfer Config (on Training 1)
 
-### 3a. Centralize the OpenAI key
-Today the key is duplicated in `start_atis.bat`, `start_towers.bat`, and the parked bats under `dev_only/`. Set it once as a Windows user env var instead:
+### 3a. Required env vars (v1.1.0+)
+Every `.bat` reads four values from Windows env vars and fails fast if any is missing. Set them once with `setx`, then **open a new cmd** so the new values are in scope:
 
 ```bat
-setx OPENAI_API_KEY "sk-proj-..."
+setx OPENAI_API_KEY    "sk-proj-..."
+setx SRS_EAM           "your-srs-eam-password"
+setx SKYEYE_SRS        "localhost:5008"     :: dev box uses localhost:5004
+setx SKYEYE_TACVIEW    "localhost:42676"
 ```
 
-Then strip the `set OPENAI_API_KEY=...` lines from each `.bat` (or leave them — `setx` wins on a fresh shell).
-
-### 3b. Update SRS / Tacview hosts
-Edit each `start_*.bat` and change:
-
-```bat
-set SRS=192.168.1.221:5004        →   set SRS=localhost:5008
-set TACVIEW=192.168.1.221:42676   →   set TACVIEW=localhost:42676   (or Training 1's actual host)
-```
-
-Same in `start_launcher.bat` (`--srs-addr` and `--tacview-addr` args).
+Notes:
+- `setx` only affects shells started *after* it runs. The shell where you ran it still has the old (empty) value.
+- Verify with: `echo %SKYEYE_SRS%` in a fresh cmd. If empty, the new shell didn't inherit it.
+- Same scripts work on dev rig and Training 1 — only the env var values differ.
+- `OPENAI_API_KEY` is read directly by `atc.exe`. `SRS_EAM` is the SRS External Audio Module password. `SKYEYE_SRS` and `SKYEYE_TACVIEW` are addresses (`host:port`).
 
 The YAML configs already point at `localhost:5008`, so no edit needed there.
 
@@ -78,11 +75,11 @@ Only Tower + ATIS run on Training 1 — they're stable and battle-tested. Carrie
 1. **`start_launcher.bat`** — opens browser dashboard at http://localhost:7000/. Use this to start/stop the rest from a UI instead of running each `.bat` by hand.
 2. **`start_atis.bat`** — all 5 ATIS stations (Dhafra, Minhad, Liwa, Al Ain, Khasab) on their own freqs. Now broadcasts every **45 seconds per station** (was 120s).
 3. **`start_towers.bat`** — Al Minhad / Al Dhafra / Al Ain Tower instances. Each binds dashboard ports 6001 / 6002 / 6003.
+4. **`start_marshal.bat`** — Marshal carrier stack on 306.3 (launch only when carrier ops are in the mission). `stop_marshal.bat` kills just Marshal without touching the towers.
 
 ### Parked roles (do not launch on Training 1)
 These bats live in `dev_only/` and are intended for the dev rig only:
 - `dev_only/start_command and deckboss.bat` — Command (282.0) + Deckboss (306.2)
-- `dev_only/start_marshal.bat` — Marshal stack (306.3)
 - `dev_only/run_scudwatch.bat` — Scudwatch / Darkstar-1-1 (264.0)
 
 ### Frequency cheat sheet

@@ -5,11 +5,19 @@ AI-powered Tower ATC for DCS World, owned by **vSFG-7**. Layered on SkyEye infra
 ## Where you are
 This is **Training 1** — the production rig where big missions run. SkyeyeATC was developed on a separate dev box (Windows Server 2022, vsfg7-atc) and ported here on **2026-04-25**. Treat this as prod: be cautious with destructive operations during live training, no exploratory refactors mid-session.
 
-## Network (Training 1, differs from dev)
-- SRS: `localhost:5008` (dev was `192.168.1.221:5004`)
-- DCS-gRPC: `localhost:50051`
-- Tacview real-time telemetry: `localhost:42676`
-- OpenAI key: read from `OPENAI_API_KEY` env var. Set globally with `setx OPENAI_API_KEY "..."` — do not re-add it to individual `.bat` files.
+## Network (env vars, v1.1.0+)
+All `.bat` scripts read four env vars and fail fast if any is missing. Same scripts work on dev rig and Training 1 — only the values differ.
+
+| Env var | Training 1 | Dev rig | Read by |
+|---|---|---|---|
+| `OPENAI_API_KEY` | sk-proj-... | sk-proj-... | `atc.exe` directly (Whisper STT + TTS) |
+| `SRS_EAM` | (rotate before mission) | (same) | All `start_*.bat`, passed as `--eam-password` |
+| `SKYEYE_SRS` | `localhost:5008` | `localhost:5004` | All `start_*.bat`, passed as `--srs-addr` |
+| `SKYEYE_TACVIEW` | `localhost:42676` | `localhost:42676` | Tower / Marshal / Scudwatch / Launcher, passed as `--tacview-addr` |
+
+Set with `setx VAR value`, then open a new cmd so the new values are in scope (setx doesn't affect the running shell). Symptom of a missing var: each script aborts at the top with `ERROR: <VAR> env var not set`.
+
+DCS-gRPC is not externalized — `:50051` is stable across boxes.
 
 ## Repo layout
 - `cmd/atc/` — main `atc.exe`, runs in different modes via flags (tower / `--atis-only` / `--command-only` / `--marshal-only` / `--scudwatch-only` / `--deckboss-freq`)
@@ -44,17 +52,20 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 1. `start_launcher.bat` — opens dashboard at http://localhost:7000/
 2. `start_atis.bat` — all 5 ATIS stations
 3. `start_towers.bat` — Minhad / Dhafra / Al Ain (dashboards on 6001 / 6002 / 6003)
+4. `start_marshal.bat` — Marshal carrier stack on 306.3 (when carrier ops in mission)
 
-Stop: close the console window, or use launcher dashboard buttons.
+Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use launcher dashboard buttons.
 
-### Training 1 active roles (2026-05-08)
-**Tower**, **ATIS**, **Marshal** (306.3), and **Command** (282.0) all run live on Training 1. Bat files at repo root: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat`.
+### Training 1 active roles (2026-05-04)
+**Tower**, **ATIS**, and **Marshal** run on Training 1 — all three are stable enough for live missions. Command, Deckboss, and Scudwatch are still parked under `dev_only/` while we iterate on them from the dev rig (vsfg7-atc).
 
-Still parked under `dev_only/` (do not launch on Training 1):
-- `dev_only/start_deckboss.bat` — Deckboss 306.2 (carrier ops)
+Parked role bats (do not launch on Training 1):
+- `dev_only/start_command and deckboss.bat` — Command 282.0 + Deckboss 306.2
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
 
-The role *code* for all parked roles stays on `main`; only the launch scripts are gated. Pull `main` on dev and run the parked bats from `dev_only/` there.
+The role *code* (`cmd/atc/{command,deckboss,scudwatch}.go`, the supporting state) stays on `main` — only the launch scripts are parked. Pull `main` on dev and run the parked bats from `dev_only/` there to keep iterating.
+
+**Dev-only Marshal test mode:** `start_marshal_test.bat` (root, local-only on dev rig — not pushed) launches Marshal with `--marshal-test-tx`, which transmits "test" on 306.3 every 30s. Used for SRS routing diagnostics. Do not run on Training 1 — it would broadcast test traffic on the carrier freq during live missions.
 
 ## Gotchas
 - **`--grpc-addr` is not a valid flag.** It was removed from `atc.exe`. Old `run_alain.bat` / `run_dhafra.bat` / `run_minhad.bat` files still pass it and will fail at launch — delete them if they are still present.
@@ -67,13 +78,11 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
-## Recent context (2026-05-08)
-- **Marshal/Command 282.0 routing bug fixed.** Root cause was the SRS handshake order in `command.go`/`marshal.go`/`deckboss.go`: they sent EAM before Sync, while Tower's `srsLoop` sent Sync before EAM. SRS only adds clients to the audio routing table on Sync — broken roles authenticated but never received UDP voice. Commit `924784f`. Marshal and Command both deploying live on Training 1 as of 2026-05-08.
-- Audio perf: STT switched to `gpt-4o-mini-transcribe`, flush ticker tightened from 500ms → 200ms in `srsLoop` (commit `461299f`).
-- New `RequestStartup` intent (`request startup` / `ready for startup` / `ready to start`) — Ground-callsign approval before taxi (commit `dafad18`). Trigger additions: `request departure`, `comcheck`, `comp check`.
-- Departure release distance bumped 5 → 7 nm across all three towers (commit `eb9803a`).
-- `controller.go` airborne fix: dropped `isCTAF` guard so `airborne`/`departing`/`clear traffic` triggers fire on direct tower address (commit `d78f5c8`).
-- OMAM runway pair order swapped — lower parallel `31L/13R` is now the default over upper `31R/13L` (commit `f83b9d7`).
+## Recent context (2026-05-01)
+- Training 1 narrowed to Tower + ATIS only. Marshal/Command/Deckboss/Scudwatch bats moved to `dev_only/` for iteration on the dev rig.
+- Marshal: 3-mile-initial regex fix, Tacview-aware stack assignment in 2k–9k band, internal-only stack collapse on commence (no step-down radio call per 07.png), 3NM Initial → push-button-XX handoff. New `--marshal-test-tx` debug flag transmits "test" every 30s for SRS path verification.
+- Tower: new `radar check` intent reads back angels/range/bearing from Tacview.
+- Diagnosed: SRS server is not routing 306.3 (Marshal) or 282.0 (Command) audio to/from the DCS pilot client. Outbound TX path through `transmitExternalAudioFile` works (verified via `--marshal-test-tx` log lines). Issue is on the SRS/DCS side — see `feedback_only_spec_phraseology.md` and `command_channel_freeze_bug.md` memories.
 
 ## Older context (2026-04-25)
 - ATIS interval changed 120s → 45s in both call sites; rebuilt `atc.exe`.
