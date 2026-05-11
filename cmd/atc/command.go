@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"runtime"
@@ -264,16 +266,46 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 				if readErr != nil {
 					continue
 				}
-				if n < 6 {
+				// 22-byte packet is a UDP ping (just the GUID), not voice.
+				if n == 22 {
 					continue
 				}
-				audioLen := int(udpBuf[4]) | int(udpBuf[5])<<8
-				if audioLen <= 0 || 6+audioLen > n {
+				if n < 7 {
 					continue
 				}
-				origin := extractOriginFromUDP(udpBuf[:n])
+				// SRS audio packet layout matches Tower's parser in main.go:
+				//   [2:4]  audioLen (uint16 LE)
+				//   [4:6]  freqSegLen (uint16 LE) — total bytes of trailing freq segments
+				//   [6:6+audioLen]  opus audio
+				//   [6+audioLen:][n*10]  freq segments (8B freq float64 + 2B trailer each)
+				//   [n-22:n]  origin client GUID
+				// Command previously read audioLen from [4:6] (which is freqSegLen),
+				// so every packet either bailed or accumulated garbage — making
+				// the Command channel deaf to pilots even though TX worked.
+				audioLen := binary.LittleEndian.Uint16(udpBuf[2:4])
+				if int(audioLen) > n-6 {
+					continue
+				}
 				opusBytes := make([]byte, audioLen)
 				copy(opusBytes, udpBuf[6:6+audioLen])
+
+				// SRS broadcasts packets from all radios to all clients; filter
+				// to our freq the same way Tower does (500Hz tolerance).
+				audioEnd := 6 + int(audioLen)
+				freqSegLen := binary.LittleEndian.Uint16(udpBuf[4:6])
+				freqMatch := false
+				for i := 0; i+10 <= int(freqSegLen) && audioEnd+i+10 <= n; i += 10 {
+					pktFreq := math.Float64frombits(binary.LittleEndian.Uint64(udpBuf[audioEnd+i : audioEnd+i+8]))
+					if math.Abs(pktFreq-freqHz) < 500 {
+						freqMatch = true
+						break
+					}
+				}
+				if !freqMatch {
+					continue
+				}
+
+				origin := extractOriginFromUDP(udpBuf[:n])
 				if transmissions[origin] == nil {
 					transmissions[origin] = &transmission{}
 				}
