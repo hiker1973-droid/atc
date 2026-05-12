@@ -20,7 +20,7 @@ var OMAM = &Airfield{
 	DepartureDistNm:  7,
 	DepartureAngels:   3,
 	HandoffCallsign:  "command",
-	HandoffFreqMHz:   282.000,
+	HandoffFreqMHz:   230.000,
 	HandoffPreset:    "channel four",
 	BreakDirections: map[string]string{
 		// Ramp on south/east side. Both 31 ends have ramp on the left side

@@ -12,7 +12,7 @@ All `.bat` scripts read four env vars and fail fast if any is missing. Same scri
 |---|---|---|---|
 | `OPENAI_API_KEY` | sk-proj-... | sk-proj-... | `atc.exe` directly (Whisper STT + TTS) |
 | `SRS_EAM` | (rotate before mission) | (same) | All `start_*.bat`, passed as `--eam-password` |
-| `SKYEYE_SRS` | `localhost:5008` | `localhost:5004` | All `start_*.bat`, passed as `--srs-addr` |
+| `SKYEYE_SRS` | `localhost:5004` | `localhost:5004` | All `start_*.bat`, passed as `--srs-addr` |
 | `SKYEYE_TACVIEW` | `localhost:42676` | `localhost:42676` | Tower / Marshal / Scudwatch / Launcher, passed as `--tacview-addr` |
 
 Set with `setx VAR value`, then open a new cmd so the new values are in scope (setx doesn't affect the running shell). Symptom of a missing var: each script aborts at the top with `ERROR: <VAR> env var not set`.
@@ -25,7 +25,7 @@ DCS-gRPC is not externalized — `:50051` is stable across boxes.
 - `cmd/logtail/` — log tail/filter CLI
 - `pkg/airfield/` — OMDM, OMAM, OMAL definitions (runways, freqs, elev)
 - `pkg/state/`, `pkg/controller/`, `pkg/composer/` — state machine, intent + conflict detection, ICAO phraseology
-- `configs/{alain,dhafra,minhad}.yaml` — per-airfield configs (already point at `localhost:5008`)
+- `configs/{alain,dhafra,minhad}.yaml` — per-airfield configs (still hardcode `localhost:5008` — stale; SRS server actually listens on 5004 here, but these YAMLs are not currently read by `atc.exe` so the mismatch is cosmetic)
 
 ## Sites and roles
 Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
@@ -60,7 +60,7 @@ Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use 
 **Tower**, **ATIS**, and **Marshal** run on Training 1 — all three are stable enough for live missions. Command, Deckboss, and Scudwatch are still parked under `dev_only/` while we iterate on them from the dev rig (vsfg7-atc).
 
 Parked role bats (do not launch on Training 1):
-- `dev_only/start_command and deckboss.bat` — Command 282.0 + Deckboss 306.2
+- `dev_only/start_command and deckboss.bat` — Command 230.0 + Deckboss 306.2
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
 
 The role *code* (`cmd/atc/{command,deckboss,scudwatch}.go`, the supporting state) stays on `main` — only the launch scripts are parked. Pull `main` on dev and run the parked bats from `dev_only/` there to keep iterating.
@@ -82,7 +82,7 @@ The role *code* (`cmd/atc/{command,deckboss,scudwatch}.go`, the supporting state
 - Training 1 narrowed to Tower + ATIS only. Marshal/Command/Deckboss/Scudwatch bats moved to `dev_only/` for iteration on the dev rig.
 - Marshal: 3-mile-initial regex fix, Tacview-aware stack assignment in 2k–9k band, internal-only stack collapse on commence (no step-down radio call per 07.png), 3NM Initial → push-button-XX handoff. New `--marshal-test-tx` debug flag transmits "test" every 30s for SRS path verification.
 - Tower: new `radar check` intent reads back angels/range/bearing from Tacview.
-- Diagnosed: SRS server is not routing 306.3 (Marshal) or 282.0 (Command) audio to/from the DCS pilot client. Outbound TX path through `transmitExternalAudioFile` works (verified via `--marshal-test-tx` log lines). Issue is on the SRS/DCS side — see `feedback_only_spec_phraseology.md` and `command_channel_freeze_bug.md` memories.
+- ~~Diagnosed: SRS server is not routing 306.3 (Marshal) or 282.0 (Command) audio…~~ **Superseded 2026-05-11**: root cause was a UDP audio parser bug in `marshal.go` / `command.go` (read `audioLen` from `[4:6]` — actually `freqSegLen` — instead of `[2:4]`). Fixed in `063f239` aligning Marshal/Command parsers to Tower's. Outbound TX always worked; inbound was deaf because every packet either bailed or accumulated 10 bytes of garbage as "opus" → Whisper hallucinated text. A separate pilot-side SRS-Client issue (failed parse of `RadioModelsCustom`) was observed silently swallowing TX on 282 specifically — moved Command to **230.0** as a workaround.
 
 ## Older context (2026-04-25)
 - ATIS interval changed 120s → 45s in both call sites; rebuilt `atc.exe`.

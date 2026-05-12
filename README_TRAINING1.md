@@ -79,7 +79,7 @@ Only Tower + ATIS run on Training 1 — they're stable and battle-tested. Carrie
 
 ### Parked roles (do not launch on Training 1)
 These bats live in `dev_only/` and are intended for the dev rig only:
-- `dev_only/start_command and deckboss.bat` — Command (282.0) + Deckboss (306.2)
+- `dev_only/start_command and deckboss.bat` — Command (230.0) + Deckboss (306.2)
 - `dev_only/run_scudwatch.bat` — Scudwatch / Darkstar-1-1 (264.0)
 
 ### Frequency cheat sheet
@@ -90,7 +90,7 @@ These bats live in `dev_only/` and are intended for the dev rig only:
 | Al Ain Tower | 250.7 | OMAL |
 | Deckboss | 306.2 | OMDM |
 | Marshal | 306.3 | OMDM |
-| Command | 282.0 | — |
+| Command | 230.0 | — |
 | Scudwatch | 264.0 | — |
 | ATIS Dhafra / Minhad / Liwa / Al Ain / Khasab | 248.2 / 248.3 / 248.55 / 248.85 / 248.5 | — |
 
