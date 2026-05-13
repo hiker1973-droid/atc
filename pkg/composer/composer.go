@@ -105,13 +105,16 @@ func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromM
 }
 
 // DepartureRelease confirms post-takeoff departure — 3 variations.
+// The angels arg is ignored; we randomize 5–7 per call so successive
+// departures don't all get assigned the same altitude. Pilot is told to
+// call tower back at distNm DME for the Command handoff.
 func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) string {
 	dist := numberWord(distNm)
-	ang := numberWord(angels)
+	ang := numberWord(5 + rand.Intn(3))
 	return pick([]string{
-		fmt.Sprintf("%s, %s, proceed to angels %s, %s DME, frequency change approved, good day.", callsign, c.towerCallsign, ang, dist),
-		fmt.Sprintf("%s, %s, climb angels %s, %s DME, freq change approved, navigate at will.", callsign, c.towerCallsign, ang, dist),
-		fmt.Sprintf("%s, %s, roger airborne, angels %s at %s DME, then on your own. Frequency change approved, safe flight.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, climb to angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
 	})
 }
 

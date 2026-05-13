@@ -1234,13 +1234,16 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
 // 14 chars/sec rate is empirical for the legacy tts-1 model at our 0.88 speed
-// setting and is close enough for gpt-4o-mini-tts at the same speed; the 1.5s
-// margin covers ExternalAudio.exe startup, the playback tail, and the ~250ms
-// added by the mic-click splice in addMicClicks.
+// setting and is close enough for gpt-4o-mini-tts at the same speed. The 5s
+// margin covers ExternalAudio.exe startup, the playback tail, the mic-click
+// splice, and — critically — the Whisper flush gap that arrives AFTER audio
+// stops playing. Without enough margin here the bot transcribes its own TX
+// loopback and re-fires the same response (observed 2026-05-12 with airborne
+// / freq-change calls repeating every 10–13s).
 func estimateTTSDuration(text string) time.Duration {
-	d := time.Duration(len(text))*time.Second/14 + 1500*time.Millisecond
-	if d < 3*time.Second {
-		return 3 * time.Second
+	d := time.Duration(len(text))*time.Second/14 + 5*time.Second
+	if d < 6*time.Second {
+		return 6 * time.Second
 	}
 	return d
 }
