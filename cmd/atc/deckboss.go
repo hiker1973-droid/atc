@@ -37,7 +37,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			return
 		}
 		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		transmitExternalAudioFile(mp3, freqMHz, "OMDM-DKB", srsHost, srsPort, flagExternalAudio)
+		transmitExternalAudioFile(ctx, mp3, freqMHz, "OMDM-DKB", srsHost, srsPort, flagExternalAudio)
 	}
 
 	// Tacview monitor — free cat if aircraft launches without airborne call

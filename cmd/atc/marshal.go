@@ -43,7 +43,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 			return
 		}
 		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		transmitExternalAudioFile(mp3, freqMHz, "OMDM-MSH", srsHost, srsPort, flagExternalAudio)
+		transmitExternalAudioFile(ctx, mp3, freqMHz, "OMDM-MSH", srsHost, srsPort, flagExternalAudio)
 	}
 
 	// DEBUG: with --marshal-test-tx, transmit "test" every 30s to verify the
