@@ -943,7 +943,7 @@ func extractCallsign(text, towerCallsign string) string {
 		if len(parts) >= 2 {
 			cs := strings.TrimSpace(parts[1])
 			if cs != "" && !strings.Contains(strings.ToLower(cs), "traffic") && !strings.Contains(strings.ToLower(cs), "tower") {
-				return cs
+				return trimTrailingTriggers(cs)
 			}
 		}
 		return ""
@@ -952,15 +952,54 @@ func extractCallsign(text, towerCallsign string) string {
 	if before != "" {
 		parts := strings.Split(before, ",")
 		if cs := strings.TrimSpace(parts[len(parts)-1]); cs != "" {
-			return cs
+			return trimTrailingTriggers(cs)
 		}
 	}
 	after := strings.TrimLeft(strings.TrimSpace(text[idx+len(towerCallsign):]), ", ")
 	parts := strings.Split(after, ",")
 	if len(parts) > 0 {
-		return strings.TrimSpace(parts[0])
+		return trimTrailingTriggers(strings.TrimSpace(parts[0]))
 	}
 	return ""
+}
+
+// trimTrailingTriggers strips known intent-trigger phrases from the tail of
+// what extractCallsign returned. Pilots routinely run callsign + request
+// together with no comma ("Raider 032 radar check") and Whisper sometimes
+// drops the comma even when said. Without this, the callsign field carries
+// the request along with it ("Raider 032 radar check.") and Tacview lookups
+// miss the actual modex-keyed contact ("Raider 032").
+func trimTrailingTriggers(cs string) string {
+	triggers := []string{
+		// radio / radar / comm checks (incl. common Whisper mishears)
+		"radar check", "raider check", "radio check",
+		"comm check", "comms check", "comp check", "com check", "comcheck",
+		// requests
+		"request taxi", "request ground", "request takeoff", "request departure",
+		"request landing", "request startup", "request start",
+		// pattern / state calls
+		"holding short", "hold short", "ready for", "ready to",
+		"airborne", "departing", "inbound",
+		"on final", " final", "turning final",
+		"downwind", "turning downwind",
+		"base", "turning base",
+		"overhead", "initial",
+		"clear active", "cleared active", "clear of runway", "runway vacated",
+		"going around", "go around", "missed approach",
+		// distance / handoff
+		"pushing command", "switching command", "push command",
+		"7 dme", "seven dme", "cleared airspace",
+		// emergencies
+		"mayday", "pan pan", "emergency",
+	}
+	lower := strings.ToLower(cs)
+	cut := len(cs)
+	for _, t := range triggers {
+		if i := strings.Index(lower, t); i >= 0 && i < cut {
+			cut = i
+		}
+	}
+	return strings.TrimSpace(strings.Trim(cs[:cut], ", ."))
 }
 
 func extractAirframe(lower string) string {
