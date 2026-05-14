@@ -1847,7 +1847,14 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 		// Send XtraLib handshake — required or Tacview drops the connection
 		conn.Write([]byte("XtraLib.Stream.0\nTacview.RealTimeTelemetry.0\nvSFG7-ATC\n0\x00"))
 
-		// Object registries declared outside loop — persist across reconnects
+		// Object registries declared outside loop — persist across reconnects.
+		// Reference lat/lon: ACMI reports T= positions as DELTAS from these
+		// globals (set once on the special object id "0"). Without them, every
+		// position is interpreted as a tiny absolute coord near (0,0) — making
+		// haversine to any real airfield return ~3000 nm. DCS exports both for
+		// the mission map; we apply them to T= coords[0..1].
+		var refLat, refLon float64
+		var refSet bool
 
 		scanner := bufio.NewScanner(conn)
 		scanner.Buffer(make([]byte, 65536), 65536)
@@ -1873,6 +1880,22 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			}
 			id := parts[0]
 			props := parts[1]
+
+			// Object id "0" is the global / world object — carries the
+			// ReferenceLatitude / ReferenceLongitude that subsequent T=
+			// position deltas are measured from. Capture and skip.
+			if id == "0" {
+				if v := extractACMIProp(props, "ReferenceLatitude"); v != "" {
+					if _, err := fmt.Sscanf(v, "%f", &refLat); err == nil {
+						refSet = true
+					}
+				}
+				if v := extractACMIProp(props, "ReferenceLongitude"); v != "" {
+					fmt.Sscanf(v, "%f", &refLon)
+					refSet = true
+				}
+				continue
+			}
 
 			// Priority for the callsign key:
 			//   1. Pilot — for AI units this is the modex/unit callsign
@@ -1934,15 +1957,28 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 				objectTypes[id] = objType
 			}
 
-			// Extract T= (transform: lon|lat|alt[|roll|pitch|heading])
+			// Extract T= (transform: lon|lat|alt[|roll|pitch|heading]).
+			// lon and lat are DELTAS in degrees from refLon/refLat. Add the
+			// reference to recover absolute coordinates. If reference hasn't
+			// been seen yet (rare race on first frames after connect), the
+			// position will be wrong this frame; the next position update
+			// after we've seen the ref will be correct.
 			if t := extractACMIProp(props, "T"); t != "" {
 				coords := strings.Split(t, "|")
 				if len(coords) >= 3 {
 					if positions[id] == nil {
 						positions[id] = &objData{}
 					}
-					fmt.Sscanf(coords[0], "%f", &positions[id].lon)
-					fmt.Sscanf(coords[1], "%f", &positions[id].lat)
+					var dLon, dLat float64
+					fmt.Sscanf(coords[0], "%f", &dLon)
+					fmt.Sscanf(coords[1], "%f", &dLat)
+					if refSet {
+						positions[id].lon = refLon + dLon
+						positions[id].lat = refLat + dLat
+					} else {
+						positions[id].lon = dLon
+						positions[id].lat = dLat
+					}
 					var altM float64
 					fmt.Sscanf(coords[2], "%f", &altM)
 					newAlt := altM * 3.28084
