@@ -149,7 +149,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 							continue
 						}
 						log.Info().Float64("freq", freqMHz).Msg("Command test TX")
-						transmitExternalAudioFile(mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
+						transmitExternalAudioFile(ctx, mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
 					}
 				}
 			}()
@@ -256,7 +256,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 							}
 							atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration(resp)).UnixNano())
 							log.Info().Str("callsign", cs).Str("text", resp).Float64("freq", freqMHz).Msg("Command TX")
-							transmitExternalAudioFile(mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
+							transmitExternalAudioFile(ctx, mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
 						}(frames)
 					}
 				}

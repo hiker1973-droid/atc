@@ -165,7 +165,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		state.mu.Unlock()
 
 		// Broadcast cached MP3
-		transmitExternalAudioFile(mp3, station.FreqMHz, station.Name, srsHost, srsPort,
+		transmitExternalAudioFile(ctx, mp3, station.FreqMHz, station.Name, srsHost, srsPort,
 			flagExternalAudio)
 	}
 

@@ -93,7 +93,7 @@ func scudwatchTXWorker(ctx context.Context, queue <-chan string,
 				log.Error().Err(err).Msg("scudwatch TTS failed")
 				continue
 			}
-			transmitExternalAudioFile(mp3, freqMHz, callsign, "", srsPort, externalAudio)
+			transmitExternalAudioFile(ctx, mp3, freqMHz, callsign, "", srsPort, externalAudio)
 			// Gap between back-to-back calls so ExternalAudio finishes cleanly.
 			select {
 			case <-ctx.Done():

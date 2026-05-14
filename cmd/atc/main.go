@@ -447,17 +447,30 @@ func run(cmd *cobra.Command, args []string) error {
 			case <-ctx.Done():
 				return
 			case text := <-txChan:
-				log.Info().Str("text", text).Msg("TX via OpenAI TTS + ExternalAudio")
-				atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
-				// Generate speech via OpenAI TTS
-				mp3, err := synthesizeSpeech(ctx, apiKey, text, flagTTSVoice)
+				log.Info().Str("text", text).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
+				// 10s ceiling on TTS: OpenAI is either fast (~2s) or hung. No
+				// SAPI fallback — operator preference is one consistent voice;
+				// pilot will repeat if TX drops.
+				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
+				ttsStart := time.Now()
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, flagTTSVoice)
+				ttsCancel()
+				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
-					log.Error().Err(err).Msg("TTS synthesis failed — falling back to SAPI")
-					transmitExternalAudio(text, freqMHz, af.ICAO+"-ATC", srsHost, srsPort, flagExternalAudio)
+					log.Warn().Err(err).Int64("ttsMs", ttsMs).Str("text", text).Msg("TTS synthesis failed — dropping TX")
 					continue
 				}
-				// Save MP3 to temp file and inject via ExternalAudio --file
-				transmitExternalAudioFile(mp3, freqMHz, af.ICAO+"-ATC", srsHost, srsPort, flagExternalAudio)
+				// Set cooldown HERE, not at dequeue: covers the actual playback
+				// window starting now. Setting at dequeue lets a slow TTS expire
+				// the cooldown before audio plays, which is how self-loopback got
+				// re-introduced via the (now-removed) SAPI fallback path.
+				atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
+				eaCtx, eaCancel := context.WithTimeout(ctx, 30*time.Second)
+				eaStart := time.Now()
+				transmitExternalAudioFile(eaCtx, mp3, freqMHz, af.ICAO+"-ATC", srsHost, srsPort, flagExternalAudio)
+				eaCancel()
+				eaMs := time.Since(eaStart).Milliseconds()
+				log.Info().Int64("ttsMs", ttsMs).Int64("eaMs", eaMs).Msg("TX done")
 			}
 		}
 	}()
@@ -1118,8 +1131,10 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 	}
 	log.Debug().Int("wavBytes", len(wav)).Msg("WAV conversion done")
 
-	// Use callsign-aware prompt to guide Whisper recognition
-	prompt := fmt.Sprintf("%s Tower, Raider, Venom, radio check, request taxi, holding short, runway, cleared for takeoff, airborne, seven DME, cleared airspace, inbound, overhead, downwind, base, short final, clear active, runway vacated, going around, mayday", callsign)
+	// Use callsign-aware prompt to guide Whisper recognition. callsign already
+	// ends in "Tower"; appending another "Tower" duplicates it in-prompt and
+	// nudges Whisper toward prompt-regurgitation hallucinations.
+	prompt := fmt.Sprintf("%s, Raider, Venom, radio check, request taxi, holding short, runway, cleared for takeoff, airborne, seven DME, cleared airspace, inbound, overhead, downwind, base, short final, clear active, runway vacated, going around, mayday", callsign)
 	text, err := whisperTranscribeWithPrompt(ctx, apiKey, wav, "audio.wav", prompt)
 	if err != nil {
 		log.Error().Err(err).Msg("Whisper transcription error")
@@ -1127,6 +1142,10 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 	}
 	if text == "" {
 		log.Warn().Msg("Whisper returned empty transcription")
+		return
+	}
+	if isWhisperHallucination(text) {
+		log.Warn().Str("text", text).Msg("Whisper hallucination — dropping")
 		return
 	}
 	log.Info().Str("text", text).Msg("recognized")
@@ -1671,7 +1690,8 @@ func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
 }
 
 // transmitExternalAudioFile injects a pre-generated MP3 file via ExternalAudio.
-func transmitExternalAudioFile(mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
+// ctx bounds the subprocess so a hung ExternalAudio.exe can't stall the TX queue.
+func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
 	if flagRadioEffect {
 		// Tower callsigns end in "-ATC" (e.g. OMAM-ATC). Use a separate
 		// intensity knob for tower so operators can crank tower static
@@ -1709,9 +1729,13 @@ func transmitExternalAudioFile(mp3 []byte, freqMHz float64, callsign, srsHost, s
 		"-v", "1",
 	}
 	log.Debug().Strs("args", args).Msg("ExternalAudio file TX")
-	out, err := exec.Command(exePath, args...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, exePath, args...).CombinedOutput()
 	if err != nil {
-		log.Error().Err(err).Str("output", string(out)).Msg("ExternalAudio file error")
+		if ctx.Err() != nil {
+			log.Warn().Err(ctx.Err()).Msg("ExternalAudio file TX timed out — killed")
+		} else {
+			log.Error().Err(err).Str("output", string(out)).Msg("ExternalAudio file error")
+		}
 	} else {
 		log.Debug().Msg("ExternalAudio file TX ok")
 	}

@@ -361,8 +361,21 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 			lon, lat, altFt = contact.Lon, contact.Lat, contact.AltFt
 			hasContact = true
 		}
+		// Diagnostic dump on miss: list every callsign Tacview is reporting so
+		// we can see exactly what DCS is exporting vs what the pilot said.
+		var known []string
+		if !hasContact {
+			for cs := range c.allPositions {
+				known = append(known, cs)
+			}
+		}
 		c.allPositionsMu.RUnlock()
 		if !hasContact {
+			log.Warn().
+				Str("askedFor", req.Callsign).
+				Int("knownCount", len(known)).
+				Strs("knownCallsigns", known).
+				Msg("radar check miss — Tacview callsign mismatch")
 			response = c.composer.RadarCheckNoContact(req.Callsign)
 			break
 		}
@@ -696,7 +709,7 @@ func (c *ATCController) pruneLoop(ctx context.Context) {
 func towerKeywordAliases(callsign string) []string {
 	aliases := map[string][]string{
 		"al minhad tower": {"almanad", "al-minhad", "minhad", "minot", "minhot", "el minhad", "el minha", "elmina", "elm and", "helm a", "el mina", "alma nad", "al minad", "helmet", "helmet on", "helmont", "el menad", "elman", "elma", "el menon", "elmenon", "el menod", "elmena"},
-		"al dhafra tower": {"dhafra", "al dhafra", "alfra", "al-dhafra", "ldaf", "ldafa", "ldot", "el dhafra", "delta for", "delta tower", "al dafra", "dafra"},
+		"al dhafra tower": {"dhafra", "al dhafra", "alfra", "al-dhafra", "ldaf", "ldafa", "ldot", "el dhafra", "delta for", "delta offer", "delta tower", "al dafra", "dafra", "altitude", "altitude offer", "al dafna", "dafna"},
 		"al ain tower":    {"al ain", "alain", "al-ain", "aline", "alan", "el ain"},
 	}
 	lower := strings.ToLower(callsign)
