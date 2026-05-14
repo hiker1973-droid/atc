@@ -1881,12 +1881,18 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			//   2. Group — usually the formation name (e.g. "Carrier strike
 			//      group-10"), only useful as a fallback.
 			//   3. Name  — aircraft type (e.g. "F-14B") as last resort.
-			// If first-seen logs show humans have their modex in Group rather
-			// than Pilot, this priority needs to differ for human vs AI.
+			// Human players: DCS reports Pilot as "<modex> | <player_name>"
+			// (e.g. "Venom 020 | BARNEY"). The pilot says only the modex on
+			// the radio, so we strip everything from " | " onward. AI units
+			// don't use the " | " separator, so this is a no-op for them.
 			_, wasKnown := objects[id]
 			switch {
 			case extractACMIProp(props, "Pilot") != "":
-				objects[id] = extractACMIProp(props, "Pilot")
+				p := extractACMIProp(props, "Pilot")
+				if i := strings.Index(p, " | "); i >= 0 {
+					p = p[:i]
+				}
+				objects[id] = p
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
