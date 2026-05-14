@@ -1889,8 +1889,11 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			switch {
 			case extractACMIProp(props, "Pilot") != "":
 				p := extractACMIProp(props, "Pilot")
-				if i := strings.Index(p, " | "); i >= 0 {
-					p = p[:i]
+				// Strip on the bare "|" — DCS uses inconsistent spacing
+				// around it ("Venom 020 | BARNEY" vs "Raider 032 |Jedi").
+				// Take everything before the first pipe and trim whitespace.
+				if i := strings.Index(p, "|"); i >= 0 {
+					p = strings.TrimSpace(p[:i])
 				}
 				objects[id] = p
 				if positions[id] == nil {
