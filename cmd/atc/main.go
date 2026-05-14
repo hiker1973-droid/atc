@@ -1875,23 +1875,23 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			props := parts[1]
 
 			// Priority for the callsign key:
-			//   1. Group  — DCS's mission-assigned callsign / modex (e.g.
-			//      "Raider 1-1"). This is what pilots say on the radio.
-			//   2. Pilot  — player handle (e.g. "Jedi") — used only when no
-			//      Group is reported (e.g. AI or older Tacview client).
-			//   3. Name   — aircraft type (e.g. "F-14B") as last resort.
-			// Earlier versions used Pilot as primary, which broke radar-check
-			// lookup whenever DCS exported a player handle distinct from the
-			// modex (almost always for human players).
+			//   1. Pilot — for AI units this is the modex/unit callsign
+			//      (e.g. "Pontiac 1-1 Rescue"); for humans it may be the
+			//      player handle. Confirmed via first-seen logs 2026-05-14.
+			//   2. Group — usually the formation name (e.g. "Carrier strike
+			//      group-10"), only useful as a fallback.
+			//   3. Name  — aircraft type (e.g. "F-14B") as last resort.
+			// If first-seen logs show humans have their modex in Group rather
+			// than Pilot, this priority needs to differ for human vs AI.
 			_, wasKnown := objects[id]
 			switch {
-			case extractACMIProp(props, "Group") != "":
-				objects[id] = extractACMIProp(props, "Group")
+			case extractACMIProp(props, "Pilot") != "":
+				objects[id] = extractACMIProp(props, "Pilot")
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
-			case extractACMIProp(props, "Pilot") != "":
-				objects[id] = extractACMIProp(props, "Pilot")
+			case extractACMIProp(props, "Group") != "":
+				objects[id] = extractACMIProp(props, "Group")
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
