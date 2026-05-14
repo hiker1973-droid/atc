@@ -1959,40 +1959,57 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 
 			// Extract T= (transform: lon|lat|alt[|roll|pitch|heading]).
 			// lon and lat are DELTAS in degrees from refLon/refLat. Add the
-			// reference to recover absolute coordinates. If reference hasn't
-			// been seen yet (rare race on first frames after connect), the
-			// position will be wrong this frame; the next position update
-			// after we've seen the ref will be correct.
+			// reference to recover absolute coordinates.
+			//
+			// ACMI delta updates: after the initial full frame for an object,
+			// subsequent T= records may contain ONLY the changed fields (e.g.
+			// `T=||5400|||92` for an alt+heading update with lon/lat empty).
+			// An empty subfield must NOT overwrite the previously stored value
+			// — earlier code parsed "" as 0 and zeroed altitude/position
+			// (observed: pilot at 13,560 ft reading as angels 0).
 			if t := extractACMIProp(props, "T"); t != "" {
 				coords := strings.Split(t, "|")
 				if len(coords) >= 3 {
 					if positions[id] == nil {
 						positions[id] = &objData{}
 					}
-					var dLon, dLat float64
-					fmt.Sscanf(coords[0], "%f", &dLon)
-					fmt.Sscanf(coords[1], "%f", &dLat)
-					if refSet {
-						positions[id].lon = refLon + dLon
-						positions[id].lat = refLat + dLat
-					} else {
-						positions[id].lon = dLon
-						positions[id].lat = dLat
-					}
-					var altM float64
-					fmt.Sscanf(coords[2], "%f", &altM)
-					newAlt := altM * 3.28084
-					// Calculate vertical speed
-					now := time.Now()
-					if positions[id].hasPos && !positions[id].prevTime.IsZero() {
-						dt := now.Sub(positions[id].prevTime).Minutes()
-						if dt > 0 {
-							positions[id].vertSpeedFpm = (newAlt - positions[id].prevAltFt) / dt
+					if coords[0] != "" {
+						var dLon float64
+						if _, err := fmt.Sscanf(coords[0], "%f", &dLon); err == nil {
+							if refSet {
+								positions[id].lon = refLon + dLon
+							} else {
+								positions[id].lon = dLon
+							}
 						}
 					}
-					positions[id].prevAltFt = newAlt
-					positions[id].prevTime = now
-					positions[id].altFt = newAlt
+					if coords[1] != "" {
+						var dLat float64
+						if _, err := fmt.Sscanf(coords[1], "%f", &dLat); err == nil {
+							if refSet {
+								positions[id].lat = refLat + dLat
+							} else {
+								positions[id].lat = dLat
+							}
+						}
+					}
+					if coords[2] != "" {
+						var altM float64
+						if _, err := fmt.Sscanf(coords[2], "%f", &altM); err == nil {
+							newAlt := altM * 3.28084
+							// Calculate vertical speed against previous alt
+							now := time.Now()
+							if positions[id].hasPos && !positions[id].prevTime.IsZero() {
+								dt := now.Sub(positions[id].prevTime).Minutes()
+								if dt > 0 {
+									positions[id].vertSpeedFpm = (newAlt - positions[id].prevAltFt) / dt
+								}
+							}
+							positions[id].prevAltFt = newAlt
+							positions[id].prevTime = now
+							positions[id].altFt = newAlt
+						}
+					}
 					positions[id].hasPos = true
 					// Heading is 6th field (index 5) in full T= record
 					if len(coords) >= 6 && coords[5] != "" {
