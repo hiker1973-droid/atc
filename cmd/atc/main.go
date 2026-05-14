@@ -1906,14 +1906,19 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			// First-seen diagnostic: dump the full ACMI prop line so we can
 			// confirm which fields DCS is actually exporting (modex vs player).
 			if !wasKnown && objects[id] != "" {
-				log.Info().
-					Str("id", id).
-					Str("chosenKey", objects[id]).
-					Str("group", extractACMIProp(props, "Group")).
-					Str("pilot", extractACMIProp(props, "Pilot")).
-					Str("name", extractACMIProp(props, "Name")).
-					Str("rawProps", props).
-					Msg("Tacview contact first-seen")
+				// Air-only: ATC only ever does callsign lookups for aircraft.
+				// Without this filter the log is drowned by every ground
+				// vehicle, ship, and static in the mission (200+ entries).
+				if t := extractACMIProp(props, "Type"); strings.HasPrefix(t, "Air") {
+					log.Info().
+						Str("id", id).
+						Str("chosenKey", objects[id]).
+						Str("group", extractACMIProp(props, "Group")).
+						Str("pilot", extractACMIProp(props, "Pilot")).
+						Str("name", extractACMIProp(props, "Name")).
+						Str("type", t).
+						Msg("Tacview contact first-seen")
+				}
 			}
 			// Extract Type — filter to air objects only
 			if objType := extractACMIProp(props, "Type"); objType != "" {
