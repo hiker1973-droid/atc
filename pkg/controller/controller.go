@@ -60,6 +60,7 @@ const (
 	RequestEmergency                // "mayday" / "pan pan" / "emergency" — priority handling
 	RequestRadarCheck               // "radar check" — read back Tacview-derived angels/range/bearing
 	RequestStartup                  // "request startup" / "ready for startup" — engine-start approval (Ground)
+	RequestPushingCommand           // "pushing command" — pilot-initiated freq change to Command, courtesy ack
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -392,6 +393,10 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestRadioCheck:
 		response = c.composer.RadioCheck(req.Callsign)
+
+	case RequestPushingCommand:
+		s.Remove(req.Callsign)
+		response = c.composer.PushingCommandAck(req.Callsign)
 
 	case RequestReadback:
 		return // Silent acknowledge
@@ -871,6 +876,10 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestTakeoffClear
 	case containsAny(lower, "request startup", "ready for startup", "ready to start", "request start"):
 		req.Type = RequestStartup
+	case containsAny(lower, "pushing command", "pushing to command", "switching command", "switching to command", "push command"):
+		// Pilot is announcing a freq change to Command — courtesy ack, no
+		// need to re-issue freq/preset (handoff was already given at 7 DME).
+		req.Type = RequestPushingCommand
 	case containsAny(lower, "request taxi", "request ground", "taxi to", "ready to taxi"):
 		req.Type = RequestTaxiClear
 	case containsAny(lower, "on final", "final", "request landing", "cleared to land"):

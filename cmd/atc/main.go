@@ -55,6 +55,8 @@ var (
 	flagEAMPassword    string
 	flagFFmpeg          string
 	flagTTSVoice        string
+	flagTTSVoiceMale    string
+	flagVoiceRotateHrs  int
 	flagMarshalFreq     string
 	flagDeckbossFreq    string
 	flagDashboardPort   int
@@ -136,7 +138,11 @@ func main() {
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",
 		"Marshal frequency MHz (OMDM only, e.g. 306.3)")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",
-		"OpenAI TTS voice: alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
+		"OpenAI TTS voice (female slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
+	f.StringVar(&flagTTSVoiceMale, "tts-voice-male", "onyx",
+		"OpenAI TTS voice (male slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
+	f.IntVar(&flagVoiceRotateHrs, "voice-rotate-hours", 4,
+		"Hours between female/male voice rotation on the tower channel (0=disabled)")
 	f.StringVar(&flagFFmpeg, "ffmpeg",
 		`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`,
 		"Path to ffmpeg.exe for audio conversion")
@@ -447,13 +453,14 @@ func run(cmd *cobra.Command, args []string) error {
 			case <-ctx.Done():
 				return
 			case text := <-txChan:
-				log.Info().Str("text", text).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
+				voice := currentTowerVoice()
+				log.Info().Str("text", text).Str("voice", voice).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
 				// 10s ceiling on TTS: OpenAI is either fast (~2s) or hung. No
 				// SAPI fallback — operator preference is one consistent voice;
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, flagTTSVoice)
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voice)
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -639,8 +646,12 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Info().Int("port", flagDashboardPort).Msg("Dashboard server started")
 	}
 
-	// Pre-warm TTS cache in background — don't block startup
+	// Pre-warm TTS cache in background — don't block startup. Warm both
+	// rotation voices so a flip mid-session doesn't cause a cold-cache spike.
 	go prewarmTTSCache(ctx, apiKey, flagTTSVoice, af.RunwayPairs[0].Primary.Designator)
+	if flagVoiceRotateHrs > 0 && flagTTSVoiceMale != flagTTSVoice {
+		go prewarmTTSCache(ctx, apiKey, flagTTSVoiceMale, af.RunwayPairs[0].Primary.Designator)
+	}
 
 	// Warn if Tacview not connected after startup
 	go func() {
@@ -1265,6 +1276,22 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	log.Info().Int("warmed", warmed).Msg("TTS cache ready")
+}
+
+// currentTowerVoice picks the tower TTS voice based on a fixed time bucket so
+// pilots hear an alternating female/male controller without operator action.
+// Bucket length is flagVoiceRotateHrs; 0 disables rotation (always returns
+// flagTTSVoice). Both voices are pre-warmed at startup so a flip doesn't
+// produce a cold-cache TX latency spike.
+func currentTowerVoice() string {
+	if flagVoiceRotateHrs <= 0 {
+		return flagTTSVoice
+	}
+	bucket := time.Now().Unix() / int64(flagVoiceRotateHrs*3600)
+	if bucket%2 == 0 {
+		return flagTTSVoice
+	}
+	return flagTTSVoiceMale
 }
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
