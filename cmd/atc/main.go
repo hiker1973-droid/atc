@@ -1874,23 +1874,46 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			id := parts[0]
 			props := parts[1]
 
-			// Extract Pilot first (real callsign in DCS) and fall back to
-			// Name (aircraft type) only if Pilot isn't reported. Without this,
-			// allPositions is keyed by aircraft type ("F-14B") instead of
-			// pilot callsign ("Raider 032"), which breaks radar-check lookup,
-			// speed warnings, and conflict detection.
-			if pilot := extractACMIProp(props, "Pilot"); pilot != "" {
-				objects[id] = pilot
+			// Priority for the callsign key:
+			//   1. Group  — DCS's mission-assigned callsign / modex (e.g.
+			//      "Raider 1-1"). This is what pilots say on the radio.
+			//   2. Pilot  — player handle (e.g. "Jedi") — used only when no
+			//      Group is reported (e.g. AI or older Tacview client).
+			//   3. Name   — aircraft type (e.g. "F-14B") as last resort.
+			// Earlier versions used Pilot as primary, which broke radar-check
+			// lookup whenever DCS exported a player handle distinct from the
+			// modex (almost always for human players).
+			_, wasKnown := objects[id]
+			switch {
+			case extractACMIProp(props, "Group") != "":
+				objects[id] = extractACMIProp(props, "Group")
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
-			} else if name := extractACMIProp(props, "Name"); name != "" {
-				if _, alreadyHasPilot := objects[id]; !alreadyHasPilot {
-					objects[id] = name
+			case extractACMIProp(props, "Pilot") != "":
+				objects[id] = extractACMIProp(props, "Pilot")
+				if positions[id] == nil {
+					positions[id] = &objData{}
+				}
+			case extractACMIProp(props, "Name") != "":
+				if !wasKnown {
+					objects[id] = extractACMIProp(props, "Name")
 				}
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
+			}
+			// First-seen diagnostic: dump the full ACMI prop line so we can
+			// confirm which fields DCS is actually exporting (modex vs player).
+			if !wasKnown && objects[id] != "" {
+				log.Info().
+					Str("id", id).
+					Str("chosenKey", objects[id]).
+					Str("group", extractACMIProp(props, "Group")).
+					Str("pilot", extractACMIProp(props, "Pilot")).
+					Str("name", extractACMIProp(props, "Name")).
+					Str("rawProps", props).
+					Msg("Tacview contact first-seen")
 			}
 			// Extract Type — filter to air objects only
 			if objType := extractACMIProp(props, "Type"); objType != "" {
