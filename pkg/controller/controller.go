@@ -895,7 +895,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestAltitude
 
 
-	case containsAny(lower, "radio check", "comm check", "comms check", "comcheck", "comp check", "how copy"):
+	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comcheck", "comp check", "how copy"):
 		req.Type = RequestRadioCheck
 	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative"):
 		req.Type = RequestReadback

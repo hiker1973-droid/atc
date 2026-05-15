@@ -225,7 +225,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
 	switch {
-	case containsAny(lower, "radio check", "comm check", "comms check", "comp check", "comcheck", "how copy"):
+	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comp check", "comcheck", "how copy"):
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
 
