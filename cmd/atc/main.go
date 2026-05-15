@@ -707,10 +707,14 @@ func isWhisperHallucination(text string) bool {
 	if matchCount >= 3 { // need 3+ matches to be sure it's a prompt echo
 		return true
 	}
-	// Compound fragments that only appear in prompt echoes
+	// Compound fragments that only appear in prompt echoes. Each must be
+	// distinctive enough that a real pilot transmission won't ever contain
+	// it. "holding short, runway" was previously here but pilots legitimately
+	// say "032 holding short, runway 27" — replaced with the longer, prompt-
+	// only "holding short, runway, cleared".
 	compound := []string{
 		"radio check, request taxi",
-		"holding short, runway",
+		"holding short, runway, cleared",
 		"base, final, runway",
 		"tower, al ain tower",
 		"raider, venom, radio",
