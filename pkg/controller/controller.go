@@ -881,8 +881,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// need to re-issue freq/preset (handoff was already given at 7 DME).
 		req.Type = RequestPushingCommand
 	case containsAny(lower, "request taxi", "request ground", "taxi to", "ready to taxi",
-		"request clearance", "requesting clearance", "clearance to the active",
-		"clearance to active", "clearance to taxi", "clearance for taxi"):
+		"requests taxi", "requested taxi",
+		"request clearance", "requesting clearance", "requests clearance", "requested clearance",
+		"clearance to the active", "clearance to active", "clearance to taxi", "clearance for taxi"):
 		req.Type = RequestTaxiClear
 	case containsAny(lower, "on final", "final", "request landing", "cleared to land"):
 		req.Type = RequestLandingClear
