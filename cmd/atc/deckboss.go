@@ -178,6 +178,8 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		log.Info().Float64("freq", freqMHz).Msg("Deckboss registered on SRS")
 
 		pingStop := make(chan struct{})
+		// UDP-only keepalive — matches Tower's srsLoop. See marshal.go for the
+		// full reasoning; re-sending Sync every 10s tears down audio routing.
 		go func() {
 			tk := time.NewTicker(10 * time.Second)
 			defer tk.Stop()
@@ -189,7 +191,6 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 					return
 				case <-tk.C:
 					udpConn.Write([]byte(guid))
-					tcpConn.Write(syncMsg)
 				}
 			}
 		}()

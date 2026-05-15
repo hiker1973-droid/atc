@@ -156,6 +156,9 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 
 		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: spawning keepalive goroutine")
 		pingStop := make(chan struct{})
+		// UDP-only keepalive — matches Tower's srsLoop. See marshal.go for the
+		// full reasoning; sending Sync+EAM every 10s was tearing down audio
+		// routing on each cycle.
 		go func() {
 			tk := time.NewTicker(10 * time.Second)
 			defer tk.Stop()
@@ -167,9 +170,6 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 					return
 				case <-tk.C:
 					udpConn.Write([]byte(guid))
-					tcpConn.Write(buildSync(guid, channelName, freqHz))
-					time.Sleep(200 * time.Millisecond)
-					tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
 				}
 			}
 		}()

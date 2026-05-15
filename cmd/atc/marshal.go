@@ -106,7 +106,13 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		tcpConn.Write(eamMsg)
 		log.Info().Float64("freq", freqMHz).Msg("Marshal registered on SRS")
 
-		// UDP keepalive
+		// UDP-only keepalive — matches Tower's srsLoop. Earlier revision
+		// also re-sent a TCP Sync every 10s; SRS treats that as a fresh
+		// client registration and tears down the audio-routing entry,
+		// dropping voice during the re-register gap. The TCP reader below
+		// already replies to server pings (MsgType=1) with a Sync echo,
+		// which is the correct protocol behavior for keeping the entry
+		// alive without re-registering.
 		keepaliveStop := make(chan struct{})
 		go func() {
 			defer close(keepaliveStop)
@@ -118,7 +124,6 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 					return
 				case <-tk.C:
 					udpConn.Write([]byte(guid))
-					tcpConn.Write(buildSync(guid, marshalCallsign, freqMHz*1e6))
 				}
 			}
 		}()
