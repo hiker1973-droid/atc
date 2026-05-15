@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -267,7 +268,9 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 				if n < 6 {
 					continue
 				}
-				audioLen := int(udpBuf[4]) | int(udpBuf[5])<<8
+				// audioLen lives at udpBuf[2:4]; offset 4 is freqSegLen. See marshal.go
+				// for the full header layout / regression history.
+				audioLen := int(binary.LittleEndian.Uint16(udpBuf[2:4]))
 				if audioLen <= 0 || 6+audioLen > n {
 					continue
 				}

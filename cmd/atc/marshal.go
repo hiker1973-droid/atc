@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -195,7 +196,12 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 				if n < 6 {
 					continue
 				}
-				audioLen := int(udpBuf[4]) | int(udpBuf[5])<<8
+				// SRS UDP voice packet header is [pktLen(2)] [audioLen(2)] [freqSegLen(2)].
+				// Earlier revision read audioLen from offset 4 — that's freqSegLen, a
+				// tiny value (typically 10 = one freq entry), so opusBytes received only
+				// ~10 bytes of header garbage and Whisper never returned a usable
+				// transcription. Tower's srsLoop reads from offset 2; aligning here.
+				audioLen := int(binary.LittleEndian.Uint16(udpBuf[2:4]))
 				if audioLen <= 0 || 6+audioLen > n {
 					continue
 				}
