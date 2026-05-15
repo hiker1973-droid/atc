@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"runtime/debug"
 	"path/filepath"
 	"io"
@@ -1038,6 +1039,21 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 // buildEAM sends the External AWACS Mode password to SRS.
 // Without this, SRS will not send audio to external clients.
 // MsgType 7 = MessageExternalAWACSModePassword
+// unitIdForCallsign returns a deterministic, per-role unitId. SRS treats the
+// unitId as the in-game DCS object the radio is bonded to; when multiple
+// clients share the same unitId, SRS de-duplicates audio routing — whichever
+// process most recently refreshed wins. Towers refresh every 10s and were
+// shadowing Marshal/Command audio because all clients were hard-coded to
+// 100000002. FNV-32 of the callsign keeps the IDs stable across restarts and
+// well inside the int32 range SRS expects.
+func unitIdForCallsign(callsign string) int64 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(callsign))
+	// Reserve 100000000..100999999 for our injected radios so they look like
+	// normal DCS object IDs without colliding with player slots.
+	return 100000000 + int64(h.Sum32()%1000000)
+}
+
 func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 	msg := map[string]interface{}{
 		"Version": "2.1.0.2",
@@ -1061,7 +1077,7 @@ func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 					},
 				},
 				"unit":   callsign,
-				"unitId": 100000002,
+				"unitId": unitIdForCallsign(callsign),
 				"iff": map[string]interface{}{
 					"control":   0,
 					"expansion": false,
@@ -1108,7 +1124,7 @@ func buildSync(guid, callsign string, freqHz float64) []byte {
 					},
 				},
 				"unit":   callsign,
-				"unitId": 100000002,
+				"unitId": unitIdForCallsign(callsign),
 				"iff": map[string]interface{}{
 					"control":   0,
 					"expansion": false,
