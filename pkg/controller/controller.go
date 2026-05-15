@@ -997,6 +997,8 @@ func trimTrailingTriggers(cs string) string {
 		// distance / handoff
 		"pushing command", "switching command", "push command",
 		"7 dme", "seven dme", "cleared airspace",
+		// Whisper often inserts "mile" between the number and "dme"
+		"7 mile", "seven mile", "mile dme", "miles dme", "dme",
 		// emergencies
 		"mayday", "pan pan", "emergency",
 	}
