@@ -31,15 +31,18 @@ var OMDM = &Airfield{
 			// Single runway 09/27 — 11,865 ft long
 			// Heading 090°/270° magnetic (diagram confirmed)
 			// ILS 09: 110.70 MHz | ILS 27: 110.75 MHz
+			// Primary set to 09 — calm-wind default. Wind-based picker still
+			// flips to 27 when easterly winds exceed 3 kts (see
+			// airfield.ActiveRunway).
 			Primary: Runway{
-				Designator:      "27",
-				MagneticHeading: 270.0,
-				ThresholdLatLon: orb.Point{55.3833, 25.0333}, // East threshold (point G)
-			},
-			Reciprocal: Runway{
 				Designator:      "09",
 				MagneticHeading: 90.0,
 				ThresholdLatLon: orb.Point{55.3550, 25.0333}, // West threshold (point A)
+			},
+			Reciprocal: Runway{
+				Designator:      "27",
+				MagneticHeading: 270.0,
+				ThresholdLatLon: orb.Point{55.3833, 25.0333}, // East threshold (point G)
 			},
 		},
 	},
