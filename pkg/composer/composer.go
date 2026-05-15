@@ -128,6 +128,17 @@ func (c *ATCComposer) HandoffToCommand(callsign, handoffCallsign string, freqMHz
 	})
 }
 
+// PushingCommandAck answers a pilot-initiated "pushing command" call — short
+// courtesy clearance, no need to re-issue freq/preset since the pilot is
+// already switching. 3 variations.
+func (c *ATCComposer) PushingCommandAck(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, cleared handoff to command, good day.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, roger pushing command, good day.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy switch to command, good day.", callsign, c.towerCallsign),
+	})
+}
+
 // DistanceInitialAck acknowledges inbound at distance — 3 variations.
 func (c *ATCComposer) DistanceInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, altimeterInHg float64, trafficAhead int) string {
 	rwy := spellRunway(activeRunway)

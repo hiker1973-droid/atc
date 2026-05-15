@@ -55,6 +55,8 @@ var (
 	flagEAMPassword    string
 	flagFFmpeg          string
 	flagTTSVoice        string
+	flagTTSVoiceMale    string
+	flagVoiceRotateHrs  int
 	flagMarshalFreq     string
 	flagDeckbossFreq    string
 	flagDashboardPort   int
@@ -136,7 +138,11 @@ func main() {
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",
 		"Marshal frequency MHz (OMDM only, e.g. 306.3)")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",
-		"OpenAI TTS voice: alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
+		"OpenAI TTS voice (female slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
+	f.StringVar(&flagTTSVoiceMale, "tts-voice-male", "onyx",
+		"OpenAI TTS voice (male slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
+	f.IntVar(&flagVoiceRotateHrs, "voice-rotate-hours", 4,
+		"Hours between female/male voice rotation on the tower channel (0=disabled)")
 	f.StringVar(&flagFFmpeg, "ffmpeg",
 		`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`,
 		"Path to ffmpeg.exe for audio conversion")
@@ -447,13 +453,14 @@ func run(cmd *cobra.Command, args []string) error {
 			case <-ctx.Done():
 				return
 			case text := <-txChan:
-				log.Info().Str("text", text).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
+				voice := currentTowerVoice()
+				log.Info().Str("text", text).Str("voice", voice).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
 				// 10s ceiling on TTS: OpenAI is either fast (~2s) or hung. No
 				// SAPI fallback — operator preference is one consistent voice;
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, flagTTSVoice)
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voice)
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -639,8 +646,12 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Info().Int("port", flagDashboardPort).Msg("Dashboard server started")
 	}
 
-	// Pre-warm TTS cache in background — don't block startup
+	// Pre-warm TTS cache in background — don't block startup. Warm both
+	// rotation voices so a flip mid-session doesn't cause a cold-cache spike.
 	go prewarmTTSCache(ctx, apiKey, flagTTSVoice, af.RunwayPairs[0].Primary.Designator)
+	if flagVoiceRotateHrs > 0 && flagTTSVoiceMale != flagTTSVoice {
+		go prewarmTTSCache(ctx, apiKey, flagTTSVoiceMale, af.RunwayPairs[0].Primary.Designator)
+	}
 
 	// Warn if Tacview not connected after startup
 	go func() {
@@ -696,10 +707,14 @@ func isWhisperHallucination(text string) bool {
 	if matchCount >= 3 { // need 3+ matches to be sure it's a prompt echo
 		return true
 	}
-	// Compound fragments that only appear in prompt echoes
+	// Compound fragments that only appear in prompt echoes. Each must be
+	// distinctive enough that a real pilot transmission won't ever contain
+	// it. "holding short, runway" was previously here but pilots legitimately
+	// say "032 holding short, runway 27" — replaced with the longer, prompt-
+	// only "holding short, runway, cleared".
 	compound := []string{
 		"radio check, request taxi",
-		"holding short, runway",
+		"holding short, runway, cleared",
 		"base, final, runway",
 		"tower, al ain tower",
 		"raider, venom, radio",
@@ -1227,10 +1242,27 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 		// Radio check
 		"Loud and clear.",
 		"Reading you loud and clear.",
-		// Common
-		"Say again.",
+		"Five by five, go ahead.",
+		// Fallback / unable-to-understand variants (all 3 from composer.UnableToUnderstand)
+		"Say again your request.",
 		"Unable to copy, say again.",
+		"You were broken, say again.",
+		// Departure release bodies (new short form: "proceed to angels {N}, contact tower at seven DME.")
+		"Proceed to angels five, contact tower at seven DME.",
+		"Proceed to angels six, contact tower at seven DME.",
+		"Proceed to angels seven, contact tower at seven DME.",
+		"Climb to angels five, contact tower at seven DME.",
+		"Climb to angels six, contact tower at seven DME.",
+		"Climb to angels seven, contact tower at seven DME.",
+		"Angels five, contact tower at seven DME.",
+		"Angels six, contact tower at seven DME.",
+		"Angels seven, contact tower at seven DME.",
 	}
+	// NOTE: prewarm cache is keyed by exact text. Today the hot-path TX is
+	// "{callsign}, {tower}, {body}." so these bare-body entries only hit if
+	// the bot ever transmits them without the prefix (it doesn't). To make
+	// prewarm actually help, the composer needs to stitch a cached body MP3
+	// with a per-callsign+tower prefix MP3 — flagged for follow-up.
 	log.Info().Int("phrases", len(phrases)).Msg("pre-warming TTS cache")
 	warmed := 0
 	for _, phrase := range phrases {
@@ -1248,6 +1280,22 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	log.Info().Int("warmed", warmed).Msg("TTS cache ready")
+}
+
+// currentTowerVoice picks the tower TTS voice based on a fixed time bucket so
+// pilots hear an alternating female/male controller without operator action.
+// Bucket length is flagVoiceRotateHrs; 0 disables rotation (always returns
+// flagTTSVoice). Both voices are pre-warmed at startup so a flip doesn't
+// produce a cold-cache TX latency spike.
+func currentTowerVoice() string {
+	if flagVoiceRotateHrs <= 0 {
+		return flagTTSVoice
+	}
+	bucket := time.Now().Unix() / int64(flagVoiceRotateHrs*3600)
+	if bucket%2 == 0 {
+		return flagTTSVoice
+	}
+	return flagTTSVoiceMale
 }
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
@@ -1830,7 +1878,14 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 		// Send XtraLib handshake — required or Tacview drops the connection
 		conn.Write([]byte("XtraLib.Stream.0\nTacview.RealTimeTelemetry.0\nvSFG7-ATC\n0\x00"))
 
-		// Object registries declared outside loop — persist across reconnects
+		// Object registries declared outside loop — persist across reconnects.
+		// Reference lat/lon: ACMI reports T= positions as DELTAS from these
+		// globals (set once on the special object id "0"). Without them, every
+		// position is interpreted as a tiny absolute coord near (0,0) — making
+		// haversine to any real airfield return ~3000 nm. DCS exports both for
+		// the mission map; we apply them to T= coords[0..1].
+		var refLat, refLon float64
+		var refSet bool
 
 		scanner := bufio.NewScanner(conn)
 		scanner.Buffer(make([]byte, 65536), 65536)
@@ -1857,22 +1912,75 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			id := parts[0]
 			props := parts[1]
 
-			// Extract Pilot first (real callsign in DCS) and fall back to
-			// Name (aircraft type) only if Pilot isn't reported. Without this,
-			// allPositions is keyed by aircraft type ("F-14B") instead of
-			// pilot callsign ("Raider 032"), which breaks radar-check lookup,
-			// speed warnings, and conflict detection.
-			if pilot := extractACMIProp(props, "Pilot"); pilot != "" {
-				objects[id] = pilot
+			// Object id "0" is the global / world object — carries the
+			// ReferenceLatitude / ReferenceLongitude that subsequent T=
+			// position deltas are measured from. Capture and skip.
+			if id == "0" {
+				if v := extractACMIProp(props, "ReferenceLatitude"); v != "" {
+					if _, err := fmt.Sscanf(v, "%f", &refLat); err == nil {
+						refSet = true
+					}
+				}
+				if v := extractACMIProp(props, "ReferenceLongitude"); v != "" {
+					fmt.Sscanf(v, "%f", &refLon)
+					refSet = true
+				}
+				continue
+			}
+
+			// Priority for the callsign key:
+			//   1. Pilot — for AI units this is the modex/unit callsign
+			//      (e.g. "Pontiac 1-1 Rescue"); for humans it may be the
+			//      player handle. Confirmed via first-seen logs 2026-05-14.
+			//   2. Group — usually the formation name (e.g. "Carrier strike
+			//      group-10"), only useful as a fallback.
+			//   3. Name  — aircraft type (e.g. "F-14B") as last resort.
+			// Human players: DCS reports Pilot as "<modex> | <player_name>"
+			// (e.g. "Venom 020 | BARNEY"). The pilot says only the modex on
+			// the radio, so we strip everything from " | " onward. AI units
+			// don't use the " | " separator, so this is a no-op for them.
+			_, wasKnown := objects[id]
+			switch {
+			case extractACMIProp(props, "Pilot") != "":
+				p := extractACMIProp(props, "Pilot")
+				// Strip on the bare "|" — DCS uses inconsistent spacing
+				// around it ("Venom 020 | BARNEY" vs "Raider 032 |Jedi").
+				// Take everything before the first pipe and trim whitespace.
+				if i := strings.Index(p, "|"); i >= 0 {
+					p = strings.TrimSpace(p[:i])
+				}
+				objects[id] = p
 				if positions[id] == nil {
 					positions[id] = &objData{}
 				}
-			} else if name := extractACMIProp(props, "Name"); name != "" {
-				if _, alreadyHasPilot := objects[id]; !alreadyHasPilot {
-					objects[id] = name
+			case extractACMIProp(props, "Group") != "":
+				objects[id] = extractACMIProp(props, "Group")
+				if positions[id] == nil {
+					positions[id] = &objData{}
+				}
+			case extractACMIProp(props, "Name") != "":
+				if !wasKnown {
+					objects[id] = extractACMIProp(props, "Name")
 				}
 				if positions[id] == nil {
 					positions[id] = &objData{}
+				}
+			}
+			// First-seen diagnostic: dump the full ACMI prop line so we can
+			// confirm which fields DCS is actually exporting (modex vs player).
+			if !wasKnown && objects[id] != "" {
+				// Air-only: ATC only ever does callsign lookups for aircraft.
+				// Without this filter the log is drowned by every ground
+				// vehicle, ship, and static in the mission (200+ entries).
+				if t := extractACMIProp(props, "Type"); strings.HasPrefix(t, "Air") {
+					log.Info().
+						Str("id", id).
+						Str("chosenKey", objects[id]).
+						Str("group", extractACMIProp(props, "Group")).
+						Str("pilot", extractACMIProp(props, "Pilot")).
+						Str("name", extractACMIProp(props, "Name")).
+						Str("type", t).
+						Msg("Tacview contact first-seen")
 				}
 			}
 			// Extract Type — filter to air objects only
@@ -1880,29 +1988,59 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 				objectTypes[id] = objType
 			}
 
-			// Extract T= (transform: lon|lat|alt[|roll|pitch|heading])
+			// Extract T= (transform: lon|lat|alt[|roll|pitch|heading]).
+			// lon and lat are DELTAS in degrees from refLon/refLat. Add the
+			// reference to recover absolute coordinates.
+			//
+			// ACMI delta updates: after the initial full frame for an object,
+			// subsequent T= records may contain ONLY the changed fields (e.g.
+			// `T=||5400|||92` for an alt+heading update with lon/lat empty).
+			// An empty subfield must NOT overwrite the previously stored value
+			// — earlier code parsed "" as 0 and zeroed altitude/position
+			// (observed: pilot at 13,560 ft reading as angels 0).
 			if t := extractACMIProp(props, "T"); t != "" {
 				coords := strings.Split(t, "|")
 				if len(coords) >= 3 {
 					if positions[id] == nil {
 						positions[id] = &objData{}
 					}
-					fmt.Sscanf(coords[0], "%f", &positions[id].lon)
-					fmt.Sscanf(coords[1], "%f", &positions[id].lat)
-					var altM float64
-					fmt.Sscanf(coords[2], "%f", &altM)
-					newAlt := altM * 3.28084
-					// Calculate vertical speed
-					now := time.Now()
-					if positions[id].hasPos && !positions[id].prevTime.IsZero() {
-						dt := now.Sub(positions[id].prevTime).Minutes()
-						if dt > 0 {
-							positions[id].vertSpeedFpm = (newAlt - positions[id].prevAltFt) / dt
+					if coords[0] != "" {
+						var dLon float64
+						if _, err := fmt.Sscanf(coords[0], "%f", &dLon); err == nil {
+							if refSet {
+								positions[id].lon = refLon + dLon
+							} else {
+								positions[id].lon = dLon
+							}
 						}
 					}
-					positions[id].prevAltFt = newAlt
-					positions[id].prevTime = now
-					positions[id].altFt = newAlt
+					if coords[1] != "" {
+						var dLat float64
+						if _, err := fmt.Sscanf(coords[1], "%f", &dLat); err == nil {
+							if refSet {
+								positions[id].lat = refLat + dLat
+							} else {
+								positions[id].lat = dLat
+							}
+						}
+					}
+					if coords[2] != "" {
+						var altM float64
+						if _, err := fmt.Sscanf(coords[2], "%f", &altM); err == nil {
+							newAlt := altM * 3.28084
+							// Calculate vertical speed against previous alt
+							now := time.Now()
+							if positions[id].hasPos && !positions[id].prevTime.IsZero() {
+								dt := now.Sub(positions[id].prevTime).Minutes()
+								if dt > 0 {
+									positions[id].vertSpeedFpm = (newAlt - positions[id].prevAltFt) / dt
+								}
+							}
+							positions[id].prevAltFt = newAlt
+							positions[id].prevTime = now
+							positions[id].altFt = newAlt
+						}
+					}
 					positions[id].hasPos = true
 					// Heading is 6th field (index 5) in full T= record
 					if len(coords) >= 6 && coords[5] != "" {

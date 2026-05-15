@@ -114,7 +114,7 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 
 ## 9. Handoff to Command (282.0)
 
-Fires after departure release.
+Fires after departure release (`7 DME` / `cleared airspace` etc).
 
 **Extra placeholders:** `{HANDOFF}` (`vSFG-7-Command`), `{FREQ}` (`two eight two point zero`), `{PRESET}` (e.g. `preset 5`)
 
@@ -122,6 +122,19 @@ Fires after departure release.
 1. `{CALLSIGN}, {TOWER}, contact {HANDOFF}, {FREQ}, {PRESET}. Good day.`
 2. `{CALLSIGN}, {TOWER}, switch to {HANDOFF}, {FREQ}, {PRESET}. Safe skies.`
 3. `{CALLSIGN}, {TOWER}, frequency change approved, {HANDOFF} on {FREQ}, {PRESET}.`
+
+---
+
+## 10. Pushing Command Acknowledge
+
+Pilot-initiated courtesy call announcing they're already switching to Command. Short ack only — freq/preset not reissued (already given in #9).
+
+**Triggers:** `pushing command` · `pushing to command` · `switching command` · `switching to command` · `push command`
+
+**Responses:**
+1. `{CALLSIGN}, {TOWER}, cleared handoff to command, good day.`
+2. `{CALLSIGN}, {TOWER}, roger pushing command, good day.`
+3. `{CALLSIGN}, {TOWER}, copy switch to command, good day.`
 
 ---
 
