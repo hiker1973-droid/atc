@@ -223,6 +223,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	lower := strings.ToLower(text)
 	fuelState := extractFuelStateMarshal(lower)
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
+	visNm := atcCtrl.GetVisibilityNm()
 	switch {
 	case containsAny(lower, "marking mom", "marking moms"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
@@ -230,14 +231,14 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		angels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
 		stack.SetAngels(callsign, angels)
 		brc := atcCtrl.GetCarrierBRC()
-		log.Info().Str("callsign", callsign).Int("position", pos).Int("angels", angels).Ints("reserved", reserved).Float64("brc", brc).Msg("Marshal: aircraft checking in")
+		log.Info().Str("callsign", callsign).Int("position", pos).Int("angels", angels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Msg("Marshal: aircraft checking in")
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
 		if len(all) > 1 {
 			stackInfo = fmt.Sprintf(" Stack has %d aircraft.", len(all))
 		}
-		transmit(comp.MarshalMarkingMom(callsign, pos, angels, altimeter, ceilingFt, brc) + stackInfo)
+		transmit(comp.MarshalMarkingMom(callsign, pos, angels, altimeter, ceilingFt, visNm, brc) + stackInfo)
 
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))

@@ -1381,6 +1381,11 @@ func (c *ATCController) GetWeatherState() (ceilingFt float64, altimeterInHg floa
 	return c.airfieldState.GetWeatherState()
 }
 
+// GetVisibilityNm returns current visibility in nautical miles.
+func (c *ATCController) GetVisibilityNm() float64 {
+	return c.airfieldState.GetVisibilityNm()
+}
+
 // TacviewContactCount returns the number of active air contacts from Tacview.
 func (c *ATCController) TacviewContactCount() int {
 	c.allPositionsMu.RLock()

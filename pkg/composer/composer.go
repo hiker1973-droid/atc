@@ -608,16 +608,48 @@ func (c *ATCComposer) DeckbossStandby(callsign string, position int) string {
 
 // ── Marshal Composer Methods ──────────────────────────────────────────────────
 
-// MarshalMarkingMom — initial marshal contact with BRC, Case, and stack altitude.
-// brc = carrier heading in degrees, -1 if unknown.
-func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, altimeterInHg, ceilingFt, brc float64) string {
+// marshalWeatherPhrase summarises ceiling + visibility into a short Marshal-style
+// weather call. Falls back to "weather clear, visibility ten" if inputs are zero.
+func marshalWeatherPhrase(ceilingFt, visNm float64) string {
+	// Visibility wording
+	visWord := "ten"
+	switch {
+	case visNm <= 0:
+		visWord = "ten"
+	case visNm < 1:
+		visWord = "less than one"
+	case visNm < 3:
+		visWord = fmt.Sprintf("%.0f", visNm)
+	case visNm >= 10:
+		visWord = "ten plus"
+	default:
+		visWord = numberWord(int(visNm))
+	}
+
+	// Ceiling wording
+	switch {
+	case ceilingFt <= 0 || ceilingFt >= 10000:
+		return fmt.Sprintf("ceiling unrestricted, visibility %s", visWord)
+	case ceilingFt >= 3000:
+		return fmt.Sprintf("ceiling %s thousand scattered, visibility %s", numberWord(int(ceilingFt/1000)), visWord)
+	case ceilingFt >= 1000:
+		return fmt.Sprintf("ceiling %s thousand broken, visibility %s", numberWord(int(ceilingFt/1000)), visWord)
+	default:
+		return fmt.Sprintf("ceiling %s hundred overcast, visibility %s", numberWord(int(ceilingFt/100)), visWord)
+	}
+}
+
+// MarshalMarkingMom — initial marshal contact with weather, Case, BRC, altimeter,
+// and stack altitude assignment. brc = carrier heading in degrees, -1 if unknown.
+func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, altimeterInHg, ceilingFt, visNm, brc float64) string {
 	ang := numberWord(angels)
 	alt := formatAltimeter(altimeterInHg)
+	wx := marshalWeatherPhrase(ceilingFt, visNm)
 
-	// Determine recovery case from weather
+	// Recovery case derived from ceiling
 	var recovery string
 	switch {
-	case ceilingFt >= 3000:
+	case ceilingFt <= 0, ceilingFt >= 3000:
 		recovery = "Case One"
 	case ceilingFt >= 1000:
 		recovery = "Case Two"
@@ -625,16 +657,21 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, a
 		recovery = "Case Three"
 	}
 
-	// Format BRC
+	// BRC phrase — omitted if carrier heading unknown
 	brcStr := ""
 	if brc >= 0 {
 		brcStr = fmt.Sprintf(", BRC %03.0f", brc)
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, mother's weather is clear, visibility ten, expect %s recovery%s, altimeter %s, Marshal angels %s, report see me at ten.", callsign, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, %s recovery%s, altimeter %s, stack angels %s, report see me at ten.", callsign, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, %s%s, altimeter %s, your angels are %s, report see me at ten.", callsign, recovery, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal, mother's weather %s, expect %s recovery%s, altimeter %s, Marshal angels %s, report see me at ten.",
+			callsign, wx, recovery, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal, %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
+			callsign, recovery, wx, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal, %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
+			callsign, recovery, wx, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal, mother %s, %s recovery%s, altimeter %s, marshal angels %s, report see me at ten.",
+			callsign, wx, recovery, brcStr, alt, ang),
 	})
 }
 

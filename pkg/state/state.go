@@ -522,6 +522,13 @@ func (s *AirfieldState) GetWeatherState() (ceilingFt float64, altimeterInHg floa
 	return s.CeilingFt, s.AltimeterInHg
 }
 
+// GetVisibilityNm returns current visibility in nautical miles.
+func (s *AirfieldState) GetVisibilityNm() float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.VisibilityNm
+}
+
 // SetActiveRunway directly sets the active runway from ATIS data.
 func (s *AirfieldState) SetActiveRunway(designator string) {
 	s.mu.Lock()

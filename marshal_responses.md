@@ -14,8 +14,16 @@ Triggers from `cmd/atc/marshal.go` `handleMarshalCall`. Responses from `pkg/comp
 - `{POS}` — position in stack
 - `{DIST}` — distance in nautical miles, spelled
 - `{STATE}` — fuel state (e.g. `4.2`)
+- `{WX}` — weather phrase derived from live ceiling + visibility (see below)
 
-**Recovery case** auto-derived from ceiling: `Case One` (≥3000 ft), `Case Two` (≥1000 ft), `Case Three` (<1000 ft).
+**Recovery case** auto-derived from ceiling: `Case One` (≥3000 ft or unknown), `Case Two` (≥1000 ft), `Case Three` (<1000 ft).
+
+**`{WX}` (mother's weather)** — built from live `ceilingFt` + `visNm`:
+- Ceiling unknown or ≥10 000 ft → `ceiling unrestricted, visibility ten plus`
+- Ceiling ≥3 000 ft → `ceiling X thousand scattered, visibility ...`
+- Ceiling ≥1 000 ft → `ceiling X thousand broken, visibility ...`
+- Ceiling <1 000 ft → `ceiling X hundred overcast, visibility ...`
+- Visibility: `ten plus` (≥10 nm), spelled int (3–9), digit (<3), `less than one` (<1)
 
 ---
 
@@ -23,12 +31,13 @@ Triggers from `cmd/atc/marshal.go` `handleMarshalCall`. Responses from `pkg/comp
 
 **Triggers:** `marking mom` · `marking moms`
 
-This is the pilot's first call to Marshal. Composer also reports a stack-summary line (`Stack has N aircraft.`) appended when other aircraft are present.
+This is the pilot's first call to Marshal. Composer also appends a stack-summary line (`Stack has N aircraft.`) when other aircraft are present. Response always carries: weather, recovery case, BRC, altimeter, stack assignment, and the "see me at ten" instruction.
 
 **Responses (`MarshalMarkingMom`):**
-1. `{CALLSIGN}, Marshal, mother's weather is clear, visibility ten, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
-2. `{CALLSIGN}, Marshal, {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
-3. `{CALLSIGN}, Marshal, {CASE}, BRC {BRC}, altimeter {ALTIMETER}, your angels are {ANGELS}, report see me at ten.`
+1. `{CALLSIGN}, Marshal, mother's weather {WX}, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
+2. `{CALLSIGN}, Marshal, {CASE} recovery, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
+3. `{CALLSIGN}, Marshal, {CASE}, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your angels are {ANGELS}, report see me at ten.`
+4. `{CALLSIGN}, Marshal, mother {WX}, {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, marshal angels {ANGELS}, report see me at ten.`
 
 When BRC unknown, the `, BRC {BRC}` clause is omitted.
 
