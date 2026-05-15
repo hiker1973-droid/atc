@@ -749,7 +749,7 @@ func extractFuelState(lower string) float64 {
 // acknowledgment — e.g. "032", "Raider 032", "Venom 201". No response needed.
 func isModexReadback(lower string) bool {
 	// Strip common callsign prefixes
-	for _, prefix := range []string{"raider", "reader", "radar", "rater", "venom", "vino", "knight", "hitman", "devil"} {
+	for _, prefix := range []string{"raider", "reader", "radar", "rater", "venom", "vino", "viper", "wiper", "hyper", "knight", "hitman", "devil"} {
 		lower = strings.TrimSpace(strings.TrimPrefix(lower, prefix))
 	}
 	// What remains should be 2-3 digits only
@@ -922,6 +922,11 @@ func normalizeCallsign(text string) string {
 		{"vino", "Venom"},
 		{"venue", "Venom"},
 		{"demon", "Venom"},
+		// Viper mishears (F-16 generic flight callsign)
+		{"viper", "Viper"},
+		{"wiper", "Viper"},
+		{"hyper", "Viper"},
+		{"vipers", "Viper"},
 	}
 	lower := strings.ToLower(text)
 	for _, pair := range replacements {
