@@ -1300,13 +1300,14 @@ func currentTowerVoice() string {
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
-// 14 chars/sec rate is empirical for the legacy tts-1 model at our 0.88 speed
-// setting and is close enough for gpt-4o-mini-tts at the same speed. The 5s
-// margin covers ExternalAudio.exe startup, the playback tail, the mic-click
-// splice, and — critically — the Whisper flush gap that arrives AFTER audio
-// stops playing. Without enough margin here the bot transcribes its own TX
-// loopback and re-fires the same response (observed 2026-05-12 with airborne
-// / freq-change calls repeating every 10–13s).
+// 14 chars/sec rate is empirical at our previous 0.88 speed; at 0.97 actual
+// playback is ~15.5 chars/sec, so 14 keeps the estimate conservative (slightly
+// over-cools rather than under-cools). The 5s margin covers ExternalAudio.exe
+// startup, the playback tail, the mic-click splice, and — critically — the
+// Whisper flush gap that arrives AFTER audio stops playing. Without enough
+// margin here the bot transcribes its own TX loopback and re-fires the same
+// response (observed 2026-05-12 with airborne / freq-change calls repeating
+// every 10–13s).
 func estimateTTSDuration(text string) time.Duration {
 	d := time.Duration(len(text))*time.Second/14 + 5*time.Second
 	if d < 6*time.Second {
@@ -1384,7 +1385,7 @@ func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string) ([]byt
 		"model": "gpt-4o-mini-tts",
 		"input": text,
 		"voice": voice,
-		"speed": 0.88,
+		"speed": 0.97,
 	}
 	data, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST",
