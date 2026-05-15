@@ -193,7 +193,9 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 				if readErr != nil {
 					continue
 				}
+				log.Debug().Int("bytes", n).Msg("Marshal UDP packet received")
 				if n < 6 {
+					log.Debug().Int("bytes", n).Msg("Marshal UDP packet too short — ignoring")
 					continue
 				}
 				// SRS UDP voice packet header is [pktLen(2)] [audioLen(2)] [freqSegLen(2)].
@@ -203,11 +205,13 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 				// transcription. Tower's srsLoop reads from offset 2; aligning here.
 				audioLen := int(binary.LittleEndian.Uint16(udpBuf[2:4]))
 				if audioLen <= 0 || 6+audioLen > n {
+					log.Debug().Int("bytes", n).Int("audioLen", audioLen).Msg("Marshal UDP audioLen rejected")
 					continue
 				}
 				origin := extractOriginFromUDP(udpBuf[:n])
 				opusBytes := make([]byte, audioLen)
 				copy(opusBytes, udpBuf[6:6+audioLen])
+				log.Debug().Str("origin", origin).Int("audioLen", audioLen).Msg("Marshal UDP voice frame accepted")
 				if transmissions[origin] == nil {
 					transmissions[origin] = &transmission{}
 				}
