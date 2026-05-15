@@ -641,8 +641,11 @@ func marshalWeatherPhrase(ceilingFt, visNm float64) string {
 
 // MarshalMarkingMom — initial marshal contact with weather, Case, BRC, altimeter,
 // and stack altitude assignment. brc = carrier heading in degrees, -1 if unknown.
-func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, altimeterInHg, ceilingFt, visNm, brc float64) string {
-	ang := numberWord(angels)
+// If radarFound, prepends a "I have you on radar at angels X, range Y, bearing Z
+// from mother" line built from live Tacview position relative to the carrier.
+func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels int, altimeterInHg, ceilingFt, visNm, brc float64,
+	radarAngels, radarDistNm, radarBearingDeg int, radarFound bool) string {
+	ang := numberWord(stackAngels)
 	alt := formatAltimeter(altimeterInHg)
 	wx := marshalWeatherPhrase(ceilingFt, visNm)
 
@@ -663,15 +666,28 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, a
 		brcStr = fmt.Sprintf(", BRC %03.0f", brc)
 	}
 
+	// Radar readback phrase from carrier — only if Tacview shows the caller
+	radarStr := ""
+	if radarFound {
+		rAng := numberWord(radarAngels)
+		rDist := milesToWord(radarDistNm)
+		rBrg := bearingWord(radarBearingDeg)
+		radarStr = pick([]string{
+			fmt.Sprintf(" radar contact, angels %s, range %s, bearing %s from mother,", rAng, rDist, rBrg),
+			fmt.Sprintf(" I have you on radar, angels %s, %s from mother, bearing %s,", rAng, rDist, rBrg),
+			fmt.Sprintf(" radar contact angels %s, %s on the %s,", rAng, rDist, rBrg),
+		})
+	}
+
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, mother's weather %s, expect %s recovery%s, altimeter %s, Marshal angels %s, report see me at ten.",
-			callsign, wx, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
-			callsign, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
-			callsign, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, mother %s, %s recovery%s, altimeter %s, marshal angels %s, report see me at ten.",
-			callsign, wx, recovery, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal,%s mother's weather %s, expect %s recovery%s, altimeter %s, Marshal angels %s, report see me at ten.",
+			callsign, radarStr, wx, recovery, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal,%s %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
+			callsign, radarStr, recovery, wx, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal,%s %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
+			callsign, radarStr, recovery, wx, brcStr, alt, ang),
+		fmt.Sprintf("%s, Marshal,%s mother %s, %s recovery%s, altimeter %s, marshal angels %s, report see me at ten.",
+			callsign, radarStr, wx, recovery, brcStr, alt, ang),
 	})
 }
 

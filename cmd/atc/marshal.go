@@ -225,20 +225,25 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
 	switch {
+	case containsAny(lower, "radio check", "comm check", "comms check", "comp check", "comcheck", "how copy"):
+		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
+		transmit(comp.RadioCheck(callsign))
+
 	case containsAny(lower, "marking mom", "marking moms"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
 		reserved := stack.ReservedAngels(callsign)
-		angels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
-		stack.SetAngels(callsign, angels)
+		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
+		stack.SetAngels(callsign, stackAngels)
 		brc := atcCtrl.GetCarrierBRC()
-		log.Info().Str("callsign", callsign).Int("position", pos).Int("angels", angels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Msg("Marshal: aircraft checking in")
+		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Msg("Marshal: aircraft checking in")
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
 		if len(all) > 1 {
 			stackInfo = fmt.Sprintf(" Stack has %d aircraft.", len(all))
 		}
-		transmit(comp.MarshalMarkingMom(callsign, pos, angels, altimeter, ceilingFt, visNm, brc) + stackInfo)
+		transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
 
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))

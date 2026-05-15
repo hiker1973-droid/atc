@@ -1300,6 +1300,33 @@ func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 	return 0, 0, false
 }
 
+// LookupCallerRelativeToCarrier returns the caller's angels (alt/1000), range
+// to mother in nm, and true bearing FROM the carrier TO the caller. Used by
+// Marshal to give a radar readback alongside stack assignment. Returns
+// found=false if either Tacview contact or carrier position is unavailable.
+func (c *ATCController) LookupCallerRelativeToCarrier(callsign string) (angels, distNm, bearingDeg int, found bool) {
+	carLon, carLat, carFound := c.GetCarrierPosition()
+	if !carFound {
+		return 0, 0, 0, false
+	}
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	contact := c.lookupContact(callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
+		return 0, 0, 0, false
+	}
+	carrierPt := orb.Point{carLon, carLat}
+	callerPt := orb.Point{contact.Lon, contact.Lat}
+	angels = int(math.Round(contact.AltFt / 1000.0))
+	if angels < 0 {
+		angels = 0
+	}
+	distNm = int(math.Round(haversineNm(callerPt, carrierPt)))
+	b := bearingDegFromTo(carrierPt, callerPt)
+	bearingDeg = ((int(math.Round(b)) % 360) + 360) % 360
+	return angels, distNm, bearingDeg, true
+}
+
 // AssignMarshalAngels picks the lowest unoccupied stack altitude in [minAngels, maxAngels].
 // A slot is "occupied" if it appears in reservedAngels (already-assigned stack slots,
 // passed in by the caller) or if Tacview shows any aircraft within 50nm of the carrier

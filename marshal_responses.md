@@ -15,6 +15,9 @@ Triggers from `cmd/atc/marshal.go` `handleMarshalCall`. Responses from `pkg/comp
 - `{DIST}` — distance in nautical miles, spelled
 - `{STATE}` — fuel state (e.g. `4.2`)
 - `{WX}` — weather phrase derived from live ceiling + visibility (see below)
+- `{R_ANG}` — caller's altitude in thousands as seen on Tacview, spelled
+- `{R_DIST}` — caller's range from carrier in nm, spelled
+- `{R_BRG}` — true bearing FROM the carrier TO the caller (cardinal/intercardinal word)
 
 **Recovery case** auto-derived from ceiling: `Case One` (≥3000 ft or unknown), `Case Two` (≥1000 ft), `Case Three` (<1000 ft).
 
@@ -31,15 +34,35 @@ Triggers from `cmd/atc/marshal.go` `handleMarshalCall`. Responses from `pkg/comp
 
 **Triggers:** `marking mom` · `marking moms`
 
-This is the pilot's first call to Marshal. Composer also appends a stack-summary line (`Stack has N aircraft.`) when other aircraft are present. Response always carries: weather, recovery case, BRC, altimeter, stack assignment, and the "see me at ten" instruction.
+Pilot's first call to Marshal. Composer also appends a stack-summary line (`Stack has N aircraft.`) when other aircraft are present. Response always carries: weather, recovery case, BRC, altimeter, stack assignment, and the "see me at ten" instruction. When the caller is visible on Tacview a `{RADAR}` clause is inserted right after `Marshal,` giving live angels/range/bearing from mother.
+
+**`{RADAR}` clause** — randomly picks one of:
+1. ` radar contact, angels {R_ANG}, range {R_DIST}, bearing {R_BRG} from mother,`
+2. ` I have you on radar, angels {R_ANG}, {R_DIST} from mother, bearing {R_BRG},`
+3. ` radar contact angels {R_ANG}, {R_DIST} on the {R_BRG},`
+
+If Tacview has no fresh contact for the caller (or carrier position unknown), `{RADAR}` is empty.
 
 **Responses (`MarshalMarkingMom`):**
-1. `{CALLSIGN}, Marshal, mother's weather {WX}, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
-2. `{CALLSIGN}, Marshal, {CASE} recovery, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
-3. `{CALLSIGN}, Marshal, {CASE}, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your angels are {ANGELS}, report see me at ten.`
-4. `{CALLSIGN}, Marshal, mother {WX}, {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, marshal angels {ANGELS}, report see me at ten.`
+1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
+2. `{CALLSIGN}, Marshal,{RADAR} {CASE} recovery, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
+3. `{CALLSIGN}, Marshal,{RADAR} {CASE}, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your angels are {ANGELS}, report see me at ten.`
+4. `{CALLSIGN}, Marshal,{RADAR} mother {WX}, {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, marshal angels {ANGELS}, report see me at ten.`
 
 When BRC unknown, the `, BRC {BRC}` clause is omitted.
+
+---
+
+## 1a. Radio check
+
+**Triggers:** `radio check` · `comm check` · `comms check` · `comp check` · `comcheck` · `how copy`
+
+Same composer method as the towers (`RadioCheck`) — composer is constructed with `marshalCallsign="Marshal"` so the responses come out Marshal-flavored automatically.
+
+**Responses (`RadioCheck`):**
+1. `{CALLSIGN}, Marshal, loud and clear.`
+2. `{CALLSIGN}, Marshal, five by five, go ahead.`
+3. `{CALLSIGN}, Marshal, reading you loud and clear.`
 
 ---
 
@@ -162,7 +185,8 @@ When an aircraft commences, its slot frees and the rest of the stack **collapses
 
 | Stage | Pilot call | Marshal response | Wired? |
 |---|---|---|---|
-| Before 50nm | `marking moms, [DIST], angels [XX], state [XX]` | mother's weather, expect Case 1, altimeter, stack angels, report see me at 10 | ✅ §1 |
+| Any | `radio check` / `comm check` / `comms check` / `how copy` | loud and clear / five by five | ✅ §1a |
+| Before 50nm | `marking moms, [DIST], angels [XX], state [XX]` | radar contact (if Tacview), mother's weather, expect Case 1, BRC, altimeter, stack angels, report see me at 10 | ✅ §1 |
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |
