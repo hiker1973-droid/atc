@@ -355,7 +355,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestRadarCheck:
 		c.allPositionsMu.RLock()
-		contact := c.allPositions[req.Callsign]
+		contact := c.lookupContact(req.Callsign)
 		var lon, lat, altFt float64
 		hasContact := false
 		if contact != nil && !contact.UpdatedAt.IsZero() {
@@ -1153,7 +1153,7 @@ func (c *ATCController) SortedInboundsByDistance() []string {
 func (c *ATCController) NearestInboundAhead(callsign string) (string, float64) {
 	sorted := c.SortedInboundsByDistance()
 	c.allPositionsMu.RLock()
-	myContact := c.allPositions[callsign]
+	myContact := c.lookupContact(callsign)
 	c.allPositionsMu.RUnlock()
 
 	if myContact == nil {
@@ -1191,6 +1191,23 @@ func (c *ATCController) sequencedArrivalResponse(callsign string, s *state.Airfi
 		return c.composer.SequencedInitialAck(callsign, 0, s.ActiveRunway, 0, s.AltimeterInHg, seqNum, leadCS, int(leadDist+0.5))
 	}
 	return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, seqNum-1)
+}
+
+// lookupContact does a case-insensitive lookup against allPositions. Tacview
+// stores the raw modex from DCS (e.g. "RAIDER 036" all-caps for player FERGI)
+// while ParseIntent / normalizeCallsign produce title-cased queries
+// ("Raider 036"). Direct map lookup misses when those don't match. Caller
+// must hold allPositionsMu (read-locked is enough).
+func (c *ATCController) lookupContact(callsign string) *TacviewContact {
+	if c, ok := c.allPositions[callsign]; ok {
+		return c
+	}
+	for k, v := range c.allPositions {
+		if strings.EqualFold(k, callsign) {
+			return v
+		}
+	}
+	return nil
 }
 
 // UpdateAnyPosition records position for ANY Tacview aircraft and updates ATC state.
@@ -1391,7 +1408,7 @@ func (c *ATCController) IsTacviewActive() bool {
 func (c *ATCController) GetAircraftDistanceNm(callsign string) float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	if contact, ok := c.allPositions[callsign]; ok {
+	if contact := c.lookupContact(callsign); contact != nil {
 		if time.Since(contact.UpdatedAt) < 30*time.Second {
 			return haversineNm(orb.Point{contact.Lon, contact.Lat}, c.airfieldState.Airfield.Center)
 		}
