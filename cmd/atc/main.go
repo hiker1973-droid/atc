@@ -773,23 +773,32 @@ func extractCallsignSimple(text string) string {
 func extractCallsignSkippingAddress(text string, addresses ...string) string {
 	text = normalizeCallsignLocal(text)
 	parts := strings.Split(text, ",")
-	if len(parts) == 0 {
-		return ""
-	}
-	first := strings.TrimSpace(parts[0])
-	firstLower := strings.ToLower(first)
-	for _, addr := range addresses {
-		if strings.Contains(firstLower, strings.ToLower(addr)) {
-			if len(parts) >= 2 {
-				// Use the second segment, but only the leading callsign part
-				// before any verb/intent words (e.g. "Raider 032 checking in"
-				// → "Raider 032").
+	if len(parts) >= 2 {
+		first := strings.TrimSpace(parts[0])
+		firstLower := strings.ToLower(first)
+		for _, addr := range addresses {
+			if strings.Contains(firstLower, strings.ToLower(addr)) {
+				// Comma-separated form: use second segment, trimmed at verb.
 				return trimCallsignAtVerb(strings.TrimSpace(parts[1]))
 			}
-			return ""
 		}
 	}
-	return first
+	// No comma OR first segment isn't an address — handle the no-comma
+	// case where Whisper drops punctuation entirely, e.g.
+	// "Union Marshal Raider 39 marking moms at 10." Strip the leading
+	// address word(s) and trim what's left at the first intent verb.
+	lower := strings.ToLower(text)
+	for _, addr := range addresses {
+		addrLower := strings.ToLower(addr)
+		if strings.HasPrefix(lower, addrLower+" ") {
+			return trimCallsignAtVerb(strings.TrimSpace(text[len(addr):]))
+		}
+	}
+	// Final fallback: first comma segment as-is.
+	if len(parts) > 0 {
+		return strings.TrimSpace(parts[0])
+	}
+	return ""
 }
 
 // trimCallsignAtVerb cuts off everything after the first intent-style word in

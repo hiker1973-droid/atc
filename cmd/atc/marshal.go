@@ -201,7 +201,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 								return
 							}
 							log.Info().Str("text", text).Msg("Marshal heard")
-							cs := extractCallsignSkippingAddress(text, "marshal", "union marshal", "marshall")
+							cs := extractCallsignSkippingAddress(text, "union marshal", "union marshall", "unit marshal", "marshall", "marshal")
 							handleMarshalCall(text, cs, stack, comp, transmit, atcCtrl)
 						}(frames)
 					}
@@ -251,13 +251,21 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *composer.ATCComposer, transmit func(string), atcCtrl *controller.ATCController) {
 	lower := strings.ToLower(text)
 	// Self-echo guard: pilot calls always lead with the address word
-	// ("marshal" / "union marshal"). Marshal's own TX has the inverse shape
-	// "<callsign>, marshal, …" — so if the heard text doesn't start with an
-	// address keyword, treat it as our own echo coming back through SRS and
-	// drop it. Without this we self-loop on responses containing "state X"
-	// (CopyState ack → retranscribed → fires CopyState again every 10s).
-	if !strings.HasPrefix(lower, "marshal") &&
-		!strings.HasPrefix(lower, "union marshal") {
+	// ("Marshal" / "Union Marshal", or Whisper variants "Marshall" /
+	// "Unit Marshal"). Marshal's own TX has the inverse shape
+	// "<callsign>, marshal, …" — so if the heard text doesn't start with one
+	// of those address tokens, treat it as our own echo coming back through
+	// SRS and drop it. Without this we self-loop on responses containing
+	// "state X" (CopyState ack → retranscribed → fires CopyState again).
+	addrPrefixes := []string{"marshal", "marshall", "union marshal", "unit marshal", "union marshall"}
+	leadsWithAddress := false
+	for _, p := range addrPrefixes {
+		if strings.HasPrefix(lower, p) {
+			leadsWithAddress = true
+			break
+		}
+	}
+	if !leadsWithAddress {
 		log.Debug().Str("text", text).Msg("Marshal: dropped — not address-led, likely self-echo")
 		return
 	}
