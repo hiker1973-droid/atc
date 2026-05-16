@@ -782,13 +782,15 @@ func (c *ATCComposer) MarshalContact(callsign string) string {
 	})
 }
 
-// MarshalEstablishedAck — pilot established in stack.
-func (c *ATCComposer) MarshalEstablishedAck(callsign string, angels int) string {
+// MarshalEstablishedAck — pilot established in stack. Confirms entry with
+// angels + position so the pilot can verify the slot.
+func (c *ATCComposer) MarshalEstablishedAck(callsign string, angels, position int) string {
 	ang := numberWord(angels)
+	pos := numberWord(position)
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, hold angels %s.", callsign, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", established angels %s, copy.", callsign, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", angels %s, stand by for Charlie.", callsign, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", entering stack at angels %s, position %s, hold for Charlie.", callsign, ang, pos),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, in the stack angels %s at position %s, stand by for Charlie.", callsign, ang, pos),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy established, angels %s, position %s in the stack.", callsign, ang, pos),
 	})
 }
 

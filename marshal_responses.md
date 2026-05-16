@@ -126,10 +126,10 @@ Pilot must still lead the transmission with the address word ("Marshal, …") �
 2. `{CALLSIGN}, Marshal, you have Charlie.`
 3. `{CALLSIGN}, Marshal, Charlie.`
 
-**If deck is busy → ack and hold:**
-1. `{CALLSIGN}, Marshal, roger, hold angels {ANGELS}.`
-2. `{CALLSIGN}, Marshal, established angels {ANGELS}, copy.`
-3. `{CALLSIGN}, Marshal, angels {ANGELS}, stand by for Charlie.`
+**If deck is busy → ack and hold (now confirms `{POS}` so pilot can verify slot):**
+1. `{CALLSIGN}, Marshal, entering stack at angels {ANGELS}, position {POS}, hold for Charlie.`
+2. `{CALLSIGN}, Marshal, roger, in the stack angels {ANGELS} at position {POS}, stand by for Charlie.`
+3. `{CALLSIGN}, Marshal, copy established, angels {ANGELS}, position {POS} in the stack.`
 
 ---
 

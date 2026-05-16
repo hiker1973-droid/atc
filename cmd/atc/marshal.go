@@ -307,14 +307,16 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	case containsAny(lower, "established angels", "established at angels"):
 		stack.SetPhase(callsign, "holding")
 		angels := 6
+		position := 1
 		if ac, ok := stack.GetAircraft(callsign); ok {
 			angels = ac.Angels
+			position = ac.Position
 		}
 		if atcCtrl.IsDeckClear() {
 			stack.SetPhase(callsign, "charlie")
 			transmit(comp.MarshalSignalCharlie(callsign))
 		} else {
-			transmit(comp.MarshalEstablishedAck(callsign, angels))
+			transmit(comp.MarshalEstablishedAck(callsign, angels, position))
 		}
 
 	case containsAny(lower, "commencing"):
