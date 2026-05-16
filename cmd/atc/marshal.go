@@ -201,7 +201,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 								return
 							}
 							log.Info().Str("text", text).Msg("Marshal heard")
-							cs := extractCallsignSimple(text)
+							cs := extractCallsignSkippingAddress(text, "marshal", "union marshal", "marshall")
 							handleMarshalCall(text, cs, stack, comp, transmit, atcCtrl)
 						}(frames)
 					}

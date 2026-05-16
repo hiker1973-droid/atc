@@ -256,7 +256,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 								return
 							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
-							cs := extractCallsignSimple(text)
+							cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
 							resp := commandResponse(text, cs, channelName)
 							if resp == "" {
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command intent miss")

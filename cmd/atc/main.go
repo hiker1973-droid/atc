@@ -760,6 +760,59 @@ func extractCallsignSimple(text string) string {
 	return ""
 }
 
+// extractCallsignSkippingAddress is like extractCallsignSimple but treats the
+// first comma segment as the address word (e.g. "Marshal", "Union Marshal",
+// "Command") and returns the SECOND segment as the pilot callsign. This is
+// the natural shape of pilot calls to non-airfield channels:
+//   "Marshal, Raider 032, comm check."   → "Raider 032"
+//   "Command, Raider 032 checking in."   → "Raider 032 checking in" → first word(s)
+// The `addresses` strings are matched case-insensitively via substring (so
+// "Marshall" with the extra L Whisper sometimes adds still matches "marshal").
+// If the first segment doesn't match any address, the simple first-segment
+// behavior is preserved as a fallback.
+func extractCallsignSkippingAddress(text string, addresses ...string) string {
+	text = normalizeCallsignLocal(text)
+	parts := strings.Split(text, ",")
+	if len(parts) == 0 {
+		return ""
+	}
+	first := strings.TrimSpace(parts[0])
+	firstLower := strings.ToLower(first)
+	for _, addr := range addresses {
+		if strings.Contains(firstLower, strings.ToLower(addr)) {
+			if len(parts) >= 2 {
+				// Use the second segment, but only the leading callsign part
+				// before any verb/intent words (e.g. "Raider 032 checking in"
+				// → "Raider 032").
+				return trimCallsignAtVerb(strings.TrimSpace(parts[1]))
+			}
+			return ""
+		}
+	}
+	return first
+}
+
+// trimCallsignAtVerb cuts off everything after the first intent-style word in
+// a callsign segment. Used when the pilot crams the callsign and the request
+// into a single comma segment, e.g. "Raider 032 checking in" → "Raider 032".
+// Conservative — only trims at a small set of common verbs so we don't chop a
+// legitimate two-word callsign like "Viper Flight".
+func trimCallsignAtVerb(s string) string {
+	verbs := []string{
+		" checking", " check", " requesting", " request", " holding",
+		" airborne", " inbound", " departing", " ready", " established",
+		" pushing", " switching", " marking", " commencing", " state",
+	}
+	lower := strings.ToLower(s)
+	cut := len(s)
+	for _, v := range verbs {
+		if i := strings.Index(lower, v); i > 0 && i < cut {
+			cut = i
+		}
+	}
+	return strings.TrimSpace(s[:cut])
+}
+
 // transcribeFramesWithPrompt wraps Opus frames and sends to Whisper with a custom prompt.
 func transcribeFramesWithPrompt(ctx context.Context, apiKey string, frames [][]byte, prompt string) (string, error) {
 	ogg := wrapOpusInOGG(frames)
