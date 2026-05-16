@@ -66,6 +66,28 @@ Same composer method as the towers (`RadioCheck`) — composer is constructed wi
 
 ---
 
+## 1b. DME position report
+
+**Triggers:** `N DME` · `N mile` · `N miles` · `N mile DME` (where `N` is a spelled or digit number — e.g. `7 DME`, `seven DME`, `7 mile`, `seven mile DME`)
+
+Pilot reports current distance from mother on inbound. Typically called between `marking moms` and `see you at ten` (e.g. at 20 / 15 / 7 DME). Pure ack — no new clearance, just confirmation Marshal sees the call. If Tacview has the caller, the response includes a brief radar confirm (`radar contact` / `paint you`).
+
+The reported distance `{DIST}` is parsed from the pilot's transmission and echoed back, spelled as digits (`7`, `15`, etc.).
+
+**Responses (`MarshalAckDME`) — no radar:**
+1. `{CALLSIGN}, Marshal, roger, {DIST} DME, continue.`
+2. `{CALLSIGN}, Marshal, copy {DIST} DME.`
+3. `{CALLSIGN}, Marshal, {DIST} DME, continue inbound.`
+
+**Responses (`MarshalAckDME`) — with radar:**
+1. `{CALLSIGN}, Marshal, radar contact, {DIST} DME, continue.`
+2. `{CALLSIGN}, Marshal, paint you at {DIST} DME, continue inbound.`
+3. `{CALLSIGN}, Marshal, contact {DIST} DME, continue.`
+
+Pilot must still lead the transmission with the address word ("Marshal, …") — the self-echo guard in `handleMarshalCall` drops anything that doesn't, so `Raider 39, 7 DME, switching channel 4` alone gets filtered. With the prefix (`Marshal, Raider 39, 7 DME`) the trigger fires.
+
+---
+
 ## 2. See me at 10 / radar contact
 
 **Triggers:** `see you at 10` · `see you at ten`
@@ -187,6 +209,7 @@ When an aircraft commences, its slot frees and the rest of the stack **collapses
 |---|---|---|---|
 | Any | `radio check` / `comm check` / `comms check` / `how copy` | loud and clear / five by five | ✅ §1a |
 | Before 50nm | `marking moms, [DIST], angels [XX], state [XX]` | radar contact (if Tacview), mother's weather, expect Case 1, BRC, altimeter, stack angels, report see me at 10 | ✅ §1 |
+| Inbound | `[DIST] DME` / `[DIST] mile(s)` (with `Marshal,` prefix) | roger DME, continue (radar-flavored if Tacview has caller) | ✅ §1b |
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |
