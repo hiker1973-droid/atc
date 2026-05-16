@@ -691,6 +691,25 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 	})
 }
 
+// MarshalSayBRC responds to a pilot's "say BRC" / "request BRC" call.
+// Returns the carrier's current Base Recovery Course (bow direction) as
+// a 3-digit spoken heading, e.g. "three five seven". Falls back to
+// "BRC unknown" if Tacview can't see the carrier.
+func (c *ATCComposer) MarshalSayBRC(callsign string, brc float64) string {
+	if brc < 0 {
+		return pick([]string{
+			fmt.Sprintf("%s, " + c.towerCallsign + ", BRC unknown, mother off scope.", callsign),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", standby — no radar contact on mother.", callsign),
+		})
+	}
+	brcStr := fmt.Sprintf("%03.0f", brc)
+	return pick([]string{
+		fmt.Sprintf("%s, " + c.towerCallsign + ", mother's BRC is %s.", callsign, brcStr),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", BRC %s.", callsign, brcStr),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", mother holding BRC %s.", callsign, brcStr),
+	})
+}
+
 // MarshalRadarContact — at 10nm contact.
 func (c *ATCComposer) MarshalRadarContact(callsign string, distNm int) string {
 	dist := numberWord(distNm)

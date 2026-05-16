@@ -277,6 +277,11 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
 
+	case containsAny(lower, "say brc", "request brc", "brc check", "say bearing"):
+		brc := atcCtrl.GetCarrierBRC()
+		log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Marshal: BRC request")
+		transmit(comp.MarshalSayBRC(callsign, brc))
+
 	case containsAny(lower, "marking mom", "marking moms", "marking bomb", "marking bombs"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
 		reserved := stack.ReservedAngels(callsign)
