@@ -772,29 +772,36 @@ func extractCallsignSimple(text string) string {
 // behavior is preserved as a fallback.
 func extractCallsignSkippingAddress(text string, addresses ...string) string {
 	text = normalizeCallsignLocal(text)
-	parts := strings.Split(text, ",")
-	if len(parts) >= 2 {
-		first := strings.TrimSpace(parts[0])
-		firstLower := strings.ToLower(first)
-		for _, addr := range addresses {
-			if strings.Contains(firstLower, strings.ToLower(addr)) {
-				// Comma-separated form: use second segment, trimmed at verb.
-				return trimCallsignAtVerb(strings.TrimSpace(parts[1]))
-			}
-		}
-	}
-	// No comma OR first segment isn't an address — handle the no-comma
-	// case where Whisper drops punctuation entirely, e.g.
-	// "Union Marshal Raider 39 marking moms at 10." Strip the leading
-	// address word(s) and trim what's left at the first intent verb.
 	lower := strings.ToLower(text)
+	// Step 1 — strip leading address tokens regardless of comma placement.
+	// Whisper produces all of these shapes:
+	//   "Marshal, Raider 39, state 5.8"    (comma after address)
+	//   "Union Marshal Raider 39, state 5.8" (no comma after address)
+	//   "Union Marshal Raider 39 state 5.8"  (no commas at all)
+	// Addresses must be passed longest-first so e.g. "union marshal" wins
+	// over "marshal" alone. We require the address to be followed by a
+	// space, comma, or end-of-string so "marshal" doesn't match inside
+	// "marshalling" or similar.
 	for _, addr := range addresses {
 		addrLower := strings.ToLower(addr)
-		if strings.HasPrefix(lower, addrLower+" ") {
-			return trimCallsignAtVerb(strings.TrimSpace(text[len(addr):]))
+		if !strings.HasPrefix(lower, addrLower) {
+			continue
 		}
+		rest := text[len(addr):]
+		if len(rest) > 0 && rest[0] != ' ' && rest[0] != ',' {
+			continue
+		}
+		rest = strings.TrimLeft(rest, ", ")
+		// Step 2 — take everything up to the first comma (request boundary),
+		// then trim at the first intent verb. That gives just the callsign.
+		if i := strings.Index(rest, ","); i > 0 {
+			rest = rest[:i]
+		}
+		return trimCallsignAtVerb(strings.TrimSpace(rest))
 	}
-	// Final fallback: first comma segment as-is.
+	// Address wasn't at the start — fall back to the simple first-segment
+	// behavior (callers can still get something useful even on garbled input).
+	parts := strings.Split(text, ",")
 	if len(parts) > 0 {
 		return strings.TrimSpace(parts[0])
 	}
