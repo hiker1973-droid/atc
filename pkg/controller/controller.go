@@ -1265,28 +1265,32 @@ func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 }
 
 // GetCarrierBRC returns the carrier's Base Recovery Course (bow direction) from
-// Tacview. Returns -1 if carrier not found. Note: DCS/Tacview reports the CVN's
-// HeadingDeg pointing at the STERN (model orientation quirk — verified
-// empirically 2026-05-16 when pilot reported BRC 357 but we were calling 179,
-// exactly the reciprocal). BRC = bow direction = heading + 180° mod 360°.
+// Tacview. Returns -1 if carrier not found. Tacview's HeadingDeg for the CVN
+// already points at the bow, so we return it directly. The "carrier" keyword
+// is intentionally NOT matched here — it appears in strike-group escort names
+// like "Carrier strike group-10" (helos, frigates) whose heading is unrelated
+// to the actual flat-top.
 func (c *ATCController) GetCarrierBRC() float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	// Look for CVN-72 or any carrier-named contact
 	for callsign, contact := range c.allPositions {
 		if time.Since(contact.UpdatedAt) > 60*time.Second {
 			continue
 		}
 		lower := strings.ToLower(callsign)
 		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
-			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") {
-			return math.Mod(contact.HeadingDeg+180, 360)
+			strings.Contains(lower, "stennis") || strings.Contains(lower, "roosevelt") ||
+			strings.Contains(lower, "washington") || strings.Contains(lower, "vinson") {
+			return contact.HeadingDeg
 		}
 	}
 	return -1
 }
 
-// GetCarrierPosition returns the carrier lon/lat from Tacview.
+// GetCarrierPosition returns the carrier lon/lat from Tacview. Like
+// GetCarrierBRC, intentionally avoids "carrier" as a match keyword since it
+// appears in strike-group escort callsigns, which would return the wrong
+// vessel's position.
 func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
@@ -1296,7 +1300,8 @@ func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 		}
 		lower := strings.ToLower(callsign)
 		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
-			strings.Contains(lower, "carrier") {
+			strings.Contains(lower, "stennis") || strings.Contains(lower, "roosevelt") ||
+			strings.Contains(lower, "washington") || strings.Contains(lower, "vinson") {
 			return contact.Lon, contact.Lat, true
 		}
 	}
