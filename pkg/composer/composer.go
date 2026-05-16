@@ -680,13 +680,13 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal,%s mother's weather %s, expect %s recovery%s, altimeter %s, Marshal angels %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother's weather %s, expect %s recovery%s, altimeter %s, " + c.towerCallsign + " angels %s, report see me at ten.",
 			callsign, radarStr, wx, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal,%s %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
 			callsign, radarStr, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal,%s %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
 			callsign, radarStr, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal,%s mother %s, %s recovery%s, altimeter %s, marshal angels %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother %s, %s recovery%s, altimeter %s, " + c.towerCallsign + " angels %s, report see me at ten.",
 			callsign, radarStr, wx, recovery, brcStr, alt, ang),
 	})
 }
@@ -695,9 +695,9 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 func (c *ATCComposer) MarshalRadarContact(callsign string, distNm int) string {
 	dist := numberWord(distNm)
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, radar contact, %s miles, say state.", callsign, dist),
-		fmt.Sprintf("%s, Marshal, contact, %s miles, say state.", callsign, dist),
-		fmt.Sprintf("%s, Marshal, got you at %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact, %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", got you at %s miles, say state.", callsign, dist),
 	})
 }
 
@@ -706,24 +706,24 @@ func (c *ATCComposer) MarshalCopyState(callsign string, fuelState float64) strin
 	s := fmt.Sprintf("%.1f", fuelState)
 	if fuelState < 2.0 {
 		return pick([]string{
-			fmt.Sprintf("%s, Marshal, state %s, expedite recovery.", callsign, s),
-			fmt.Sprintf("%s, Marshal, copy state %s, you are priority.", callsign, s),
-			fmt.Sprintf("%s, Marshal, state %s, priority recovery.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, expedite recovery.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy state %s, you are priority.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, priority recovery.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, copy state %s.", callsign, s),
-		fmt.Sprintf("%s, Marshal, state %s, copy.", callsign, s),
-		fmt.Sprintf("%s, Marshal, roger, state %s.", callsign, s),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy state %s.", callsign, s),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, copy.", callsign, s),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, state %s.", callsign, s),
 	})
 }
 
 // MarshalSignalCharlie — deck is clear, cleared to commence.
 func (c *ATCComposer) MarshalSignalCharlie(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, signal Charlie.", callsign),
-		fmt.Sprintf("%s, Marshal, you have Charlie.", callsign),
-		fmt.Sprintf("%s, Marshal, Charlie.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", signal Charlie.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", you have Charlie.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", Charlie.", callsign),
 	})
 }
 
@@ -732,15 +732,15 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, Marshal, copy commencing, state %s.", callsign, s),
-			fmt.Sprintf("%s, Marshal, commencing, state %s, copy.", callsign, s),
-			fmt.Sprintf("%s, Marshal, roger, commencing, state %s.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, copy.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", roger, commencing, state %s.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, copy commencing.", callsign),
-		fmt.Sprintf("%s, Marshal, commencing, copy.", callsign),
-		fmt.Sprintf("%s, Marshal, roger, commencing.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, copy.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, commencing.", callsign),
 	})
 }
 
@@ -748,18 +748,18 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 func (c *ATCComposer) MarshalPushButton(callsign string, tacanChannel int) string {
 	ch := numberWord(tacanChannel)
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, push button %s, check in.", callsign, ch),
-		fmt.Sprintf("%s, Marshal, button %s, check in.", callsign, ch),
-		fmt.Sprintf("%s, Marshal, push button %s and check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", push button %s, check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", button %s, check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", push button %s and check in.", callsign, ch),
 	})
 }
 
 // MarshalContact — LSO contact, marshal done.
 func (c *ATCComposer) MarshalContact(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, contact.", callsign),
-		fmt.Sprintf("%s, Marshal, you have contact.", callsign),
-		fmt.Sprintf("%s, Marshal, contact, good luck.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", you have contact.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact, good luck.", callsign),
 	})
 }
 
@@ -767,9 +767,9 @@ func (c *ATCComposer) MarshalContact(callsign string) string {
 func (c *ATCComposer) MarshalEstablishedAck(callsign string, angels int) string {
 	ang := numberWord(angels)
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, roger, hold angels %s.", callsign, ang),
-		fmt.Sprintf("%s, Marshal, established angels %s, copy.", callsign, ang),
-		fmt.Sprintf("%s, Marshal, angels %s, stand by for Charlie.", callsign, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, hold angels %s.", callsign, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", established angels %s, copy.", callsign, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", angels %s, stand by for Charlie.", callsign, ang),
 	})
 }
 

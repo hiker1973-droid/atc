@@ -250,6 +250,17 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 // handleMarshalCall processes a recognized marshal transmission.
 func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *composer.ATCComposer, transmit func(string), atcCtrl *controller.ATCController) {
 	lower := strings.ToLower(text)
+	// Self-echo guard: pilot calls always lead with the address word
+	// ("marshal" / "union marshal"). Marshal's own TX has the inverse shape
+	// "<callsign>, marshal, …" — so if the heard text doesn't start with an
+	// address keyword, treat it as our own echo coming back through SRS and
+	// drop it. Without this we self-loop on responses containing "state X"
+	// (CopyState ack → retranscribed → fires CopyState again every 10s).
+	if !strings.HasPrefix(lower, "marshal") &&
+		!strings.HasPrefix(lower, "union marshal") {
+		log.Debug().Str("text", text).Msg("Marshal: dropped — not address-led, likely self-echo")
+		return
+	}
 	fuelState := extractFuelStateMarshal(lower)
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
@@ -258,7 +269,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
 
-	case containsAny(lower, "marking mom", "marking moms"):
+	case containsAny(lower, "marking mom", "marking moms", "marking bomb", "marking bombs"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
 		reserved := stack.ReservedAngels(callsign)
 		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
