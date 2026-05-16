@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -88,10 +87,21 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		guid := "vsfg7msh" + fmt.Sprintf("%014d", time.Now().UnixNano()%100000000000000)
 		if len(guid) > guidLen { guid = guid[:guidLen] }
 		for len(guid) < guidLen { guid += "0" }
-		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		port, _ := strconv.Atoi(srsPort)
-		udpAddr := fmt.Sprintf("%s:%d", srsHost, port)
-		udpConn, err := net.Dial("udp", udpAddr)
+		// UDP setup — mirror Tower's ResolveUDPAddr + DialUDP path exactly. The
+		// previous string-form net.Dial("udp", "localhost:5008") path bound the
+		// socket via Go's default resolver, which on Windows preferred the IPv6
+		// ::1 address. SRS routed audio to the IPv4 source-port of the client
+		// list entry, so packets never reached us — SkyEye on the same SRS/freq
+		// received voice fine. Aligning the UDP create call to ResolveUDPAddr +
+		// DialUDP removes that resolver variable and binds the same way Tower
+		// does (verified working). Confirmed via bisect with SkyEye 2026-05-16.
+		udpResolved, err := net.ResolveUDPAddr("udp", srsAddr)
+		if err != nil {
+			tcpConn.Close()
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		udpConn, err := net.DialUDP("udp", nil, udpResolved)
 		if err != nil {
 			tcpConn.Close()
 			time.Sleep(5 * time.Second)
@@ -101,9 +111,13 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		freqHz := freqMHz * 1e6
 		syncMsg := buildSync(guid, marshalCallsign, freqHz)
 		tcpConn.Write(syncMsg)
-		time.Sleep(200 * time.Millisecond)
 		eamMsg := buildEAM(guid, marshalCallsign, freqHz, eamPassword)
 		tcpConn.Write(eamMsg)
+		// Prime the UDP NAT mapping immediately. Without this the first
+		// keepalive doesn't fire for 10s, so SRS never learns our UDP source
+		// address and routes nothing to us until then. SkyEye's SendPing at
+		// the end of initialize() does the same.
+		udpConn.Write([]byte(guid))
 		log.Info().Float64("freq", freqMHz).Msg("Marshal registered on SRS")
 
 		// UDP-only keepalive — matches Tower's srsLoop. Earlier revision
