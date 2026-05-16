@@ -277,7 +277,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
 
-	case containsAny(lower, "say brc", "request brc", "brc check", "say bearing"):
+	case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing"):
 		brc := atcCtrl.GetCarrierBRC()
 		log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Marshal: BRC request")
 		transmit(comp.MarshalSayBRC(callsign, brc))
