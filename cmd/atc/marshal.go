@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	marshalCallsign     = "Marshal"
+	marshalCallsign     = "Union Marshal"
 	marshalVoice        = "onyx"
 	marshalTacanChannel = 72
 	// Stack altitude band — Marshal assigns the lowest unoccupied angel in

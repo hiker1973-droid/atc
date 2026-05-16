@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -112,8 +111,20 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		freqHz := freqMHz * 1e6
 
 		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		port, _ := strconv.Atoi(srsPort)
-		udpConn, err := net.Dial("udp", fmt.Sprintf("%s:%d", srsHost, port))
+		// UDP setup — mirror Tower's ResolveUDPAddr + DialUDP path. The
+		// previous string-form net.Dial("udp", "localhost:5008") bound the
+		// socket via Go's default resolver, which on Windows preferred IPv6
+		// ::1. SRS routed audio to the IPv4 source-port and our IPv6-bound
+		// socket never received voice. Same root cause that Marshal had —
+		// fix verified there 2026-05-16, replicating here for Command.
+		udpResolved, err := net.ResolveUDPAddr("udp", srsAddr)
+		if err != nil {
+			log.Warn().Err(err).Msg("Command: UDP resolve failed")
+			tcpConn.Close()
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		udpConn, err := net.DialUDP("udp", nil, udpResolved)
 		if err != nil {
 			log.Warn().Err(err).Msg("Command: UDP connect failed")
 			tcpConn.Close()
@@ -124,6 +135,11 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		tcpConn.Write(buildSync(guid, channelName, freqHz))
 		time.Sleep(200 * time.Millisecond)
 		tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
+		// Prime the UDP NAT mapping so SRS learns our source port immediately,
+		// rather than waiting 10s for the first keepalive tick. Mirrors
+		// SkyEye's initialize() → SendPing() pattern. See marshal.go for the
+		// full reasoning.
+		udpConn.Write([]byte(guid))
 		log.Info().Float64("freq", freqMHz).Str("name", channelName).Msg("Command channel registered on SRS")
 
 		// DEBUG: with --command-test-tx, transmit "command test" every 30s to
