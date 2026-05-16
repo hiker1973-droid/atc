@@ -113,8 +113,8 @@ func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) stri
 	ang := numberWord(5 + rand.Intn(3))
 	return pick([]string{
 		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
-		fmt.Sprintf("%s, %s, climb to angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
-		fmt.Sprintf("%s, %s, angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower passing %s DME.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, proceed to angels %s, frequency change approved at %s DME.", callsign, c.towerCallsign, ang, dist),
 	})
 }
 
@@ -608,16 +608,51 @@ func (c *ATCComposer) DeckbossStandby(callsign string, position int) string {
 
 // ── Marshal Composer Methods ──────────────────────────────────────────────────
 
-// MarshalMarkingMom — initial marshal contact with BRC, Case, and stack altitude.
-// brc = carrier heading in degrees, -1 if unknown.
-func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, altimeterInHg, ceilingFt, brc float64) string {
-	ang := numberWord(angels)
-	alt := formatAltimeter(altimeterInHg)
+// marshalWeatherPhrase summarises ceiling + visibility into a short Marshal-style
+// weather call. Falls back to "weather clear, visibility ten" if inputs are zero.
+func marshalWeatherPhrase(ceilingFt, visNm float64) string {
+	// Visibility wording
+	visWord := "ten"
+	switch {
+	case visNm <= 0:
+		visWord = "ten"
+	case visNm < 1:
+		visWord = "less than one"
+	case visNm < 3:
+		visWord = fmt.Sprintf("%.0f", visNm)
+	case visNm >= 10:
+		visWord = "ten plus"
+	default:
+		visWord = numberWord(int(visNm))
+	}
 
-	// Determine recovery case from weather
+	// Ceiling wording
+	switch {
+	case ceilingFt <= 0 || ceilingFt >= 10000:
+		return fmt.Sprintf("ceiling unrestricted, visibility %s", visWord)
+	case ceilingFt >= 3000:
+		return fmt.Sprintf("ceiling %s thousand scattered, visibility %s", numberWord(int(ceilingFt/1000)), visWord)
+	case ceilingFt >= 1000:
+		return fmt.Sprintf("ceiling %s thousand broken, visibility %s", numberWord(int(ceilingFt/1000)), visWord)
+	default:
+		return fmt.Sprintf("ceiling %s hundred overcast, visibility %s", numberWord(int(ceilingFt/100)), visWord)
+	}
+}
+
+// MarshalMarkingMom — initial marshal contact with weather, Case, BRC, altimeter,
+// and stack altitude assignment. brc = carrier heading in degrees, -1 if unknown.
+// If radarFound, prepends a "I have you on radar at angels X, range Y, bearing Z
+// from mother" line built from live Tacview position relative to the carrier.
+func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels int, altimeterInHg, ceilingFt, visNm, brc float64,
+	radarAngels, radarDistNm, radarBearingDeg int, radarFound bool) string {
+	ang := numberWord(stackAngels)
+	alt := formatAltimeter(altimeterInHg)
+	wx := marshalWeatherPhrase(ceilingFt, visNm)
+
+	// Recovery case derived from ceiling
 	var recovery string
 	switch {
-	case ceilingFt >= 3000:
+	case ceilingFt <= 0, ceilingFt >= 3000:
 		recovery = "Case One"
 	case ceilingFt >= 1000:
 		recovery = "Case Two"
@@ -625,16 +660,53 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, a
 		recovery = "Case Three"
 	}
 
-	// Format BRC
+	// BRC phrase — omitted if carrier heading unknown
 	brcStr := ""
 	if brc >= 0 {
 		brcStr = fmt.Sprintf(", BRC %03.0f", brc)
 	}
 
+	// Radar readback phrase from carrier — only if Tacview shows the caller
+	radarStr := ""
+	if radarFound {
+		rAng := numberWord(radarAngels)
+		rDist := milesToWord(radarDistNm)
+		rBrg := bearingWord(radarBearingDeg)
+		radarStr = pick([]string{
+			fmt.Sprintf(" radar contact, angels %s, range %s, bearing %s from mother,", rAng, rDist, rBrg),
+			fmt.Sprintf(" I have you on radar, angels %s, %s from mother, bearing %s,", rAng, rDist, rBrg),
+			fmt.Sprintf(" radar contact angels %s, %s on the %s,", rAng, rDist, rBrg),
+		})
+	}
+
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, mother's weather is clear, visibility ten, expect %s recovery%s, altimeter %s, Marshal angels %s, report see me at ten.", callsign, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, %s recovery%s, altimeter %s, stack angels %s, report see me at ten.", callsign, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, Marshal, %s%s, altimeter %s, your angels are %s, report see me at ten.", callsign, recovery, brcStr, alt, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother's weather %s, expect %s recovery%s, altimeter %s, " + c.towerCallsign + " angels %s, report see me at ten.",
+			callsign, radarStr, wx, recovery, brcStr, alt, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
+			callsign, radarStr, recovery, wx, brcStr, alt, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
+			callsign, radarStr, recovery, wx, brcStr, alt, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother %s, %s recovery%s, altimeter %s, " + c.towerCallsign + " angels %s, report see me at ten.",
+			callsign, radarStr, wx, recovery, brcStr, alt, ang),
+	})
+}
+
+// MarshalSayBRC responds to a pilot's "say BRC" / "request BRC" call.
+// Returns the carrier's current Base Recovery Course (bow direction) as
+// a 3-digit spoken heading, e.g. "three five seven". Falls back to
+// "BRC unknown" if Tacview can't see the carrier.
+func (c *ATCComposer) MarshalSayBRC(callsign string, brc float64) string {
+	if brc < 0 {
+		return pick([]string{
+			fmt.Sprintf("%s, " + c.towerCallsign + ", BRC unknown, mother off scope.", callsign),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", standby — no radar contact on mother.", callsign),
+		})
+	}
+	brcStr := fmt.Sprintf("%03.0f", brc)
+	return pick([]string{
+		fmt.Sprintf("%s, " + c.towerCallsign + ", mother's BRC is %s.", callsign, brcStr),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", BRC %s.", callsign, brcStr),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", mother holding BRC %s.", callsign, brcStr),
 	})
 }
 
@@ -642,9 +714,9 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, angels int, a
 func (c *ATCComposer) MarshalRadarContact(callsign string, distNm int) string {
 	dist := numberWord(distNm)
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, radar contact, %s miles, say state.", callsign, dist),
-		fmt.Sprintf("%s, Marshal, contact, %s miles, say state.", callsign, dist),
-		fmt.Sprintf("%s, Marshal, got you at %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact, %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", got you at %s miles, say state.", callsign, dist),
 	})
 }
 
@@ -653,24 +725,24 @@ func (c *ATCComposer) MarshalCopyState(callsign string, fuelState float64) strin
 	s := fmt.Sprintf("%.1f", fuelState)
 	if fuelState < 2.0 {
 		return pick([]string{
-			fmt.Sprintf("%s, Marshal, state %s, expedite recovery.", callsign, s),
-			fmt.Sprintf("%s, Marshal, copy state %s, you are priority.", callsign, s),
-			fmt.Sprintf("%s, Marshal, state %s, priority recovery.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, expedite recovery.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy state %s, you are priority.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, priority recovery.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, copy state %s.", callsign, s),
-		fmt.Sprintf("%s, Marshal, state %s, copy.", callsign, s),
-		fmt.Sprintf("%s, Marshal, roger, state %s.", callsign, s),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy state %s.", callsign, s),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, copy.", callsign, s),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, state %s.", callsign, s),
 	})
 }
 
 // MarshalSignalCharlie — deck is clear, cleared to commence.
 func (c *ATCComposer) MarshalSignalCharlie(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, signal Charlie.", callsign),
-		fmt.Sprintf("%s, Marshal, you have Charlie.", callsign),
-		fmt.Sprintf("%s, Marshal, Charlie.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", signal Charlie.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", you have Charlie.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", Charlie.", callsign),
 	})
 }
 
@@ -679,15 +751,15 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, Marshal, copy commencing, state %s.", callsign, s),
-			fmt.Sprintf("%s, Marshal, commencing, state %s, copy.", callsign, s),
-			fmt.Sprintf("%s, Marshal, roger, commencing, state %s.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, copy.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", roger, commencing, state %s.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, copy commencing.", callsign),
-		fmt.Sprintf("%s, Marshal, commencing, copy.", callsign),
-		fmt.Sprintf("%s, Marshal, roger, commencing.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, copy.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, commencing.", callsign),
 	})
 }
 
@@ -695,28 +767,30 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 func (c *ATCComposer) MarshalPushButton(callsign string, tacanChannel int) string {
 	ch := numberWord(tacanChannel)
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, push button %s, check in.", callsign, ch),
-		fmt.Sprintf("%s, Marshal, button %s, check in.", callsign, ch),
-		fmt.Sprintf("%s, Marshal, push button %s and check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", push button %s, check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", button %s, check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", push button %s and check in.", callsign, ch),
 	})
 }
 
 // MarshalContact — LSO contact, marshal done.
 func (c *ATCComposer) MarshalContact(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, contact.", callsign),
-		fmt.Sprintf("%s, Marshal, you have contact.", callsign),
-		fmt.Sprintf("%s, Marshal, contact, good luck.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", you have contact.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact, good luck.", callsign),
 	})
 }
 
-// MarshalEstablishedAck — pilot established in stack.
-func (c *ATCComposer) MarshalEstablishedAck(callsign string, angels int) string {
+// MarshalEstablishedAck — pilot established in stack. Confirms entry with
+// angels + position so the pilot can verify the slot.
+func (c *ATCComposer) MarshalEstablishedAck(callsign string, angels, position int) string {
 	ang := numberWord(angels)
+	pos := numberWord(position)
 	return pick([]string{
-		fmt.Sprintf("%s, Marshal, roger, hold angels %s.", callsign, ang),
-		fmt.Sprintf("%s, Marshal, established angels %s, copy.", callsign, ang),
-		fmt.Sprintf("%s, Marshal, angels %s, stand by for Charlie.", callsign, ang),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", entering stack at angels %s, position %s, hold for Charlie.", callsign, ang, pos),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, in the stack angels %s at position %s, stand by for Charlie.", callsign, ang, pos),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy established, angels %s, position %s in the stack.", callsign, ang, pos),
 	})
 }
 

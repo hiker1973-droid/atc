@@ -355,7 +355,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestRadarCheck:
 		c.allPositionsMu.RLock()
-		contact := c.allPositions[req.Callsign]
+		contact := c.lookupContact(req.Callsign)
 		var lon, lat, altFt float64
 		hasContact := false
 		if contact != nil && !contact.UpdatedAt.IsZero() {
@@ -749,7 +749,7 @@ func extractFuelState(lower string) float64 {
 // acknowledgment — e.g. "032", "Raider 032", "Venom 201". No response needed.
 func isModexReadback(lower string) bool {
 	// Strip common callsign prefixes
-	for _, prefix := range []string{"raider", "reader", "radar", "rater", "venom", "vino", "knight", "hitman", "devil"} {
+	for _, prefix := range []string{"raider", "reader", "radar", "rater", "venom", "vino", "viper", "wiper", "hyper", "knight", "hitman", "devil"} {
 		lower = strings.TrimSpace(strings.TrimPrefix(lower, prefix))
 	}
 	// What remains should be 2-3 digits only
@@ -895,7 +895,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestAltitude
 
 
-	case containsAny(lower, "radio check", "comm check", "comms check", "comcheck", "comp check", "how copy"):
+	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comcheck", "comp check", "how copy"):
 		req.Type = RequestRadioCheck
 	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative"):
 		req.Type = RequestReadback
@@ -922,6 +922,11 @@ func normalizeCallsign(text string) string {
 		{"vino", "Venom"},
 		{"venue", "Venom"},
 		{"demon", "Venom"},
+		// Viper mishears (F-16 generic flight callsign)
+		{"viper", "Viper"},
+		{"wiper", "Viper"},
+		{"hyper", "Viper"},
+		{"vipers", "Viper"},
 	}
 	lower := strings.ToLower(text)
 	for _, pair := range replacements {
@@ -992,6 +997,8 @@ func trimTrailingTriggers(cs string) string {
 		// distance / handoff
 		"pushing command", "switching command", "push command",
 		"7 dme", "seven dme", "cleared airspace",
+		// Whisper often inserts "mile" between the number and "dme"
+		"7 mile", "seven mile", "mile dme", "miles dme", "dme",
 		// emergencies
 		"mayday", "pan pan", "emergency",
 	}
@@ -1148,7 +1155,7 @@ func (c *ATCController) SortedInboundsByDistance() []string {
 func (c *ATCController) NearestInboundAhead(callsign string) (string, float64) {
 	sorted := c.SortedInboundsByDistance()
 	c.allPositionsMu.RLock()
-	myContact := c.allPositions[callsign]
+	myContact := c.lookupContact(callsign)
 	c.allPositionsMu.RUnlock()
 
 	if myContact == nil {
@@ -1186,6 +1193,23 @@ func (c *ATCController) sequencedArrivalResponse(callsign string, s *state.Airfi
 		return c.composer.SequencedInitialAck(callsign, 0, s.ActiveRunway, 0, s.AltimeterInHg, seqNum, leadCS, int(leadDist+0.5))
 	}
 	return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, seqNum-1)
+}
+
+// lookupContact does a case-insensitive lookup against allPositions. Tacview
+// stores the raw modex from DCS (e.g. "RAIDER 036" all-caps for player FERGI)
+// while ParseIntent / normalizeCallsign produce title-cased queries
+// ("Raider 036"). Direct map lookup misses when those don't match. Caller
+// must hold allPositionsMu (read-locked is enough).
+func (c *ATCController) lookupContact(callsign string) *TacviewContact {
+	if c, ok := c.allPositions[callsign]; ok {
+		return c
+	}
+	for k, v := range c.allPositions {
+		if strings.EqualFold(k, callsign) {
+			return v
+		}
+	}
+	return nil
 }
 
 // UpdateAnyPosition records position for ANY Tacview aircraft and updates ATC state.
@@ -1240,26 +1264,35 @@ func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 	return false
 }
 
-// GetCarrierBRC returns the carrier's current magnetic heading (BRC) from Tacview.
-// Returns -1 if carrier not found.
+// GetCarrierBRC returns the carrier's Base Recovery Course (bow direction) from
+// Tacview. Returns -1 if carrier not found. Tacview's HeadingDeg on the CVN
+// points at the bow, so we return it directly. "Carrier strike group-N" is
+// literally how DCS labels the actual flat-top in many missions, so we keep
+// the broad "carrier" keyword. Helo/escort callsigns like "Pontiac 1-1
+// Rescue" don't contain the word "carrier" — only the STRIKE GROUP names
+// (which we don't index) reference it. Confirmed against live Tacview on
+// 2026-05-16.
 func (c *ATCController) GetCarrierBRC() float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	// Look for CVN-72 or any carrier-named contact
 	for callsign, contact := range c.allPositions {
 		if time.Since(contact.UpdatedAt) > 60*time.Second {
 			continue
 		}
 		lower := strings.ToLower(callsign)
 		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
-			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") {
+			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") ||
+			strings.Contains(lower, "roosevelt") || strings.Contains(lower, "washington") ||
+			strings.Contains(lower, "vinson") {
 			return contact.HeadingDeg
 		}
 	}
 	return -1
 }
 
-// GetCarrierPosition returns the carrier lon/lat from Tacview.
+// GetCarrierPosition returns the carrier lon/lat from Tacview. Match set
+// matches GetCarrierBRC — "carrier" is included because the actual CVN ship
+// is often labeled "Carrier strike group-N" in DCS missions.
 func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
@@ -1269,11 +1302,40 @@ func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 		}
 		lower := strings.ToLower(callsign)
 		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
-			strings.Contains(lower, "carrier") {
+			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") ||
+			strings.Contains(lower, "roosevelt") || strings.Contains(lower, "washington") ||
+			strings.Contains(lower, "vinson") {
 			return contact.Lon, contact.Lat, true
 		}
 	}
 	return 0, 0, false
+}
+
+// LookupCallerRelativeToCarrier returns the caller's angels (alt/1000), range
+// to mother in nm, and true bearing FROM the carrier TO the caller. Used by
+// Marshal to give a radar readback alongside stack assignment. Returns
+// found=false if either Tacview contact or carrier position is unavailable.
+func (c *ATCController) LookupCallerRelativeToCarrier(callsign string) (angels, distNm, bearingDeg int, found bool) {
+	carLon, carLat, carFound := c.GetCarrierPosition()
+	if !carFound {
+		return 0, 0, 0, false
+	}
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	contact := c.lookupContact(callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
+		return 0, 0, 0, false
+	}
+	carrierPt := orb.Point{carLon, carLat}
+	callerPt := orb.Point{contact.Lon, contact.Lat}
+	angels = int(math.Round(contact.AltFt / 1000.0))
+	if angels < 0 {
+		angels = 0
+	}
+	distNm = int(math.Round(haversineNm(callerPt, carrierPt)))
+	b := bearingDegFromTo(carrierPt, callerPt)
+	bearingDeg = ((int(math.Round(b)) % 360) + 360) % 360
+	return angels, distNm, bearingDeg, true
 }
 
 // AssignMarshalAngels picks the lowest unoccupied stack altitude in [minAngels, maxAngels].
@@ -1357,6 +1419,11 @@ func (c *ATCController) GetWeatherState() (ceilingFt float64, altimeterInHg floa
 	return c.airfieldState.GetWeatherState()
 }
 
+// GetVisibilityNm returns current visibility in nautical miles.
+func (c *ATCController) GetVisibilityNm() float64 {
+	return c.airfieldState.GetVisibilityNm()
+}
+
 // TacviewContactCount returns the number of active air contacts from Tacview.
 func (c *ATCController) TacviewContactCount() int {
 	c.allPositionsMu.RLock()
@@ -1386,7 +1453,7 @@ func (c *ATCController) IsTacviewActive() bool {
 func (c *ATCController) GetAircraftDistanceNm(callsign string) float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	if contact, ok := c.allPositions[callsign]; ok {
+	if contact := c.lookupContact(callsign); contact != nil {
 		if time.Since(contact.UpdatedAt) < 30*time.Second {
 			return haversineNm(orb.Point{contact.Lon, contact.Lat}, c.airfieldState.Airfield.Center)
 		}

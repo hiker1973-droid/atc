@@ -6,9 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -20,7 +18,7 @@ import (
 )
 
 const (
-	marshalCallsign     = "Marshal"
+	marshalCallsign     = "Union Marshal"
 	marshalVoice        = "onyx"
 	marshalTacanChannel = 72
 	// Stack altitude band — Marshal assigns the lowest unoccupied angel in
@@ -89,10 +87,21 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		guid := "vsfg7msh" + fmt.Sprintf("%014d", time.Now().UnixNano()%100000000000000)
 		if len(guid) > guidLen { guid = guid[:guidLen] }
 		for len(guid) < guidLen { guid += "0" }
-		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		port, _ := strconv.Atoi(srsPort)
-		udpAddr := fmt.Sprintf("%s:%d", srsHost, port)
-		udpConn, err := net.Dial("udp", udpAddr)
+		// UDP setup — mirror Tower's ResolveUDPAddr + DialUDP path exactly. The
+		// previous string-form net.Dial("udp", "localhost:5008") path bound the
+		// socket via Go's default resolver, which on Windows preferred the IPv6
+		// ::1 address. SRS routed audio to the IPv4 source-port of the client
+		// list entry, so packets never reached us — SkyEye on the same SRS/freq
+		// received voice fine. Aligning the UDP create call to ResolveUDPAddr +
+		// DialUDP removes that resolver variable and binds the same way Tower
+		// does (verified working). Confirmed via bisect with SkyEye 2026-05-16.
+		udpResolved, err := net.ResolveUDPAddr("udp", srsAddr)
+		if err != nil {
+			tcpConn.Close()
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		udpConn, err := net.DialUDP("udp", nil, udpResolved)
 		if err != nil {
 			tcpConn.Close()
 			time.Sleep(5 * time.Second)
@@ -102,12 +111,22 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		freqHz := freqMHz * 1e6
 		syncMsg := buildSync(guid, marshalCallsign, freqHz)
 		tcpConn.Write(syncMsg)
-		time.Sleep(200 * time.Millisecond)
 		eamMsg := buildEAM(guid, marshalCallsign, freqHz, eamPassword)
 		tcpConn.Write(eamMsg)
+		// Prime the UDP NAT mapping immediately. Without this the first
+		// keepalive doesn't fire for 10s, so SRS never learns our UDP source
+		// address and routes nothing to us until then. SkyEye's SendPing at
+		// the end of initialize() does the same.
+		udpConn.Write([]byte(guid))
 		log.Info().Float64("freq", freqMHz).Msg("Marshal registered on SRS")
 
-		// UDP keepalive
+		// UDP-only keepalive — matches Tower's srsLoop. Earlier revision
+		// also re-sent a TCP Sync every 10s; SRS treats that as a fresh
+		// client registration and tears down the audio-routing entry,
+		// dropping voice during the re-register gap. The TCP reader below
+		// already replies to server pings (MsgType=1) with a Sync echo,
+		// which is the correct protocol behavior for keeping the entry
+		// alive without re-registering.
 		keepaliveStop := make(chan struct{})
 		go func() {
 			defer close(keepaliveStop)
@@ -119,7 +138,6 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 					return
 				case <-tk.C:
 					udpConn.Write([]byte(guid))
-					tcpConn.Write(buildSync(guid, marshalCallsign, freqMHz*1e6))
 				}
 			}
 		}()
@@ -183,7 +201,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 								return
 							}
 							log.Info().Str("text", text).Msg("Marshal heard")
-							cs := extractCallsignSimple(text)
+							cs := extractCallsignSkippingAddress(text, "union marshal", "union marshall", "unit marshal", "marshall", "marshal")
 							handleMarshalCall(text, cs, stack, comp, transmit, atcCtrl)
 						}(frames)
 					}
@@ -194,46 +212,25 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 				if readErr != nil {
 					continue
 				}
-				// 22-byte packet is a UDP ping (just the GUID), not voice.
-				if n == 22 {
+				log.Debug().Int("bytes", n).Msg("Marshal UDP packet received")
+				if n < 6 {
+					log.Debug().Int("bytes", n).Msg("Marshal UDP packet too short — ignoring")
 					continue
 				}
-				if n < 7 {
+				// SRS UDP voice packet header is [pktLen(2)] [audioLen(2)] [freqSegLen(2)].
+				// Earlier revision read audioLen from offset 4 — that's freqSegLen, a
+				// tiny value (typically 10 = one freq entry), so opusBytes received only
+				// ~10 bytes of header garbage and Whisper never returned a usable
+				// transcription. Tower's srsLoop reads from offset 2; aligning here.
+				audioLen := int(binary.LittleEndian.Uint16(udpBuf[2:4]))
+				if audioLen <= 0 || 6+audioLen > n {
+					log.Debug().Int("bytes", n).Int("audioLen", audioLen).Msg("Marshal UDP audioLen rejected")
 					continue
 				}
-				// SRS audio packet layout matches Tower's parser in main.go:
-				//   [2:4]  audioLen (uint16 LE)
-				//   [4:6]  freqSegLen (uint16 LE) — total bytes of trailing freq segments
-				//   [6:6+audioLen]  opus audio
-				//   [6+audioLen:][n*10]  freq segments (8B freq float64 + 2B trailer each)
-				//   [n-22:n]  origin client GUID
-				// Marshal previously read audioLen from [4:6] (which is freqSegLen),
-				// so every packet either bailed or accumulated garbage — making
-				// Marshal deaf to pilots even though TX worked.
-				audioLen := binary.LittleEndian.Uint16(udpBuf[2:4])
-				if int(audioLen) > n-6 {
-					continue
-				}
+				origin := extractOriginFromUDP(udpBuf[:n])
 				opusBytes := make([]byte, audioLen)
 				copy(opusBytes, udpBuf[6:6+audioLen])
-
-				// SRS broadcasts packets from all radios to all clients; filter
-				// to our freq the same way Tower does (500Hz tolerance).
-				audioEnd := 6 + int(audioLen)
-				freqSegLen := binary.LittleEndian.Uint16(udpBuf[4:6])
-				freqMatch := false
-				for i := 0; i+10 <= int(freqSegLen) && audioEnd+i+10 <= n; i += 10 {
-					pktFreq := math.Float64frombits(binary.LittleEndian.Uint64(udpBuf[audioEnd+i : audioEnd+i+8]))
-					if math.Abs(pktFreq-freqHz) < 500 {
-						freqMatch = true
-						break
-					}
-				}
-				if !freqMatch {
-					continue
-				}
-
-				origin := extractOriginFromUDP(udpBuf[:n])
+				log.Debug().Str("origin", origin).Int("audioLen", audioLen).Msg("Marshal UDP voice frame accepted")
 				if transmissions[origin] == nil {
 					transmissions[origin] = &transmission{}
 				}
@@ -253,23 +250,53 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 // handleMarshalCall processes a recognized marshal transmission.
 func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *composer.ATCComposer, transmit func(string), atcCtrl *controller.ATCController) {
 	lower := strings.ToLower(text)
+	// Self-echo guard: pilot calls always lead with the address word
+	// ("Marshal" / "Union Marshal", or Whisper variants "Marshall" /
+	// "Unit Marshal"). Marshal's own TX has the inverse shape
+	// "<callsign>, marshal, …" — so if the heard text doesn't start with one
+	// of those address tokens, treat it as our own echo coming back through
+	// SRS and drop it. Without this we self-loop on responses containing
+	// "state X" (CopyState ack → retranscribed → fires CopyState again).
+	addrPrefixes := []string{"marshal", "marshall", "union marshal", "unit marshal", "union marshall"}
+	leadsWithAddress := false
+	for _, p := range addrPrefixes {
+		if strings.HasPrefix(lower, p) {
+			leadsWithAddress = true
+			break
+		}
+	}
+	if !leadsWithAddress {
+		log.Debug().Str("text", text).Msg("Marshal: dropped — not address-led, likely self-echo")
+		return
+	}
 	fuelState := extractFuelStateMarshal(lower)
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
+	visNm := atcCtrl.GetVisibilityNm()
 	switch {
-	case containsAny(lower, "marking mom", "marking moms"):
+	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comp check", "comcheck", "how copy"):
+		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
+		transmit(comp.RadioCheck(callsign))
+
+	case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing"):
+		brc := atcCtrl.GetCarrierBRC()
+		log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Marshal: BRC request")
+		transmit(comp.MarshalSayBRC(callsign, brc))
+
+	case containsAny(lower, "marking mom", "marking moms", "marking bomb", "marking bombs"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
 		reserved := stack.ReservedAngels(callsign)
-		angels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
-		stack.SetAngels(callsign, angels)
+		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
+		stack.SetAngels(callsign, stackAngels)
 		brc := atcCtrl.GetCarrierBRC()
-		log.Info().Str("callsign", callsign).Int("position", pos).Int("angels", angels).Ints("reserved", reserved).Float64("brc", brc).Msg("Marshal: aircraft checking in")
+		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Msg("Marshal: aircraft checking in")
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
 		if len(all) > 1 {
 			stackInfo = fmt.Sprintf(" Stack has %d aircraft.", len(all))
 		}
-		transmit(comp.MarshalMarkingMom(callsign, pos, angels, altimeter, ceilingFt, brc) + stackInfo)
+		transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
 
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))
@@ -280,14 +307,16 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	case containsAny(lower, "established angels", "established at angels"):
 		stack.SetPhase(callsign, "holding")
 		angels := 6
+		position := 1
 		if ac, ok := stack.GetAircraft(callsign); ok {
 			angels = ac.Angels
+			position = ac.Position
 		}
 		if atcCtrl.IsDeckClear() {
 			stack.SetPhase(callsign, "charlie")
 			transmit(comp.MarshalSignalCharlie(callsign))
 		} else {
-			transmit(comp.MarshalEstablishedAck(callsign, angels))
+			transmit(comp.MarshalEstablishedAck(callsign, angels, position))
 		}
 
 	case containsAny(lower, "commencing"):

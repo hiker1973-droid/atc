@@ -6,11 +6,9 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/rand"
 	"net"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -113,8 +111,20 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		freqHz := freqMHz * 1e6
 
 		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		port, _ := strconv.Atoi(srsPort)
-		udpConn, err := net.Dial("udp", fmt.Sprintf("%s:%d", srsHost, port))
+		// UDP setup — mirror Tower's ResolveUDPAddr + DialUDP path. The
+		// previous string-form net.Dial("udp", "localhost:5008") bound the
+		// socket via Go's default resolver, which on Windows preferred IPv6
+		// ::1. SRS routed audio to the IPv4 source-port and our IPv6-bound
+		// socket never received voice. Same root cause that Marshal had —
+		// fix verified there 2026-05-16, replicating here for Command.
+		udpResolved, err := net.ResolveUDPAddr("udp", srsAddr)
+		if err != nil {
+			log.Warn().Err(err).Msg("Command: UDP resolve failed")
+			tcpConn.Close()
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		udpConn, err := net.DialUDP("udp", nil, udpResolved)
 		if err != nil {
 			log.Warn().Err(err).Msg("Command: UDP connect failed")
 			tcpConn.Close()
@@ -125,6 +135,11 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		tcpConn.Write(buildSync(guid, channelName, freqHz))
 		time.Sleep(200 * time.Millisecond)
 		tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
+		// Prime the UDP NAT mapping so SRS learns our source port immediately,
+		// rather than waiting 10s for the first keepalive tick. Mirrors
+		// SkyEye's initialize() → SendPing() pattern. See marshal.go for the
+		// full reasoning.
+		udpConn.Write([]byte(guid))
 		log.Info().Float64("freq", freqMHz).Str("name", channelName).Msg("Command channel registered on SRS")
 
 		// DEBUG: with --command-test-tx, transmit "command test" every 30s to
@@ -157,6 +172,9 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 
 		log.Info().Int("goroutines", runtime.NumGoroutine()).Msg("Command: spawning keepalive goroutine")
 		pingStop := make(chan struct{})
+		// UDP-only keepalive — matches Tower's srsLoop. See marshal.go for the
+		// full reasoning; sending Sync+EAM every 10s was tearing down audio
+		// routing on each cycle.
 		go func() {
 			tk := time.NewTicker(10 * time.Second)
 			defer tk.Stop()
@@ -168,9 +186,6 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 					return
 				case <-tk.C:
 					udpConn.Write([]byte(guid))
-					tcpConn.Write(buildSync(guid, channelName, freqHz))
-					time.Sleep(200 * time.Millisecond)
-					tcpConn.Write(buildEAM(guid, channelName, freqHz, eamPassword))
 				}
 			}
 		}()
@@ -241,7 +256,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 								return
 							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
-							cs := extractCallsignSimple(text)
+							cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
 							resp := commandResponse(text, cs, channelName)
 							if resp == "" {
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command intent miss")
@@ -266,46 +281,18 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 				if readErr != nil {
 					continue
 				}
-				// 22-byte packet is a UDP ping (just the GUID), not voice.
-				if n == 22 {
+				if n < 6 {
 					continue
 				}
-				if n < 7 {
+				// audioLen lives at udpBuf[2:4]; offset 4 is freqSegLen. See marshal.go
+				// for the full header layout / regression history.
+				audioLen := int(binary.LittleEndian.Uint16(udpBuf[2:4]))
+				if audioLen <= 0 || 6+audioLen > n {
 					continue
 				}
-				// SRS audio packet layout matches Tower's parser in main.go:
-				//   [2:4]  audioLen (uint16 LE)
-				//   [4:6]  freqSegLen (uint16 LE) — total bytes of trailing freq segments
-				//   [6:6+audioLen]  opus audio
-				//   [6+audioLen:][n*10]  freq segments (8B freq float64 + 2B trailer each)
-				//   [n-22:n]  origin client GUID
-				// Command previously read audioLen from [4:6] (which is freqSegLen),
-				// so every packet either bailed or accumulated garbage — making
-				// the Command channel deaf to pilots even though TX worked.
-				audioLen := binary.LittleEndian.Uint16(udpBuf[2:4])
-				if int(audioLen) > n-6 {
-					continue
-				}
+				origin := extractOriginFromUDP(udpBuf[:n])
 				opusBytes := make([]byte, audioLen)
 				copy(opusBytes, udpBuf[6:6+audioLen])
-
-				// SRS broadcasts packets from all radios to all clients; filter
-				// to our freq the same way Tower does (500Hz tolerance).
-				audioEnd := 6 + int(audioLen)
-				freqSegLen := binary.LittleEndian.Uint16(udpBuf[4:6])
-				freqMatch := false
-				for i := 0; i+10 <= int(freqSegLen) && audioEnd+i+10 <= n; i += 10 {
-					pktFreq := math.Float64frombits(binary.LittleEndian.Uint64(udpBuf[audioEnd+i : audioEnd+i+8]))
-					if math.Abs(pktFreq-freqHz) < 500 {
-						freqMatch = true
-						break
-					}
-				}
-				if !freqMatch {
-					continue
-				}
-
-				origin := extractOriginFromUDP(udpBuf[:n])
 				if transmissions[origin] == nil {
 					transmissions[origin] = &transmission{}
 				}

@@ -14,8 +14,19 @@ Triggers from `cmd/atc/marshal.go` `handleMarshalCall`. Responses from `pkg/comp
 - `{POS}` — position in stack
 - `{DIST}` — distance in nautical miles, spelled
 - `{STATE}` — fuel state (e.g. `4.2`)
+- `{WX}` — weather phrase derived from live ceiling + visibility (see below)
+- `{R_ANG}` — caller's altitude in thousands as seen on Tacview, spelled
+- `{R_DIST}` — caller's range from carrier in nm, spelled
+- `{R_BRG}` — true bearing FROM the carrier TO the caller (cardinal/intercardinal word)
 
-**Recovery case** auto-derived from ceiling: `Case One` (≥3000 ft), `Case Two` (≥1000 ft), `Case Three` (<1000 ft).
+**Recovery case** auto-derived from ceiling: `Case One` (≥3000 ft or unknown), `Case Two` (≥1000 ft), `Case Three` (<1000 ft).
+
+**`{WX}` (mother's weather)** — built from live `ceilingFt` + `visNm`:
+- Ceiling unknown or ≥10 000 ft → `ceiling unrestricted, visibility ten plus`
+- Ceiling ≥3 000 ft → `ceiling X thousand scattered, visibility ...`
+- Ceiling ≥1 000 ft → `ceiling X thousand broken, visibility ...`
+- Ceiling <1 000 ft → `ceiling X hundred overcast, visibility ...`
+- Visibility: `ten plus` (≥10 nm), spelled int (3–9), digit (<3), `less than one` (<1)
 
 ---
 
@@ -23,14 +34,57 @@ Triggers from `cmd/atc/marshal.go` `handleMarshalCall`. Responses from `pkg/comp
 
 **Triggers:** `marking mom` · `marking moms`
 
-This is the pilot's first call to Marshal. Composer also reports a stack-summary line (`Stack has N aircraft.`) appended when other aircraft are present.
+Pilot's first call to Marshal. Composer also appends a stack-summary line (`Stack has N aircraft.`) when other aircraft are present. Response always carries: weather, recovery case, BRC, altimeter, stack assignment, and the "see me at ten" instruction. When the caller is visible on Tacview a `{RADAR}` clause is inserted right after `Marshal,` giving live angels/range/bearing from mother.
+
+**`{RADAR}` clause** — randomly picks one of:
+1. ` radar contact, angels {R_ANG}, range {R_DIST}, bearing {R_BRG} from mother,`
+2. ` I have you on radar, angels {R_ANG}, {R_DIST} from mother, bearing {R_BRG},`
+3. ` radar contact angels {R_ANG}, {R_DIST} on the {R_BRG},`
+
+If Tacview has no fresh contact for the caller (or carrier position unknown), `{RADAR}` is empty.
 
 **Responses (`MarshalMarkingMom`):**
-1. `{CALLSIGN}, Marshal, mother's weather is clear, visibility ten, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
-2. `{CALLSIGN}, Marshal, {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
-3. `{CALLSIGN}, Marshal, {CASE}, BRC {BRC}, altimeter {ALTIMETER}, your angels are {ANGELS}, report see me at ten.`
+1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
+2. `{CALLSIGN}, Marshal,{RADAR} {CASE} recovery, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
+3. `{CALLSIGN}, Marshal,{RADAR} {CASE}, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your angels are {ANGELS}, report see me at ten.`
+4. `{CALLSIGN}, Marshal,{RADAR} mother {WX}, {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, marshal angels {ANGELS}, report see me at ten.`
 
 When BRC unknown, the `, BRC {BRC}` clause is omitted.
+
+---
+
+## 1a. Radio check
+
+**Triggers:** `radio check` · `comm check` · `comms check` · `comp check` · `comcheck` · `how copy`
+
+Same composer method as the towers (`RadioCheck`) — composer is constructed with `marshalCallsign="Marshal"` so the responses come out Marshal-flavored automatically.
+
+**Responses (`RadioCheck`):**
+1. `{CALLSIGN}, Marshal, loud and clear.`
+2. `{CALLSIGN}, Marshal, five by five, go ahead.`
+3. `{CALLSIGN}, Marshal, reading you loud and clear.`
+
+---
+
+## 1b. DME position report
+
+**Triggers:** `N DME` · `N mile` · `N miles` · `N mile DME` (where `N` is a spelled or digit number — e.g. `7 DME`, `seven DME`, `7 mile`, `seven mile DME`)
+
+Pilot reports current distance from mother on inbound. Typically called between `marking moms` and `see you at ten` (e.g. at 20 / 15 / 7 DME). Pure ack — no new clearance, just confirmation Marshal sees the call. If Tacview has the caller, the response includes a brief radar confirm (`radar contact` / `paint you`).
+
+The reported distance `{DIST}` is parsed from the pilot's transmission and echoed back, spelled as digits (`7`, `15`, etc.).
+
+**Responses (`MarshalAckDME`) — no radar:**
+1. `{CALLSIGN}, Marshal, roger, {DIST} DME, continue.`
+2. `{CALLSIGN}, Marshal, copy {DIST} DME.`
+3. `{CALLSIGN}, Marshal, {DIST} DME, continue inbound.`
+
+**Responses (`MarshalAckDME`) — with radar:**
+1. `{CALLSIGN}, Marshal, radar contact, {DIST} DME, continue.`
+2. `{CALLSIGN}, Marshal, paint you at {DIST} DME, continue inbound.`
+3. `{CALLSIGN}, Marshal, contact {DIST} DME, continue.`
+
+Pilot must still lead the transmission with the address word ("Marshal, …") — the self-echo guard in `handleMarshalCall` drops anything that doesn't, so `Raider 39, 7 DME, switching channel 4` alone gets filtered. With the prefix (`Marshal, Raider 39, 7 DME`) the trigger fires.
 
 ---
 
@@ -72,10 +126,10 @@ When BRC unknown, the `, BRC {BRC}` clause is omitted.
 2. `{CALLSIGN}, Marshal, you have Charlie.`
 3. `{CALLSIGN}, Marshal, Charlie.`
 
-**If deck is busy → ack and hold:**
-1. `{CALLSIGN}, Marshal, roger, hold angels {ANGELS}.`
-2. `{CALLSIGN}, Marshal, established angels {ANGELS}, copy.`
-3. `{CALLSIGN}, Marshal, angels {ANGELS}, stand by for Charlie.`
+**If deck is busy → ack and hold (now confirms `{POS}` so pilot can verify slot):**
+1. `{CALLSIGN}, Marshal, entering stack at angels {ANGELS}, position {POS}, hold for Charlie.`
+2. `{CALLSIGN}, Marshal, roger, in the stack angels {ANGELS} at position {POS}, stand by for Charlie.`
+3. `{CALLSIGN}, Marshal, copy established, angels {ANGELS}, position {POS} in the stack.`
 
 ---
 
@@ -153,7 +207,9 @@ When an aircraft commences, its slot frees and the rest of the stack **collapses
 
 | Stage | Pilot call | Marshal response | Wired? |
 |---|---|---|---|
-| Before 50nm | `marking moms, [DIST], angels [XX], state [XX]` | mother's weather, expect Case 1, altimeter, stack angels, report see me at 10 | ✅ §1 |
+| Any | `radio check` / `comm check` / `comms check` / `how copy` | loud and clear / five by five | ✅ §1a |
+| Before 50nm | `marking moms, [DIST], angels [XX], state [XX]` | radar contact (if Tacview), mother's weather, expect Case 1, BRC, altimeter, stack angels, report see me at 10 | ✅ §1 |
+| Inbound | `[DIST] DME` / `[DIST] mile(s)` (with `Marshal,` prefix) | roger DME, continue (radar-flavored if Tacview has caller) | ✅ §1b |
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |

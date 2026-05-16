@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"runtime/debug"
 	"path/filepath"
 	"io"
@@ -759,6 +760,75 @@ func extractCallsignSimple(text string) string {
 	return ""
 }
 
+// extractCallsignSkippingAddress is like extractCallsignSimple but treats the
+// first comma segment as the address word (e.g. "Marshal", "Union Marshal",
+// "Command") and returns the SECOND segment as the pilot callsign. This is
+// the natural shape of pilot calls to non-airfield channels:
+//   "Marshal, Raider 032, comm check."   → "Raider 032"
+//   "Command, Raider 032 checking in."   → "Raider 032 checking in" → first word(s)
+// The `addresses` strings are matched case-insensitively via substring (so
+// "Marshall" with the extra L Whisper sometimes adds still matches "marshal").
+// If the first segment doesn't match any address, the simple first-segment
+// behavior is preserved as a fallback.
+func extractCallsignSkippingAddress(text string, addresses ...string) string {
+	text = normalizeCallsignLocal(text)
+	lower := strings.ToLower(text)
+	// Step 1 — strip leading address tokens regardless of comma placement.
+	// Whisper produces all of these shapes:
+	//   "Marshal, Raider 39, state 5.8"    (comma after address)
+	//   "Union Marshal Raider 39, state 5.8" (no comma after address)
+	//   "Union Marshal Raider 39 state 5.8"  (no commas at all)
+	// Addresses must be passed longest-first so e.g. "union marshal" wins
+	// over "marshal" alone. We require the address to be followed by a
+	// space, comma, or end-of-string so "marshal" doesn't match inside
+	// "marshalling" or similar.
+	for _, addr := range addresses {
+		addrLower := strings.ToLower(addr)
+		if !strings.HasPrefix(lower, addrLower) {
+			continue
+		}
+		rest := text[len(addr):]
+		if len(rest) > 0 && rest[0] != ' ' && rest[0] != ',' {
+			continue
+		}
+		rest = strings.TrimLeft(rest, ", ")
+		// Step 2 — take everything up to the first comma (request boundary),
+		// then trim at the first intent verb. That gives just the callsign.
+		if i := strings.Index(rest, ","); i > 0 {
+			rest = rest[:i]
+		}
+		return trimCallsignAtVerb(strings.TrimSpace(rest))
+	}
+	// Address wasn't at the start — fall back to the simple first-segment
+	// behavior (callers can still get something useful even on garbled input).
+	parts := strings.Split(text, ",")
+	if len(parts) > 0 {
+		return strings.TrimSpace(parts[0])
+	}
+	return ""
+}
+
+// trimCallsignAtVerb cuts off everything after the first intent-style word in
+// a callsign segment. Used when the pilot crams the callsign and the request
+// into a single comma segment, e.g. "Raider 032 checking in" → "Raider 032".
+// Conservative — only trims at a small set of common verbs so we don't chop a
+// legitimate two-word callsign like "Viper Flight".
+func trimCallsignAtVerb(s string) string {
+	verbs := []string{
+		" checking", " check", " requesting", " request", " holding",
+		" airborne", " inbound", " departing", " ready", " established",
+		" pushing", " switching", " marking", " commencing", " state",
+	}
+	lower := strings.ToLower(s)
+	cut := len(s)
+	for _, v := range verbs {
+		if i := strings.Index(lower, v); i > 0 && i < cut {
+			cut = i
+		}
+	}
+	return strings.TrimSpace(s[:cut])
+}
+
 // transcribeFramesWithPrompt wraps Opus frames and sends to Whisper with a custom prompt.
 func transcribeFramesWithPrompt(ctx context.Context, apiKey string, frames [][]byte, prompt string) (string, error) {
 	ogg := wrapOpusInOGG(frames)
@@ -1038,6 +1108,21 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 // buildEAM sends the External AWACS Mode password to SRS.
 // Without this, SRS will not send audio to external clients.
 // MsgType 7 = MessageExternalAWACSModePassword
+// unitIdForCallsign returns a deterministic, per-role unitId. SRS treats the
+// unitId as the in-game DCS object the radio is bonded to; when multiple
+// clients share the same unitId, SRS de-duplicates audio routing — whichever
+// process most recently refreshed wins. Towers refresh every 10s and were
+// shadowing Marshal/Command audio because all clients were hard-coded to
+// 100000002. FNV-32 of the callsign keeps the IDs stable across restarts and
+// well inside the int32 range SRS expects.
+func unitIdForCallsign(callsign string) int64 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(callsign))
+	// Reserve 100000000..100999999 for our injected radios so they look like
+	// normal DCS object IDs without colliding with player slots.
+	return 100000000 + int64(h.Sum32()%1000000)
+}
+
 func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 	msg := map[string]interface{}{
 		"Version": "2.1.0.2",
@@ -1061,7 +1146,7 @@ func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 					},
 				},
 				"unit":   callsign,
-				"unitId": 100000002,
+				"unitId": unitIdForCallsign(callsign),
 				"iff": map[string]interface{}{
 					"control":   0,
 					"expansion": false,
@@ -1108,7 +1193,7 @@ func buildSync(guid, callsign string, freqHz float64) []byte {
 					},
 				},
 				"unit":   callsign,
-				"unitId": 100000002,
+				"unitId": unitIdForCallsign(callsign),
 				"iff": map[string]interface{}{
 					"control":   0,
 					"expansion": false,
@@ -1300,13 +1385,14 @@ func currentTowerVoice() string {
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
-// 14 chars/sec rate is empirical for the legacy tts-1 model at our 0.88 speed
-// setting and is close enough for gpt-4o-mini-tts at the same speed. The 5s
-// margin covers ExternalAudio.exe startup, the playback tail, the mic-click
-// splice, and — critically — the Whisper flush gap that arrives AFTER audio
-// stops playing. Without enough margin here the bot transcribes its own TX
-// loopback and re-fires the same response (observed 2026-05-12 with airborne
-// / freq-change calls repeating every 10–13s).
+// 14 chars/sec rate is empirical at our previous 0.88 speed; at 0.97 actual
+// playback is ~15.5 chars/sec, so 14 keeps the estimate conservative (slightly
+// over-cools rather than under-cools). The 5s margin covers ExternalAudio.exe
+// startup, the playback tail, the mic-click splice, and — critically — the
+// Whisper flush gap that arrives AFTER audio stops playing. Without enough
+// margin here the bot transcribes its own TX loopback and re-fires the same
+// response (observed 2026-05-12 with airborne / freq-change calls repeating
+// every 10–13s).
 func estimateTTSDuration(text string) time.Duration {
 	d := time.Duration(len(text))*time.Second/14 + 5*time.Second
 	if d < 6*time.Second {
@@ -1384,7 +1470,7 @@ func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string) ([]byt
 		"model": "gpt-4o-mini-tts",
 		"input": text,
 		"voice": voice,
-		"speed": 0.88,
+		"speed": 0.97,
 	}
 	data, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST",
