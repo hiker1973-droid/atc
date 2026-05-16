@@ -1264,8 +1264,11 @@ func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 	return false
 }
 
-// GetCarrierBRC returns the carrier's current magnetic heading (BRC) from Tacview.
-// Returns -1 if carrier not found.
+// GetCarrierBRC returns the carrier's Base Recovery Course (bow direction) from
+// Tacview. Returns -1 if carrier not found. Note: DCS/Tacview reports the CVN's
+// HeadingDeg pointing at the STERN (model orientation quirk — verified
+// empirically 2026-05-16 when pilot reported BRC 357 but we were calling 179,
+// exactly the reciprocal). BRC = bow direction = heading + 180° mod 360°.
 func (c *ATCController) GetCarrierBRC() float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
@@ -1277,7 +1280,7 @@ func (c *ATCController) GetCarrierBRC() float64 {
 		lower := strings.ToLower(callsign)
 		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
 			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") {
-			return contact.HeadingDeg
+			return math.Mod(contact.HeadingDeg+180, 360)
 		}
 	}
 	return -1
