@@ -26,7 +26,7 @@ Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
 |---|---|---|---|
 | `atc-omal.log` | OMAL / Al Ain | 250.7 | — |
 | `atc-omam.log` | OMAM / Al Dhafra | 251.1 | — |
-| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | Deckboss (306.2), Marshal (306.3) |
+| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | Marshal (306.3, "Union Marshal", `onyx`), Deckboss (128.6, "Deckboss", `ash`) |
 
 Role names in logs: `Tower`, `Deckboss`, `Marshal` (single L). User's verbal "Marshall" = the `Marshal` role. When the user says "monitor towers / deckboss / marshal", tail all three log files filtering on `heard`, `TX`, role lifecycle (`online`/`offline`/`stack online`/`registered on SRS`), and all warn/error levels. Prefix each event with the site code so the user can tell which instance produced it.
 
@@ -47,14 +47,15 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 
 Stop: close the console window, or use launcher dashboard buttons.
 
-### Training 1 active roles (2026-05-08)
-**Tower**, **ATIS**, **Marshal** (306.3), and **Command** (282.0) all run live on Training 1. Bat files at repo root: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat`.
+### Training 1 active roles (2026-05-17)
+**Tower**, **ATIS**, **Marshal** (306.3), **Command** (282.0), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat` at repo root; **`dev_only/start_deckboss.bat`** is still in `dev_only/` for legacy reasons but runs in production — promote to root next maintenance window.
+
+Voices: all roles use `onyx` except Deckboss which uses `ash` (calm authoritative) for audible differentiation. Switchable via `--deckboss-voice <echo|ballad|sage|onyx|…>` without rebuilds.
 
 Still parked under `dev_only/` (do not launch on Training 1):
-- `dev_only/start_deckboss.bat` — Deckboss 306.2 (carrier ops)
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
 
-The role *code* for all parked roles stays on `main`; only the launch scripts are gated. Pull `main` on dev and run the parked bats from `dev_only/` there.
+The role *code* for all parked roles stays on `main`; only the launch scripts are gated.
 
 ## Gotchas
 - **`--grpc-addr` is not a valid flag.** It was removed from `atc.exe`. Old `run_alain.bat` / `run_dhafra.bat` / `run_minhad.bat` files still pass it and will fail at launch — delete them if they are still present.
@@ -66,6 +67,12 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - Tests roles one at a time and asks Claude to tail the relevant log(s) for the session. They want filtered, site-prefixed events, not raw JSONL.
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
+
+## Recent context (2026-05-17)
+- **Deckboss live on 128.6** (DCS carrier UHF, was 306.2). Brought up with: IPv6 UDP fix (`net.ResolveUDPAddr` + `net.DialUDP` like Marshal — `net.Dial("udp", ...)` was binding `::1` and silently dropping audio), §1/§2 trigger alignment with `deckboss_responses.md` (now accepts `request taxi`/`green jet` and `(tension|ready)+cat`), self-echo guard on §1/§2/§6, voice default `ash` via new `--deckboss-voice` flag, `Clea to launch` typo fixed. Commits `716e588` / `7b95c74` / `fe792d8`.
+- **DME position report §1b wired** in Marshal — "Marshal, Raider 39, 7 DME" → ack with radar confirm if Tacview has the caller. Commit `793837e`.
+- **MarshalEstablishedAck includes stack position** — "entering stack at angels XX, position YY". Commit `f8a9c71`.
+- **Versioning** — semver tags (`vMAJOR.MINOR.PATCH`). `v1.1.0` cut at `793837e` to collapse the Training-1-era backlog since `v1.0.1`. Next minor when the next feature batch lands (likely v1.2.0 with Deckboss-live + DME).
 
 ## Recent context (2026-05-08)
 - **Marshal/Command 282.0 routing bug fixed.** Root cause was the SRS handshake order in `command.go`/`marshal.go`/`deckboss.go`: they sent EAM before Sync, while Tower's `srsLoop` sent Sync before EAM. SRS only adds clients to the audio routing table on Sync — broken roles authenticated but never received UDP voice. Commit `924784f`. Marshal and Command both deploying live on Training 1 as of 2026-05-08.
