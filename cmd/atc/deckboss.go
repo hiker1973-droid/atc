@@ -20,13 +20,14 @@ import (
 
 // deckbossLoop handles carrier deck operations (default 128.600 MHz —
 // DCS carrier UHF control).
-func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword string,
+func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword, voice string,
 	txCooldown *int64, atcCtrl *controller.ATCController, deck *state.DeckbossState) {
 
-	const (
-		deckCallsign = "Deckboss"
-		deckVoice    = "onyx"
-	)
+	const deckCallsign = "Deckboss"
+	deckVoice := voice
+	if deckVoice == "" {
+		deckVoice = "ash"
+	}
 	comp := composer.NewATCComposer(deckCallsign)
 
 	transmit := func(text string) {
