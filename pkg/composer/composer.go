@@ -547,7 +547,7 @@ func (c *ATCComposer) CommandFuelState(callsign string, fuelState float64) strin
 func (c *ATCComposer) DeckbossUnderTension(callsign string, catNum int) string {
 	cat := numberWord(catNum)
 	return pick([]string{
-		fmt.Sprintf("%s, Deckboss, under tension, cat %s.", callsign, cat),
+		fmt.Sprintf("%s, Deckboss, under tension, cat %s, clear to launch.", callsign, cat),
 		fmt.Sprintf("%s, Deckboss, tension cat %s, hold.", callsign, cat),
 		fmt.Sprintf("%s, Deckboss, cat %s under tension, stand by.", callsign, cat),
 	})

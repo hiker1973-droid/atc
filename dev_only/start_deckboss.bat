@@ -8,4 +8,4 @@ set GOMAXPROCS=2
 set GOGC=50
 set GOMEMLIMIT=256MiB
 
-start "Deckboss" cmd /k "%~dp0..\atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 306.2 --no-atis --log-level %LOG%"
+start "Deckboss" cmd /k "%~dp0..\atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --no-atis --log-level %LOG%"

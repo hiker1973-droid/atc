@@ -135,7 +135,7 @@ func main() {
 	f.IntVar(&flagDashboardPort, "dashboard-port", 0,
 		"HTTP dashboard port (0=disabled). OMDM=6001, OMAM=6002, OMAL=6003")
 	f.StringVar(&flagDeckbossFreq, "deckboss-freq", "0",
-		"Deckboss frequency MHz (OMDM only, e.g. 306.2)")
+		"Deckboss frequency MHz (OMDM only, e.g. 128.6 — DCS carrier UHF)")
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",
 		"Marshal frequency MHz (OMDM only, e.g. 306.3)")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",

@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -19,7 +18,8 @@ import (
 	"github.com/vsfg7/atc/pkg/state"
 )
 
-// deckbossLoop handles carrier deck operations on 306.200 MHz.
+// deckbossLoop handles carrier deck operations (default 128.600 MHz —
+// DCS carrier UHF control).
 func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword string,
 	txCooldown *int64, atcCtrl *controller.ATCController, deck *state.DeckbossState) {
 
@@ -79,33 +79,31 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		lower := strings.ToLower(text)
 
 		switch {
-		case containsAny(lower, "green jet"):
-			// Check in — assign cat or conga
+		case containsAny(lower, "request taxi", "ready for taxi", "green jet"):
+			// §1 check-in: assign cat or queue in conga
 			catNum := deck.AssignCat(callsign)
 			if catNum > 0 {
 				transmit(comp.DeckbossCatAssignment(callsign, catNum))
 			} else {
-				// All cats busy — try conga
 				pos := deck.EnqueueConga(callsign)
 				if pos == -1 {
-					// Conga full
 					transmit(comp.DeckbossDeckFull(callsign))
 				} else if pos == -2 {
-					// Already in conga
 					transmit(comp.DeckbossStandby(callsign, pos))
 				} else {
 					transmit(comp.DeckbossCongaLine(callsign))
 				}
 			}
 
-		case containsAny(lower, "ready") && containsAny(lower, "cat"):
+		case containsAny(lower, "tension", "ready") && containsAny(lower, "cat"):
+			// §2 under tension: pilot reports ready on cat (or shooter under tension)
 			catNum := deck.GetCatByCallsign(callsign)
 			if catNum > 0 {
 				transmit(comp.DeckbossUnderTension(callsign, catNum))
 			}
 
 		case containsAny(lower, "tension"):
-			// Pilot confirms tension — silent, they go
+			// §3 tension-only (no cat word): pilot confirms tension — silent, they go
 			log.Debug().Str("callsign", callsign).Msg("Deckboss: tension confirmed, pilot launching")
 
 		case containsAny(lower, "airborne", "clear traffic"):
@@ -123,7 +121,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				}
 			}
 
-		case containsAny(lower, "radio check", "comm check", "how copy", "radio", "5x5", "five by five", "five by"):
+		case containsAny(lower, "radio check", "comm check", "comms check", "how copy", "five by five", "five by"):
 			opts := []string{
 				fmt.Sprintf("%s, Deckboss, loud and clear.", callsign),
 				fmt.Sprintf("%s, Deckboss, five by five.", callsign),
@@ -161,9 +159,19 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			guid += "0"
 		}
 
-		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
-		port, _ := strconv.Atoi(srsPort)
-		udpConn, err := net.Dial("udp", fmt.Sprintf("%s:%d", srsHost, port))
+		// UDP setup — mirror Tower / Marshal / Command. The previous
+		// string-form net.Dial("udp", host:port) path bound the socket via
+		// Go's default resolver, which on Windows preferred IPv6 ::1; SRS
+		// routes audio to the IPv4 client-list entry, so packets never
+		// arrived. ResolveUDPAddr + DialUDP locks the same v4 binding the
+		// other roles use. See marshal.go for the full bisect history.
+		udpResolved, err := net.ResolveUDPAddr("udp", srsAddr)
+		if err != nil {
+			tcpConn.Close()
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		udpConn, err := net.DialUDP("udp", nil, udpResolved)
 		if err != nil {
 			tcpConn.Close()
 			time.Sleep(5 * time.Second)
@@ -173,8 +181,10 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		freqHz := freqMHz * 1e6
 		syncMsg := buildSync(guid, deckCallsign, freqHz)
 		tcpConn.Write(syncMsg)
-		time.Sleep(200 * time.Millisecond)
 		tcpConn.Write(buildEAM(guid, deckCallsign, freqHz, eamPassword))
+		// Prime the UDP NAT mapping immediately — without this, SRS doesn't
+		// learn our UDP source address until the first 10s keepalive tick.
+		udpConn.Write([]byte(guid))
 		log.Info().Float64("freq", freqMHz).Msg("Deckboss registered on SRS")
 
 		pingStop := make(chan struct{})
