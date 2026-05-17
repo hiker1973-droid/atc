@@ -737,6 +737,25 @@ func (c *ATCComposer) MarshalCopyState(callsign string, fuelState float64) strin
 	})
 }
 
+// MarshalAckDME — pilot reports current DME from mother (e.g. "Marshal,
+// Raider 39, 7 DME"). Pure ack; if Tacview has the caller, the response
+// confirms radar contact.
+func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool) string {
+	d := fmt.Sprintf("%d", distNm)
+	if radar {
+		return pick([]string{
+			fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s DME, continue.", callsign, d),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", paint you at %s DME, continue inbound.", callsign, d),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", contact %s DME, continue.", callsign, d),
+		})
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, %s DME, continue.", callsign, d),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy %s DME.", callsign, d),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", %s DME, continue inbound.", callsign, d),
+	})
+}
+
 // MarshalSignalCharlie — deck is clear, cleared to commence.
 func (c *ATCComposer) MarshalSignalCharlie(callsign string) string {
 	return pick([]string{

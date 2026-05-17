@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,34 @@ import (
 	"github.com/vsfg7/atc/pkg/controller"
 	"github.com/vsfg7/atc/pkg/state"
 )
+
+// dmeDistanceRe matches "7 DME", "12 mile", "15 miles", "10 mile DME".
+// Anchored on the unit word so unrelated digits (channels, headings) don't
+// trigger a false position-report.
+var dmeDistanceRe = regexp.MustCompile(`\b(\d{1,3})[\s\-]+(?:dme|miles?(?:\s+dme)?)\b`)
+
+var dmeWordNums = map[string]int{
+	"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+	"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+	"twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30,
+}
+
+// extractDMEDistance parses a DME distance from "Marshal, Raider 39, 7 DME"
+// or word forms like "seven miles". Returns 0 when no recognizable distance
+// is present.
+func extractDMEDistance(lower string) int {
+	if m := dmeDistanceRe.FindStringSubmatch(lower); m != nil {
+		var v int
+		fmt.Sscanf(m[1], "%d", &v)
+		return v
+	}
+	for word, val := range dmeWordNums {
+		if strings.Contains(lower, word+" dme") || strings.Contains(lower, word+" mile") {
+			return val
+		}
+	}
+	return 0
+}
 
 const (
 	marshalCallsign     = "Union Marshal"
@@ -300,6 +329,16 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))
+
+	case containsAny(lower, " dme", " mile"):
+		dist := extractDMEDistance(lower)
+		if dist <= 0 {
+			log.Debug().Str("text", text).Msg("Marshal: DME-shaped call but no parseable distance — dropped")
+			break
+		}
+		_, _, _, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		log.Info().Str("callsign", callsign).Int("distNm", dist).Bool("radarFound", rFound).Msg("Marshal: DME position report")
+		transmit(comp.MarshalAckDME(callsign, dist, rFound))
 
 	case containsAny(lower, "state") && fuelState > 0:
 		transmit(comp.MarshalCopyState(callsign, fuelState))
