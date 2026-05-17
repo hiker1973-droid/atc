@@ -13,6 +13,8 @@ Triggers from `cmd/atc/deckboss.go` `handleDeckbossCall`. Responses from `pkg/co
 
 Deckboss handles **on-deck** aircraft only — cat assignment, conga-line sequencing, launch detection. Inbound recovery is Marshal's job (306.3).
 
+**Address rule:** §1 (check-in), §2 (under tension), and §6 (radio check) require the pilot to lead with `Deckboss, ...`. Without the address prefix the call is treated as a self-echo of Deckboss's own TX and dropped. §3 (shooter / tension-only) and §4 (airborne / clear traffic) skip the guard — pilots typically don't address Deckboss on those quick calls and the response shapes can't false-fire §4.
+
 ---
 
 ## 1. Request Taxi / check-in for cat assignment

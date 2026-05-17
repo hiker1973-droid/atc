@@ -78,8 +78,24 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 	handleDeckbossCall := func(text, callsign string) {
 		lower := strings.ToLower(text)
 
+		// Address-led guard: pilot calls for §1 / §2 / §6 always lead with
+		// the word "Deckboss". Our own TX echoes back through SRS in the
+		// shape "<callsign>, Deckboss, ..." (callsign-led), so anything not
+		// starting with "deckboss" is treated as self-echo for those cases
+		// and dropped. Without this, the §2 response ("under tension, cat
+		// X, clear to launch") re-triggers §2 on echo → infinite loop.
+		// §3 (silent) and §4 (airborne / clear traffic) skip the guard —
+		// pilots typically don't address Deckboss on those quick calls,
+		// and the response shapes can't false-fire §4 (verified: no other
+		// Deckboss TX contains "airborne" or "clear traffic").
+		addressed := strings.HasPrefix(lower, "deckboss") || strings.HasPrefix(lower, "deck boss")
+
 		switch {
 		case containsAny(lower, "request taxi", "ready for taxi", "green jet"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: §1 dropped — not address-led, likely self-echo")
+				return
+			}
 			// §1 check-in: assign cat or queue in conga
 			catNum := deck.AssignCat(callsign)
 			if catNum > 0 {
@@ -96,6 +112,10 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			}
 
 		case containsAny(lower, "tension", "ready") && containsAny(lower, "cat"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: §2 dropped — not address-led, likely self-echo of under-tension response")
+				return
+			}
 			// §2 under tension: pilot reports ready on cat (or shooter under tension)
 			catNum := deck.GetCatByCallsign(callsign)
 			if catNum > 0 {
@@ -122,6 +142,10 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			}
 
 		case containsAny(lower, "radio check", "comm check", "comms check", "how copy", "five by five", "five by"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: §6 radio check dropped — not address-led")
+				return
+			}
 			opts := []string{
 				fmt.Sprintf("%s, Deckboss, loud and clear.", callsign),
 				fmt.Sprintf("%s, Deckboss, five by five.", callsign),
