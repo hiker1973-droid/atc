@@ -6,21 +6,26 @@
 <style>
   * { box-sizing: border-box; }
   :root {
-    --bg: #0d1117;
-    --panel: #161b22;
-    --panel-2: #1c232c;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --muted: #6e7681;
-    --label: #8b949e;
+    /* vSFG-7 palette — Navy blue & gold. */
+    --bg: #0a1424;
+    --panel: #11203a;
+    --panel-2: #162b4d;
+    --border: #2a4373;
+    --text: #d8e3f4;
+    --muted: #6f86a8;
+    --label: #8fa3c2;
+    --gold: #ffd166;
+    --gold-dim: #7a5f1f;
+    --blue: #6dabff;
+    --blue-dim: #1f4a8c;
     --green: #3fb950;
     --green-dim: #1f6b34;
     --red: #f85149;
-    --orange: #f0883e;
-    --yellow: #d2a106;
-    --blue: #58a6ff;
-    --cyan: #39c5cf;
-    --magenta: #d2a8ff;
+    /* Back-compat aliases so older rules keep rendering. */
+    --orange: var(--gold);
+    --yellow: var(--gold);
+    --cyan: var(--blue);
+    --magenta: var(--gold);
   }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 13px; }
   a { color: var(--blue); text-decoration: none; }
@@ -120,11 +125,11 @@
   .log .ts { color: var(--muted); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
   .log .msg { flex: 1; word-break: break-word; }
   .log .src { font-weight: 500; }
-  .log .row.t-rx .msg { color: var(--orange); }
-  .log .row.t-tx .msg { color: var(--green); }
-  .log .row.t-sys .msg { color: var(--cyan); }
-  .log .row.t-msh .msg { color: #a8e7c4; }
-  .log .row.t-dkb .msg { color: #ffd591; }
+  .log .row.t-rx .msg { color: var(--gold); }
+  .log .row.t-tx .msg { color: var(--blue); }
+  .log .row.t-sys .msg { color: #9fc1ee; }
+  .log .row.t-msh .msg { color: #6dabff; }
+  .log .row.t-dkb .msg { color: var(--gold); }
   .log .row.t-err .msg { color: var(--red); }
   .log-legend { float: right; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
   .log-legend .pip { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.25rem; vertical-align: middle; }
@@ -150,7 +155,7 @@
   </div>
   <div class="server">
     <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE</div>
-    <div class="clock" id="clock">--:--:-- UTC</div>
+    <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
   </div>
 </header>
 
@@ -226,9 +231,9 @@
   <section class="panel">
     <h3>Live Transmission Log
       <span class="log-legend">
-        <span><span class="pip" style="background:var(--green)"></span>ATC TX</span>
-        <span><span class="pip" style="background:var(--orange)"></span>Pilot RX</span>
-        <span><span class="pip" style="background:var(--cyan)"></span>Sys</span>
+        <span><span class="pip" style="background:var(--blue)"></span>ATC TX</span>
+        <span><span class="pip" style="background:var(--gold)"></span>Pilot RX</span>
+        <span><span class="pip" style="background:#9fc1ee"></span>Sys</span>
         <span><span class="pip" style="background:var(--red)"></span>Err</span>
       </span>
     </h3>
@@ -293,6 +298,12 @@ setInterval(tickClock, 1000); tickClock();
 // ──────────────────────────────────────────────────────────────────────────
 let roleStatus = {};      // name -> "running"|"stopped"
 let towerStatus = {};     // icao -> /status JSON (or null on fail)
+let carrierStatus = {};   // 'marshal' | 'deckboss' -> /status JSON (or null on fail)
+
+const CARRIER = [
+  { key: 'marshal',  port: 6004 },
+  { key: 'deckboss', port: 6005 },
+];
 
 async function refreshRoles() {
   try {
@@ -310,6 +321,16 @@ async function refreshTowers() {
       if (!r.ok) throw new Error(r.status);
       towerStatus[t.icao] = await r.json();
     } catch { towerStatus[t.icao] = null; }
+  }));
+}
+
+async function refreshCarrier() {
+  await Promise.all(CARRIER.map(async c => {
+    try {
+      const r = await fetch(`http://localhost:${c.port}/status`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      carrierStatus[c.key] = await r.json();
+    } catch { carrierStatus[c.key] = null; }
   }));
 }
 
@@ -365,6 +386,16 @@ function renderCards() {
   $('roleCards').innerHTML = parts.join('');
 }
 
+function renderMissionClock() {
+  // Server already applies the UAE +4 offset and ships a HH:MM local string.
+  let local = null;
+  for (const t of TOWERS) {
+    const st = towerStatus[t.icao];
+    if (st && st.missionTimeLocal) { local = st.missionTimeLocal; break; }
+  }
+  $('missionClock').textContent = local ? `Mission ${local}` : 'Mission —';
+}
+
 function renderWeather() {
   // Mockup shows OMDM weather; use OMDM /status.
   const st = towerStatus['OMDM'];
@@ -384,6 +415,74 @@ function renderWeather() {
   if (t.ceilingFt && t.ceilingFt < 1500) cs = 'CASE 3';
   else if (t.ceilingFt && t.ceilingFt < 3000) cs = 'CASE 2';
   $('wxCase').textContent = cs;
+}
+
+function renderMarshalStack() {
+  const tbl = $('stackTbl');
+  const st = carrierStatus.marshal;
+  if (!st) {
+    tbl.innerHTML = '<div class="empty">Marshal dashboard offline (:6004).</div>';
+    return;
+  }
+  const stack = Array.isArray(st.marshal) ? st.marshal : [];
+  if (!stack.length) {
+    tbl.innerHTML = '<div class="empty">Stack empty.</div>';
+    return;
+  }
+  const rows = stack.map(m => {
+    const fuel = m.fuelState != null ? Number(m.fuelState).toFixed(1) : '—';
+    const phase = String(m.phase || '').toLowerCase();
+    let pillCls = 'pill-phase';
+    if (phase.includes('charlie')) pillCls += ' charlie';
+    else if (phase.includes('hold')) pillCls += ' holding';
+    else if (phase.includes('inbound') || phase.includes('commenc')) pillCls += ' inbound';
+    return `
+      <tr>
+        <td class="num">${esc(String(m.position||''))}</td>
+        <td>${esc(m.callsign||'')}</td>
+        <td class="num">${esc(String(m.angels||''))}</td>
+        <td class="num">${fuel}</td>
+        <td><span class="${pillCls}">${esc(m.phase||'')}</span></td>
+      </tr>`;
+  }).join('');
+  tbl.innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>Callsign</th><th>Angels</th><th>Fuel</th><th>Phase</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderCats() {
+  const tbl = $('catsTbl');
+  const hdr = $('catsHdrSub');
+  const st = carrierStatus.deckboss;
+  if (!st) {
+    tbl.innerHTML = '<div class="empty">Deckboss dashboard offline (:6005).</div>';
+    hdr.textContent = '';
+    return;
+  }
+  const cats = Array.isArray(st.cats) ? st.cats : [];
+  const busy = cats.filter(c => c.status !== 'free').length;
+  const conga = Array.isArray(st.congaLine) ? st.congaLine : [];
+  hdr.textContent = `${busy} busy / ${cats.length - busy} free` + (conga.length ? ` · conga ${conga.length}` : '');
+  if (!cats.length) {
+    tbl.innerHTML = '<div class="empty">No cat data.</div>';
+    return;
+  }
+  const rows = cats.map(c => {
+    const free = c.status === 'free';
+    const dotCls = free ? 'up' : (c.status === 'busy' ? 'down' : 'busy');
+    const stCls = free ? 'pill-free' : (c.status === 'busy' ? 'pill-busy' : 'pill-staged');
+    return `
+      <tr>
+        <td><span class="dot ${dotCls}"></span>Cat ${esc(String(c.num))}</td>
+        <td>${esc(c.callsign||'')}</td>
+        <td class="${stCls}">${esc((c.status||'').toUpperCase())}</td>
+      </tr>`;
+  }).join('');
+  const congaRow = conga.length ? `<div class="hint">Conga: ${esc(conga.join(' → '))}</div>` : '<div class="hint">Conga: empty</div>';
+  tbl.innerHTML = `
+    <table><tbody>${rows}</tbody></table>${congaRow}`;
 }
 
 function renderPattern() {
@@ -513,16 +612,20 @@ async function loadModalLog() {
 // Refresh loop
 // ──────────────────────────────────────────────────────────────────────────
 async function refreshAll() {
-  await Promise.all([refreshRoles(), refreshTowers(), refreshHealth()]);
+  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth()]);
   renderCards();
+  renderMissionClock();
   renderWeather();
   renderPattern();
+  renderMarshalStack();
+  renderCats();
 }
 
 // Boot
 refreshAll();
 setInterval(refreshAll, 3000);
 TOWERS.forEach(connectLog);
+CARRIER.forEach(c => connectLog({ icao: c.key.toUpperCase(), port: c.port }));
 </script>
 </body>
 </html>

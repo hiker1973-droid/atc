@@ -70,6 +70,7 @@ var (
 	flagStaticVisSm     float64
 	flagStaticAltInHg   float64
 	flagStaticTempC     float64
+	flagStaticNight     bool
 	flagTacviewAddr     string
 	flagATISFreq        string
 	flagATISBroadcast   bool
@@ -125,6 +126,7 @@ func main() {
 	f.Float64Var(&flagStaticVisSm,   "static-vis-sm",   10, "Static visibility statute miles (Training VM)")
 	f.Float64Var(&flagStaticAltInHg, "static-alt-inhg", 29.92, "Static altimeter inHg (Training VM)")
 	f.Float64Var(&flagStaticTempC,   "static-temp-c",   15, "Static temperature Celsius (Training VM)")
+	f.BoolVar(&flagStaticNight,      "static-night",    false, "Treat mission as night (sets IsNight + 'VFR Night' mode). Real-world server clock is unrelated to DCS mission time, so this must be set explicitly.")
 	f.BoolVar(&flagCommandOnly, "command-only", false,
 		"Run as command channel only — no tower, no ATIS, no marshal")
 	f.StringVar(&flagCommandVoice, "command-voice", "onyx",
@@ -302,6 +304,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// ── ATC controller ────────────────────────────────────────────────────────
 	atcCtrl := controller.NewATCController(callsign, af)
+	// Seed weather from --static-* flags so dashboard /status reports real
+	// values instead of zeros. UpdateFlightConditions wires CeilingFt /
+	// VisibilityNm / IsNight, which UpdateWeather alone does not. IsNight is
+	// only the initial seed — once Tacview ReferenceTime + #offset arrive, the
+	// dashboard derives day/night from mission time directly.
+	atcCtrl.SetFullWeather(flagStaticWindDir, flagStaticWindKts, flagStaticCeilFt, flagStaticVisSm, flagStaticAltInHg, flagStaticNight)
 	marshStack := state.NewMarshalStack()
 
 	// ATIS-only mode — Training VM, static weather
@@ -421,6 +429,18 @@ func run(cmd *cobra.Command, args []string) error {
 			marshalLoop(ctx, flagSRSAddr, marshalFreqMHz, apiKey, flagEAMPassword,
 				&marshalCooldown, atcCtrl, marshStack)
 		}()
+
+		// Expose marshStack for the ops dashboard when --dashboard-port is set.
+		// deckState is nil here — marshal-only mode never populates cats.
+		if flagDashboardPort > 0 {
+			ds := newDashboardServer(flagDashboardPort, "Marshal", af, atcCtrl, marshStack, nil)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ds.run(ctx)
+			}()
+			log.Info().Int("port", flagDashboardPort).Msg("Marshal dashboard started")
+		}
 
 		<-ctx.Done()
 		wg.Wait()
@@ -1995,6 +2015,12 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 		var refLat, refLon float64
 		var refSet bool
 
+		// ReferenceTime is the mission start (UTC) reported on object "0".
+		// Lines starting with "#" carry the seconds-since-ReferenceTime offset.
+		// Together they let us compute in-sim wall-clock time, used by the
+		// dashboard to decide day vs night without depending on real-world UTC.
+		var refTime time.Time
+
 		scanner := bufio.NewScanner(conn)
 		scanner.Buffer(make([]byte, 65536), 65536)
 
@@ -2008,7 +2034,19 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 			}
 
 			line := strings.TrimSpace(scanner.Text())
-			if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+			if line == "" || strings.HasPrefix(line, "//") {
+				continue
+			}
+			// "#<seconds>" lines are Tacview time markers. Combine with the
+			// ReferenceTime captured on object "0" to get mission UTC, and
+			// push it to the controller so the dashboard can render day/night.
+			if strings.HasPrefix(line, "#") {
+				if !refTime.IsZero() {
+					var offset float64
+					if _, err := fmt.Sscanf(line[1:], "%f", &offset); err == nil {
+						atcCtrl.SetMissionTime(refTime.Add(time.Duration(offset * float64(time.Second))))
+					}
+				}
 				continue
 			}
 
@@ -2022,7 +2060,8 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 
 			// Object id "0" is the global / world object — carries the
 			// ReferenceLatitude / ReferenceLongitude that subsequent T=
-			// position deltas are measured from. Capture and skip.
+			// position deltas are measured from, plus ReferenceTime (mission
+			// start UTC). Capture and skip.
 			if id == "0" {
 				if v := extractACMIProp(props, "ReferenceLatitude"); v != "" {
 					if _, err := fmt.Sscanf(v, "%f", &refLat); err == nil {
@@ -2032,6 +2071,14 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 				if v := extractACMIProp(props, "ReferenceLongitude"); v != "" {
 					fmt.Sscanf(v, "%f", &refLon)
 					refSet = true
+				}
+				if v := extractACMIProp(props, "ReferenceTime"); v != "" {
+					if t, err := time.Parse(time.RFC3339, v); err == nil {
+						refTime = t
+						// Seed mission time at offset 0 so the dashboard has
+						// something to render before the first #tick arrives.
+						atcCtrl.SetMissionTime(t)
+					}
 				}
 				continue
 			}

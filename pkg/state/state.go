@@ -663,6 +663,7 @@ type AirfieldStateSnapshot struct {
 	WindKts       float64
 	AltimeterInHg float64
 	CeilingFt     float64
+	VisibilityNm  float64
 	IsNight       bool
 }
 
@@ -677,6 +678,7 @@ func (s *AirfieldState) GetAirfieldStateSnapshot() AirfieldStateSnapshot {
 		WindKts:       s.WindKts,
 		AltimeterInHg: s.AltimeterInHg,
 		CeilingFt:     s.CeilingFt,
+		VisibilityNm:  s.VisibilityNm,
 		IsNight:       s.IsNight,
 	}
 }

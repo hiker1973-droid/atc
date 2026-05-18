@@ -112,8 +112,10 @@ type CatEntry struct {
 }
 
 type StatusSnapshot struct {
-	Timestamp   string            `json:"timestamp"`
-	Tower       TowerStatus       `json:"tower"`
+	Timestamp        string            `json:"timestamp"`
+	MissionTime      string            `json:"missionTime,omitempty"`      // UTC ISO
+	MissionTimeLocal string            `json:"missionTimeLocal,omitempty"` // airfield-local HH:MM
+	Tower            TowerStatus       `json:"tower"`
 	Pattern     []PatternAircraft `json:"pattern"`
 	Marshal     []MarshalEntry    `json:"marshal"`
 	Cats        []CatEntry        `json:"cats"`
@@ -193,12 +195,27 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 	ceil, altim := ds.atcCtrl.GetWeatherState()
 	s := ds.atcCtrl.GetAirfieldStateSnapshot()
 
+	// Prefer mission time from Tacview for the night flag — real-world server
+	// UTC has no relationship to DCS mission time. Fall back to the
+	// --static-night flag (carried on s.IsNight) when Tacview hasn't synced yet.
+	// Training 1 missions are based in the Emirates (UTC+4); ReferenceTime
+	// arrives in UTC, so we shift it for the day/night check and the UI label.
+	const tzOffsetHours = 4
+	isNight := s.IsNight
+	var missionTimeISO, missionTimeLocal string
+	if mt, ok := ds.atcCtrl.GetMissionTime(); ok {
+		local := mt.UTC().Add(time.Duration(tzOffsetHours) * time.Hour)
+		isNight = local.Hour() < 6 || local.Hour() >= 18
+		missionTimeISO = mt.UTC().Format(time.RFC3339)
+		missionTimeLocal = local.Format("15:04")
+	}
+
 	modeStr := "VFR"
 	switch s.FlightMode {
 	case state.ModeIFR:
 		modeStr = "IFR"
 	}
-	if s.IsNight && s.FlightMode != state.ModeIFR {
+	if isNight && s.FlightMode != state.ModeIFR {
 		modeStr = "VFR Night"
 	}
 
@@ -210,10 +227,11 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		ActiveRunway:  s.ActiveRunway,
 		FlightMode:    modeStr,
 		CeilingFt:     ceil,
+		VisibNm:       s.VisibilityNm,
 		AltimeterInHg: altim,
 		WindDir:       s.WindFromMag,
 		WindKts:       s.WindKts,
-		IsNight:       s.IsNight,
+		IsNight:       isNight,
 	}
 
 	// Pattern aircraft from Tacview
@@ -268,6 +286,8 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 
 	snap := StatusSnapshot{
 		Timestamp:        time.Now().UTC().Format("15:04:05"),
+		MissionTime:      missionTimeISO,
+		MissionTimeLocal: missionTimeLocal,
 		Tower:            tower,
 		Pattern:          pattern,
 		Marshal:          marshal,

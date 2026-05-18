@@ -19,4 +19,7 @@ call "%~dp0start_command.bat"
 echo [vSFG-7] Launching Deckboss...
 call "%~dp0start_deckboss.bat"
 
+echo [vSFG-7] Launching Dashboard...
+call "%~dp0start_launcher.bat"
+
 echo [vSFG-7] All roles launched.
