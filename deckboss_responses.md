@@ -24,9 +24,9 @@ Deckboss handles **on-deck** aircraft only — cat assignment, conga-line sequen
 This is the pilot's call when they're up and ready for cat. Deckboss assigns a free cat or queues them in the conga. `Green Jet` is the legacy DCS phrase (yellow-shirt → green-shirt handoff on the deck) and stays accepted for backward compatibility.
 
 ### 1a. Cat assigned (free cat available) — `DeckbossCatAssignment`
-1. `{CALLSIGN}, Deckboss, cat {CAT}, clear to taxi cat {CAT}.`
+1. `{CALLSIGN}, Deckboss, cleared to cat {CAT}.`
 2. `{CALLSIGN}, Deckboss, cat {CAT} is yours, taxi forward.`
-3. `{CALLSIGN}, Deckboss, proceed to cat {CAT}, cleared to spot.`
+3. `{CALLSIGN}, Deckboss, proceed to cat {CAT}.`
 
 ### 1b. All cats busy → join conga — `DeckbossCongaLine`
 1. `{CALLSIGN}, Deckboss, all cats engaged, proceed to conga line, standby for assignment.`
@@ -48,14 +48,29 @@ This is the pilot's call when they're up and ready for cat. Deckboss assigns a f
 
 ## 2. Ready on cat (under tension)
 
-**Triggers:** (`ready` OR `tension`) AND `cat`  *(must appear together)*
+**Triggers:** (`ready` OR `tension`) AND `cat`  *(must appear together)*  ·  OR `shoot` (shortcut)
 
-Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing).
+Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing). The `shoot` shortcut collapses the under-tension call into one word — pilot just says `Deckboss, Raider XX, shoot` and Deckboss fires §2 ack + §2a auto-shoot. Cat number sourced from §1 assignment if present, otherwise parsed from the transmission, otherwise generic ack.
 
 **Responses (`DeckbossUnderTension`):**
 1. `{CALLSIGN}, Deckboss, under tension, cat {CAT}, clear to launch.`
 2. `{CALLSIGN}, Deckboss, tension cat {CAT}, hold.`
 3. `{CALLSIGN}, Deckboss, cat {CAT} under tension, stand by.`
+
+---
+
+## 2a. Auto-shoot (5s after §2)
+
+**Triggers:** automatic — fires 5 seconds after a successful §2 `DeckbossUnderTension` response. Not pilot-initiated.
+
+Shooter's launch signal. Not callsigned (addresses the cat, deck-wide).
+
+**Responses (`DeckbossShoot`):**
+1. `Cat {CAT}, fly.`
+2. `Cat {CAT}, shoot, shoot, shoot.`
+3. `Cat {CAT}, cleared to launch.`
+
+Only fires when §2 had a real cat number (either from `GetCatByCallsign` or parsed from the pilot's transmission). The generic "copy under tension" fallback skips the auto-shoot.
 
 ---
 
@@ -71,9 +86,14 @@ Currently **silent** — no transmission, just a debug log. Pilot is going. If t
 
 **Triggers:** `airborne` OR `clear traffic` (from the just-launched pilot)
 
-Pilot calls airborne off the deck; Deckboss frees their cat and pulls the next conga aircraft onto it. Response is prefixed with the **next-up** callsign so the player hears `Raider 045, Cat one is clear.` The pilot who just launched gets no ack — they're already gone.
+Pilot calls airborne off the deck. Deckboss first acks the launching pilot, then frees their cat and pulls the next conga aircraft onto it. The ack to next-up is prefixed with the next-up callsign so the player hears `Raider 045, Cat one is clear.`
 
-**Responses (`DeckbossCatClear`):**
+**Ack to launching pilot** (always fires, even when nothing in conga):
+- `{CALLSIGN}, Deckboss, copy, good hunting.`
+
+The ack deliberately omits the word "airborne" so the SRS echo of our own TX doesn't re-trigger §4 in a loop. (§4 skips the address-led guard since pilots don't address Deckboss on quick airborne calls — the self-trigger risk is mitigated by avoiding the trigger word in our response.)
+
+**Cat-clear ack to next-up (`DeckbossCatClear`):**
 1. `Cat {CAT} is clear.`
 2. `Cat {CAT} clear, deck is moving.`
 3. `Cat {CAT} off the deck.`
@@ -100,6 +120,22 @@ No pilot-side trigger here — it's a background timer.
 1. `{CALLSIGN}, Deckboss, loud and clear.`
 2. `{CALLSIGN}, Deckboss, five by five.`
 3. `{CALLSIGN}, Deckboss, read you five by five.`
+
+---
+
+## 7. BRC request
+
+**Triggers:** `say brc` · `request brc` · `brc check` · `check brc` · `what's brc` · `what is brc` · `say bearing` · `current brc` · `current bearing`
+
+Pilot asks for mother's bow heading. Deckboss reads the live carrier BRC from Tacview. Reuses `MarshalSayBRC` — composer is constructed with `towerCallsign="Deckboss"` so the response comes out Deckboss-flavored automatically.
+
+**Responses (`MarshalSayBRC`, Deckboss flavor):**
+1. `{CALLSIGN}, Deckboss, mother's BRC is {BRC}.`
+2. (additional variants per composer)
+
+If BRC is unknown (no carrier on Tacview), the composer returns "BRC unknown" phrasing.
+
+Address-led guard applies — pilot must lead with `Deckboss, ...`.
 
 ---
 

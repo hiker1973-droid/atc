@@ -88,7 +88,7 @@ func scudwatchTXWorker(ctx context.Context, queue <-chan string,
 				return
 			}
 			log.Info().Str("text", text).Msg("scudwatch TX")
-			mp3, err := synthesizeSpeech(ctx, apiKey, text, voice)
+			mp3, err := synthesizeSpeech(ctx, apiKey, text, voice, flagTTSSpeed)
 			if err != nil {
 				log.Error().Err(err).Msg("scudwatch TTS failed")
 				continue

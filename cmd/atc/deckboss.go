@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,9 @@ import (
 	"github.com/vsfg7/atc/pkg/controller"
 	"github.com/vsfg7/atc/pkg/state"
 )
+
+// catNumRe captures the cat number from "cat 1" / "CAT 2" / "cat3".
+var catNumRe = regexp.MustCompile(`\bcat\s*(\d)\b`)
 
 // deckbossLoop handles carrier deck operations (default 128.600 MHz —
 // DCS carrier UHF control).
@@ -33,7 +37,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 	transmit := func(text string) {
 		log.Info().Str("text", text).Msg("Deckboss TX")
 		atomic.StoreInt64(txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, deckVoice)
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, deckVoice, flagTTSSpeed)
 		if err != nil {
 			log.Error().Err(err).Msg("Deckboss TTS failed")
 			return
@@ -89,10 +93,19 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		// pilots typically don't address Deckboss on those quick calls,
 		// and the response shapes can't false-fire §4 (verified: no other
 		// Deckboss TX contains "airborne" or "clear traffic").
-		addressed := strings.HasPrefix(lower, "deckboss") || strings.HasPrefix(lower, "deck boss")
+		// Defensive prefix list — Whisper variants of "Deck boss" we've seen
+		// in the wild: "duck boss", "tech boss", "dec boss". Add as observed.
+		addrPrefixes := []string{"deckboss", "deck boss", "duck boss", "tech boss", "dec boss", "check boss"}
+		addressed := false
+		for _, p := range addrPrefixes {
+			if strings.HasPrefix(lower, p) {
+				addressed = true
+				break
+			}
+		}
 
 		switch {
-		case containsAny(lower, "request taxi", "ready for taxi", "green jet"):
+		case containsAny(lower, "request taxi", "requesting taxi", "ready for taxi", "ready to taxi", "green jet", "greenjet"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §1 dropped — not address-led, likely self-echo")
 				return
@@ -112,22 +125,67 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				}
 			}
 
-		case containsAny(lower, "tension", "ready") && containsAny(lower, "cat"):
+		case (containsAny(lower, "tension", "ready") && containsAny(lower, "cat")) || containsAny(lower, "shoot"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §2 dropped — not address-led, likely self-echo of under-tension response")
 				return
 			}
-			// §2 under tension: pilot reports ready on cat (or shooter under tension)
+			// §2 under tension / shoot shortcut: pilot says either
+			// "under tension cat X" / "ready cat X" OR the shortcut "shoot"
+			// (with the address). Fires the under-tension ack + the 5s auto-
+			// shoot. Cat number is sourced from state (§1 assignment), then
+			// from text regex, then a generic ack as last resort.
 			catNum := deck.GetCatByCallsign(callsign)
+			if catNum == 0 {
+				// Pilot called §2 without prior §1 — parse cat number directly
+				// from the transmission so we still ack ("Cat 1 under tension").
+				if m := catNumRe.FindStringSubmatch(lower); m != nil {
+					var n int
+					fmt.Sscanf(m[1], "%d", &n)
+					if n >= 1 && n <= 4 {
+						catNum = n
+					}
+				}
+			}
 			if catNum > 0 {
 				transmit(comp.DeckbossUnderTension(callsign, catNum))
+				// §2a auto-shoot: shooter's launch signal 5s after the
+				// under-tension ack. Matches real-deck cadence (shooter
+				// waits for pilot salute, then touches deck).
+				go func(cn int) {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(5 * time.Second):
+						transmit(comp.DeckbossShoot(cn))
+					}
+				}(catNum)
+			} else {
+				// Couldn't parse a cat number from the call — generic ack
+				transmit(fmt.Sprintf("%s, Deckboss, copy under tension.", callsign))
 			}
+
+		case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing", "current brc", "current bearing", "current vrc", "say vrc", "check vrc"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: BRC dropped — not address-led")
+				return
+			}
+			// §7 BRC request: pilot asks mother's bow heading
+			brc := atcCtrl.GetCarrierBRC()
+			log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Deckboss: BRC request")
+			transmit(comp.MarshalSayBRC(callsign, brc))
 
 		case containsAny(lower, "tension"):
 			// §3 tension-only (no cat word): pilot confirms tension — silent, they go
 			log.Debug().Str("callsign", callsign).Msg("Deckboss: tension confirmed, pilot launching")
 
 		case containsAny(lower, "airborne", "clear traffic"):
+			// §4: ack the just-launched pilot so they know we copy, then
+			// free the cat and (if conga has someone) cycle the next
+			// aircraft onto the freed cat 3s later. The ack deliberately
+			// omits the word "airborne" so the SRS echo doesn't re-trigger
+			// this same case in a loop.
+			transmit(fmt.Sprintf("%s, Deckboss, copy, good hunting.", callsign))
 			catNum := deck.FreeCat(callsign)
 			if catNum > 0 {
 				log.Info().Str("callsign", callsign).Int("cat", catNum).Msg("Deckboss: cat cleared")
@@ -287,7 +345,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 								return
 							}
 							log.Info().Str("text", text).Msg("Deckboss heard")
-							cs := extractCallsignSimple(text)
+							cs := extractCallsignSkippingAddress(text, "deckboss", "deck boss", "duck boss", "tech boss", "dec boss", "check boss")
 							handleDeckbossCall(text, cs)
 						}(frames)
 					}

@@ -553,7 +553,17 @@ func (c *ATCComposer) DeckbossUnderTension(callsign string, catNum int) string {
 	})
 }
 
-// DeckbossShooter — shooter call, aggressive, cleared to launch.
+// DeckbossShoot — shooter's launch signal, fires ~5s after UnderTension.
+// Not callsigned; addresses the cat itself, deck-wide.
+func (c *ATCComposer) DeckbossShoot(catNum int) string {
+	cat := numberWord(catNum)
+	return pick([]string{
+		fmt.Sprintf("Cat %s, fly.", cat),
+		fmt.Sprintf("Cat %s, shoot, shoot, shoot.", cat),
+		fmt.Sprintf("Cat %s, cleared to launch.", cat),
+	})
+}
+
 // DeckbossCatClear — cat has cleared after launch, advance conga.
 func (c *ATCComposer) DeckbossCatClear(catNum int) string {
 	cat := numberWord(catNum)
@@ -581,9 +591,9 @@ func (c *ATCComposer) DeckbossDeckFull(callsign string) string {
 func (c *ATCComposer) DeckbossCatAssignment(callsign string, catNum int) string {
 	cat := numberWord(catNum)
 	return pick([]string{
-		fmt.Sprintf("%s, Deckboss, cat %s, clear to taxi cat %s.", callsign, cat, cat),
+		fmt.Sprintf("%s, Deckboss, cleared to cat %s.", callsign, cat),
 		fmt.Sprintf("%s, Deckboss, cat %s is yours, taxi forward.", callsign, cat),
-		fmt.Sprintf("%s, Deckboss, proceed to cat %s, cleared to spot.", callsign, cat),
+		fmt.Sprintf("%s, Deckboss, proceed to cat %s.", callsign, cat),
 	})
 }
 
