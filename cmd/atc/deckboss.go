@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,9 @@ import (
 	"github.com/vsfg7/atc/pkg/controller"
 	"github.com/vsfg7/atc/pkg/state"
 )
+
+// catNumRe captures the cat number from "cat 1" / "CAT 2" / "cat3".
+var catNumRe = regexp.MustCompile(`\bcat\s*(\d)\b`)
 
 // deckbossLoop handles carrier deck operations (default 128.600 MHz —
 // DCS carrier UHF control).
@@ -128,8 +132,22 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			}
 			// §2 under tension: pilot reports ready on cat (or shooter under tension)
 			catNum := deck.GetCatByCallsign(callsign)
+			if catNum == 0 {
+				// Pilot called §2 without prior §1 — parse cat number directly
+				// from the transmission so we still ack ("Cat 1 under tension").
+				if m := catNumRe.FindStringSubmatch(lower); m != nil {
+					var n int
+					fmt.Sscanf(m[1], "%d", &n)
+					if n >= 1 && n <= 4 {
+						catNum = n
+					}
+				}
+			}
 			if catNum > 0 {
 				transmit(comp.DeckbossUnderTension(callsign, catNum))
+			} else {
+				// Couldn't parse a cat number from the call — generic ack
+				transmit(fmt.Sprintf("%s, Deckboss, copy under tension.", callsign))
 			}
 
 		case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing", "current brc", "current bearing", "current vrc", "say vrc", "check vrc"):
