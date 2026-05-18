@@ -67,6 +67,7 @@
   .card .freq { color: var(--blue); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
   .card .pill { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.7rem; color: var(--label); margin-top: 0.45rem; }
   .card .extra { color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
+  .card select.rwy-sel { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.3rem; font-size: 0.72rem; font-family: inherit; margin-top: 0.3rem; }
   .card .actions { margin-top: 0.55rem; }
   .card .actions button { width: 100%; }
 
@@ -344,7 +345,13 @@ function renderCards() {
     const st = towerStatus[t.icao];
     const running = roleStatus[t.role] === 'running';
     const mode = (st && st.tower && st.tower.flightMode) ? st.tower.flightMode : '—';
-    const rwy  = (st && st.tower && st.tower.activeRunway) ? `RWY ${st.tower.activeRunway}` : 'RWY —';
+    const current = (st && st.tower && st.tower.activeRunway) || '';
+    const available = (st && st.tower && st.tower.availableRunways) || [];
+    const rwySelect = available.length
+      ? `<select class="rwy-sel" onchange="setRunway(${t.port}, this.value)">
+           ${available.map(r => `<option value="${esc(r)}"${r===current?' selected':''}>RWY ${esc(r)}</option>`).join('')}
+         </select>`
+      : `<span>RWY ${esc(current || '—')}</span>`;
     parts.push(`
       <div class="card">
         <div class="card-head">
@@ -353,7 +360,7 @@ function renderCards() {
         </div>
         <div class="freq">${t.freq} MHz</div>
         <span class="pill">${esc(mode)}</span>
-        <div class="extra">${esc(rwy)}</div>
+        <div class="extra">${rwySelect}</div>
         <div class="actions">
           ${running
             ? `<button class="btn stop" onclick="stopRole('${esc(t.role)}')">Stop Tower</button>`
@@ -430,7 +437,10 @@ function renderMarshalStack() {
     return;
   }
   const rows = stack.map(m => {
-    const fuel = m.fuelState != null ? Number(m.fuelState).toFixed(1) : '—';
+    const fuel = m.fuelState != null && m.fuelState > 0 ? Number(m.fuelState).toFixed(1) : '—';
+    const assigned = m.angels ? `${m.angels}` : '—';
+    const cur = m.curAngels ? `${m.curAngels}` : '—';
+    const dist = m.distNm ? `${m.distNm}` : '—';
     const phase = String(m.phase || '').toLowerCase();
     let pillCls = 'pill-phase';
     if (phase.includes('charlie')) pillCls += ' charlie';
@@ -440,16 +450,19 @@ function renderMarshalStack() {
       <tr>
         <td class="num">${esc(String(m.position||''))}</td>
         <td>${esc(m.callsign||'')}</td>
-        <td class="num">${esc(String(m.angels||''))}</td>
+        <td class="num">${assigned}</td>
+        <td class="num">${cur}</td>
+        <td class="num">${dist}</td>
         <td class="num">${fuel}</td>
         <td><span class="${pillCls}">${esc(m.phase||'')}</span></td>
       </tr>`;
   }).join('');
   tbl.innerHTML = `
     <table>
-      <thead><tr><th>#</th><th>Callsign</th><th>Angels</th><th>Fuel</th><th>Phase</th></tr></thead>
+      <thead><tr><th>#</th><th>Modex</th><th>Stk</th><th>Alt</th><th>Dist</th><th>Fuel</th><th>Phase</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>`;
+    </table>
+    <div class="hint">Stk = assigned angels · Alt = current /1000 ft · Dist = nm to mother · Fuel = pilot-reported state</div>`;
 }
 
 function renderCats() {
@@ -481,7 +494,9 @@ function renderCats() {
         <td class="${stCls}">${esc((c.status||'').toUpperCase())}</td>
       </tr>`;
   }).join('');
-  const congaRow = conga.length ? `<div class="hint">Conga: ${esc(conga.join(' → '))}</div>` : '<div class="hint">Conga: empty</div>';
+  const congaRow = conga.length
+    ? `<div style="margin-top:0.5rem;font-size:0.75rem"><span style="color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Conga</span>: <span style="color:var(--gold)">${esc(conga.join(' → '))}</span></div>`
+    : `<div class="hint">Conga: empty</div>`;
   tbl.innerHTML = `
     <table>
       <thead><tr><th>Cat</th><th>Aircraft</th><th>Status</th></tr></thead>
@@ -530,6 +545,13 @@ function renderPattern() {
 async function startRole(name)   { await fetch('/api/start?name='   + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
 async function stopRole(name)    { await fetch('/api/stop?name='    + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
 async function restartRole(name) { await fetch('/api/restart?name=' + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
+async function setRunway(port, runway) {
+  try {
+    const r = await fetch(`http://localhost:${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
+    if (!r.ok) alert(`Runway change failed: ${await r.text()}`);
+  } catch (e) { alert('Runway change failed: ' + e.message); }
+  setTimeout(refreshAll, 500);
+}
 async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch('/api/start?name=' + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
 async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch('/api/stop?name=' + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
 

@@ -73,18 +73,19 @@ func broadcastLog(typ, msg string) {
 // ── Status snapshot ────────────────────────────────────────────────────────
 
 type TowerStatus struct {
-	Callsign    string  `json:"callsign"`
-	ICAO        string  `json:"icao"`
-	FreqMHz     float64 `json:"freqMHz"`
-	Online      bool    `json:"online"`
-	ActiveRunway string `json:"activeRunway"`
-	FlightMode  string  `json:"flightMode"`
-	CeilingFt   float64 `json:"ceilingFt"`
-	VisibNm     float64 `json:"visibNm"`
+	Callsign     string   `json:"callsign"`
+	ICAO         string   `json:"icao"`
+	FreqMHz      float64  `json:"freqMHz"`
+	Online       bool     `json:"online"`
+	ActiveRunway string   `json:"activeRunway"`
+	AvailableRunways []string `json:"availableRunways"`
+	FlightMode   string   `json:"flightMode"`
+	CeilingFt    float64  `json:"ceilingFt"`
+	VisibNm      float64  `json:"visibNm"`
 	AltimeterInHg float64 `json:"altimeterInHg"`
-	WindDir     float64 `json:"windDir"`
-	WindKts     float64 `json:"windKts"`
-	IsNight     bool    `json:"isNight"`
+	WindDir      float64  `json:"windDir"`
+	WindKts      float64  `json:"windKts"`
+	IsNight      bool     `json:"isNight"`
 }
 
 type PatternAircraft struct {
@@ -98,11 +99,14 @@ type PatternAircraft struct {
 }
 
 type MarshalEntry struct {
-	Callsign  string  `json:"callsign"`
-	Position  int     `json:"position"`
-	Angels    int     `json:"angels"`
-	FuelState float64 `json:"fuelState"`
-	Phase     string  `json:"phase"`
+	Callsign     string  `json:"callsign"`
+	Position     int     `json:"position"`
+	Angels       int     `json:"angels"`       // assigned stack angels
+	CurAngels    int     `json:"curAngels"`    // live altitude from Tacview, /1000 ft
+	DistNm       int     `json:"distNm"`       // range to mother
+	BearingDeg   int     `json:"bearingDeg"`   // bearing from carrier to aircraft (true)
+	FuelState    float64 `json:"fuelState"`
+	Phase        string  `json:"phase"`
 }
 
 type CatEntry struct {
@@ -155,7 +159,7 @@ func (ds *dashboardServer) run(ctx context.Context) {
 	cors := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(204)
@@ -166,6 +170,7 @@ func (ds *dashboardServer) run(ctx context.Context) {
 	}
 
 	mux.HandleFunc("/status", cors(ds.handleStatus))
+	mux.HandleFunc("/runway", cors(ds.handleRunway))
 	mux.HandleFunc("/ws/log", ds.handleWSLog)
 	mux.HandleFunc("/health", cors(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -219,19 +224,25 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		modeStr = "VFR Night"
 	}
 
+	available := make([]string, 0, len(ds.af.RunwayPairs)*2)
+	for _, p := range ds.af.RunwayPairs {
+		available = append(available, p.Primary.Designator, p.Reciprocal.Designator)
+	}
+
 	tower := TowerStatus{
-		Callsign:      ds.callsign,
-		ICAO:          ds.af.ICAO,
-		FreqMHz:       s.FreqMHz,
-		Online:        true,
-		ActiveRunway:  s.ActiveRunway,
-		FlightMode:    modeStr,
-		CeilingFt:     ceil,
-		VisibNm:       s.VisibilityNm,
-		AltimeterInHg: altim,
-		WindDir:       s.WindFromMag,
-		WindKts:       s.WindKts,
-		IsNight:       isNight,
+		Callsign:         ds.callsign,
+		ICAO:             ds.af.ICAO,
+		FreqMHz:          s.FreqMHz,
+		Online:           true,
+		ActiveRunway:     s.ActiveRunway,
+		AvailableRunways: available,
+		FlightMode:       modeStr,
+		CeilingFt:        ceil,
+		VisibNm:          s.VisibilityNm,
+		AltimeterInHg:    altim,
+		WindDir:          s.WindFromMag,
+		WindKts:          s.WindKts,
+		IsNight:          isNight,
 	}
 
 	// Pattern aircraft from Tacview
@@ -248,17 +259,26 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	// Marshal stack
+	// Marshal stack — augment each entry with live alt + distance to mother.
+	// LookupCallerRelativeToCarrier returns angels (current alt / 1000), range
+	// nm and bearing from the carrier; the assigned stack altitude stays in
+	// the Angels field for comparison.
 	marshal := []MarshalEntry{}
 	if ds.marshStack != nil {
 		for _, ac := range ds.marshStack.GetAll() {
-			marshal = append(marshal, MarshalEntry{
+			entry := MarshalEntry{
 				Callsign:  ac.Callsign,
 				Position:  ac.Position,
 				Angels:    ac.Angels,
 				FuelState: ac.FuelState,
 				Phase:     ac.Phase,
-			})
+			}
+			if curAng, dist, brg, ok := ds.atcCtrl.LookupCallerRelativeToCarrier(ac.Callsign); ok {
+				entry.CurAngels = curAng
+				entry.DistNm = dist
+				entry.BearingDeg = brg
+			}
+			marshal = append(marshal, entry)
 		}
 	}
 
@@ -301,6 +321,37 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	json.NewEncoder(w).Encode(snap)
+}
+
+// handleRunway lets the dashboard switch the airfield's active runway.
+// POST /runway?to=<designator> — the designator must appear in
+// af.RunwayPairs as either a primary or reciprocal end.
+func (ds *dashboardServer) handleRunway(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	to := r.URL.Query().Get("to")
+	if to == "" {
+		http.Error(w, "missing 'to' parameter", http.StatusBadRequest)
+		return
+	}
+	valid := false
+	for _, p := range ds.af.RunwayPairs {
+		if p.Primary.Designator == to || p.Reciprocal.Designator == to {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		http.Error(w, "runway not found at "+ds.af.ICAO, http.StatusBadRequest)
+		return
+	}
+	ds.atcCtrl.SetActiveRunway(to)
+	log.Info().Str("rwy", to).Str("icao", ds.af.ICAO).Msg("Active runway set via dashboard")
+	broadcastLog("sys", "Active runway: "+to+" ("+ds.af.ICAO+")")
+	json.NewEncoder(w).Encode(map[string]string{"activeRunway": to})
 }
 
 // handleWSLog streams log entries to connected WebSocket clients.
