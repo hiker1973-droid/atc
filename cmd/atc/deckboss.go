@@ -145,6 +145,17 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			}
 			if catNum > 0 {
 				transmit(comp.DeckbossUnderTension(callsign, catNum))
+				// §2a auto-shoot: shooter's launch signal 5s after the
+				// under-tension ack. Matches real-deck cadence (shooter
+				// waits for pilot salute, then touches deck).
+				go func(cn int) {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(5 * time.Second):
+						transmit(comp.DeckbossShoot(cn))
+					}
+				}(catNum)
 			} else {
 				// Couldn't parse a cat number from the call — generic ack
 				transmit(fmt.Sprintf("%s, Deckboss, copy under tension.", callsign))

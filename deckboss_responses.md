@@ -59,6 +59,21 @@ Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both
 
 ---
 
+## 2a. Auto-shoot (5s after §2)
+
+**Triggers:** automatic — fires 5 seconds after a successful §2 `DeckbossUnderTension` response. Not pilot-initiated.
+
+Shooter's launch signal. Not callsigned (addresses the cat, deck-wide).
+
+**Responses (`DeckbossShoot`):**
+1. `Cat {CAT}, fly.`
+2. `Cat {CAT}, shoot, shoot, shoot.`
+3. `Cat {CAT}, cleared to launch.`
+
+Only fires when §2 had a real cat number (either from `GetCatByCallsign` or parsed from the pilot's transmission). The generic "copy under tension" fallback skips the auto-shoot.
+
+---
+
 ## 3. Tension-only (pilot launching)
 
 **Triggers:** `tension` (without a "cat" word)
