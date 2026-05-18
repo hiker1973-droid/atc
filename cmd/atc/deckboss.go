@@ -92,7 +92,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		addressed := strings.HasPrefix(lower, "deckboss") || strings.HasPrefix(lower, "deck boss")
 
 		switch {
-		case containsAny(lower, "request taxi", "ready for taxi", "green jet"):
+		case containsAny(lower, "request taxi", "ready for taxi", "green jet", "greenjet"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §1 dropped — not address-led, likely self-echo")
 				return
