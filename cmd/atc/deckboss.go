@@ -287,7 +287,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 								return
 							}
 							log.Info().Str("text", text).Msg("Deckboss heard")
-							cs := extractCallsignSimple(text)
+							cs := extractCallsignSkippingAddress(text, "deckboss", "deck boss")
 							handleDeckbossCall(text, cs)
 						}(frames)
 					}
