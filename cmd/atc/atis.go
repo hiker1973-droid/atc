@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,42 @@ import (
 	"github.com/vsfg7/atc/pkg/airfield"
 	"github.com/vsfg7/atc/pkg/controller"
 )
+
+// towerDashboardPortByICAO maps an airfield ICAO to the dashboard port of the
+// tower process that owns that airfield's authoritative state. ATIS polls this
+// to keep the broadcasted runway aligned with whatever the tower's dashboard
+// has set, since the two processes don't share an ATCController.
+var towerDashboardPortByICAO = map[string]int{
+	"OMDM": 6001,
+	"OMAM": 6002,
+	"OMAL": 6003,
+}
+
+// fetchTowerRunway returns the active runway reported by the tower /status
+// endpoint for the given ICAO, or "" when there's no paired tower (Liwa,
+// Khasab) or the tower is offline. Short timeout — we never want ATIS to
+// stall its broadcast cadence on a hung HTTP call.
+func fetchTowerRunway(icao string) string {
+	port, ok := towerDashboardPortByICAO[icao]
+	if !ok {
+		return ""
+	}
+	client := http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/status", port))
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	var data struct {
+		Tower struct {
+			ActiveRunway string `json:"activeRunway"`
+		} `json:"tower"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return ""
+	}
+	return data.Tower.ActiveRunway
+}
 
 type atisStation struct {
 	Name      string
@@ -115,6 +153,13 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		state.windFrom = atcCtrl.GetWindFrom()
 		state.windKts  = atcCtrl.GetWindKts()
 		state.activeRwy = atcCtrl.GetActiveRunway()
+		// Prefer the paired tower's active runway when it's reachable — that
+		// lets the launcher /runway dropdown propagate into the next ATIS
+		// broadcast. Stations with no paired tower (Liwa, Khasab) keep the
+		// atcCtrl value.
+		if rwy := fetchTowerRunway(station.ICAO); rwy != "" {
+			state.activeRwy = rwy
+		}
 
 		currentKey := state.weatherKey()
 		weatherChanged := currentKey != lastKey

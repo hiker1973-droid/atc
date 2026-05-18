@@ -432,8 +432,10 @@ function renderMarshalStack() {
     return;
   }
   const stack = Array.isArray(st.marshal) ? st.marshal : [];
+  const headHtml = `<thead><tr><th>#</th><th>Modex</th><th>Stk</th><th>Alt</th><th>Dist</th><th>Fuel</th><th>Phase</th></tr></thead>`;
+  const legend = `<div class="hint">Stk = assigned angels · Alt = current /1000 ft · Dist = nm to mother · Fuel = pilot-reported state</div>`;
   if (!stack.length) {
-    tbl.innerHTML = '<div class="empty">Stack empty.</div>';
+    tbl.innerHTML = `<table>${headHtml}<tbody><tr><td colspan="7" class="empty" style="padding:0.8rem">Stack empty.</td></tr></tbody></table>${legend}`;
     return;
   }
   const rows = stack.map(m => {
@@ -457,12 +459,7 @@ function renderMarshalStack() {
         <td><span class="${pillCls}">${esc(m.phase||'')}</span></td>
       </tr>`;
   }).join('');
-  tbl.innerHTML = `
-    <table>
-      <thead><tr><th>#</th><th>Modex</th><th>Stk</th><th>Alt</th><th>Dist</th><th>Fuel</th><th>Phase</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="hint">Stk = assigned angels · Alt = current /1000 ft · Dist = nm to mother · Fuel = pilot-reported state</div>`;
+  tbl.innerHTML = `<table>${headHtml}<tbody>${rows}</tbody></table>${legend}`;
 }
 
 function renderCats() {
