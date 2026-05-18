@@ -473,16 +473,20 @@ function renderCats() {
     const free = c.status === 'free';
     const dotCls = free ? 'up' : (c.status === 'busy' ? 'down' : 'busy');
     const stCls = free ? 'pill-free' : (c.status === 'busy' ? 'pill-busy' : 'pill-staged');
+    const callsign = c.callsign ? esc(c.callsign) : '<span style="color:var(--muted)">—</span>';
     return `
       <tr>
         <td><span class="dot ${dotCls}"></span>Cat ${esc(String(c.num))}</td>
-        <td>${esc(c.callsign||'')}</td>
+        <td>${callsign}</td>
         <td class="${stCls}">${esc((c.status||'').toUpperCase())}</td>
       </tr>`;
   }).join('');
   const congaRow = conga.length ? `<div class="hint">Conga: ${esc(conga.join(' → '))}</div>` : '<div class="hint">Conga: empty</div>';
   tbl.innerHTML = `
-    <table><tbody>${rows}</tbody></table>${congaRow}`;
+    <table>
+      <thead><tr><th>Cat</th><th>Aircraft</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>${congaRow}`;
 }
 
 function renderPattern() {

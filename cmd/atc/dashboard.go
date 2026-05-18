@@ -198,13 +198,13 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 	// Prefer mission time from Tacview for the night flag — real-world server
 	// UTC has no relationship to DCS mission time. Fall back to the
 	// --static-night flag (carried on s.IsNight) when Tacview hasn't synced yet.
-	// Training 1 missions are based in the Emirates (UTC+4); ReferenceTime
-	// arrives in UTC, so we shift it for the day/night check and the UI label.
-	const tzOffsetHours = 4
+	// Operator setting: Tacview is configured to publish UTC+3:30, so the
+	// mission wall clock is the reported value plus 3 hours 30 minutes.
+	const tzOffsetMinutes = 3*60 + 30
 	isNight := s.IsNight
 	var missionTimeISO, missionTimeLocal string
 	if mt, ok := ds.atcCtrl.GetMissionTime(); ok {
-		local := mt.UTC().Add(time.Duration(tzOffsetHours) * time.Hour)
+		local := mt.UTC().Add(time.Duration(tzOffsetMinutes) * time.Minute)
 		isNight = local.Hour() < 6 || local.Hour() >= 18
 		missionTimeISO = mt.UTC().Format(time.RFC3339)
 		missionTimeLocal = local.Format("15:04")
