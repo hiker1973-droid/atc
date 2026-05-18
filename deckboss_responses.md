@@ -24,9 +24,9 @@ Deckboss handles **on-deck** aircraft only — cat assignment, conga-line sequen
 This is the pilot's call when they're up and ready for cat. Deckboss assigns a free cat or queues them in the conga. `Green Jet` is the legacy DCS phrase (yellow-shirt → green-shirt handoff on the deck) and stays accepted for backward compatibility.
 
 ### 1a. Cat assigned (free cat available) — `DeckbossCatAssignment`
-1. `{CALLSIGN}, Deckboss, cat {CAT}, clear to taxi cat {CAT}.`
+1. `{CALLSIGN}, Deckboss, cleared to cat {CAT}.`
 2. `{CALLSIGN}, Deckboss, cat {CAT} is yours, taxi forward.`
-3. `{CALLSIGN}, Deckboss, proceed to cat {CAT}, cleared to spot.`
+3. `{CALLSIGN}, Deckboss, proceed to cat {CAT}.`
 
 ### 1b. All cats busy → join conga — `DeckbossCongaLine`
 1. `{CALLSIGN}, Deckboss, all cats engaged, proceed to conga line, standby for assignment.`

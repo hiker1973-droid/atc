@@ -581,9 +581,9 @@ func (c *ATCComposer) DeckbossDeckFull(callsign string) string {
 func (c *ATCComposer) DeckbossCatAssignment(callsign string, catNum int) string {
 	cat := numberWord(catNum)
 	return pick([]string{
-		fmt.Sprintf("%s, Deckboss, cat %s, clear to taxi cat %s.", callsign, cat, cat),
+		fmt.Sprintf("%s, Deckboss, cleared to cat %s.", callsign, cat),
 		fmt.Sprintf("%s, Deckboss, cat %s is yours, taxi forward.", callsign, cat),
-		fmt.Sprintf("%s, Deckboss, proceed to cat %s, cleared to spot.", callsign, cat),
+		fmt.Sprintf("%s, Deckboss, proceed to cat %s.", callsign, cat),
 	})
 }
 

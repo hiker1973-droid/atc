@@ -89,7 +89,16 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		// pilots typically don't address Deckboss on those quick calls,
 		// and the response shapes can't false-fire §4 (verified: no other
 		// Deckboss TX contains "airborne" or "clear traffic").
-		addressed := strings.HasPrefix(lower, "deckboss") || strings.HasPrefix(lower, "deck boss")
+		// Defensive prefix list — Whisper variants of "Deck boss" we've seen
+		// in the wild: "duck boss", "tech boss", "dec boss". Add as observed.
+		addrPrefixes := []string{"deckboss", "deck boss", "duck boss", "tech boss", "dec boss", "check boss"}
+		addressed := false
+		for _, p := range addrPrefixes {
+			if strings.HasPrefix(lower, p) {
+				addressed = true
+				break
+			}
+		}
 
 		switch {
 		case containsAny(lower, "request taxi", "requesting taxi", "ready for taxi", "ready to taxi", "green jet", "greenjet"):
@@ -297,7 +306,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 								return
 							}
 							log.Info().Str("text", text).Msg("Deckboss heard")
-							cs := extractCallsignSkippingAddress(text, "deckboss", "deck boss")
+							cs := extractCallsignSkippingAddress(text, "deckboss", "deck boss", "duck boss", "tech boss", "dec boss", "check boss")
 							handleDeckbossCall(text, cs)
 						}(frames)
 					}
