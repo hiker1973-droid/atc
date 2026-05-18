@@ -1,4 +1,4 @@
-# Deckboss Responses (306.2 MHz, OMDM carrier deck operations)
+# Deckboss Responses (128.6 MHz — DCS carrier UHF, OMDM carrier deck operations)
 
 Edit response text and send back. Ports to `pkg/composer/composer.go` (Deckboss section) and `cmd/atc/deckboss.go` (intent handler). `v1.0.2` for text edits, `v1.1.0` for new intents.
 
@@ -13,13 +13,15 @@ Triggers from `cmd/atc/deckboss.go` `handleDeckbossCall`. Responses from `pkg/co
 
 Deckboss handles **on-deck** aircraft only — cat assignment, conga-line sequencing, launch detection. Inbound recovery is Marshal's job (306.3).
 
+**Address rule:** §1 (check-in), §2 (under tension), and §6 (radio check) require the pilot to lead with `Deckboss, ...`. Without the address prefix the call is treated as a self-echo of Deckboss's own TX and dropped. §3 (shooter / tension-only) and §4 (airborne / clear traffic) skip the guard — pilots typically don't address Deckboss on those quick calls and the response shapes can't false-fire §4.
+
 ---
 
-## 1. Request Taxi (check-in for cat assignment)
+## 1. Request Taxi / check-in for cat assignment
 
-**Triggers:** `Request Taxi`
+**Triggers:** `Request Taxi` · `Ready for Taxi` · `Green Jet`
 
-This is the pilot's call when they're up and ready for cat. Deckboss assigns a free cat or queues them in the conga.
+This is the pilot's call when they're up and ready for cat. Deckboss assigns a free cat or queues them in the conga. `Green Jet` is the legacy DCS phrase (yellow-shirt → green-shirt handoff on the deck) and stays accepted for backward compatibility.
 
 ### 1a. Cat assigned (free cat available) — `DeckbossCatAssignment`
 1. `{CALLSIGN}, Deckboss, cat {CAT}, clear to taxi cat {CAT}.`
@@ -46,33 +48,37 @@ This is the pilot's call when they're up and ready for cat. Deckboss assigns a f
 
 ## 2. Ready on cat (under tension)
 
-**Triggers:** `tension` AND `cat`  *(both must appear)*
+**Triggers:** (`ready` OR `tension`) AND `cat`  *(must appear together)*
 
-Pilot reports they're spotted and ready. Deckboss confirms tension.
+Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing).
 
 **Responses (`DeckbossUnderTension`):**
-1. `{CALLSIGN}, Deckboss, under tension, cat {CAT}. Clea to launch`
+1. `{CALLSIGN}, Deckboss, under tension, cat {CAT}, clear to launch.`
 2. `{CALLSIGN}, Deckboss, tension cat {CAT}, hold.`
 3. `{CALLSIGN}, Deckboss, cat {CAT} under tension, stand by.`
 
 ---
 
-## 3. Tension confirmed (pilot launching)
+## 3. Tension-only (pilot launching)
 
-**Triggers:** `shooter`
+**Triggers:** `tension` (without a "cat" word)
 
-Currently **silent** — no transmission, just a debug log. Pilot is going. Could add an audible response if desired (would be a v1.0.2 patch).
-
-Suggested if you want one:
-2. `Current BRC  XXX (BRC of Carrier)
-
-(Just suggestions — leave commented out if you don't want them.)
+Currently **silent** — no transmission, just a debug log. Pilot is going. If they say "tension cat X" instead, that matches §2 instead and gets the audible under-tension ack.
 
 ---
 
-(Note: response is prefixed with the next-up callsign at runtime, so player hears: `Raider 045, Cat one is clear.`)
+## 4. Cat clear (post-launch handoff to next in conga)
 
-The pilot who just launched gets **no acknowledgement** — they're already gone. If you want a "good launch" call to them too, that's a v1.0.2 addition.
+**Triggers:** `airborne` OR `clear traffic` (from the just-launched pilot)
+
+Pilot calls airborne off the deck; Deckboss frees their cat and pulls the next conga aircraft onto it. Response is prefixed with the **next-up** callsign so the player hears `Raider 045, Cat one is clear.` The pilot who just launched gets no ack — they're already gone.
+
+**Responses (`DeckbossCatClear`):**
+1. `Cat {CAT} is clear.`
+2. `Cat {CAT} clear, deck is moving.`
+3. `Cat {CAT} off the deck.`
+
+If no pilot calls "airborne", the Tacview monitor auto-frees the cat 2 min after assignment when the aircraft is detected airborne (see §5).
 
 ---
 
@@ -86,7 +92,9 @@ No pilot-side trigger here — it's a background timer.
 
 ## 6. Radio check
 
-**Triggers:** `radio check` · `comm check` · `how copy` · `radio` · `5x5` · `five by five` · `five by`
+**Triggers:** `radio check` · `comm check` · `comms check` · `how copy` · `five by five` · `five by`
+
+(Dropped the bare `radio` and `5x5` triggers — `radio` was too loose and false-fired on any TX containing "radio"; `5x5` was a STT-unreliable variant of `five by five`.)
 
 **Responses** (defined inline in deckboss.go, NOT in composer):
 1. `{CALLSIGN}, Deckboss, loud and clear.`

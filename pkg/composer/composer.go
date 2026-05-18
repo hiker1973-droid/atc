@@ -547,7 +547,7 @@ func (c *ATCComposer) CommandFuelState(callsign string, fuelState float64) strin
 func (c *ATCComposer) DeckbossUnderTension(callsign string, catNum int) string {
 	cat := numberWord(catNum)
 	return pick([]string{
-		fmt.Sprintf("%s, Deckboss, under tension, cat %s.", callsign, cat),
+		fmt.Sprintf("%s, Deckboss, under tension, cat %s, clear to launch.", callsign, cat),
 		fmt.Sprintf("%s, Deckboss, tension cat %s, hold.", callsign, cat),
 		fmt.Sprintf("%s, Deckboss, cat %s under tension, stand by.", callsign, cat),
 	})
@@ -734,6 +734,25 @@ func (c *ATCComposer) MarshalCopyState(callsign string, fuelState float64) strin
 		fmt.Sprintf("%s, " + c.towerCallsign + ", copy state %s.", callsign, s),
 		fmt.Sprintf("%s, " + c.towerCallsign + ", state %s, copy.", callsign, s),
 		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, state %s.", callsign, s),
+	})
+}
+
+// MarshalAckDME — pilot reports current DME from mother (e.g. "Marshal,
+// Raider 39, 7 DME"). Pure ack; if Tacview has the caller, the response
+// confirms radar contact.
+func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool) string {
+	d := fmt.Sprintf("%d", distNm)
+	if radar {
+		return pick([]string{
+			fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s DME, continue.", callsign, d),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", paint you at %s DME, continue inbound.", callsign, d),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", contact %s DME, continue.", callsign, d),
+		})
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, %s DME, continue.", callsign, d),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy %s DME.", callsign, d),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", %s DME, continue inbound.", callsign, d),
 	})
 }
 

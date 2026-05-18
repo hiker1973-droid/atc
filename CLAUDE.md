@@ -34,7 +34,7 @@ Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
 |---|---|---|---|
 | `atc-omal.log` | OMAL / Al Ain | 250.7 | — |
 | `atc-omam.log` | OMAM / Al Dhafra | 251.1 | — |
-| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | Deckboss (306.2), Marshal (306.3) |
+| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | Marshal (306.3, "Union Marshal", `onyx`), Deckboss (128.6, "Deckboss", `ash`) |
 
 Role names in logs: `Tower`, `Deckboss`, `Marshal` (single L). User's verbal "Marshall" = the `Marshal` role. When the user says "monitor towers / deckboss / marshal", tail all three log files filtering on `heard`, `TX`, role lifecycle (`online`/`offline`/`stack online`/`registered on SRS`), and all warn/error levels. Prefix each event with the site code so the user can tell which instance produced it.
 
@@ -56,14 +56,17 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 
 Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use launcher dashboard buttons.
 
-### Training 1 active roles (2026-05-04)
-**Tower**, **ATIS**, and **Marshal** run on Training 1 — all three are stable enough for live missions. Command, Deckboss, and Scudwatch are still parked under `dev_only/` while we iterate on them from the dev rig (vsfg7-atc).
+### Training 1 active roles (2026-05-18)
+**Tower**, **ATIS**, **Marshal** (306.3), **Command** (**230.0** on Training 1 — see note), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat` at repo root; **`dev_only/start_deckboss.bat`** is still in `dev_only/` for legacy reasons but runs in production — promote to root next maintenance window.
 
-Parked role bats (do not launch on Training 1):
-- `dev_only/start_command and deckboss.bat` — Command 230.0 + Deckboss 306.2
+**Command freq divergence:** origin documents Command at 282.0 (default in `cmd/atc/main.go` flag and dev rig). Training 1 runs Command at **230.0** (commit `5956c10`) as a workaround for a pilot-side SRS-Client `RadioModelsCustom` parse failure that silently dropped TX on 282 — see 2026-05-11 in Recent context. When the pilot-side issue is resolved, Training 1 can revert to 282 by editing `start_command.bat` and `pkg/airfield/*.go HandoffFreqMHz`.
+
+Voices: all roles use `onyx` except Deckboss which uses `ash` (calm authoritative) for audible differentiation. Switchable via `--deckboss-voice <echo|ballad|sage|onyx|…>` without rebuilds.
+
+Still parked under `dev_only/` (do not launch on Training 1):
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
 
-The role *code* (`cmd/atc/{command,deckboss,scudwatch}.go`, the supporting state) stays on `main` — only the launch scripts are parked. Pull `main` on dev and run the parked bats from `dev_only/` there to keep iterating.
+The role *code* for all parked roles stays on `main`; only the launch scripts are gated.
 
 **Dev-only Marshal test mode:** `start_marshal_test.bat` (root, local-only on dev rig — not pushed) launches Marshal with `--marshal-test-tx`, which transmits "test" on 306.3 every 30s. Used for SRS routing diagnostics. Do not run on Training 1 — it would broadcast test traffic on the carrier freq during live missions.
 
@@ -78,11 +81,23 @@ The role *code* (`cmd/atc/{command,deckboss,scudwatch}.go`, the supporting state
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
-## Recent context (2026-05-01)
-- Training 1 narrowed to Tower + ATIS only. Marshal/Command/Deckboss/Scudwatch bats moved to `dev_only/` for iteration on the dev rig.
-- Marshal: 3-mile-initial regex fix, Tacview-aware stack assignment in 2k–9k band, internal-only stack collapse on commence (no step-down radio call per 07.png), 3NM Initial → push-button-XX handoff. New `--marshal-test-tx` debug flag transmits "test" every 30s for SRS path verification.
-- Tower: new `radar check` intent reads back angels/range/bearing from Tacview.
-- ~~Diagnosed: SRS server is not routing 306.3 (Marshal) or 282.0 (Command) audio…~~ **Superseded 2026-05-11**: root cause was a UDP audio parser bug in `marshal.go` / `command.go` (read `audioLen` from `[4:6]` — actually `freqSegLen` — instead of `[2:4]`). Fixed in `063f239` aligning Marshal/Command parsers to Tower's. Outbound TX always worked; inbound was deaf because every packet either bailed or accumulated 10 bytes of garbage as "opus" → Whisper hallucinated text. A separate pilot-side SRS-Client issue (failed parse of `RadioModelsCustom`) was observed silently swallowing TX on 282 specifically — moved Command to **230.0** as a workaround.
+## Recent context (2026-05-17)
+- **Deckboss live on 128.6** (DCS carrier UHF, was 306.2). Brought up with: IPv6 UDP fix (`net.ResolveUDPAddr` + `net.DialUDP` like Marshal — `net.Dial("udp", ...)` was binding `::1` and silently dropping audio), §1/§2 trigger alignment with `deckboss_responses.md` (now accepts `request taxi`/`green jet` and `(tension|ready)+cat`), self-echo guard on §1/§2/§6, voice default `ash` via new `--deckboss-voice` flag, `Clea to launch` typo fixed. Commits `716e588` / `7b95c74` / `fe792d8`.
+- **DME position report §1b wired** in Marshal — "Marshal, Raider 39, 7 DME" → ack with radar confirm if Tacview has the caller. Commit `793837e`.
+- **MarshalEstablishedAck includes stack position** — "entering stack at angels XX, position YY". Commit `f8a9c71`.
+- **Versioning** — semver tags (`vMAJOR.MINOR.PATCH`). `v1.1.0` cut at `793837e` to collapse the Training-1-era backlog since `v1.0.1`. Next minor when the next feature batch lands (likely v1.2.0 with Deckboss-live + DME).
+
+## Recent context (2026-05-11)
+- **UDP audio parser bug fixed** on Training 1 in local commit `063f239` (Marshal/Command read `audioLen` from `[4:6]` — actually `freqSegLen` — instead of `[2:4]`). Origin landed the equivalent fix independently in `96cfe21`; merge of `2026-05-16` took origin's version and added per-callsign unitId / UDP IPv6 / Union Marshal rename on top.
+- **Pilot-side SRS-Client `RadioModelsCustom` parse failure** was observed silently swallowing pilot TX on 282 specifically (Tower freqs OK, Marshal/Command silent). Training 1 Command moved to 230.0 as a workaround (commit `5956c10`). When pilot-side is repaired, revert to 282.
+
+## Recent context (2026-05-08)
+- **Marshal/Command 282.0 routing bug fixed.** Root cause was the SRS handshake order in `command.go`/`marshal.go`/`deckboss.go`: they sent EAM before Sync, while Tower's `srsLoop` sent Sync before EAM. SRS only adds clients to the audio routing table on Sync — broken roles authenticated but never received UDP voice. Commit `924784f`. Marshal and Command both deploying live on Training 1 as of 2026-05-08.
+- Audio perf: STT switched to `gpt-4o-mini-transcribe`, flush ticker tightened from 500ms → 200ms in `srsLoop` (commit `461299f`).
+- New `RequestStartup` intent (`request startup` / `ready for startup` / `ready to start`) — Ground-callsign approval before taxi (commit `dafad18`). Trigger additions: `request departure`, `comcheck`, `comp check`.
+- Departure release distance bumped 5 → 7 nm across all three towers (commit `eb9803a`).
+- `controller.go` airborne fix: dropped `isCTAF` guard so `airborne`/`departing`/`clear traffic` triggers fire on direct tower address (commit `d78f5c8`).
+- OMAM runway pair order swapped — lower parallel `31L/13R` is now the default over upper `31R/13L` (commit `f83b9d7`).
 
 ## Older context (2026-04-25)
 - ATIS interval changed 120s → 45s in both call sites; rebuilt `atc.exe`.

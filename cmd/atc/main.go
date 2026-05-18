@@ -76,6 +76,7 @@ var (
 	flagCommandFreq     string
 	flagCommandName     string
 	flagCommandVoice    string
+	flagDeckbossVoice   string
 	flagRadioEffect         bool
 	flagRadioIntensity      string
 	flagTowerRadioIntensity string
@@ -135,7 +136,9 @@ func main() {
 	f.IntVar(&flagDashboardPort, "dashboard-port", 0,
 		"HTTP dashboard port (0=disabled). OMDM=6001, OMAM=6002, OMAL=6003")
 	f.StringVar(&flagDeckbossFreq, "deckboss-freq", "0",
-		"Deckboss frequency MHz (OMDM only, e.g. 306.2)")
+		"Deckboss frequency MHz (OMDM only, e.g. 128.6 — DCS carrier UHF)")
+	f.StringVar(&flagDeckbossVoice, "deckboss-voice", "ash",
+		"OpenAI TTS voice for Deckboss: ash (default, calm authoritative), echo (mid male), ballad, sage, onyx, etc.")
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",
 		"Marshal frequency MHz (OMDM only, e.g. 306.3)")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",
@@ -619,7 +622,7 @@ func run(cmd *cobra.Command, args []string) error {
 		go func() {
 			defer wg.Done()
 			deckbossLoop(ctx, flagSRSAddr, deckFreqMHz, apiKey, flagEAMPassword,
-				&deckbossCooldown, atcCtrl, deckState)
+				flagDeckbossVoice, &deckbossCooldown, atcCtrl, deckState)
 		}()
 		log.Info().Float64("freq", deckFreqMHz).Msg("Deckboss online")
 	}
