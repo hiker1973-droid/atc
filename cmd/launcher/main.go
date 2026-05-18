@@ -99,7 +99,7 @@ func main() {
 // ── Bat discovery ─────────────────────────────────────────────────────────────
 
 var (
-	reStart         = regexp.MustCompile(`(?i)start\s+"([^"]+)"\s+cmd\s+/k\s+"([^"]+)"`)
+	reStart         = regexp.MustCompile(`(?i)start\s+"([^"]+)"\s+cmd\s+/[kc]\s+"([^"]+)"`)
 	reAirfield      = regexp.MustCompile(`--airfield\s+(\S+)`)
 	reDashboardPort = regexp.MustCompile(`--dashboard-port\s+(\d+)`)
 )
