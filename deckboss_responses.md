@@ -103,6 +103,22 @@ No pilot-side trigger here — it's a background timer.
 
 ---
 
+## 7. BRC request
+
+**Triggers:** `say brc` · `request brc` · `brc check` · `check brc` · `what's brc` · `what is brc` · `say bearing` · `current brc` · `current bearing`
+
+Pilot asks for mother's bow heading. Deckboss reads the live carrier BRC from Tacview. Reuses `MarshalSayBRC` — composer is constructed with `towerCallsign="Deckboss"` so the response comes out Deckboss-flavored automatically.
+
+**Responses (`MarshalSayBRC`, Deckboss flavor):**
+1. `{CALLSIGN}, Deckboss, mother's BRC is {BRC}.`
+2. (additional variants per composer)
+
+If BRC is unknown (no carrier on Tacview), the composer returns "BRC unknown" phrasing.
+
+Address-led guard applies — pilot must lead with `Deckboss, ...`.
+
+---
+
 ## Notes
 
 - **No Marshal/Recovery responses here.** Deckboss only does deck operations (launch). Recovery is Marshal's role on 306.3.

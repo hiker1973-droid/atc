@@ -123,6 +123,16 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				transmit(comp.DeckbossUnderTension(callsign, catNum))
 			}
 
+		case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing", "current brc", "current bearing", "current vrc", "say vrc", "check vrc"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: BRC dropped — not address-led")
+				return
+			}
+			// §7 BRC request: pilot asks mother's bow heading
+			brc := atcCtrl.GetCarrierBRC()
+			log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Deckboss: BRC request")
+			transmit(comp.MarshalSayBRC(callsign, brc))
+
 		case containsAny(lower, "tension"):
 			// §3 tension-only (no cat word): pilot confirms tension — silent, they go
 			log.Debug().Str("callsign", callsign).Msg("Deckboss: tension confirmed, pilot launching")
