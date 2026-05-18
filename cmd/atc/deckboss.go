@@ -37,7 +37,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 	transmit := func(text string) {
 		log.Info().Str("text", text).Msg("Deckboss TX")
 		atomic.StoreInt64(txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, deckVoice)
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, deckVoice, flagTTSSpeed)
 		if err != nil {
 			log.Error().Err(err).Msg("Deckboss TTS failed")
 			return
@@ -125,12 +125,16 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				}
 			}
 
-		case containsAny(lower, "tension", "ready") && containsAny(lower, "cat"):
+		case (containsAny(lower, "tension", "ready") && containsAny(lower, "cat")) || containsAny(lower, "shoot"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §2 dropped — not address-led, likely self-echo of under-tension response")
 				return
 			}
-			// §2 under tension: pilot reports ready on cat (or shooter under tension)
+			// §2 under tension / shoot shortcut: pilot says either
+			// "under tension cat X" / "ready cat X" OR the shortcut "shoot"
+			// (with the address). Fires the under-tension ack + the 5s auto-
+			// shoot. Cat number is sourced from state (§1 assignment), then
+			// from text regex, then a generic ack as last resort.
 			catNum := deck.GetCatByCallsign(callsign)
 			if catNum == 0 {
 				// Pilot called §2 without prior §1 — parse cat number directly
@@ -176,6 +180,12 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			log.Debug().Str("callsign", callsign).Msg("Deckboss: tension confirmed, pilot launching")
 
 		case containsAny(lower, "airborne", "clear traffic"):
+			// §4: ack the just-launched pilot so they know we copy, then
+			// free the cat and (if conga has someone) cycle the next
+			// aircraft onto the freed cat 3s later. The ack deliberately
+			// omits the word "airborne" so the SRS echo doesn't re-trigger
+			// this same case in a loop.
+			transmit(fmt.Sprintf("%s, Deckboss, copy, good hunting.", callsign))
 			catNum := deck.FreeCat(callsign)
 			if catNum > 0 {
 				log.Info().Str("callsign", callsign).Int("cat", catNum).Msg("Deckboss: cat cleared")

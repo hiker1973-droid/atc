@@ -48,9 +48,9 @@ This is the pilot's call when they're up and ready for cat. Deckboss assigns a f
 
 ## 2. Ready on cat (under tension)
 
-**Triggers:** (`ready` OR `tension`) AND `cat`  *(must appear together)*
+**Triggers:** (`ready` OR `tension`) AND `cat`  *(must appear together)*  ·  OR `shoot` (shortcut)
 
-Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing).
+Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing). The `shoot` shortcut collapses the under-tension call into one word — pilot just says `Deckboss, Raider XX, shoot` and Deckboss fires §2 ack + §2a auto-shoot. Cat number sourced from §1 assignment if present, otherwise parsed from the transmission, otherwise generic ack.
 
 **Responses (`DeckbossUnderTension`):**
 1. `{CALLSIGN}, Deckboss, under tension, cat {CAT}, clear to launch.`
@@ -86,9 +86,14 @@ Currently **silent** — no transmission, just a debug log. Pilot is going. If t
 
 **Triggers:** `airborne` OR `clear traffic` (from the just-launched pilot)
 
-Pilot calls airborne off the deck; Deckboss frees their cat and pulls the next conga aircraft onto it. Response is prefixed with the **next-up** callsign so the player hears `Raider 045, Cat one is clear.` The pilot who just launched gets no ack — they're already gone.
+Pilot calls airborne off the deck. Deckboss first acks the launching pilot, then frees their cat and pulls the next conga aircraft onto it. The ack to next-up is prefixed with the next-up callsign so the player hears `Raider 045, Cat one is clear.`
 
-**Responses (`DeckbossCatClear`):**
+**Ack to launching pilot** (always fires, even when nothing in conga):
+- `{CALLSIGN}, Deckboss, copy, good hunting.`
+
+The ack deliberately omits the word "airborne" so the SRS echo of our own TX doesn't re-trigger §4 in a loop. (§4 skips the address-led guard since pilots don't address Deckboss on quick airborne calls — the self-trigger risk is mitigated by avoiding the trigger word in our response.)
+
+**Cat-clear ack to next-up (`DeckbossCatClear`):**
 1. `Cat {CAT} is clear.`
 2. `Cat {CAT} clear, deck is moving.`
 3. `Cat {CAT} off the deck.`

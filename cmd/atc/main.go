@@ -77,9 +77,11 @@ var (
 	flagCommandName     string
 	flagCommandVoice    string
 	flagDeckbossVoice   string
-	flagRadioEffect         bool
-	flagRadioIntensity      string
-	flagTowerRadioIntensity string
+	flagRadioEffect          bool
+	flagRadioIntensity       string
+	flagTowerRadioIntensity  string
+	flagATISRadioIntensity   string
+	flagTTSSpeed             float64
 	flagScudwatchOnly       bool
 	flagScudwatchFreq       string
 	flagScudwatchCallsign   string
@@ -157,10 +159,14 @@ func main() {
 		"Path to DCS-SR-ExternalAudio.exe")
 	f.BoolVar(&flagRadioEffect, "radio-effect", true,
 		"Apply radio/static effect to TTS audio before SRS injection")
-	f.StringVar(&flagRadioIntensity, "radio-effect-intensity", "light",
-		"Radio effect intensity for ATIS/command/deckboss/marshal: light, medium, heavy, extreme")
-	f.StringVar(&flagTowerRadioIntensity, "tower-radio-intensity", "medium",
+	f.StringVar(&flagRadioIntensity, "radio-effect-intensity", "medium",
+		"Radio effect intensity for command/deckboss/marshal: light, medium, heavy, extreme")
+	f.StringVar(&flagTowerRadioIntensity, "tower-radio-intensity", "heavy",
 		"Radio effect intensity for tower TX: light, medium, heavy, extreme")
+	f.StringVar(&flagATISRadioIntensity, "atis-radio-intensity", "light",
+		"Radio effect intensity for ATIS TX (kept clean since it's a recorded loop): light, medium, heavy, extreme")
+	f.Float64Var(&flagTTSSpeed, "tts-speed", 1.05,
+		"TTS playback speed for tower/marshal/command/deckboss (ATIS stays at 0.97 for clarity)")
 	f.BoolVar(&flagScudwatchOnly, "scudwatch-only", false,
 		"Run as Scud / launch-warning monitor only — no tower, ATIS, deckboss, or marshal")
 	f.StringVar(&flagScudwatchFreq, "scudwatch-freq", "282.00",
@@ -464,7 +470,7 @@ func run(cmd *cobra.Command, args []string) error {
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voice)
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voice, flagTTSSpeed)
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -1278,8 +1284,8 @@ type ttsCache struct {
 
 var globalTTSCache = &ttsCache{items: make(map[string][]byte)}
 
-func (c *ttsCache) get(voice, text string) ([]byte, bool) {
-	key := voice + ":" + text
+func (c *ttsCache) get(voice string, speed float64, text string) ([]byte, bool) {
+	key := fmt.Sprintf("%s:%.2f:%s", voice, speed, text)
 	c.mu.RLock()
 	v, ok := c.items[key]
 	c.mu.RUnlock()
@@ -1289,8 +1295,8 @@ func (c *ttsCache) get(voice, text string) ([]byte, bool) {
 	return v, ok
 }
 
-func (c *ttsCache) set(voice, text string, mp3 []byte) {
-	key := voice + ":" + text
+func (c *ttsCache) set(voice string, speed float64, text string, mp3 []byte) {
+	key := fmt.Sprintf("%s:%.2f:%s", voice, speed, text)
 	c.mu.Lock()
 	// Evict random entries if cache exceeds 200 items (~5MB)
 	if len(c.items) >= 200 {
@@ -1356,15 +1362,15 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 	log.Info().Int("phrases", len(phrases)).Msg("pre-warming TTS cache")
 	warmed := 0
 	for _, phrase := range phrases {
-		if _, ok := globalTTSCache.get(voice, phrase); ok {
+		if _, ok := globalTTSCache.get(voice, flagTTSSpeed, phrase); ok {
 			continue
 		}
-		mp3, err := synthesizeSpeechAPI(ctx, apiKey, phrase, voice)
+		mp3, err := synthesizeSpeechAPI(ctx, apiKey, phrase, voice, flagTTSSpeed)
 		if err != nil {
 			log.Warn().Err(err).Str("phrase", phrase).Msg("TTS prewarm failed")
 			continue
 		}
-		globalTTSCache.set(voice, phrase, mp3)
+		globalTTSCache.set(voice, flagTTSSpeed, phrase, mp3)
 		warmed++
 		// Small delay to avoid rate limiting
 		time.Sleep(200 * time.Millisecond)
@@ -1406,17 +1412,19 @@ func estimateTTSDuration(text string) time.Duration {
 	return d
 }
 
-// synthesizeSpeech checks cache first, falls back to API on miss.
-func synthesizeSpeech(ctx context.Context, apiKey, text, voice string) ([]byte, error) {
-	if mp3, ok := globalTTSCache.get(voice, text); ok {
+// synthesizeSpeech checks cache first, falls back to API on miss. speed is the
+// TTS playback rate (0.97 for ATIS to keep clarity, ~1.05 for tower/marshal/
+// command/deckboss for snappier ATC cadence).
+func synthesizeSpeech(ctx context.Context, apiKey, text, voice string, speed float64) ([]byte, error) {
+	if mp3, ok := globalTTSCache.get(voice, speed, text); ok {
 		log.Debug().Str("text", text).Msg("TTS cache hit")
 		return mp3, nil
 	}
-	mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, voice)
+	mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, voice, speed)
 	if err != nil {
 		return nil, err
 	}
-	globalTTSCache.set(voice, text, mp3)
+	globalTTSCache.set(voice, speed, text, mp3)
 	return mp3, nil
 }
 
@@ -1470,12 +1478,15 @@ func translateToArabic(ctx context.Context, apiKey, text string) (string, error)
 	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 
-func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string) ([]byte, error) {
+func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string, speed float64) ([]byte, error) {
+	if speed <= 0 {
+		speed = 0.97
+	}
 	body := map[string]interface{}{
 		"model": "gpt-4o-mini-tts",
 		"input": text,
 		"voice": voice,
-		"speed": 0.97,
+		"speed": speed,
 	}
 	data, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST",
@@ -1832,12 +1843,18 @@ func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
 // ctx bounds the subprocess so a hung ExternalAudio.exe can't stall the TX queue.
 func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
 	if flagRadioEffect {
-		// Tower callsigns end in "-ATC" (e.g. OMAM-ATC). Use a separate
-		// intensity knob for tower so operators can crank tower static
-		// without also making ATIS/command/deckboss harder to understand.
+		// Per-role intensity:
+		// - Tower callsigns end in "-ATC" (e.g. OMAM-ATC) → heavier static
+		//   for that punchy ATC sound.
+		// - ATIS station callsigns end with " ATIS" (e.g. "Liwa ATIS",
+		//   "Khasab ATIS") → kept clean since it's a recorded loop.
+		// - Everything else (OMDM-MSH, OMDM-DKB, vSFG-7-Command) gets the
+		//   general operational intensity.
 		intensity := flagRadioIntensity
 		if strings.HasSuffix(callsign, "-ATC") {
 			intensity = flagTowerRadioIntensity
+		} else if strings.HasSuffix(callsign, " ATIS") {
+			intensity = flagATISRadioIntensity
 		}
 		mp3 = applyRadioEffect(mp3, flagFFmpeg, intensity)
 		mp3 = addMicClicks(mp3, flagFFmpeg)
