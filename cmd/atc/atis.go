@@ -157,7 +157,12 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		// lets the launcher /runway dropdown propagate into the next ATIS
 		// broadcast. Stations with no paired tower (Liwa, Khasab) keep the
 		// atcCtrl value.
-		if rwy := fetchTowerRunway(station.ICAO); rwy != "" {
+		if rwy := fetchTowerRunway(station.ICAO); rwy != "" && rwy != state.activeRwy {
+			log.Info().Str("station", station.Name).Str("icao", station.ICAO).
+				Str("from", state.activeRwy).Str("to", rwy).
+				Msg("ATIS picked up runway change from tower dashboard")
+			state.activeRwy = rwy
+		} else if rwy != "" {
 			state.activeRwy = rwy
 		}
 

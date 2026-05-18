@@ -215,7 +215,20 @@ func run(cmd *cobra.Command, args []string) error {
 	// Write logs to both stderr (console) and a rotating log file
 	logDir := "C:\\SkyeyeATC\\logs"
 	os.MkdirAll(logDir, 0755)
-	logPath := filepath.Join(logDir, fmt.Sprintf("atc-%s.log", strings.ToLower(flagAirfield)))
+	// Pick a sane log filename. --airfield defaults to "OMDM" even for
+	// ATIS-only / Command-only modes, so we have to let the mode flag win or
+	// these processes silently piggyback on atc-omdm.log instead of writing
+	// their own file.
+	logSlug := strings.ToLower(flagAirfield)
+	switch {
+	case flagATISOnly:
+		logSlug = "atis"
+	case flagCommandOnly:
+		logSlug = "command"
+	case logSlug == "":
+		logSlug = "misc"
+	}
+	logPath := filepath.Join(logDir, fmt.Sprintf("atc-%s.log", logSlug))
 	rotateLogIfNeeded(logPath)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
