@@ -225,6 +225,8 @@ func run(cmd *cobra.Command, args []string) error {
 		logSlug = "atis"
 	case flagCommandOnly:
 		logSlug = "command"
+	case flagMarshalOnly:
+		logSlug = "marshal"
 	case logSlug == "":
 		logSlug = "misc"
 	}
