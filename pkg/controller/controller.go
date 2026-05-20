@@ -856,6 +856,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// Clear runway variants
 		"clear runway", "cleared runway", "clearing runway", "runway clear",
 		"runway cleared", "cleared the runway", "clear of", "clear active",
+		"clear the active", "cleared the active", "clearing the active",
 		"cleared active", "clearing active", "runway is clear", "runway is vacated",
 		// Clear traffic variants (post-departure)
 		"clear traffic", "cleared traffic", "clearing traffic", "clear of traffic",
@@ -878,16 +879,19 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestDistanceInitial
 	case containsAny(lower, "holding short", "hold short", "short of runway", "at the hold"):
 		req.Type = RequestHoldingShort
-	case containsAny(lower, "request takeoff", "request departure", "ready for departure", "ready for takeoff", "lineup"):
+	case containsAny(lower, "request takeoff", "request departure", "ready for departure", "ready for takeoff",
+		"requesting takeoff", "requesting departure",
+		"line up", "lining up", "lineup"):
 		req.Type = RequestTakeoffClear
-	case containsAny(lower, "request startup", "ready for startup", "ready to start", "request start"):
+	case containsAny(lower, "request startup", "ready for startup", "ready to start", "request start",
+		"requesting startup", "requesting start"):
 		req.Type = RequestStartup
 	case containsAny(lower, "pushing command", "pushing to command", "switching command", "switching to command", "push command"):
 		// Pilot is announcing a freq change to Command — courtesy ack, no
 		// need to re-issue freq/preset (handoff was already given at 7 DME).
 		req.Type = RequestPushingCommand
 	case containsAny(lower, "request taxi", "request ground", "taxi to", "ready to taxi",
-		"requests taxi", "requested taxi",
+		"requests taxi", "requested taxi", "requesting taxi", "requesting ground",
 		"request clearance", "requesting clearance", "requests clearance", "requested clearance",
 		"clearance to the active", "clearance to active", "clearance to taxi", "clearance for taxi"):
 		req.Type = RequestTaxiClear
@@ -991,6 +995,11 @@ func trimTrailingTriggers(cs string) string {
 		// requests
 		"request taxi", "request ground", "request takeoff", "request departure",
 		"request landing", "request startup", "request start",
+		// requesting X variants (Whisper often hears the -ing form)
+		"requesting taxi", "requesting ground", "requesting takeoff", "requesting departure",
+		"requesting startup", "requesting start", "requesting clearance",
+		// line up variants — also fired by pilots reporting they've entered the runway
+		"line up", "lining up",
 		// pattern / state calls
 		"holding short", "hold short", "ready for", "ready to",
 		"airborne", "departing", "inbound",
@@ -998,7 +1007,7 @@ func trimTrailingTriggers(cs string) string {
 		"downwind", "turning downwind",
 		"base", "turning base",
 		"overhead", "initial",
-		"clear active", "cleared active", "clear of runway", "runway vacated",
+		"clear active", "cleared active", "clear the active", "clear of runway", "runway vacated",
 		"going around", "go around", "missed approach",
 		// distance / handoff
 		"pushing command", "switching command", "push command",
