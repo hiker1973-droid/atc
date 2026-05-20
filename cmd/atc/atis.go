@@ -193,11 +193,22 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 				arMP3 = mp3
 			}
 
-			// MP3 frames are independent so byte-concat plays back as one
-			// continuous stream in DCS-SR-ExternalAudio's decoder.
+			// Merge EN+AR through ffmpeg so the result is a single re-encoded
+			// MP3 stream. The previous byte-concat approach (two MP3 files
+			// stitched at the byte level) caused DCS-SR-ExternalAudio's
+			// decoder to play both languages simultaneously — apparently
+			// because the second file's ID3 header looked like a new parallel
+			// stream. Re-encoding via ffmpeg with a brief silence guarantees
+			// serial playback. On ffmpeg failure fall back to EN-only rather
+			// than risk the overlap bug.
 			combined := enMP3
 			if arMP3 != nil {
-				combined = append(append([]byte{}, enMP3...), arMP3...)
+				if merged, mErr := concatMP3WithSilence(enMP3, arMP3, flagFFmpeg, 1.2); mErr == nil {
+					combined = merged
+				} else {
+					log.Warn().Err(mErr).Str("station", station.Name).
+						Msg("EN+AR ffmpeg concat failed — broadcasting English only")
+				}
 			}
 
 			state.cachedMP3 = combined

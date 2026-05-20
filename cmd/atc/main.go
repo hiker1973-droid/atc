@@ -1874,6 +1874,67 @@ func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
 	return processed
 }
 
+// concatMP3WithSilence re-encodes two MP3 byte slices into a single MP3 with
+// `silenceSec` seconds of silence between them. Used by ATIS to merge EN+AR
+// into one clean stream — byte-level MP3 concat is fragile and can cause some
+// decoders (DCS-SR-ExternalAudio) to play the two halves simultaneously.
+func concatMP3WithSilence(en, ar []byte, ffmpegPath string, silenceSec float64) ([]byte, error) {
+	tmpEn, err := os.CreateTemp("", "atc-atis-en-*.mp3")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpEn.Name())
+	if _, err := tmpEn.Write(en); err != nil {
+		tmpEn.Close()
+		return nil, err
+	}
+	tmpEn.Close()
+
+	tmpAr, err := os.CreateTemp("", "atc-atis-ar-*.mp3")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpAr.Name())
+	if _, err := tmpAr.Write(ar); err != nil {
+		tmpAr.Close()
+		return nil, err
+	}
+	tmpAr.Close()
+
+	tmpOut := tmpEn.Name() + ".out.mp3"
+	defer os.Remove(tmpOut)
+
+	filter := fmt.Sprintf(
+		"[0:a]aresample=44100,aformat=channel_layouts=mono[en];"+
+			"[1:a]aresample=44100,aformat=channel_layouts=mono[ar];"+
+			"anullsrc=r=44100:cl=mono,atrim=duration=%.3f[sil];"+
+			"[en][sil][ar]concat=n=3:v=0:a=1[out]",
+		silenceSec,
+	)
+
+	cmd := exec.Command(ffmpegPath,
+		"-y",
+		"-i", tmpEn.Name(),
+		"-i", tmpAr.Name(),
+		"-filter_complex", filter,
+		"-map", "[out]",
+		"-c:a", "libmp3lame",
+		"-q:a", "4",
+		tmpOut,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("ffmpeg: %v: %s", err, string(out))
+	}
+	data, err := os.ReadFile(tmpOut)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("ffmpeg produced empty output")
+	}
+	return data, nil
+}
+
 // transmitExternalAudioFile injects a pre-generated MP3 file via ExternalAudio.
 // ctx bounds the subprocess so a hung ExternalAudio.exe can't stall the TX queue.
 func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
