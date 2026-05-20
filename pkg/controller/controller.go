@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vsfg7/atc/pkg/airfield"
@@ -122,6 +123,11 @@ type ATCController struct {
 	intentMissMu    sync.Mutex
 	intentMisses    []IntentMiss
 	intentMissCount int64
+
+	// missionTime is the in-sim time as reported by Tacview (ReferenceTime + #offset).
+	// Zero until the first Tacview tick lands. Stored via atomic.Value so reads on
+	// the dashboard hot path don't contend with the Tacview writer.
+	missionTime atomic.Value // time.Time
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -1234,6 +1240,41 @@ func (c *ATCController) UpdateAnyPosition(callsign string, lon, lat, altFt, spee
 // SetWeather injects static weather — used by ATIS-only Training VM mode.
 func (c *ATCController) SetWeather(windDir, windKts, ceilFt, altInHg float64) {
 	c.airfieldState.UpdateWeather(windDir, windKts, altInHg, ceilFt)
+}
+
+// SetFullWeather sets wind, altimeter, ceiling, visibility, and night in one
+// shot for the tower / marshal-only paths. SetWeather alone leaves CeilingFt
+// at zero because UpdateWeather has no ceiling parameter — that's the bug
+// dashboard /status was hitting. Sentinel value -1 means "unset" — for
+// ceiling we clamp to a high (clear) number so the flight-mode calc doesn't
+// flip to IFR on a negative ceiling.
+func (c *ATCController) SetFullWeather(windDir, windKts, ceilFt, visNm, altInHg float64, isNight bool) {
+	if ceilFt < 0 {
+		ceilFt = 25000
+	}
+	if windDir < 0 {
+		windDir = 0
+	}
+	c.airfieldState.UpdateFlightConditions(ceilFt, visNm, isNight)
+	c.airfieldState.UpdateWeather(windDir, windKts, altInHg, visNm)
+}
+
+// SetMissionTime records the current in-sim time (Tacview ReferenceTime + offset).
+// Called from the Tacview reader on every #<seconds> tick.
+func (c *ATCController) SetMissionTime(t time.Time) {
+	c.missionTime.Store(t)
+}
+
+// GetMissionTime returns the last reported in-sim time and ok=true. Returns
+// ok=false when Tacview hasn't sent a ReferenceTime yet (replay loop start or
+// telemetry offline).
+func (c *ATCController) GetMissionTime() (time.Time, bool) {
+	v := c.missionTime.Load()
+	if v == nil {
+		return time.Time{}, false
+	}
+	t, ok := v.(time.Time)
+	return t, ok && !t.IsZero()
 }
 
 // GetAirfieldStateSnapshot returns a dashboard-friendly state snapshot.

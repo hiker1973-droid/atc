@@ -99,7 +99,7 @@ func main() {
 // ── Bat discovery ─────────────────────────────────────────────────────────────
 
 var (
-	reStart         = regexp.MustCompile(`(?i)start\s+"([^"]+)"\s+cmd\s+/k\s+"([^"]+)"`)
+	reStart         = regexp.MustCompile(`(?i)start\s+"([^"]+)"\s+cmd\s+/[kc]\s+"([^"]+)"`)
 	reAirfield      = regexp.MustCompile(`--airfield\s+(\S+)`)
 	reDashboardPort = regexp.MustCompile(`--dashboard-port\s+(\d+)`)
 )
@@ -186,6 +186,24 @@ func enumerateCmdWindows() map[string]int {
 	return m
 }
 
+// findWindowPID matches `name` against window titles, accepting either an
+// exact match or a "<name> - <cmdline>" prefix. Newer Windows builds append
+// the spawned command to the console title, so a strict equality check
+// reports running roles as stopped.
+func findWindowPID(wins map[string]int, name string) (int, bool) {
+	key := strings.ToLower(name)
+	if pid, ok := wins[key]; ok {
+		return pid, true
+	}
+	prefix := key + " - "
+	for title, pid := range wins {
+		if strings.HasPrefix(title, prefix) {
+			return pid, true
+		}
+	}
+	return 0, false
+}
+
 // killTree force-kills pid and any descendants. Needed because each .bat
 // window owns a child atc.exe process — /t walks the tree.
 func killTree(pid int) error {
@@ -264,7 +282,7 @@ func startRole(name string) error {
 
 func stopRole(name string) error {
 	wins := enumerateCmdWindows()
-	pid, ok := wins[strings.ToLower(name)]
+	pid, ok := findWindowPID(wins, name)
 	if !ok {
 		return fmt.Errorf("not running: %s", name)
 	}
@@ -295,7 +313,7 @@ func handleRoles(w http.ResponseWriter, _ *http.Request) {
 
 	wins := enumerateCmdWindows()
 	for i := range out {
-		if pid, ok := wins[strings.ToLower(out[i].Name)]; ok {
+		if pid, ok := findWindowPID(wins, out[i].Name); ok {
 			out[i].Status = "running"
 			out[i].PID = pid
 		} else {

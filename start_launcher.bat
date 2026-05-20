@@ -10,6 +10,6 @@ if not defined SKYEYE_TACVIEW (
     pause
     exit /b 1
 )
-start "vSFG-7 Launcher" cmd /k "%~dp0launcher.exe --listen :7000 --srs-addr %SKYEYE_SRS% --tacview-addr %SKYEYE_TACVIEW%"
+start "vSFG-7 Launcher" cmd /c "%~dp0launcher.exe --listen :7000 --srs-addr %SKYEYE_SRS% --tacview-addr %SKYEYE_TACVIEW%"
 %SystemRoot%\System32\timeout.exe /t 2 /nobreak >nul
 start http://localhost:7000/

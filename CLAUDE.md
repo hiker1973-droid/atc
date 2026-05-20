@@ -56,8 +56,8 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 
 Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use launcher dashboard buttons.
 
-### Training 1 active roles (2026-05-18)
-**Tower**, **ATIS**, **Marshal** (306.3), **Command** (282.0), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat` at repo root; **`dev_only/start_deckboss.bat`** is still in `dev_only/` for legacy reasons but runs in production — promote to root next maintenance window.
+### Training 1 active roles (2026-05-19)
+**Tower**, **ATIS**, **Marshal** (306.3), **Command** (282.0), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files at repo root: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_deckboss.bat`, `start_launcher.bat`. Post-reboot one-shot: **`start_all.bat`** fires ATIS → towers → marshal → command → deckboss → launcher in order.
 
 Voices: all roles use `onyx` except Deckboss which uses `ash` (calm authoritative) for audible differentiation. Switchable via `--deckboss-voice <echo|ballad|sage|onyx|…>` without rebuilds.
 

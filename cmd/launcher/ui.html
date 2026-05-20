@@ -2,193 +2,653 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>vSFG-7 Launcher</title>
+<title>vSFG-7 AI Tower ATC Control Portal</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 0; background: #0d1117; color: #c9d1d9; }
-  header { padding: 1rem 1.5rem; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
-  header h1 { margin: 0; font-size: 1.1rem; }
-  .health { display: flex; gap: 1.2rem; font-size: 0.85rem; }
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle; }
-  .dot.up { background: #3fb950; box-shadow: 0 0 8px rgba(63,185,80,0.6); }
-  .dot.down { background: #f85149; box-shadow: 0 0 8px rgba(248,81,73,0.5); }
-  .dot.pending { background: #6e7681; }
-  .ctrls { margin-left: auto; display: flex; gap: 0.4rem; }
-  main { padding: 1rem 1.5rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid #30363d; }
-  th { background: #161b22; font-weight: 500; font-size: 0.8rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
-  .status { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.03em; }
-  .status.running { background: #0f3d1e; color: #3fb950; }
-  .status.stopped { background: #262d34; color: #8b949e; }
-  button { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.8rem; font-family: inherit; }
-  button:hover { background: #30363d; }
-  button.primary { background: #238636; border-color: #2ea043; color: #fff; }
-  button.primary:hover { background: #2ea043; }
-  button.danger { background: #5d1a1a; border-color: #8b1e1e; color: #ffb3b3; }
-  button.danger:hover { background: #8b1e1e; color: #fff; }
-  .actions { white-space: nowrap; }
-  .actions button { margin-right: 4px; }
-  a { color: #58a6ff; text-decoration: none; }
+  :root {
+    /* vSFG-7 palette — Navy blue & gold. */
+    --bg: #0a1424;
+    --panel: #11203a;
+    --panel-2: #162b4d;
+    --border: #2a4373;
+    --text: #d8e3f4;
+    --muted: #6f86a8;
+    --label: #8fa3c2;
+    --gold: #ffd166;
+    --gold-dim: #7a5f1f;
+    --blue: #6dabff;
+    --blue-dim: #1f4a8c;
+    --green: #3fb950;
+    --green-dim: #1f6b34;
+    --red: #f85149;
+    /* Back-compat aliases so older rules keep rendering. */
+    --orange: var(--gold);
+    --yellow: var(--gold);
+    --cyan: var(--blue);
+    --magenta: var(--gold);
+  }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 13px; }
+  a { color: var(--blue); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  .sub { font-size: 0.73rem; color: #6e7681; margin-top: 2px; }
+
+  /* Header */
+  header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange); display: flex; align-items: center; gap: 1rem; }
+  .brand { display: flex; align-items: baseline; gap: 0.8rem; }
+  .logo { font-size: 1.5rem; font-weight: 700; color: var(--orange); letter-spacing: 0.05em; }
+  .title { color: var(--label); font-size: 0.9rem; }
+  .beta { background: var(--orange); color: #000; font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px; letter-spacing: 0.1em; }
+  .server { margin-left: auto; text-align: right; }
+  .server-line { color: var(--green); font-weight: 500; font-size: 0.8rem; letter-spacing: 0.08em; }
+  .server-line .dot { width: 8px; height: 8px; }
+  .server-line.down { color: var(--red); }
+  .clock { color: var(--muted); font-size: 0.78rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* Dots */
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 0.35rem; background: var(--muted); }
+  .dot.up    { background: var(--green);  box-shadow: 0 0 8px rgba(63,185,80,0.6); }
+  .dot.down  { background: var(--red);    box-shadow: 0 0 8px rgba(248,81,73,0.5); }
+  .dot.busy  { background: var(--orange); box-shadow: 0 0 8px rgba(240,136,62,0.5); }
+  .dot.idle  { background: var(--muted); }
+
+  /* Layout */
+  main { padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.9rem; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.9rem; }
+  .panel h3 { margin: 0 0 0.6rem 0; font-size: 0.7rem; color: var(--label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .panel h3 .sub { float: right; color: var(--muted); font-weight: 400; letter-spacing: 0.02em; text-transform: none; font-size: 0.72rem; }
+
+  /* Role card row */
+  .role-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.7rem; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.9rem; }
+  .card-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }
+  .card-head .name { font-weight: 600; font-size: 0.95rem; flex: 1; }
+  .card-head .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .card-head .status-dot.up { background: var(--green); box-shadow: 0 0 6px rgba(63,185,80,0.6); }
+  .card-head .status-dot.down { background: var(--red); }
+  .card .freq { color: var(--blue); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+  .card .pill { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.7rem; color: var(--label); margin-top: 0.45rem; }
+  .card .extra { color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
+  .card select.rwy-sel { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.3rem; font-size: 0.72rem; font-family: inherit; margin-top: 0.3rem; }
+  .card .actions { margin-top: 0.55rem; }
+  .card .actions button { width: 100%; }
+
+  /* Row 2: weather / stack / cats */
+  .row-2 { display: grid; grid-template-columns: 1.1fr 2fr 1.4fr; gap: 0.7rem; }
+  .weather-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem 0.7rem; }
+  .weather-grid .cell { }
+  .weather-grid .cell .lbl { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .weather-grid .cell .val { color: var(--cyan); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+  .case-pill { float: right; background: var(--panel-2); border: 1px solid var(--orange); color: var(--orange); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; letter-spacing: 0.08em; }
+
+  /* Tables (stack, pattern, freqs, cats) */
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  table th, table td { text-align: left; padding: 0.32rem 0.4rem; }
+  table th { color: var(--muted); font-weight: 500; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  table td { border-bottom: 1px solid #21262d; }
+  table tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pill-phase { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 500; }
+  .pill-phase.charlie { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid var(--green-dim); }
+  .pill-phase.holding { background: rgba(240,136,62,0.15); color: var(--orange); border: 1px solid #7d4818; }
+  .pill-phase.inbound { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid #1f4070; }
+  .pill-staged  { color: var(--orange); }
+  .pill-free    { color: var(--green); }
+  .pill-busy    { color: var(--red); }
+
+  /* Fuel / progress bars */
+  .bar { background: var(--panel-2); border-radius: 2px; height: 8px; overflow: hidden; min-width: 60px; }
+  .bar > span { display: block; height: 100%; background: var(--green); }
+  .bar.lo > span { background: var(--orange); }
+  .bar.crit > span { background: var(--red); }
+
+  /* Row 3: pattern / freqs / controls */
+  .row-3 { display: grid; grid-template-columns: 1.9fr 1fr 1.7fr; gap: 0.7rem; }
+  .freq-list { font-size: 0.78rem; }
+  .freq-list .row { display: flex; padding: 0.3rem 0.2rem; border-bottom: 1px solid #21262d; }
+  .freq-list .row:last-child { border-bottom: none; }
+  .freq-list .name { flex: 1; color: var(--text); }
+  .freq-list .num { color: var(--blue); font-variant-numeric: tabular-nums; }
+
+  /* Controls grid */
+  .ctrl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  button.btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0.55rem 0.6rem; cursor: pointer; font: inherit; font-size: 0.78rem; text-align: center; }
+  button.btn:hover { background: #2a313a; }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.btn.start  { border-color: var(--green-dim); color: var(--green); }
+  button.btn.start:hover  { background: rgba(63,185,80,0.15); }
+  button.btn.stop   { border-color: #5d1a1a; color: #ffb3b3; }
+  button.btn.stop:hover   { background: rgba(248,81,73,0.15); }
+  button.btn.warn   { border-color: #6e5a1c; color: var(--yellow); }
+  button.btn.info   { border-color: #1f4070; color: var(--blue); }
+
+  /* Log */
+  .log { height: 360px; overflow-y: auto; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.55; padding: 0.4rem 0.6rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; }
+  .log .row { display: flex; gap: 0.7rem; padding: 0.05rem 0; }
+  .log .ts { color: var(--muted); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+  .log .msg { flex: 1; word-break: break-word; }
+  .log .src { font-weight: 500; }
+  .log .row.t-rx .msg { color: var(--gold); }
+  .log .row.t-tx .msg { color: var(--blue); }
+  .log .row.t-sys .msg { color: #9fc1ee; }
+  .log .row.t-msh .msg { color: #6dabff; }
+  .log .row.t-dkb .msg { color: var(--gold); }
+  .log .row.t-err .msg { color: var(--red); }
+  .log-legend { float: right; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
+  .log-legend .pip { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.25rem; vertical-align: middle; }
+
+  .empty { color: var(--muted); padding: 1rem 0.3rem; font-style: italic; text-align: center; font-size: 0.78rem; }
+  .hint  { color: var(--muted); font-size: 0.7rem; font-style: italic; padding: 0.3rem 0.3rem 0 0.3rem; }
+
+  /* Existing log modal */
   #logModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10; }
   #logModal.open { display: flex; align-items: center; justify-content: center; }
-  #logInner { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
-  #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+  #logInner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
+  #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   #logTitle { font-weight: 500; }
   #logBody { flex: 1; overflow: auto; padding: 0.8rem 1rem; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; color: #b1bac4; }
-  .empty { padding: 3rem; text-align: center; color: #6e7681; }
 </style>
 </head>
 <body>
 <header>
-  <h1>vSFG-7 Launcher</h1>
-  <div class="health">
-    <span><span id="dot-srs" class="dot pending"></span>SRS</span>
-    <span><span id="dot-tacview" class="dot pending"></span>Tacview</span>
-    <span><span id="dot-openai" class="dot pending"></span>OpenAI</span>
+  <div class="brand">
+    <span class="logo">vSFG-7</span>
+    <span class="title">AI Tower ATC Control Portal</span>
+    <span class="beta">BETA</span>
   </div>
-  <div class="ctrls">
-    <button class="primary" onclick="startAll()">Start all</button>
-    <button class="danger" onclick="stopAll()">Stop all</button>
-    <button onclick="rescan()">Rescan bats</button>
+  <div class="server">
+    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE</div>
+    <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
   </div>
 </header>
+
 <main>
-<table id="roleTable">
-  <thead>
-    <tr>
-      <th>Role</th>
-      <th>Status</th>
-      <th>Bat</th>
-      <th>Log</th>
-      <th>Dashboard</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody id="roleBody">
-    <tr><td colspan="6" class="empty">Loading…</td></tr>
-  </tbody>
-</table>
+  <!-- Role cards -->
+  <section class="role-row" id="roleCards"></section>
+
+  <!-- Row 2: Weather / Marshal Stack / Catapults -->
+  <section class="row-2">
+    <div class="panel">
+      <h3>Weather — OMDM <span class="case-pill" id="wxCase">CASE 1</span></h3>
+      <div class="weather-grid" id="wxGrid">
+        <div class="cell"><div class="lbl">Ceiling</div><div class="val" id="wxCeil">—</div></div>
+        <div class="cell"><div class="lbl">Visibility</div><div class="val" id="wxVis">—</div></div>
+        <div class="cell"><div class="lbl">Altimeter</div><div class="val" id="wxAlt">—</div></div>
+        <div class="cell"><div class="lbl">Wind</div><div class="val" id="wxWind">—</div></div>
+        <div class="cell"><div class="lbl">Temp</div><div class="val" id="wxTemp">—</div></div>
+        <div class="cell"><div class="lbl">Night</div><div class="val" id="wxNight">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Marshal Stack — CVN-72 ABE <span class="sub" id="stackHdrSub">BRC —</span></h3>
+      <div id="stackTbl"><div class="empty">Phase 2 — Marshal process needs dashboard port wired.</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>Catapults — CVN-72 <span class="sub" id="catsHdrSub"></span></h3>
+      <div id="catsTbl"><div class="empty">Phase 2 — Deckboss process needs dashboard port wired.</div></div>
+    </div>
+  </section>
+
+  <!-- Row 3: Aircraft / Freqs / Controls -->
+  <section class="row-3">
+    <div class="panel">
+      <h3>Aircraft In Pattern <span class="sub" id="patternSub">0 contacts</span></h3>
+      <div id="patternTbl"><div class="empty">No aircraft in pattern.</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>Frequencies</h3>
+      <div class="freq-list">
+        <div class="row"><span class="name">Al Minhad Tower</span><span class="num">250.100</span></div>
+        <div class="row"><span class="name">Al Minhad ATIS</span> <span class="num">248.300</span></div>
+        <div class="row"><span class="name">Al Dhafra Tower</span><span class="num">251.100</span></div>
+        <div class="row"><span class="name">Al Dhafra ATIS</span> <span class="num">248.200</span></div>
+        <div class="row"><span class="name">Al Ain Tower</span>   <span class="num">250.700</span></div>
+        <div class="row"><span class="name">Al Ain ATIS</span>    <span class="num">248.850</span></div>
+        <div class="row"><span class="name">Liwa ATIS</span>      <span class="num">248.550</span></div>
+        <div class="row"><span class="name">Khasab ATIS</span>    <span class="num">248.500</span></div>
+        <div class="row"><span class="name">Command</span>        <span class="num">282.000</span></div>
+        <div class="row"><span class="name">Marshal</span>        <span class="num">306.300</span></div>
+        <div class="row"><span class="name">Deckboss</span>       <span class="num">128.600</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Controls</h3>
+      <div class="ctrl-grid">
+        <button class="btn start" onclick="startGroup(['Al Minhad Tower','Al Dhafra Tower','Al Ain Tower'])">Start All Towers</button>
+        <button class="btn stop"  onclick="stopGroup(['Al Minhad Tower','Al Dhafra Tower','Al Ain Tower'])">Stop All Towers</button>
+        <button class="btn warn"  onclick="restartRole('Al Minhad Tower')">Restart Al Minhad</button>
+        <button class="btn start" onclick="startRole('Deckboss')">Start Deckboss</button>
+        <button class="btn stop"  onclick="stopRole('Deckboss')">Stop Deckboss</button>
+        <button class="btn info"  onclick="alert('Refresh Weather endpoint not wired yet — phase 2.')">Refresh Weather</button>
+        <button class="btn info"  onclick="document.querySelector('.row-2').scrollIntoView({behavior:'smooth'})">Marshal Stack</button>
+        <button class="btn info"  onclick="openLogModal()">Full Log</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Live transmission log -->
+  <section class="panel">
+    <h3>Live Transmission Log
+      <span class="log-legend">
+        <span><span class="pip" style="background:var(--blue)"></span>ATC TX</span>
+        <span><span class="pip" style="background:var(--gold)"></span>Pilot RX</span>
+        <span><span class="pip" style="background:#9fc1ee"></span>Sys</span>
+        <span><span class="pip" style="background:var(--red)"></span>Err</span>
+      </span>
+    </h3>
+    <div class="log" id="logFeed"></div>
+  </section>
 </main>
 
-<div id="logModal" onclick="if(event.target===this)closeLog()">
+<!-- Full log modal (existing functionality) -->
+<div id="logModal" onclick="if(event.target===this)closeLogModal()">
   <div id="logInner">
     <div id="logHead">
-      <span id="logTitle"></span>
-      <button onclick="closeLog()">Close</button>
+      <span id="logTitle">Tail — atc-omdm.log</span>
+      <span>
+        <select id="logSel" onchange="loadModalLog()">
+          <option value="atc-omdm.log">atc-omdm.log (Minhad/Marshal/Deckboss)</option>
+          <option value="atc-omam.log">atc-omam.log (Dhafra)</option>
+          <option value="atc-omal.log">atc-omal.log (Al Ain)</option>
+          <option value="atc-.log">atc-.log (ATIS/Command)</option>
+        </select>
+        <button class="btn" onclick="closeLogModal()">Close</button>
+      </span>
     </div>
-    <div id="logBody"></div>
+    <div id="logBody">Loading…</div>
   </div>
 </div>
 
 <script>
-let roles = [];
-let currentLogRole = null;
+// ──────────────────────────────────────────────────────────────────────────
+// Config — role → tower port + window-title mapping
+// ──────────────────────────────────────────────────────────────────────────
+const TOWERS = [
+  { icao: 'OMDM', label: 'Al Minhad', freq: '250.100', port: 6001, role: 'Al Minhad Tower' },
+  { icao: 'OMAM', label: 'Al Dhafra', freq: '251.100', port: 6002, role: 'Al Dhafra Tower' },
+  { icao: 'OMAL', label: 'Al Ain',    freq: '250.700', port: 6003, role: 'Al Ain Tower' },
+];
+// Non-tower roles each get their own card.
+const COMBO_CARDS = [
+  { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · BRC 275°', roles: ['Marshal'],        stopLabel: 'Stop Marshal' },
+  { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command',    roles: ['vSFG-7 Command'], stopLabel: 'Stop Command' },
+  { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'OMDM carrier UHF',  roles: ['Deckboss'],       stopLabel: 'Stop Deckboss' },
+];
 
-async function refresh() {
+// ──────────────────────────────────────────────────────────────────────────
+// Tiny helpers
+// ──────────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtNum = (n, d=0) => (n==null || n===0 || !isFinite(n)) ? '—' : Number(n).toFixed(d);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Clock
+// ──────────────────────────────────────────────────────────────────────────
+function tickClock() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  $('clock').textContent = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+}
+setInterval(tickClock, 1000); tickClock();
+
+// ──────────────────────────────────────────────────────────────────────────
+// Role state — populated from /api/roles + per-tower /status
+// ──────────────────────────────────────────────────────────────────────────
+let roleStatus = {};      // name -> "running"|"stopped"
+let towerStatus = {};     // icao -> /status JSON (or null on fail)
+let carrierStatus = {};   // 'marshal' | 'deckboss' -> /status JSON (or null on fail)
+
+const CARRIER = [
+  { key: 'marshal',  port: 6004 },
+  { key: 'deckboss', port: 6005 },
+];
+
+async function refreshRoles() {
   try {
-    const [r, h] = await Promise.all([
-      fetch('/api/roles').then(r => r.json()),
-      fetch('/api/health').then(r => r.json())
-    ]);
-    roles = r;
-    renderRoles();
-    renderHealth(h);
-    if (currentLogRole) loadLog();
-  } catch (e) {
-    console.error(e);
+    const r = await fetch('/api/roles');
+    const list = await r.json();
+    roleStatus = {};
+    for (const x of (list||[])) roleStatus[x.name] = x.status;
+  } catch (e) { /* leave previous state */ }
+}
+
+async function refreshTowers() {
+  await Promise.all(TOWERS.map(async t => {
+    try {
+      const r = await fetch(`http://localhost:${t.port}/status`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      towerStatus[t.icao] = await r.json();
+    } catch { towerStatus[t.icao] = null; }
+  }));
+}
+
+async function refreshCarrier() {
+  await Promise.all(CARRIER.map(async c => {
+    try {
+      const r = await fetch(`http://localhost:${c.port}/status`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      carrierStatus[c.key] = await r.json();
+    } catch { carrierStatus[c.key] = null; }
+  }));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Rendering
+// ──────────────────────────────────────────────────────────────────────────
+function renderCards() {
+  const parts = [];
+
+  for (const t of TOWERS) {
+    const st = towerStatus[t.icao];
+    const running = roleStatus[t.role] === 'running';
+    const mode = (st && st.tower && st.tower.flightMode) ? st.tower.flightMode : '—';
+    const current = (st && st.tower && st.tower.activeRunway) || '';
+    const available = (st && st.tower && st.tower.availableRunways) || [];
+    const rwySelect = available.length
+      ? `<select class="rwy-sel" onchange="setRunway(${t.port}, this.value)">
+           ${available.map(r => `<option value="${esc(r)}"${r===current?' selected':''}>RWY ${esc(r)}</option>`).join('')}
+         </select>`
+      : `<span>RWY ${esc(current || '—')}</span>`;
+    parts.push(`
+      <div class="card">
+        <div class="card-head">
+          <span class="name">${t.label}</span>
+          <span class="status-dot ${running ? 'up' : 'down'}"></span>
+        </div>
+        <div class="freq">${t.freq} MHz</div>
+        <span class="pill">${esc(mode)}</span>
+        <div class="extra">${rwySelect}</div>
+        <div class="actions">
+          ${running
+            ? `<button class="btn stop" onclick="stopRole('${esc(t.role)}')">Stop Tower</button>`
+            : `<button class="btn start" onclick="startRole('${esc(t.role)}')">Start Tower</button>`}
+        </div>
+      </div>`);
   }
+
+  for (const c of COMBO_CARDS) {
+    const runAny = c.roles.some(r => roleStatus[r] === 'running');
+    const runAll = c.roles.every(r => roleStatus[r] === 'running');
+    const dotCls = runAll ? 'up' : (runAny ? 'down' : 'down');
+    const stateLabel = runAll ? 'ONLINE' : (runAny ? 'PARTIAL' : 'OFFLINE');
+    parts.push(`
+      <div class="card">
+        <div class="card-head">
+          <span class="name">${c.label}</span>
+          <span class="status-dot ${dotCls}"></span>
+        </div>
+        <div class="freq">${c.freq} MHz</div>
+        <span class="pill">${stateLabel}</span>
+        <div class="extra">${esc(c.extras)}</div>
+        <div class="actions">
+          ${runAny
+            ? `<button class="btn stop" onclick="stopGroup(${JSON.stringify(c.roles).replace(/"/g,'&quot;')})">${esc(c.stopLabel)}</button>`
+            : `<button class="btn start" onclick="startGroup(${JSON.stringify(c.roles).replace(/"/g,'&quot;')})">Start</button>`}
+        </div>
+      </div>`);
+  }
+  $('roleCards').innerHTML = parts.join('');
 }
 
-function renderHealth(h) {
-  setDot('dot-srs', h.srs);
-  setDot('dot-tacview', h.tacview);
-  setDot('dot-openai', h.openai);
-}
-function setDot(id, up) {
-  document.getElementById(id).className = 'dot ' + (up ? 'up' : 'down');
+function renderMissionClock() {
+  // Server already applies the UAE +4 offset and ships a HH:MM local string.
+  let local = null;
+  for (const t of TOWERS) {
+    const st = towerStatus[t.icao];
+    if (st && st.missionTimeLocal) { local = st.missionTimeLocal; break; }
+  }
+  $('missionClock').textContent = local ? `Mission ${local}` : 'Mission —';
 }
 
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-
-function renderRoles() {
-  const body = document.getElementById('roleBody');
-  if (!roles.length) {
-    body.innerHTML = '<tr><td colspan="6" class="empty">No roles discovered. Add a run_*.bat or start_*.bat alongside launcher.exe.</td></tr>';
+function renderWeather() {
+  // Mockup shows OMDM weather; use OMDM /status.
+  const st = towerStatus['OMDM'];
+  if (!st || !st.tower) {
+    ['wxCeil','wxVis','wxAlt','wxWind','wxTemp','wxNight'].forEach(id => $(id).textContent = '—');
     return;
   }
-  body.innerHTML = roles.map(r => `
-    <tr>
-      <td>${esc(r.name)}<div class="sub">${esc(r.airfield || '')}</div></td>
-      <td><span class="status ${r.status}">${r.status.toUpperCase()}</span></td>
-      <td class="sub">${esc(r.bat)}</td>
-      <td><a href="#" onclick="openLog('${esc(r.name)}');return false">${esc(r.logFile)}</a></td>
-      <td>${r.dashboardPort ? `<a target="_blank" href="http://localhost:${r.dashboardPort}/">:${r.dashboardPort}</a>` : '<span class="sub">—</span>'}</td>
-      <td class="actions">
-        ${r.status === 'running'
-          ? `<button class="danger" onclick="act('stop','${esc(r.name)}')">Stop</button>
-             <button onclick="act('restart','${esc(r.name)}')">Restart</button>`
-          : `<button class="primary" onclick="act('start','${esc(r.name)}')">Start</button>`}
-      </td>
-    </tr>
-  `).join('');
+  const t = st.tower;
+  $('wxCeil').textContent  = t.ceilingFt ? `${Math.round(t.ceilingFt)} ft` : '—';
+  $('wxVis').textContent   = t.visibNm   ? `${t.visibNm} nm` : '—';
+  $('wxAlt').textContent   = t.altimeterInHg ? Number(t.altimeterInHg).toFixed(2) : '—';
+  $('wxWind').textContent  = (t.windKts || t.windDir) ? `${Math.round(t.windDir||0)}° / ${Math.round(t.windKts||0)} kt` : '—';
+  $('wxTemp').textContent  = '—'; // not exposed yet
+  $('wxNight').textContent = t.isNight ? 'Yes' : 'No';
+  // Crude Case heuristic: ceiling < 3000 or vis < 5 → Case 3, ceil < 1500 → Case 2, else Case 1
+  let cs = 'CASE 1';
+  if (t.ceilingFt && t.ceilingFt < 1500) cs = 'CASE 3';
+  else if (t.ceilingFt && t.ceilingFt < 3000) cs = 'CASE 2';
+  $('wxCase').textContent = cs;
 }
 
-async function act(kind, name) {
-  await fetch('/api/' + kind + '?name=' + encodeURIComponent(name), { method: 'POST' });
-  setTimeout(refresh, 600);
+function renderMarshalStack() {
+  const tbl = $('stackTbl');
+  const st = carrierStatus.marshal;
+  if (!st) {
+    tbl.innerHTML = '<div class="empty">Marshal dashboard offline (:6004).</div>';
+    return;
+  }
+  const stack = Array.isArray(st.marshal) ? st.marshal : [];
+  const headHtml = `<thead><tr><th>#</th><th>Modex</th><th>Stk</th><th>Alt</th><th>Dist</th><th>Fuel</th><th>Phase</th></tr></thead>`;
+  const legend = `<div class="hint">Stk = assigned angels · Alt = current /1000 ft · Dist = nm to mother · Fuel = pilot-reported state</div>`;
+  if (!stack.length) {
+    tbl.innerHTML = `<table>${headHtml}<tbody><tr><td colspan="7" class="empty" style="padding:0.8rem">Stack empty.</td></tr></tbody></table>${legend}`;
+    return;
+  }
+  const rows = stack.map(m => {
+    const fuel = m.fuelState != null && m.fuelState > 0 ? Number(m.fuelState).toFixed(1) : '—';
+    const assigned = m.angels ? `${m.angels}` : '—';
+    const cur = m.curAngels ? `${m.curAngels}` : '—';
+    const dist = m.distNm ? `${m.distNm}` : '—';
+    const phase = String(m.phase || '').toLowerCase();
+    let pillCls = 'pill-phase';
+    if (phase.includes('charlie')) pillCls += ' charlie';
+    else if (phase.includes('hold')) pillCls += ' holding';
+    else if (phase.includes('inbound') || phase.includes('commenc')) pillCls += ' inbound';
+    return `
+      <tr>
+        <td class="num">${esc(String(m.position||''))}</td>
+        <td>${esc(m.callsign||'')}</td>
+        <td class="num">${assigned}</td>
+        <td class="num">${cur}</td>
+        <td class="num">${dist}</td>
+        <td class="num">${fuel}</td>
+        <td><span class="${pillCls}">${esc(m.phase||'')}</span></td>
+      </tr>`;
+  }).join('');
+  tbl.innerHTML = `<table>${headHtml}<tbody>${rows}</tbody></table>${legend}`;
 }
 
-async function startAll() {
-  for (const r of roles) {
-    if (r.status !== 'running') {
-      await fetch('/api/start?name=' + encodeURIComponent(r.name), { method: 'POST' });
-      await new Promise(res => setTimeout(res, 1000));
+function renderCats() {
+  const tbl = $('catsTbl');
+  const hdr = $('catsHdrSub');
+  const st = carrierStatus.deckboss;
+  if (!st) {
+    tbl.innerHTML = '<div class="empty">Deckboss dashboard offline (:6005).</div>';
+    hdr.textContent = '';
+    return;
+  }
+  const cats = Array.isArray(st.cats) ? st.cats : [];
+  const busy = cats.filter(c => c.status !== 'free').length;
+  const conga = Array.isArray(st.congaLine) ? st.congaLine : [];
+  hdr.textContent = `${busy} busy / ${cats.length - busy} free` + (conga.length ? ` · conga ${conga.length}` : '');
+  if (!cats.length) {
+    tbl.innerHTML = '<div class="empty">No cat data.</div>';
+    return;
+  }
+  const rows = cats.map(c => {
+    const free = c.status === 'free';
+    const dotCls = free ? 'up' : (c.status === 'busy' ? 'down' : 'busy');
+    const stCls = free ? 'pill-free' : (c.status === 'busy' ? 'pill-busy' : 'pill-staged');
+    const callsign = c.callsign ? esc(c.callsign) : '<span style="color:var(--muted)">—</span>';
+    return `
+      <tr>
+        <td><span class="dot ${dotCls}"></span>Cat ${esc(String(c.num))}</td>
+        <td>${callsign}</td>
+        <td class="${stCls}">${esc((c.status||'').toUpperCase())}</td>
+      </tr>`;
+  }).join('');
+  const congaRow = conga.length
+    ? `<div style="margin-top:0.5rem;font-size:0.75rem"><span style="color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Conga</span>: <span style="color:var(--gold)">${esc(conga.join(' → '))}</span></div>`
+    : `<div class="hint">Conga: empty</div>`;
+  tbl.innerHTML = `
+    <table>
+      <thead><tr><th>Cat</th><th>Aircraft</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>${congaRow}`;
+}
+
+function renderPattern() {
+  // Aggregate pattern aircraft across all three towers.
+  const all = [];
+  for (const t of TOWERS) {
+    const st = towerStatus[t.icao];
+    if (st && Array.isArray(st.pattern)) {
+      for (const ac of st.pattern) all.push({ ...ac, icao: t.icao });
     }
   }
-  refresh();
-}
-
-async function stopAll() {
-  if (!confirm('Stop every running role?')) return;
-  await Promise.all(roles.filter(r => r.status === 'running').map(r =>
-    fetch('/api/stop?name=' + encodeURIComponent(r.name), { method: 'POST' })));
-  setTimeout(refresh, 600);
-}
-
-async function rescan() {
-  await fetch('/api/rescan', { method: 'POST' });
-  refresh();
-}
-
-function openLog(name) {
-  currentLogRole = name;
-  document.getElementById('logTitle').textContent = 'Log — ' + name;
-  document.getElementById('logModal').classList.add('open');
-  loadLog();
-}
-
-function closeLog() {
-  currentLogRole = null;
-  document.getElementById('logModal').classList.remove('open');
-}
-
-async function loadLog() {
-  if (!currentLogRole) return;
-  try {
-    const res = await fetch('/api/log?name=' + encodeURIComponent(currentLogRole));
-    const body = document.getElementById('logBody');
-    body.textContent = res.ok ? await res.text() : 'Log file not available yet.';
-    body.scrollTop = body.scrollHeight;
-  } catch (e) {
-    document.getElementById('logBody').textContent = 'Error: ' + e.message;
+  $('patternSub').textContent = `${all.length} contact${all.length===1?'':'s'}`;
+  if (!all.length) {
+    $('patternTbl').innerHTML = '<div class="empty">No aircraft in pattern.</div>';
+    return;
   }
+  const rows = all.map(ac => {
+    const fuel = ac.fuelState != null ? Number(ac.fuelState).toFixed(1) : '—';
+    const fuelPct = ac.fuelState ? Math.max(0, Math.min(100, ac.fuelState * 10)) : 0;
+    const barCls = ac.fuelState && ac.fuelState < 2 ? 'crit' : (ac.fuelState && ac.fuelState < 4 ? 'lo' : '');
+    return `
+      <tr>
+        <td>${esc(ac.callsign||'')}<div style="color:var(--muted);font-size:0.65rem">${esc(ac.icao)}</div></td>
+        <td>${esc(ac.phase||'')}</td>
+        <td class="num">${fmtNum(ac.altFt, 0)}</td>
+        <td class="num">${fmtNum(ac.speedKts, 0)}</td>
+        <td class="num">${fuel}</td>
+        <td><div class="bar ${barCls}"><span style="width:${fuelPct}%"></span></div></td>
+      </tr>`;
+  }).join('');
+  $('patternTbl').innerHTML = `
+    <table>
+      <thead><tr><th>Callsign</th><th>Phase</th><th>Alt</th><th>Speed</th><th>Fuel</th><th>Bar</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
-refresh();
-setInterval(refresh, 3000);
+// ──────────────────────────────────────────────────────────────────────────
+// Role control actions
+// ──────────────────────────────────────────────────────────────────────────
+async function startRole(name)   { await fetch('/api/start?name='   + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function stopRole(name)    { await fetch('/api/stop?name='    + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function restartRole(name) { await fetch('/api/restart?name=' + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
+async function setRunway(port, runway) {
+  try {
+    const r = await fetch(`http://localhost:${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
+    if (!r.ok) alert(`Runway change failed: ${await r.text()}`);
+  } catch (e) { alert('Runway change failed: ' + e.message); }
+  setTimeout(refreshAll, 500);
+}
+async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch('/api/start?name=' + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
+async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch('/api/stop?name=' + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Live log — open one SSE per tower, merge into one feed
+// ──────────────────────────────────────────────────────────────────────────
+const MAX_LOG = 250;
+const logEvents = [];
+const sources = {};
+
+function connectLog(t) {
+  if (sources[t.icao]) return;
+  try {
+    const es = new EventSource(`http://localhost:${t.port}/ws/log`);
+    sources[t.icao] = es;
+    es.onmessage = ev => {
+      try {
+        const e = JSON.parse(ev.data);
+        e._src = t.icao;
+        logEvents.push(e);
+        if (logEvents.length > MAX_LOG) logEvents.shift();
+        appendLogRow(e);
+      } catch {}
+    };
+    es.onerror = () => {
+      // Will auto-retry, but if the tower is offline this fires constantly.
+      // EventSource handles backoff itself.
+    };
+  } catch (e) { /* ignore */ }
+}
+
+function appendLogRow(e) {
+  const feed = $('logFeed');
+  const div = document.createElement('div');
+  div.className = `row t-${esc(e.type||'sys')}`;
+  div.innerHTML = `<span class="ts">${esc(e.time||'')}</span>`
+                + `<span class="src" style="color:var(--muted);min-width:46px">[${esc(e._src||'')}]</span>`
+                + `<span class="msg">${esc(e.msg||'')}</span>`;
+  feed.appendChild(div);
+  while (feed.children.length > MAX_LOG) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Health (server-online indicator drives off /api/health)
+// ──────────────────────────────────────────────────────────────────────────
+async function refreshHealth() {
+  try {
+    const h = await fetch('/api/health').then(r => r.json());
+    const ok = h && (h.srs || h.tacview || h.openai);
+    $('serverLine').className = 'server-line' + (ok ? '' : ' down');
+  } catch { $('serverLine').className = 'server-line down'; }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Full log modal (uses launcher /api/log)
+// ──────────────────────────────────────────────────────────────────────────
+let modalLogTimer = null;
+function openLogModal() {
+  $('logModal').classList.add('open');
+  loadModalLog();
+  modalLogTimer = setInterval(loadModalLog, 2000);
+}
+function closeLogModal() {
+  $('logModal').classList.remove('open');
+  clearInterval(modalLogTimer);
+  modalLogTimer = null;
+}
+async function loadModalLog() {
+  const file = $('logSel').value;
+  // /api/log takes a role name; pass the matching tower (the launcher already
+  // resolves that to the log file via Role.LogFile). Pick by file.
+  const map = { 'atc-omdm.log': 'Al Minhad Tower', 'atc-omam.log': 'Al Dhafra Tower', 'atc-omal.log': 'Al Ain Tower', 'atc-.log': 'vSFG-7 ATIS' };
+  const role = map[file] || 'Al Minhad Tower';
+  $('logTitle').textContent = `Tail — ${file}`;
+  try {
+    const r = await fetch('/api/log?name=' + encodeURIComponent(role));
+    $('logBody').textContent = r.ok ? await r.text() : 'Log not available.';
+    $('logBody').scrollTop = $('logBody').scrollHeight;
+  } catch (e) { $('logBody').textContent = 'Error: ' + e.message; }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Refresh loop
+// ──────────────────────────────────────────────────────────────────────────
+async function refreshAll() {
+  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth()]);
+  renderCards();
+  renderMissionClock();
+  renderWeather();
+  renderPattern();
+  renderMarshalStack();
+  renderCats();
+}
+
+// Boot
+refreshAll();
+setInterval(refreshAll, 3000);
+TOWERS.forEach(connectLog);
+CARRIER.forEach(c => connectLog({ icao: c.key.toUpperCase(), port: c.port }));
 </script>
 </body>
 </html>
