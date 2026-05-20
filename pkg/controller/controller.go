@@ -456,7 +456,7 @@ func (c *ATCController) handleTakeoffRequest(
 		s.ClearForTakeoff(callsign)
 	}
 	return c.composer.ClearedForTakeoff(
-		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal,
+		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal, len(s.ActiveDepartures()),
 	)
 }
 
@@ -509,7 +509,7 @@ func (c *ATCController) handleHoldingShortRequest(
 	trafficOnFinal := s.LandingQueueLen()
 	s.ClearForTakeoff(callsign)
 	return c.composer.ProceedToRunway(
-		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal,
+		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal, len(s.ActiveDepartures()),
 	)
 }
 
@@ -653,6 +653,7 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 						s.WindFromMag,
 						s.WindKts,
 						trafficOnFinal,
+						len(s.ActiveDepartures()),
 					)
 					log.Info().
 						Str("callsign", next.Callsign).

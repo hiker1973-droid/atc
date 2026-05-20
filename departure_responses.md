@@ -85,6 +85,7 @@ Triggers come from `pkg/controller/controller.go` (the intent classifier). Respo
 1. `{CALLSIGN}, {TOWER}, wind {WIND}, runway {RUNWAY}[, traffic on final], cleared for takeoff. Report airborne when clear.`
 2. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, wind {WIND}[, traffic on final], you are cleared for takeoff. Report airborne when clear.`
 3. `{CALLSIGN}, {TOWER}, cleared for takeoff runway {RUNWAY}, wind {WIND}[, traffic on final], report airborne when clear, have a good flight.`
+4. `{CALLSIGN}, {TOWER}, you are number {POSITION} for takeoff, runway {RUNWAY}, wind {WIND}[, traffic on final]. Report airborne when clear.`
 
 ---
 
@@ -96,6 +97,7 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 1. `{CALLSIGN}, {TOWER}, proceed to runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff. Report airborne when clear.`
 2. `{CALLSIGN}, {TOWER}, enter and line up runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff. Report airborne when clear.`
 3. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is yours, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff. Report airborne when clear.`
+4. `{CALLSIGN}, {TOWER}, you are number {POSITION} for takeoff, runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}]. Report airborne when clear.`
 
 ---
 

@@ -89,18 +89,24 @@ func (c *ATCComposer) LineUpAndWait(callsign, activeRunway, trafficCallsign stri
 	})
 }
 
-// ClearedForTakeoff issues takeoff clearance — 3 variations.
-func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromMag, windKts float64, trafficOnFinal int) string {
+// ClearedForTakeoff issues takeoff clearance — 4 variations.
+// position is the aircraft's slot in the active-departure queue (1 = first).
+func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromMag, windKts float64, trafficOnFinal, position int) string {
 	rwy := spellRunway(activeRunway)
 	wind := formatWind(windFromMag, windKts)
 	trafficNote := ""
 	if trafficOnFinal > 0 {
 		trafficNote = fmt.Sprintf(", traffic on final")
 	}
+	if position < 1 {
+		position = 1
+	}
+	pos := numberWord(position)
 	return pick([]string{
 		fmt.Sprintf("%s, %s, wind %s, runway %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, wind, rwy, trafficNote),
 		fmt.Sprintf("%s, %s, runway %s, wind %s%s, you are cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, cleared for takeoff runway %s, wind %s%s, report airborne when clear, have a good flight.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, you are number %s for takeoff, runway %s, wind %s%s. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
 	})
 }
 
@@ -379,18 +385,24 @@ func (c *ATCComposer) EmergencyAck(callsign, activeRunway string, windFromMag, w
 	})
 }
 
-// ProceedToRunway clears from hold short with takeoff clearance — 3 variations.
-func (c *ATCComposer) ProceedToRunway(callsign, activeRunway string, windFromMag, windKts float64, trafficOnFinal int) string {
+// ProceedToRunway clears from hold short with takeoff clearance — 4 variations.
+// position is the aircraft's slot in the active-departure queue (1 = first).
+func (c *ATCComposer) ProceedToRunway(callsign, activeRunway string, windFromMag, windKts float64, trafficOnFinal, position int) string {
 	rwy := spellRunway(activeRunway)
 	wind := formatWind(windFromMag, windKts)
 	trafficNote := ""
 	if trafficOnFinal > 0 {
 		trafficNote = fmt.Sprintf(", traffic on final runway %s", rwy)
 	}
+	if position < 1 {
+		position = 1
+	}
+	pos := numberWord(position)
 	return pick([]string{
 		fmt.Sprintf("%s, %s, proceed to runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, enter and line up runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, runway %s is yours, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, you are number %s for takeoff, runway %s, wind %s%s. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
 	})
 }
 
