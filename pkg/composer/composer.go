@@ -98,9 +98,9 @@ func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromM
 		trafficNote = fmt.Sprintf(", traffic on final")
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, wind %s, runway %s%s, cleared for takeoff.", callsign, c.towerCallsign, wind, rwy, trafficNote),
-		fmt.Sprintf("%s, %s, runway %s, wind %s%s, you are cleared for takeoff.", callsign, c.towerCallsign, rwy, wind, trafficNote),
-		fmt.Sprintf("%s, %s, cleared for takeoff runway %s, wind %s%s, have a good flight.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, wind %s, runway %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, wind, rwy, trafficNote),
+		fmt.Sprintf("%s, %s, runway %s, wind %s%s, you are cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, cleared for takeoff runway %s, wind %s%s, report airborne when clear, have a good flight.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 	})
 }
 
@@ -388,9 +388,9 @@ func (c *ATCComposer) ProceedToRunway(callsign, activeRunway string, windFromMag
 		trafficNote = fmt.Sprintf(", traffic on final runway %s", rwy)
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, proceed to runway %s, wind %s%s, cleared for takeoff.", callsign, c.towerCallsign, rwy, wind, trafficNote),
-		fmt.Sprintf("%s, %s, enter and line up runway %s, wind %s%s, cleared for takeoff.", callsign, c.towerCallsign, rwy, wind, trafficNote),
-		fmt.Sprintf("%s, %s, runway %s is yours, wind %s%s, cleared for takeoff.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, proceed to runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, enter and line up runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, runway %s is yours, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 	})
 }
 

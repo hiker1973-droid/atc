@@ -82,9 +82,9 @@ Triggers come from `pkg/controller/controller.go` (the intent classifier). Respo
 **Optional `, traffic on final`** appended when traffic is in pattern.
 
 **Responses:**
-1. `{CALLSIGN}, {TOWER}, wind {WIND}, runway {RUNWAY}[, traffic on final], cleared for takeoff.`
-2. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, wind {WIND}[, traffic on final], you are cleared for takeoff.`
-3. `{CALLSIGN}, {TOWER}, cleared for takeoff runway {RUNWAY}, wind {WIND}[, traffic on final], have a good flight.`
+1. `{CALLSIGN}, {TOWER}, wind {WIND}, runway {RUNWAY}[, traffic on final], cleared for takeoff. Report airborne when clear.`
+2. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, wind {WIND}[, traffic on final], you are cleared for takeoff. Report airborne when clear.`
+3. `{CALLSIGN}, {TOWER}, cleared for takeoff runway {RUNWAY}, wind {WIND}[, traffic on final], report airborne when clear, have a good flight.`
 
 ---
 
@@ -93,9 +93,9 @@ Triggers come from `pkg/controller/controller.go` (the intent classifier). Respo
 Used when pilot has been holding and tower issues combined "proceed and cleared".
 
 **Responses:**
-1. `{CALLSIGN}, {TOWER}, proceed to runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff.`
-2. `{CALLSIGN}, {TOWER}, enter and line up runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff.`
-3. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is yours, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff.`
+1. `{CALLSIGN}, {TOWER}, proceed to runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff. Report airborne when clear.`
+2. `{CALLSIGN}, {TOWER}, enter and line up runway {RUNWAY}, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff. Report airborne when clear.`
+3. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is yours, wind {WIND}[, traffic on final runway {RUNWAY}], cleared for takeoff. Report airborne when clear.`
 
 ---
 
