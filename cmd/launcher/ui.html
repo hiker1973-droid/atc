@@ -41,6 +41,9 @@
   .server-line { color: var(--green); font-weight: 500; font-size: 0.8rem; letter-spacing: 0.08em; }
   .server-line .dot { width: 8px; height: 8px; }
   .server-line.down { color: var(--red); }
+  .tv64-badge { display: none; background: var(--panel-2); border: 1px solid var(--red); color: var(--red); padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.7rem; letter-spacing: 0.05em; margin-left: 0.6rem; vertical-align: middle; }
+  .tv64-badge.show { display: inline-block; animation: tv64pulse 2s ease-in-out infinite; }
+  @keyframes tv64pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
   .clock { color: var(--muted); font-size: 0.78rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
   /* Dots */
@@ -155,7 +158,7 @@
     <span class="beta">BETA</span>
   </div>
   <div class="server">
-    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE</div>
+    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
     <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
   </div>
 </header>
@@ -600,7 +603,11 @@ async function refreshHealth() {
     const h = await fetch('/api/health').then(r => r.json());
     const ok = h && (h.srs || h.tacview || h.openai);
     $('serverLine').className = 'server-line' + (ok ? '' : ' down');
-  } catch { $('serverLine').className = 'server-line down'; }
+    $('tv64Badge').className = 'tv64-badge' + (h && h.tacview64 === false ? ' show' : '');
+  } catch {
+    $('serverLine').className = 'server-line down';
+    $('tv64Badge').className = 'tv64-badge';
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────

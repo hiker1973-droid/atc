@@ -50,10 +50,11 @@ type Role struct {
 }
 
 type Health struct {
-	SRS     bool      `json:"srs"`
-	Tacview bool      `json:"tacview"`
-	OpenAI  bool      `json:"openai"`
-	At      time.Time `json:"at"`
+	SRS       bool      `json:"srs"`
+	Tacview   bool      `json:"tacview"`
+	Tacview64 bool      `json:"tacview64"`
+	OpenAI    bool      `json:"openai"`
+	At        time.Time `json:"at"`
 }
 
 var (
@@ -221,14 +222,28 @@ func healthLoop() {
 
 func updateHealth() {
 	h := Health{
-		At:      time.Now(),
-		SRS:     tcpProbe(*flagSRSAddr, 2*time.Second),
-		Tacview: tcpProbe(*flagTacviewAddr, 2*time.Second),
-		OpenAI:  openaiProbe(3 * time.Second),
+		At:        time.Now(),
+		SRS:       tcpProbe(*flagSRSAddr, 2*time.Second),
+		Tacview:   tcpProbe(*flagTacviewAddr, 2*time.Second),
+		Tacview64: tacview64Probe(),
+		OpenAI:    openaiProbe(3 * time.Second),
 	}
 	healthMu.Lock()
 	cachedHealth = h
 	healthMu.Unlock()
+}
+
+// tacview64Probe checks whether the standalone Tacview64.exe viewer is
+// running. The viewer is operator-launched (not auto-started with DCS) and
+// easy to forget after a VM reboot. This is Windows-only and harmless if
+// tasklist is unavailable — returns false.
+func tacview64Probe() bool {
+	cmd := exec.Command("tasklist", "/fi", "imagename eq Tacview64.exe", "/nh")
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(out)), "tacview64.exe")
 }
 
 func tcpProbe(addr string, timeout time.Duration) bool {
