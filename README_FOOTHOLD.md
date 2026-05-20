@@ -15,7 +15,14 @@ Deployment guide for installing **ATIS + 3 Tower instances** on the **Foothold**
 
 - **SRS Server** running on `:5002`. Confirm via `netstat -ano | findstr :5002` — should show `LISTENING`.
 - **Tacview real-time telemetry** enabled on `:42676` (DCS Tacview export setting).
-- **`OPENAI_API_KEY` env var** set system-wide (`setx OPENAI_API_KEY "sk-proj-..."`). Confirm in a fresh shell: `echo %OPENAI_API_KEY%`.
+- **Four env vars set system-wide** (v1.1.0+ requirement — bats fail-fast without them):
+  ```bat
+  setx OPENAI_API_KEY  "sk-proj-..."
+  setx SRS_EAM         "blue42"
+  setx SKYEYE_SRS      "localhost:5002"
+  setx SKYEYE_TACVIEW  "localhost:42676"
+  ```
+  After `setx`, **open a fresh shell** so the new values are in scope. Verify with `echo %SKYEYE_SRS%`.
 - **`ffmpeg.exe`** on PATH (used for radio effect / audio re-encode).
 - **DCS-SR-ExternalAudio.exe** present where atc.exe expects it (set via `--external-audio` flag if non-default).
 
@@ -67,46 +74,23 @@ Required:
 | Item | Notes |
 |---|---|
 | `atc.exe`, `launcher.exe` | Built binaries (or build on foothold) |
-| `configs\*.yaml` | Per-airfield configs (already point at `localhost:5008` — needs editing) |
-| `start_atis.bat`, `start_towers.bat`, `start_launcher.bat` | Launch scripts |
+| `start_atis.bat`, `start_towers.bat`, `start_launcher.bat` | Launch scripts (env-var driven — no per-host edits needed) |
 | `cmd\`, `pkg\`, `go.mod`, `go.sum`, `build.bat` | Source — only needed if rebuilding on foothold |
 | `atis_cache\` | Optional — copy to skip first-run TTS regeneration |
 
 Skip:
 - `logs\` (regenerates)
 - `start_command.bat`, `start_marshal.bat`, `dev_only/` (roles not deployed here)
+- `configs\*.yaml` (not currently read by `atc.exe` — historically pointed at `:5008` and never updated; cosmetic only)
 - `*.exe~`, `*.lnk` (build/operator artifacts)
 
 ---
 
 ## 3. Post-Copy Config
 
-### 3a. Update SRS port in launch scripts
+As of v1.1.0+ all per-host config is via env vars (see section 1). **No bat-editing is required after copy.** If the bats fail-fast with `ERROR: <VAR> env var not set`, you missed a `setx` or didn't open a fresh shell — re-do section 1 and try again.
 
-Each `start_*.bat` defaults to `localhost:5008`. Foothold needs `5002`. Edit:
-
-```bat
-set SRS=localhost:5002
-```
-
-In:
-- `start_atis.bat`
-- `start_towers.bat`
-- `start_launcher.bat` (`--srs-addr localhost:5002`)
-
-### 3b. Update SRS port in YAML configs
-
-`configs\alain.yaml`, `configs\dhafra.yaml`, `configs\minhad.yaml` — change any `srs:` host reference from `:5008` → `:5002`.
-
-### 3c. Centralize OpenAI key (one-time)
-
-Set globally so we don't have to keep editing bats:
-
-```bat
-setx OPENAI_API_KEY "sk-proj-..."
-```
-
-Open a fresh shell after `setx` (the current shell won't pick it up).
+If the four env vars are set correctly, skip ahead to section 4.
 
 ---
 
@@ -173,11 +157,12 @@ In `serverSettings.cfg` for the SRS instance on `:5002`:
 
 | Symptom | Likely cause |
 |---|---|
-| `SRS TCP failed` looping | SRS not on `:5002`, or `set SRS=` in bat still says `5008` |
-| `TTS prewarm failed` / `OpenAI 401` | `OPENAI_API_KEY` missing in the shell that launched atc.exe |
+| `ERROR: <VAR> env var not set` at bat startup | One of the four env vars (`OPENAI_API_KEY`, `SRS_EAM`, `SKYEYE_SRS`, `SKYEYE_TACVIEW`) wasn't set, or the bat was launched in a shell that pre-dates the `setx`. Open a fresh shell. |
+| `SRS TCP failed` looping | SRS not listening on the address in `$SKYEYE_SRS`, or value typo. Re-check with `netstat -ano | findstr :5002` |
+| `TTS prewarm failed` / `OpenAI 401` | `OPENAI_API_KEY` missing or invalid in the shell that launched atc.exe |
 | `Whisper returned empty transcription` | OpenAI rate limit or pilot mic muted — usually self-heals |
 | `ExternalAudio file error` | `ffmpeg` not on PATH, or DCS-SR-ExternalAudio.exe path wrong |
-| Tower hands off to "command on 282.0" — but Command isn't deployed | Expected. Tower's handoff line is data-driven from `pkg/airfield/*.go`. Either ignore it, or edit `HandoffFreqMHz` / `HandoffPreset` to point somewhere relevant on Foothold |
+| Tower hands off to Command on a freq nobody is on | Expected — Tower's handoff line is data-driven from `pkg/airfield/*.go` `HandoffFreqMHz` (currently `282.0`). Either ignore it on Foothold (Command isn't deployed) or edit `HandoffFreqMHz` / `HandoffPreset` to suit your op |
 | ATIS skipping cycles ("broadcast already in progress") | Audio runtime exceeds 45s interval — drop back toward 60-90s in `cmd/atc/atis.go:336` and `main.go:537` (rebuild required) |
 | Pilots see Towers but not ATIS in client list | ATIS is broadcast-only — no UI presence required. Pilots should still hear it on the freq |
 

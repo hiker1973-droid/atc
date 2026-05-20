@@ -18,7 +18,7 @@ var OMDM = &Airfield{
 	DepartureDistNm:  7,
 	DepartureAngels:   3,
 	HandoffCallsign:  "command",
-	HandoffFreqMHz:   230.000,
+	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",
 	BreakDirections: map[string]string{
 		// Ramp on south side. Heading west on 27 → south is on the left.

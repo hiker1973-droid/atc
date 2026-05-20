@@ -57,9 +57,7 @@ Start scripts in `C:\SkyeyeATC\`. Recommended order:
 Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use launcher dashboard buttons.
 
 ### Training 1 active roles (2026-05-18)
-**Tower**, **ATIS**, **Marshal** (306.3), **Command** (**230.0** on Training 1 — see note), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat` at repo root; **`dev_only/start_deckboss.bat`** is still in `dev_only/` for legacy reasons but runs in production — promote to root next maintenance window.
-
-**Command freq divergence:** origin documents Command at 282.0 (default in `cmd/atc/main.go` flag and dev rig). Training 1 runs Command at **230.0** (commit `5956c10`) as a workaround for a pilot-side SRS-Client `RadioModelsCustom` parse failure that silently dropped TX on 282 — see 2026-05-11 in Recent context. When the pilot-side issue is resolved, Training 1 can revert to 282 by editing `start_command.bat` and `pkg/airfield/*.go HandoffFreqMHz`.
+**Tower**, **ATIS**, **Marshal** (306.3), **Command** (282.0), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_launcher.bat` at repo root; **`dev_only/start_deckboss.bat`** is still in `dev_only/` for legacy reasons but runs in production — promote to root next maintenance window.
 
 Voices: all roles use `onyx` except Deckboss which uses `ash` (calm authoritative) for audible differentiation. Switchable via `--deckboss-voice <echo|ballad|sage|onyx|…>` without rebuilds.
 
@@ -89,7 +87,7 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 
 ## Recent context (2026-05-11)
 - **UDP audio parser bug fixed** on Training 1 in local commit `063f239` (Marshal/Command read `audioLen` from `[4:6]` — actually `freqSegLen` — instead of `[2:4]`). Origin landed the equivalent fix independently in `96cfe21`; merge of `2026-05-16` took origin's version and added per-callsign unitId / UDP IPv6 / Union Marshal rename on top.
-- **Pilot-side SRS-Client `RadioModelsCustom` parse failure** was observed silently swallowing pilot TX on 282 specifically (Tower freqs OK, Marshal/Command silent). Training 1 Command moved to 230.0 as a workaround (commit `5956c10`). When pilot-side is repaired, revert to 282.
+- **Pilot-side SRS-Client `RadioModelsCustom` parse failure** was observed silently swallowing pilot TX on 282 specifically (Tower freqs OK, Marshal/Command silent). Training 1 Command was temporarily moved to 230.0 (commit `5956c10`). Pilot-side fix landed 2026-05-18; Command reverted to 282.0 same day.
 
 ## Recent context (2026-05-08)
 - **Marshal/Command 282.0 routing bug fixed.** Root cause was the SRS handshake order in `command.go`/`marshal.go`/`deckboss.go`: they sent EAM before Sync, while Tower's `srsLoop` sent Sync before EAM. SRS only adds clients to the audio routing table on Sync — broken roles authenticated but never received UDP voice. Commit `924784f`. Marshal and Command both deploying live on Training 1 as of 2026-05-08.

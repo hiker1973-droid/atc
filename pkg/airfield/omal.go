@@ -19,7 +19,7 @@ var OMAL = &Airfield{
 	DepartureDistNm:  7,
 	DepartureAngels:   4, // Higher due to terrain/elevation
 	HandoffCallsign:  "command",
-	HandoffFreqMHz:   230.000,
+	HandoffFreqMHz:   282.000,
 	HandoffPreset:    "channel four",
 	BreakDirections: map[string]string{
 		// Terminal on west side. Heading south on 19 → west is on the right.
