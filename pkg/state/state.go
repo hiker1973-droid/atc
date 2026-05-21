@@ -125,6 +125,38 @@ const (
 	ModeIFR                   // IFR — straight-in (night, IMC, or low vis)
 )
 
+// ── RecoveryCase ──────────────────────────────────────────────────────────────
+
+// RecoveryCase classifies carrier-recovery procedure per ceiling/visibility/night.
+type RecoveryCase int
+
+const (
+	CaseOne   RecoveryCase = 1 // VMC daytime — overhead break / visual
+	CaseTwo   RecoveryCase = 2 // marginal VMC daytime — CCA until visual at 5–10 nm
+	CaseThree RecoveryCase = 3 // IMC or any night recovery — full marshal + CV-1
+)
+
+// ComputeRecoveryCase derives the recovery case from ceiling (ft), visibility (nm),
+// and night flag. Night forces Case III regardless of weather. Zero/negative
+// ceiling or vis is treated as "unrestricted" (Case I). Matches the launcher
+// dashboard heuristic but adds night handling and a visibility floor.
+func ComputeRecoveryCase(ceilingFt, visNm float64, isNight bool) RecoveryCase {
+	switch {
+	case isNight:
+		return CaseThree
+	case ceilingFt > 0 && ceilingFt < 1500:
+		return CaseThree
+	case visNm > 0 && visNm < 3:
+		return CaseThree
+	case ceilingFt > 0 && ceilingFt < 3000:
+		return CaseTwo
+	case visNm > 0 && visNm < 5:
+		return CaseTwo
+	default:
+		return CaseOne
+	}
+}
+
 // ── AirfieldState ─────────────────────────────────────────────────────────────
 
 // AirfieldState tracks the full ATC picture for one airfield.
@@ -140,6 +172,7 @@ type AirfieldState struct {
 	VisibilityNm     float64
 	WeatherUpdatedAt time.Time
 	FlightMode       FlightMode
+	RecoveryCase     RecoveryCase
 	CeilingFt        float64
 	IsNight          bool
 
@@ -545,7 +578,7 @@ func (s *AirfieldState) SetActiveRunway(designator string) {
 }
 
 // UpdateFlightConditions updates ceiling, visibility and night flag,
-// then recalculates the FlightMode.
+// then recalculates the FlightMode and RecoveryCase.
 func (s *AirfieldState) UpdateFlightConditions(ceilingFt, visNm float64, isNight bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -558,6 +591,21 @@ func (s *AirfieldState) UpdateFlightConditions(ceilingFt, visNm float64, isNight
 	default:
 		s.FlightMode = ModeVFR
 	}
+	s.RecoveryCase = ComputeRecoveryCase(ceilingFt, visNm, isNight)
+}
+
+// RefreshRecoveryCase recomputes RecoveryCase using the supplied night flag
+// against the current ceiling/visibility. Returns the previous and new values
+// so callers can detect a transition without holding the lock. Used by the
+// Marshal loop's periodic tick so night-only transitions (mission time
+// crossing dawn/dusk) flip Case without needing a fresh weather update.
+func (s *AirfieldState) RefreshRecoveryCase(isNight bool) (old, current RecoveryCase) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.IsNight = isNight
+	old = s.RecoveryCase
+	s.RecoveryCase = ComputeRecoveryCase(s.CeilingFt, s.VisibilityNm, isNight)
+	return old, s.RecoveryCase
 }
 
 // GetFlightMode returns the current flight mode.
@@ -565,6 +613,20 @@ func (s *AirfieldState) GetFlightMode() FlightMode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.FlightMode
+}
+
+// GetRecoveryCase returns the current carrier recovery case.
+func (s *AirfieldState) GetRecoveryCase() RecoveryCase {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.RecoveryCase
+}
+
+// GetIsNight returns the current night flag under read lock.
+func (s *AirfieldState) GetIsNight() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.IsNight
 }
 
 // AllAircraftWithinNm returns ALL tracked aircraft (any phase) within distNm.
@@ -659,6 +721,7 @@ type AirfieldStateSnapshot struct {
 	FreqMHz       float64
 	ActiveRunway  string
 	FlightMode    FlightMode
+	RecoveryCase  RecoveryCase
 	WindFromMag   float64
 	WindKts       float64
 	AltimeterInHg float64
@@ -674,6 +737,7 @@ func (s *AirfieldState) GetAirfieldStateSnapshot() AirfieldStateSnapshot {
 	return AirfieldStateSnapshot{
 		ActiveRunway:  s.ActiveRunway,
 		FlightMode:    s.FlightMode,
+		RecoveryCase:  s.RecoveryCase,
 		WindFromMag:   s.WindFromMag,
 		WindKts:       s.WindKts,
 		AltimeterInHg: s.AltimeterInHg,

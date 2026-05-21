@@ -80,6 +80,7 @@ type TowerStatus struct {
 	ActiveRunway string   `json:"activeRunway"`
 	AvailableRunways []string `json:"availableRunways"`
 	FlightMode   string   `json:"flightMode"`
+	RecoveryCase int      `json:"recoveryCase"` // 1/2/3 for carrier ops; same value on tower roles
 	CeilingFt    float64  `json:"ceilingFt"`
 	VisibNm      float64  `json:"visibNm"`
 	AltimeterInHg float64 `json:"altimeterInHg"`
@@ -229,6 +230,11 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		available = append(available, p.Primary.Designator, p.Reciprocal.Designator)
 	}
 
+	// Refresh recovery case against live mission-time night flag so the
+	// dashboard reflects night-only transitions without waiting for the
+	// Marshal loop's 30s tick. Cheap — single lock + comparison.
+	_, _ = ds.atcCtrl.RefreshRecoveryCase()
+
 	tower := TowerStatus{
 		Callsign:         ds.callsign,
 		ICAO:             ds.af.ICAO,
@@ -237,6 +243,7 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		ActiveRunway:     s.ActiveRunway,
 		AvailableRunways: available,
 		FlightMode:       modeStr,
+		RecoveryCase:     int(ds.atcCtrl.GetRecoveryCase()),
 		CeilingFt:        ceil,
 		VisibNm:          s.VisibilityNm,
 		AltimeterInHg:    altim,

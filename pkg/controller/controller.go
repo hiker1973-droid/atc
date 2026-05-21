@@ -1512,6 +1512,36 @@ func (c *ATCController) GetVisibilityNm() float64 {
 	return c.airfieldState.GetVisibilityNm()
 }
 
+// MissionLocalTZOffsetMinutes is the UTC offset Tacview publishes for the
+// PG/UAE theatre (UTC+3:30). Shared by Marshal Case logic and the dashboard
+// so both compute night identically from mission time.
+const MissionLocalTZOffsetMinutes = 3*60 + 30
+
+// IsNight returns whether the current mission time is in the night window
+// (local hour < 6 or >= 18). Falls back to the persisted state.IsNight flag
+// when Tacview hasn't synced a mission time yet (typically the --static-night
+// path).
+func (c *ATCController) IsNight() bool {
+	if mt, ok := c.GetMissionTime(); ok {
+		local := mt.UTC().Add(time.Duration(MissionLocalTZOffsetMinutes) * time.Minute)
+		hr := local.Hour()
+		return hr < 6 || hr >= 18
+	}
+	return c.airfieldState.GetIsNight()
+}
+
+// GetRecoveryCase returns the current carrier recovery case from state.
+func (c *ATCController) GetRecoveryCase() state.RecoveryCase {
+	return c.airfieldState.GetRecoveryCase()
+}
+
+// RefreshRecoveryCase recomputes the recovery case using the live night flag
+// (mission-time-aware) and current ceiling/visibility. Returns previous and
+// new values so the Marshal loop can detect transitions.
+func (c *ATCController) RefreshRecoveryCase() (old, current state.RecoveryCase) {
+	return c.airfieldState.RefreshRecoveryCase(c.IsNight())
+}
+
 // TacviewContactCount returns the number of active air contacts from Tacview.
 func (c *ATCController) TacviewContactCount() int {
 	c.allPositionsMu.RLock()

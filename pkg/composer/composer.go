@@ -683,25 +683,35 @@ func marshalWeatherPhrase(ceilingFt, visNm float64) string {
 	}
 }
 
+// CaseLabel maps a recovery case number (1/2/3) to the spoken phrase used in
+// Marshal radio calls.
+func CaseLabel(caseNum int) string {
+	switch caseNum {
+	case 1:
+		return "Case One"
+	case 2:
+		return "Case Two"
+	case 3:
+		return "Case Three"
+	}
+	return "Case One"
+}
+
 // MarshalMarkingMom — initial marshal contact with weather, Case, BRC, altimeter,
-// and stack altitude assignment. brc = carrier heading in degrees, -1 if unknown.
-// If radarFound, prepends a "I have you on radar at angels X, range Y, bearing Z
-// from mother" line built from live Tacview position relative to the carrier.
+// and stack altitude assignment. recoveryCase is the spoken Case label
+// ("Case One" / "Case Two" / "Case Three") derived from live state by the
+// caller. brc = carrier heading in degrees, -1 if unknown. If radarFound,
+// prepends a "I have you on radar at angels X, range Y, bearing Z from mother"
+// line built from live Tacview position relative to the carrier.
 func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels int, altimeterInHg, ceilingFt, visNm, brc float64,
-	radarAngels, radarDistNm, radarBearingDeg int, radarFound bool) string {
+	radarAngels, radarDistNm, radarBearingDeg int, radarFound bool, recoveryCase string) string {
 	ang := numberWord(stackAngels)
 	alt := formatAltimeter(altimeterInHg)
 	wx := marshalWeatherPhrase(ceilingFt, visNm)
 
-	// Recovery case derived from ceiling
-	var recovery string
-	switch {
-	case ceilingFt <= 0, ceilingFt >= 3000:
+	recovery := recoveryCase
+	if recovery == "" {
 		recovery = "Case One"
-	case ceilingFt >= 1000:
-		recovery = "Case Two"
-	default:
-		recovery = "Case Three"
 	}
 
 	// BRC phrase — omitted if carrier heading unknown
@@ -854,6 +864,17 @@ func (c *ATCComposer) MarshalEstablishedAck(callsign string, angels, position in
 		fmt.Sprintf("%s, " + c.towerCallsign + ", entering stack at angels %s, position %s, hold for Charlie.", callsign, ang, pos),
 		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, in the stack angels %s at position %s, stand by for Charlie.", callsign, ang, pos),
 		fmt.Sprintf("%s, " + c.towerCallsign + ", copy established, angels %s, position %s in the stack.", callsign, ang, pos),
+	})
+}
+
+// MarshalCaseChange announces a recovery-case transition to all aircraft
+// currently in the marshal stack. Non-addressed broadcast; pilots are
+// expected to update their procedure on the next pattern.
+func (c *ATCComposer) MarshalCaseChange(newCaseLabel string) string {
+	return pick([]string{
+		fmt.Sprintf("All marshal aircraft, " + c.towerCallsign + ", recovery is now %s, acknowledge on next push.", newCaseLabel),
+		fmt.Sprintf("Stack, " + c.towerCallsign + ", be advised, mother is now recovering %s.", newCaseLabel),
+		fmt.Sprintf("All stations " + c.towerCallsign + ", recovery case change, %s in effect, adjust procedure.", newCaseLabel),
 	})
 }
 

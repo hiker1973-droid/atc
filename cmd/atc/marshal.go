@@ -75,6 +75,32 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		transmitExternalAudioFile(ctx, mp3, freqMHz, "OMDM-MSH", srsHost, srsPort, flagExternalAudio)
 	}
 
+	// Recovery-case watcher — every 30s, recompute Case from live weather +
+	// mission-time night flag. On transition, log it and (if anyone is in the
+	// stack) broadcast an advisory call. Runs for the lifetime of the role.
+	go func() {
+		// Prime the state so the first tick doesn't fire a spurious transition
+		// against the zero value.
+		atcCtrl.RefreshRecoveryCase()
+		tk := time.NewTicker(30 * time.Second)
+		defer tk.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tk.C:
+				old, current := atcCtrl.RefreshRecoveryCase()
+				if old == current {
+					continue
+				}
+				log.Info().Int("from", int(old)).Int("to", int(current)).Str("label", composer.CaseLabel(int(current))).Msg("Marshal: recovery case changed")
+				if len(stack.GetAll()) > 0 {
+					transmit(comp.MarshalCaseChange(composer.CaseLabel(int(current))))
+				}
+			}
+		}
+	}()
+
 	// DEBUG: with --marshal-test-tx, transmit "test" every 30s to verify the
 	// outbound SRS path independently of pilot audio. Leave the flag off in
 	// production — every tick blocks the cooldown window for a few seconds.
@@ -318,14 +344,17 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		stack.SetAngels(callsign, stackAngels)
 		brc := atcCtrl.GetCarrierBRC()
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
-		log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Msg("Marshal: aircraft checking in")
+		// Pull live recovery case from state so phraseology stays in sync with
+		// any mid-recovery transition the watcher already announced.
+		caseLabel := composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))
+		log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
 		if len(all) > 1 {
 			stackInfo = fmt.Sprintf(" Stack has %d aircraft.", len(all))
 		}
-		transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
+		transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
 
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))
