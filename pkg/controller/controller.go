@@ -1393,9 +1393,11 @@ func (c *ATCController) GetCarrierBRC() float64 {
 			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") ||
 			strings.Contains(lower, "roosevelt") || strings.Contains(lower, "washington") ||
 			strings.Contains(lower, "vinson") {
+			log.Info().Str("callsign", callsign).Float64("heading", contact.HeadingDeg).Msg("GetCarrierBRC matched")
 			return contact.HeadingDeg
 		}
 	}
+	log.Info().Msg("GetCarrierBRC no match — returning -1")
 	return -1
 }
 

@@ -332,6 +332,15 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
 
+	case containsAny(lower, "radar check", "radar contact", "request radar", "radar service"):
+		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		log.Info().Str("callsign", callsign).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Msg("Marshal: radar check")
+		if rFound {
+			transmit(comp.MarshalRadarCheck(callsign, rAng, rDist, rBrg))
+		} else {
+			transmit(comp.MarshalRadarCheckNoContact(callsign))
+		}
+
 	case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing"):
 		brc := atcCtrl.GetCarrierBRC()
 		log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Marshal: BRC request")

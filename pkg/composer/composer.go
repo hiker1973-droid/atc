@@ -461,6 +461,27 @@ func (c *ATCComposer) RadarCheckNoContact(callsign string) string {
 	})
 }
 
+// MarshalRadarCheck — Marshal-flavored radar check ("from mother").
+func (c *ATCComposer) MarshalRadarCheck(callsign string, angels, distNm, bearingDeg int) string {
+	ang := numberWord(angels)
+	dist := milesToWord(distNm)
+	brg := bearingWord(bearingDeg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, radar contact, angels %s, range %s, bearing %s from mother.", callsign, c.towerCallsign, ang, dist, brg),
+		fmt.Sprintf("%s, %s, I have you on radar, angels %s, %s from mother, bearing %s.", callsign, c.towerCallsign, ang, dist, brg),
+		fmt.Sprintf("%s, %s, radar contact angels %s, %s on the %s from mother.", callsign, c.towerCallsign, ang, dist, brg),
+	})
+}
+
+// MarshalRadarCheckNoContact — Marshal "no radar contact" response.
+func (c *ATCComposer) MarshalRadarCheckNoContact(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, negative radar contact, say posit relative mother.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, no radar contact, say your range and bearing from mother.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, unable radar contact, say posit.", callsign, c.towerCallsign),
+	})
+}
+
 // SequencedInitialAck — Tacview-aware initial ack with named traffic ahead.
 func (c *ATCComposer) SequencedInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, altimeterInHg float64, seqNum int, leadCallsign string, leadDistNm int) string {
 	rwy := spellRunway(activeRunway)
