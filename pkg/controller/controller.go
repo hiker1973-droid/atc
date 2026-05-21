@@ -260,7 +260,15 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestInbound:
 		seqNum := s.EnqueueLanding(ac)
-		response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
+		if s.FlightMode == state.ModeIFR {
+			if seqNum > 1 {
+				response = c.composer.StraightInSequenced(req.Callsign, s.ActiveRunway, s.AltimeterInHg, seqNum-1)
+			} else {
+				response = c.composer.StraightInApproved(req.Callsign, s.ActiveRunway, s.AltimeterInHg)
+			}
+		} else {
+			response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
+		}
 
 
 	case RequestLandingClear:
@@ -287,18 +295,27 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		seqNum := s.EnqueueLanding(ac)
 		// Far-out caller (>15 NM) gets a "continue inbound" reply with a
 		// later report point. Closer callers fall through to the existing
-		// field-info / sequence flow.
-		if req.DistanceNm > 15 {
+		// field-info / sequence flow. In IFR mode, route everyone through
+		// the IMC-distance straight-in redirect instead.
+		switch {
+		case s.FlightMode == state.ModeIFR:
+			response = c.composer.IMCDistanceInitialAck(req.Callsign, req.DistanceNm, s.ActiveRunway, s.AltimeterInHg, seqNum-1)
+		case req.DistanceNm > 15:
 			response = c.composer.ContinueInbound(req.Callsign, s.ActiveRunway, req.DistanceNm, seqNum)
-		} else {
+		default:
 			response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
 		}
 
 
 	case RequestOverhead:
-		seqNum := s.EnqueueLanding(ac)
-		brk := s.Airfield.BreakDirections[s.ActiveRunway]
-		response = c.composer.OverheadAck(req.Callsign, s.ActiveRunway, brk, seqNum-1)
+		if s.FlightMode == state.ModeIFR {
+			s.EnqueueLanding(ac)
+			response = c.composer.RedirectToStraightIn(req.Callsign, s.ActiveRunway, s.AltimeterInHg)
+		} else {
+			seqNum := s.EnqueueLanding(ac)
+			brk := s.Airfield.BreakDirections[s.ActiveRunway]
+			response = c.composer.OverheadAck(req.Callsign, s.ActiveRunway, brk, seqNum-1)
+		}
 
 
 	case RequestDownwind:
@@ -332,9 +349,13 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		if ac := s.Get(req.Callsign); ac == nil || ac.SequenceNumber == 0 {
 			s.EnqueueLanding(ac)
 		}
-		seqNum := 0
-		if ac := s.Get(req.Callsign); ac != nil { seqNum = ac.SequenceNumber - 1 }
-		response = c.composer.BreakAck(req.Callsign, s.ActiveRunway, seqNum)
+		if s.FlightMode == state.ModeIFR {
+			response = c.composer.RedirectToStraightIn(req.Callsign, s.ActiveRunway, s.AltimeterInHg)
+		} else {
+			seqNum := 0
+			if ac := s.Get(req.Callsign); ac != nil { seqNum = ac.SequenceNumber - 1 }
+			response = c.composer.BreakAck(req.Callsign, s.ActiveRunway, seqNum)
+		}
 
 
 	case RequestStraightIn:
