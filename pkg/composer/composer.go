@@ -256,6 +256,28 @@ func (c *ATCComposer) ClearedToLand(callsign, activeRunway string, windFromMag, 
 	})
 }
 
+// ContinueInbound responds to a far-out inbound call ("30 miles inbound")
+// with an expect-runway + report-point reply instead of immediate field info.
+// 3 variations. Report point is set to roughly half the current distance so
+// the next call lands well inside the pattern.
+func (c *ATCComposer) ContinueInbound(callsign, activeRunway string, distNm, sequenceNum int) string {
+	rwy := spellRunway(activeRunway)
+	reportAt := distNm / 2
+	if reportAt < 5 {
+		reportAt = 5
+	}
+	reportWord := numberWord(reportAt)
+	traffic := ""
+	if sequenceNum > 1 {
+		traffic = fmt.Sprintf(" Number %s in sequence.", numberWord(sequenceNum))
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, expect runway %s, continue inbound, report %s miles.%s", callsign, c.towerCallsign, rwy, reportWord, traffic),
+		fmt.Sprintf("%s, %s, runway %s is active, continue inbound, call %s mile final.%s", callsign, c.towerCallsign, rwy, reportWord, traffic),
+		fmt.Sprintf("%s, %s, copy inbound, plan runway %s, report %s miles.%s", callsign, c.towerCallsign, rwy, reportWord, traffic),
+	})
+}
+
 // InboundAck acknowledges inbound and provides field info — 3 variations.
 func (c *ATCComposer) InboundAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64, trafficAhead int) string {
 	rwy := spellRunway(activeRunway)

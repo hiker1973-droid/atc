@@ -71,6 +71,10 @@ type ATCRequest struct {
 	Type      RequestType
 	FuelState float64
 	Raw       string
+	// DistanceNm is the pilot-stated distance ("X miles inbound") or 0 if
+	// none was given. Used by the inbound flow to choose between a far-out
+	// "continue inbound" reply and a pattern-entry field-info reply.
+	DistanceNm int
 }
 
 // ── Controller ────────────────────────────────────────────────────────────────
@@ -281,7 +285,14 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestDistanceInitial:
 		seqNum := s.EnqueueLanding(ac)
-		response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
+		// Far-out caller (>15 NM) gets a "continue inbound" reply with a
+		// later report point. Closer callers fall through to the existing
+		// field-info / sequence flow.
+		if req.DistanceNm > 15 {
+			response = c.composer.ContinueInbound(req.Callsign, s.ActiveRunway, req.DistanceNm, seqNum)
+		} else {
+			response = c.sequencedArrivalResponse(req.Callsign, s, seqNum)
+		}
 
 
 	case RequestOverhead:
@@ -291,12 +302,21 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 
 	case RequestDownwind:
+		// Auto-enqueue if pilot reported downwind without prior inbound call —
+		// otherwise SequenceNumber stays 0 and the math underflows ("number zero").
+		if ac := s.Get(req.Callsign); ac == nil || ac.SequenceNumber == 0 {
+			s.EnqueueLanding(ac)
+		}
 		seqNum := 0
 		if ac := s.Get(req.Callsign); ac != nil { seqNum = ac.SequenceNumber - 1 }
 		response = c.composer.DownwindAck(req.Callsign, s.ActiveRunway, seqNum)
 
 
 	case RequestBase:
+		// Same auto-enqueue guard as downwind.
+		if ac := s.Get(req.Callsign); ac == nil || ac.SequenceNumber == 0 {
+			s.EnqueueLanding(ac)
+		}
 		if ac := s.Get(req.Callsign); ac != nil && ac.SequenceNumber > 1 {
 			response = c.composer.BaseAck(req.Callsign, s.ActiveRunway, ac.SequenceNumber)
 		} else {
@@ -307,6 +327,11 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		return // basic mode — not active
 
 	case RequestBreak:
+		// Auto-enqueue if pilot called break without prior inbound — fixes the
+		// "number zero" off-by-one (SequenceNumber 0 → seqNum -1 → numberWord(0)).
+		if ac := s.Get(req.Callsign); ac == nil || ac.SequenceNumber == 0 {
+			s.EnqueueLanding(ac)
+		}
 		seqNum := 0
 		if ac := s.Get(req.Callsign); ac != nil { seqNum = ac.SequenceNumber - 1 }
 		response = c.composer.BreakAck(req.Callsign, s.ActiveRunway, seqNum)
@@ -834,6 +859,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	case containsDistanceMiles(lower) && containsAny(lower, "initial", "mile", "inbound"):
 		// 3 mile initial = overhead break entry; others = inbound position report
 		dist := extractDistanceMilesInt(lower)
+		req.DistanceNm = dist
 		if dist <= 3 {
 			req.Type = RequestOverhead
 		} else {
@@ -870,8 +896,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestRunwayVacated
 	case containsAny(lower, "straight in", "straight-in", "ils", "instrument approach", "rnav"):
 		req.Type = RequestStraightIn
-	case containsAny(lower, "break"):
+	case containsAny(lower, "break", "initial"):
 		// Only classify as break if not part of "radio check" etc.
+		// "initial" alone is the overhead-break entry call — same intent.
 		if !containsAny(lower, "radio", "check") {
 			req.Type = RequestBreak
 		}
@@ -887,7 +914,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	case containsAny(lower, "request startup", "ready for startup", "ready to start", "request start",
 		"requesting startup", "requesting start"):
 		req.Type = RequestStartup
-	case containsAny(lower, "pushing command", "pushing to command", "switching command", "switching to command", "push command"):
+	case containsAny(lower, "pushing command", "pushing to command",
+		"switching command", "switching to command", "switching over to command", "switching over",
+		"push command"):
 		// Pilot is announcing a freq change to Command — courtesy ack, no
 		// need to re-issue freq/preset (handoff was already given at 7 DME).
 		req.Type = RequestPushingCommand
@@ -908,7 +937,11 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 
 	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comcheck", "comp check", "how copy"):
 		req.Type = RequestRadioCheck
-	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative"):
+	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative",
+		"taxiing", "taxying"):
+		// "taxiing runway X" is a status call after a taxi clearance — treat
+		// as a readback so the controller doesn't re-prompt or fall through
+		// to "unable to copy".
 		req.Type = RequestReadback
 	case isModexReadback(lower):
 		// Short numeric-only transmission e.g. "032" or "Raider 032" — pilot acknowledging
@@ -928,6 +961,9 @@ func normalizeCallsign(text string) string {
 		{"radar", "Raider"},
 		{"rater", "Raider"},
 		{"raiders", "Raider"},
+		// Whisper sometimes hears "zero" (in spoken modex "0 3 2") as "zoo"
+		// — repair so callsign extractor sees a digit and Tacview lookup hits.
+		{" zoo ", " zero "},
 		// Venom mishears
 		{"venom", "Venom"},
 		{"vino", "Venom"},
@@ -1011,7 +1047,8 @@ func trimTrailingTriggers(cs string) string {
 		"clear active", "cleared active", "clear the active", "clear of runway", "runway vacated",
 		"going around", "go around", "missed approach",
 		// distance / handoff
-		"pushing command", "switching command", "push command",
+		"pushing command", "switching command", "switching over to command", "switching over", "push command",
+		"taxiing", "taxying",
 		"7 dme", "seven dme", "cleared airspace",
 		// Whisper often inserts "mile" between the number and "dme"
 		"7 mile", "seven mile", "mile dme", "miles dme", "dme",

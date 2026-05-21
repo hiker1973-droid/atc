@@ -21,6 +21,13 @@ Triggers from `pkg/controller/controller.go`. Responses from `pkg/composer/compo
 
 **Triggers:** `[N] mile initial` · `[N] miles inbound` · `inbound`
 
+**Distance branch:** when the stated distance is **>15 NM**, Tower responds with a "continue inbound" reply (variants below) instead of immediate field info; when ≤15 NM, the standard variants apply.
+
+**Far-out variants** (`ContinueInbound`, fires for `[N] miles inbound` with N>15):
+1. `{CALLSIGN}, {TOWER}, expect runway {RUNWAY}, continue inbound, report {N/2} miles.[ Number {SEQ} in sequence.]`
+2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is active, continue inbound, call {N/2} mile final.[ Number {SEQ} in sequence.]`
+3. `{CALLSIGN}, {TOWER}, copy inbound, plan runway {RUNWAY}, report {N/2} miles.[ Number {SEQ} in sequence.]`
+
 **Day VMC variants** (`DistanceInitialAck`):
 1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, Number {SEQ}.`
 2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} in use, Number {SEQ}.`

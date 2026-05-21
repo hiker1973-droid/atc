@@ -471,7 +471,29 @@ func run(cmd *cobra.Command, args []string) error {
 		var cmdFreq float64
 		fmt.Sscanf(flagCommandFreq, "%f", &cmdFreq)
 		log.Info().Float64("freq", cmdFreq).Str("name", flagCommandName).Str("srs", flagSRSAddr).Msg("Command channel starting")
-		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio)
+
+		// Phase 3b: Tacview-driven tower handoff. If --tacview-addr is set,
+		// spawn a mini Tacview consumer and a watcher that TXs a tower handoff
+		// when a tracked pilot crosses 30 NM inbound to any of OMDM/OMAM/OMAL.
+		var tracker *pilotTracker
+		if flagTacviewAddr != "" {
+			tracker = newPilotTracker()
+			store := newTacviewPositions()
+			go runMiniTacview(ctx, flagTacviewAddr, store)
+			srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
+			handoffTX := func(text, _ string) {
+				mp3, err := synthesizeSpeech(ctx, apiKey, text, flagCommandVoice, flagTTSSpeed)
+				if err != nil {
+					log.Error().Err(err).Msg("Command handoff TTS failed")
+					return
+				}
+				transmitExternalAudioFile(ctx, mp3, cmdFreq, flagCommandName, srsHost, srsPort, flagExternalAudio)
+			}
+			go runCommandHandoffWatch(ctx, tracker, store, handoffTX)
+			log.Info().Str("tacview", flagTacviewAddr).Msg("Command: tower-handoff watcher armed")
+		}
+
+		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio, tracker)
 		return nil
 	}
 

@@ -111,3 +111,13 @@ A new intent is a `v1.1.0` minor bump (per the semver convention). Pure response
 ## Source reference
 
 Current code lives in `cmd/atc/command.go:23-83` (function `commandResponse`). When you send this file back, I'll regenerate that function from your edits.
+
+---
+
+## Proactive Tower handoff (Tacview-driven, no trigger phrase)
+
+When `--tacview-addr` is set on Command, a background watcher (`cmd/atc/command_handoff.go`) tracks every pilot who has transmitted to Command. Each 30s it checks their position; when one crosses from outside 30 NM to inside 30 NM of any of OMDM/OMAM/OMAL (whichever is nearest), Command TXs **once**:
+
+> `{CALLSIGN}, vSFG-7-Command, contact {TOWER NAME} tower on {FREQ}, switching now approved, good landing.`
+
+Each pilot is handed off at most once per Command session; the watcher forgets pilots after 60 min of radio silence.
