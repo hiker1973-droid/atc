@@ -78,6 +78,7 @@ var (
 	flagCommandName     string
 	flagCommandVoice    string
 	flagDeckbossVoice   string
+	flagMarshalVoice    string
 	flagRadioEffect          bool
 	flagRadioIntensity       string
 	flagTowerRadioIntensity  string
@@ -143,6 +144,8 @@ func main() {
 		"Deckboss frequency MHz (OMDM only, e.g. 128.6 — DCS carrier UHF)")
 	f.StringVar(&flagDeckbossVoice, "deckboss-voice", "ash",
 		"OpenAI TTS voice for Deckboss: ash (default, calm authoritative), echo (mid male), ballad, sage, onyx, etc.")
+	f.StringVar(&flagMarshalVoice, "marshal-voice", "ballad",
+		"OpenAI TTS voice for Marshal: ballad (default, naval-controller feel), verse, sage, onyx, etc.")
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",
 		"Marshal frequency MHz (OMDM only, e.g. 306.3)")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",
@@ -442,7 +445,7 @@ func run(cmd *cobra.Command, args []string) error {
 		go func() {
 			defer wg.Done()
 			marshalLoop(ctx, flagSRSAddr, marshalFreqMHz, apiKey, flagEAMPassword,
-				&marshalCooldown, atcCtrl, marshStack)
+				flagMarshalVoice, &marshalCooldown, atcCtrl, marshStack)
 		}()
 
 		// Expose marshStack for the ops dashboard when --dashboard-port is set.
@@ -697,7 +700,7 @@ func run(cmd *cobra.Command, args []string) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			marshalLoop(ctx, flagSRSAddr, marshalFreqMHz, apiKey, flagEAMPassword, &marshalCooldown, atcCtrl, marshStack)
+			marshalLoop(ctx, flagSRSAddr, marshalFreqMHz, apiKey, flagEAMPassword, flagMarshalVoice, &marshalCooldown, atcCtrl, marshStack)
 		}()
 		log.Info().Float64("freq", marshalFreqMHz).Msg("Marshal stack online")
 	}

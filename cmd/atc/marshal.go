@@ -48,7 +48,6 @@ func extractDMEDistance(lower string) int {
 
 const (
 	marshalCallsign     = "Union Marshal"
-	marshalVoice        = "onyx"
 	marshalTacanChannel = 72
 	// Stack altitude band — Marshal assigns the lowest unoccupied angel in
 	// [marshalMinAngels, marshalMaxAngels]. "Unoccupied" considers both stack
@@ -58,7 +57,7 @@ const (
 )
 
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
-func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword string,
+func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword, voice string,
 	txCooldown *int64, atcCtrl *controller.ATCController, stack *state.MarshalStack) {
 
 	comp := composer.NewATCComposer(marshalCallsign)
@@ -66,7 +65,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 	transmit := func(text string) {
 		log.Info().Str("text", text).Msg("Marshal TX")
 		atomic.StoreInt64(txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, marshalVoice, flagTTSSpeed)
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, voice, flagTTSSpeed)
 		if err != nil {
 			log.Error().Err(err).Msg("Marshal TTS failed")
 			return
