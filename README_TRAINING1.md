@@ -107,7 +107,54 @@ Tail with `logtail.exe` or any JSONL viewer. Filter on `level=warn|error`, plus 
 
 ---
 
-## 5. Common Issues After Transfer
+## 5. Pulling Updates
+
+When changes land on `origin/main`, Training 1 needs a pull + rebuild + restart of the affected roles. Windows locks running `.exe` files, so any process that loaded `atc.exe` must be stopped before `build.bat` will succeed on it.
+
+### Standard flow
+
+```bat
+cd C:\SkyeyeATC
+git pull origin main
+:: stop the roles whose code actually changed (see table below)
+build.bat
+:: relaunch the same roles
+```
+
+### What to restart by area of change
+
+| Code touched | Roles to bounce |
+|---|---|
+| `pkg/composer/`, `pkg/state/`, `pkg/controller/` | Everything — phraseology and state machine are shared across roles |
+| `cmd/atc/marshal.go` or Marshal voice/flag only | Marshal — `stop_marshal.bat` then `start_marshal.bat` |
+| `cmd/atc/command.go` or Command-only flags | Command — kill the `*command-only*` atc.exe, then `start_command.bat` |
+| `cmd/atc/deckboss.go` or Deckboss voice/freq | Deckboss — kill the `*deckboss*` atc.exe, then `start_deckboss.bat` |
+| `cmd/atc/atis.go` | ATIS — close ATIS console, then `start_atis.bat` |
+| `cmd/atc/main.go` or shared Tower paths | All three Towers — close tower consoles, then `start_towers.bat` |
+| `cmd/launcher/` | Launcher — close console, then `start_launcher.bat` |
+
+When in doubt, bounce everything with `start_all.bat` after a clean stop.
+
+### Build-in-use trick
+
+If `build.bat` fails because a process still has `atc.exe` open, stage the new binary alongside the old one and bounce roles on your own schedule:
+
+```bat
+move atc.exe atc.exe.old
+build.bat
+:: kill + relaunch affected atc.exe processes when ready
+del atc.exe.old
+```
+
+The old binary keeps running off its `.old` file handle until you stop the process — useful for staging a new build mid-mission and cutting over between sorties.
+
+### Live-mission caution
+
+Training 1 is prod. During an active mission, prefer bouncing one role at a time and watching its log for `online` / `registered on SRS` before moving to the next. Avoid mass-restarts on freqs that are actively being used.
+
+---
+
+## 6. Common Issues After Transfer
 
 | Symptom | Likely cause |
 |---|---|
@@ -120,7 +167,7 @@ Tail with `logtail.exe` or any JSONL viewer. Filter on `level=warn|error`, plus 
 
 ---
 
-## 6. Using Claude Code on Training 1
+## 7. Using Claude Code on Training 1
 
 Once installed on the Training 1 VM, drop these in `CLAUDE.md` at `C:\SkyeyeATC\` so Claude has context:
 - Production rig — be cautious with destructive ops during sessions
