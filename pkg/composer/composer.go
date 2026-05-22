@@ -755,13 +755,13 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother's weather %s, expect %s recovery%s, altimeter %s, " + c.towerCallsign + " angels %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother's weather %s, expect %s recovery%s, altimeter %s, Marshal at angels %s.",
 			callsign, radarStr, wx, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s recovery, mother %s%s, altimeter %s, stack angels %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s recovery, mother %s%s, altimeter %s, Marshal at angels %s.",
 			callsign, radarStr, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s, %s%s, altimeter %s, your angels are %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s, %s%s, altimeter %s, Marshal at angels %s.",
 			callsign, radarStr, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother %s, %s recovery%s, altimeter %s, " + c.towerCallsign + " angels %s, report see me at ten.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother %s, %s recovery%s, altimeter %s, Marshal at angels %s.",
 			callsign, radarStr, wx, recovery, brcStr, alt, ang),
 	})
 }
@@ -785,13 +785,15 @@ func (c *ATCComposer) MarshalSayBRC(callsign string, brc float64) string {
 	})
 }
 
-// MarshalRadarContact — at 10nm contact.
+// MarshalRadarContact — acknowledges the pilot's visual-on-mother call
+// ("see you at 10") and asks for an altitude + range report so Marshal can
+// confirm the inbound's slot before assigning angels.
 func (c *ATCComposer) MarshalRadarContact(callsign string, distNm int) string {
 	dist := numberWord(distNm)
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s miles, say state.", callsign, dist),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", contact, %s miles, say state.", callsign, dist),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", got you at %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", visual carrier at %s miles, report altitude and range.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger visual on mother at %s, say altitude and range.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy visual at %s miles, report your altitude and range.", callsign, dist),
 	})
 }
 
