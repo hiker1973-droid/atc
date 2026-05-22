@@ -345,7 +345,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Marshal: BRC request")
 		transmit(comp.MarshalSayBRC(callsign, brc))
 
-	case containsAny(lower, "marking mom", "marking moms", "marking bomb", "marking bombs"):
+	case containsAny(lower, "marking mom", "marking moms", "marking bomb", "marking bombs", "mark your mom", "mark your mum"):
 		pos, _ := stack.Enqueue(callsign, fuelState)
 		reserved := stack.ReservedAngels(callsign)
 		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
