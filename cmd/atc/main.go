@@ -93,6 +93,7 @@ var (
 	flagCommandTestTx       bool
 	flagPprofPort           int
 	flagRunwayRotation      bool
+	flagRunwaySlot          time.Duration
 )
 
 func main() {
@@ -191,6 +192,8 @@ func main() {
 		"Run net/http/pprof on this localhost port for goroutine/heap debugging (0=disabled)")
 	f.BoolVar(&flagRunwayRotation, "runway-rotation", true,
 		"Rotate active runway every 4h instead of selecting by wind. Disable with --runway-rotation=false to fall back to wind-driven selection.")
+	f.DurationVar(&flagRunwaySlot, "runway-slot", 4*time.Hour,
+		"Length of one runway-rotation slot. Default 4h matches production cadence; shorten (e.g. 60s) for live verification of slot rolls.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -322,6 +325,16 @@ func run(cmd *cobra.Command, args []string) error {
 
 	var wg sync.WaitGroup
 
+
+	// Apply runway-slot override before any AirfieldState is constructed so
+	// the rotation anchor uses the requested cadence from t=0. Logged so any
+	// non-default duration is loud in the operator console.
+	if flagRunwaySlot != 4*time.Hour {
+		airfield.RotationSlotDuration = flagRunwaySlot
+		log.Warn().
+			Dur("slot", flagRunwaySlot).
+			Msg("DEBUG: runway-slot overridden — non-production cadence")
+	}
 
 	// ── ATC controller ────────────────────────────────────────────────────────
 	atcCtrl := controller.NewATCController(callsign, af)
@@ -635,15 +648,22 @@ func run(cmd *cobra.Command, args []string) error {
 		Float64("freqMHz", freqMHz).
 		Msg("ATC online — ready for traffic")
 
-	// Runway rotation ticker — checks every 60s whether the 4h slot has
-	// rolled and updates the active runway accordingly. UpdateWeather also
-	// reads the rotation, but Tacview-driven weather updates can be sparse
-	// in stable conditions, so the ticker is needed to catch slot rollovers.
+	// Runway rotation ticker — checks every 60s (or twice per slot, whichever
+	// is shorter) whether the slot has rolled and updates the active runway.
+	// UpdateWeather also reads rotation but Tacview weather updates can be
+	// sparse in stable conditions, so the ticker is the reliable trigger.
 	if flagRunwayRotation {
+		tickInterval := 60 * time.Second
+		if airfield.RotationSlotDuration < 2*tickInterval {
+			tickInterval = airfield.RotationSlotDuration / 2
+		}
+		if tickInterval < time.Second {
+			tickInterval = time.Second
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ticker := time.NewTicker(60 * time.Second)
+			ticker := time.NewTicker(tickInterval)
 			defer ticker.Stop()
 			for {
 				select {
@@ -657,7 +677,9 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Info().
 			Str("airfield", af.ICAO).
 			Str("startRunway", atcCtrl.GetActiveRunway()).
-			Msg("runway rotation enabled — 4h slots, ignores wind")
+			Dur("slot", airfield.RotationSlotDuration).
+			Dur("tick", tickInterval).
+			Msg("runway rotation enabled — slot-based, ignores wind")
 	}
 
 	// Start ATIS broadcast loop — OMDM tower only, not deckboss instance.

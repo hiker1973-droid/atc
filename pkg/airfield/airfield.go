@@ -9,7 +9,9 @@ import (
 )
 
 // RotationSlotDuration is the wall-clock length of one runway-rotation slot.
-const RotationSlotDuration = 4 * time.Hour
+// Declared as a var (not const) so debug builds can shorten it via the
+// --runway-slot flag for live verification without waiting 4h between rolls.
+var RotationSlotDuration = 4 * time.Hour
 
 // Runway defines a single runway end.
 type Runway struct {
