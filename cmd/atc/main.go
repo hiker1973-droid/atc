@@ -92,6 +92,7 @@ var (
 	flagMarshalTestTx       bool
 	flagCommandTestTx       bool
 	flagPprofPort           int
+	flagRunwayRotation      bool
 )
 
 func main() {
@@ -188,6 +189,8 @@ func main() {
 		"DEBUG: have Command transmit \"command test\" every 30s (used to verify SRS routing — leave off in production)")
 	f.IntVar(&flagPprofPort, "pprof-port", 0,
 		"Run net/http/pprof on this localhost port for goroutine/heap debugging (0=disabled)")
+	f.BoolVar(&flagRunwayRotation, "runway-rotation", true,
+		"Rotate active runway every 4h instead of selecting by wind. Disable with --runway-rotation=false to fall back to wind-driven selection.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -322,6 +325,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// ── ATC controller ────────────────────────────────────────────────────────
 	atcCtrl := controller.NewATCController(callsign, af)
+	if !flagRunwayRotation {
+		atcCtrl.DisableRunwayRotation()
+	}
 	// Seed weather from --static-* flags so dashboard /status reports real
 	// values instead of zeros. UpdateFlightConditions wires CeilingFt /
 	// VisibilityNm / IsNight, which UpdateWeather alone does not. IsNight is
@@ -628,6 +634,31 @@ func run(cmd *cobra.Command, args []string) error {
 		Str("callsign", callsign).
 		Float64("freqMHz", freqMHz).
 		Msg("ATC online — ready for traffic")
+
+	// Runway rotation ticker — checks every 60s whether the 4h slot has
+	// rolled and updates the active runway accordingly. UpdateWeather also
+	// reads the rotation, but Tacview-driven weather updates can be sparse
+	// in stable conditions, so the ticker is needed to catch slot rollovers.
+	if flagRunwayRotation {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ticker := time.NewTicker(60 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					atcCtrl.RotateRunwayIfDue()
+				}
+			}
+		}()
+		log.Info().
+			Str("airfield", af.ICAO).
+			Str("startRunway", atcCtrl.GetActiveRunway()).
+			Msg("runway rotation enabled — 4h slots, ignores wind")
+	}
 
 	// Start ATIS broadcast loop — OMDM tower only, not deckboss instance.
 	// Opt-in via --atis-broadcast so the tower doesn't double up with a

@@ -190,6 +190,30 @@ func (c *ATCController) SetActiveRunway(designator string) {
 		Msg("active runway set from ATIS")
 }
 
+// DisableRunwayRotation turns off time-based runway rotation, reverting the
+// active runway to wind-driven selection. Used by --runway-rotation=false.
+func (c *ATCController) DisableRunwayRotation() {
+	c.airfieldState.DisableRunwayRotation()
+	log.Info().
+		Str("airfield", c.airfieldState.Airfield.ICAO).
+		Msg("runway rotation disabled — reverting to wind-driven selection")
+}
+
+// RotateRunwayIfDue advances the rotation-driven active runway when its 4h
+// slot has rolled. Logs the transition. No-op when rotation is disabled or
+// the slot hasn't changed.
+func (c *ATCController) RotateRunwayIfDue() {
+	from, to, changed := c.airfieldState.RotateRunwayIfDue()
+	if !changed {
+		return
+	}
+	log.Info().
+		Str("airfield", c.airfieldState.Airfield.ICAO).
+		Str("from", from).
+		Str("to", to).
+		Msg("runway rotation slot rolled")
+}
+
 // UpdateFlightConditions passes ATIS-parsed weather into the airfield state.
 func (c *ATCController) UpdateFlightConditions(ceilingFt, visNm float64, isNight bool) {
 	c.airfieldState.UpdateFlightConditions(ceilingFt, visNm, isNight)

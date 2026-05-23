@@ -179,19 +179,56 @@ type AirfieldState struct {
 	LandingQueue   []*AircraftState
 	DepartureQueue []*AircraftState
 
+	// Runway rotation
+	RotationEnabled bool      // when true, runway selection is time-driven, not wind-driven
+	RotationAnchor  time.Time // start of slot 0; slots advance every airfield.RotationSlotDuration
+
 	tracked map[string]*AircraftState
 }
 
 // NewAirfieldState creates an ATC state manager for the given airfield.
+// Runway rotation is enabled by default and anchored at process start.
 func NewAirfieldState(af *airfield.Airfield) *AirfieldState {
+	now := time.Now()
 	s := &AirfieldState{
-		Airfield:      af,
-		AltimeterInHg: 29.92,
-		VisibilityNm:  10,
-		tracked:       make(map[string]*AircraftState),
+		Airfield:        af,
+		AltimeterInHg:   29.92,
+		VisibilityNm:    10,
+		RotationEnabled: true,
+		RotationAnchor:  now,
+		tracked:         make(map[string]*AircraftState),
 	}
-	s.ActiveRunway = af.RunwayPairs[0].Primary.Designator
+	s.ActiveRunway = af.RotationRunway(now, s.RotationAnchor).Designator
 	return s
+}
+
+// DisableRunwayRotation turns off time-based rotation and reverts the active
+// runway to wind-driven selection. Used by the --runway-rotation=false flag.
+func (s *AirfieldState) DisableRunwayRotation() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.RotationEnabled = false
+	rwy := s.Airfield.ActiveRunway(s.WindFromMag, s.WindKts)
+	s.ActiveRunway = rwy.Designator
+}
+
+// RotateRunwayIfDue recomputes the rotation-driven active runway and updates
+// state if the slot has rolled since the last call. Returns the new and
+// previous designators (equal if no change) so the caller can log transitions.
+// No-op when rotation is disabled.
+func (s *AirfieldState) RotateRunwayIfDue() (from, to string, changed bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.RotationEnabled {
+		return s.ActiveRunway, s.ActiveRunway, false
+	}
+	rwy := s.Airfield.RotationRunway(time.Now(), s.RotationAnchor).Designator
+	if rwy == s.ActiveRunway {
+		return s.ActiveRunway, s.ActiveRunway, false
+	}
+	from = s.ActiveRunway
+	s.ActiveRunway = rwy
+	return from, rwy, true
 }
 
 // UpdateWeather refreshes wind and altimeter. windFromTrue is in degrees true;
@@ -208,7 +245,12 @@ func (s *AirfieldState) UpdateWeather(windFromTrue, windKts, altimeterInHg, visN
 	s.AltimeterInHg = altimeterInHg
 	s.VisibilityNm = visNm
 	s.WeatherUpdatedAt = time.Now()
-	activeRwy := s.Airfield.ActiveRunway(windFromMag, windKts)
+	var activeRwy airfield.Runway
+	if s.RotationEnabled {
+		activeRwy = s.Airfield.RotationRunway(s.WeatherUpdatedAt, s.RotationAnchor)
+	} else {
+		activeRwy = s.Airfield.ActiveRunway(windFromMag, windKts)
+	}
 	if activeRwy.Designator != s.ActiveRunway {
 		s.ActiveRunway = activeRwy.Designator
 	}

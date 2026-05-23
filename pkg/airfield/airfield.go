@@ -2,7 +2,14 @@
 // Runway headings are magnetic. Coordinates are WGS-84 [lon, lat].
 package airfield
 
-import "github.com/paulmach/orb"
+import (
+	"time"
+
+	"github.com/paulmach/orb"
+)
+
+// RotationSlotDuration is the wall-clock length of one runway-rotation slot.
+const RotationSlotDuration = 4 * time.Hour
 
 // Runway defines a single runway end.
 type Runway struct {
@@ -78,6 +85,30 @@ func (a *Airfield) ActiveRunway(windFromMag float64, windKts float64) Runway {
 		}
 	}
 	return best
+}
+
+// RotationRunway returns the active runway for a time-based rotation cycle
+// anchored at startTime. Cycle order visits every runway end (Primary then
+// Reciprocal of each pair, in pair-declaration order); at OMAM with two
+// parallels this gives 31L → 13R → 31R → 13L over 16h.
+//
+// Unlike ActiveRunway, this ignores wind — pilots will sometimes land
+// downwind. Intentional, for training variety.
+func (a *Airfield) RotationRunway(now, startTime time.Time) Runway {
+	elapsed := now.Sub(startTime)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	slot := int(elapsed / RotationSlotDuration)
+
+	cycle := make([]Runway, 0, len(a.RunwayPairs)*2)
+	for _, pair := range a.RunwayPairs {
+		cycle = append(cycle, pair.Primary, pair.Reciprocal)
+	}
+	if len(cycle) == 0 {
+		return Runway{}
+	}
+	return cycle[slot%len(cycle)]
 }
 
 // headingDiff returns the absolute angular difference between two headings (0–180).
