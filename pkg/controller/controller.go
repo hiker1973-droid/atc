@@ -18,6 +18,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// squadronCallsignRe matches "<squadron> <modex>" for the squadrons normalizeCallsign
+// canonicalizes. Used as a comma-less fallback in extractCallsign when Whisper
+// drops every comma — better to scrape the canonical callsign out of the middle
+// of the text than to enqueue an empty-string aircraft.
+var squadronCallsignRe = regexp.MustCompile(`(?i)\b(Raider|Venom|Viper)\s+\d{1,4}\b`)
+
 // ── Conflict thresholds ───────────────────────────────────────────────────────
 
 const (
@@ -1036,6 +1042,16 @@ func extractCallsign(text, towerCallsign string) string {
 	lower := strings.ToLower(text)
 	towerLower := strings.ToLower(towerCallsign)
 	idx := strings.Index(lower, towerLower)
+	if idx < 0 && strings.HasPrefix(towerLower, "al ") {
+		// Pilots routinely drop the "Al " prefix ("Minhad Tower" / "Dhafra Tower").
+		// Retry with the short form before falling through to the comma-only path.
+		short := towerCallsign[3:]
+		if i := strings.Index(lower, strings.ToLower(short)); i >= 0 {
+			idx = i
+			towerCallsign = short
+			towerLower = strings.ToLower(short)
+		}
+	}
 	if idx < 0 {
 		// Tower name not found — bare "traffic/tower, [callsign], ..." format
 		// Extract second comma-delimited segment as callsign
@@ -1045,6 +1061,10 @@ func extractCallsign(text, towerCallsign string) string {
 			if cs != "" && !strings.Contains(strings.ToLower(cs), "traffic") && !strings.Contains(strings.ToLower(cs), "tower") {
 				return trimTrailingTriggers(cs)
 			}
+		}
+		// Comma-less last resort: scan for a known squadron word + modex.
+		if m := squadronCallsignRe.FindString(text); m != "" {
+			return strings.TrimSpace(m)
 		}
 		return ""
 	}
@@ -1080,12 +1100,15 @@ func trimTrailingTriggers(cs string) string {
 		// requesting X variants (Whisper often hears the -ing form)
 		"requesting taxi", "requesting ground", "requesting takeoff", "requesting departure",
 		"requesting startup", "requesting start", "requesting clearance",
+		"requesting overhead", "requesting straight", "requesting",
 		// line up variants — also fired by pilots reporting they've entered the runway
 		"line up", "lining up",
 		// pattern / state calls
 		"holding short", "hold short", "ready for", "ready to",
 		"airborne", "departing", "inbound",
-		"on final", " final", "turning final",
+		"on final", " final", "turning final", "short final", "on short",
+		"straight in", "straight-in", "full stop", "touch and go",
+		"3 mile", "three mile", "3-mile", "three-mile",
 		"downwind", "turning downwind",
 		"base", "turning base",
 		"overhead", "initial",
