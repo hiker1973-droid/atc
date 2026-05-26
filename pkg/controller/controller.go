@@ -1420,53 +1420,81 @@ func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 	return false
 }
 
+// findCarrierContact locates the carrier in Tacview using a two-tier match.
+// Different missions name the CVN differently:
+//   - Training missions export the CVN as e.g. "CVN-72 ABE" (matches the
+//     "cvn"/"lincoln" tier).
+//   - Foothold exports the CVN as "Carrier strike group-5" (only matches the
+//     generic "carrier" tier), and the same mission may also export escort /
+//     group-center marker units that ALSO contain "carrier" in their name and
+//     sit dozens of nm away from the actual flat-top.
+//
+// To stay correct across both naming conventions, we prefer named-ship matches
+// (tier 1) and fall back to the generic "carrier" tier only when no specific
+// CVN is found. All matching candidates are logged so future mismatches can
+// be debugged from the JSONL trail. Caller must hold c.allPositionsMu (read).
+func (c *ATCController) findCarrierContact() (callsign string, contact *TacviewContact, found bool) {
+	var primaryCS, fallbackCS string
+	var primary, fallback *TacviewContact
+	var candidates []string
+	for cs, ct := range c.allPositions {
+		if time.Since(ct.UpdatedAt) > 60*time.Second {
+			continue
+		}
+		lower := strings.ToLower(cs)
+		switch {
+		case strings.Contains(lower, "cvn"),
+			strings.Contains(lower, "lincoln"),
+			strings.Contains(lower, "stennis"),
+			strings.Contains(lower, "roosevelt"),
+			strings.Contains(lower, "washington"),
+			strings.Contains(lower, "vinson"):
+			candidates = append(candidates, cs+" [CVN]")
+			if primary == nil {
+				primaryCS, primary = cs, ct
+			}
+		case strings.Contains(lower, "carrier"):
+			candidates = append(candidates, cs+" [group]")
+			if fallback == nil {
+				fallbackCS, fallback = cs, ct
+			}
+		}
+	}
+	if primary != nil {
+		log.Debug().Strs("candidates", candidates).Str("chosen", primaryCS).Msg("carrier match")
+		return primaryCS, primary, true
+	}
+	if fallback != nil {
+		log.Debug().Strs("candidates", candidates).Str("chosen", fallbackCS).Msg("carrier match (group-label fallback)")
+		return fallbackCS, fallback, true
+	}
+	return "", nil, false
+}
+
 // GetCarrierBRC returns the carrier's Base Recovery Course (bow direction) from
 // Tacview. Returns -1 if carrier not found. Tacview's HeadingDeg on the CVN
-// points at the bow, so we return it directly. "Carrier strike group-N" is
-// literally how DCS labels the actual flat-top in many missions, so we keep
-// the broad "carrier" keyword. Helo/escort callsigns like "Pontiac 1-1
-// Rescue" don't contain the word "carrier" — only the STRIKE GROUP names
-// (which we don't index) reference it. Confirmed against live Tacview on
-// 2026-05-16.
+// points at the bow, so we return it directly.
 func (c *ATCController) GetCarrierBRC() float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	for callsign, contact := range c.allPositions {
-		if time.Since(contact.UpdatedAt) > 60*time.Second {
-			continue
-		}
-		lower := strings.ToLower(callsign)
-		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
-			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") ||
-			strings.Contains(lower, "roosevelt") || strings.Contains(lower, "washington") ||
-			strings.Contains(lower, "vinson") {
-			log.Info().Str("callsign", callsign).Float64("heading", contact.HeadingDeg).Msg("GetCarrierBRC matched")
-			return contact.HeadingDeg
-		}
+	cs, contact, found := c.findCarrierContact()
+	if !found {
+		log.Info().Msg("GetCarrierBRC no match — returning -1")
+		return -1
 	}
-	log.Info().Msg("GetCarrierBRC no match — returning -1")
-	return -1
+	log.Info().Str("callsign", cs).Float64("heading", contact.HeadingDeg).Msg("GetCarrierBRC matched")
+	return contact.HeadingDeg
 }
 
-// GetCarrierPosition returns the carrier lon/lat from Tacview. Match set
-// matches GetCarrierBRC — "carrier" is included because the actual CVN ship
-// is often labeled "Carrier strike group-N" in DCS missions.
+// GetCarrierPosition returns the carrier lon/lat from Tacview.
 func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	for callsign, contact := range c.allPositions {
-		if time.Since(contact.UpdatedAt) > 60*time.Second {
-			continue
-		}
-		lower := strings.ToLower(callsign)
-		if strings.Contains(lower, "cvn") || strings.Contains(lower, "lincoln") ||
-			strings.Contains(lower, "carrier") || strings.Contains(lower, "stennis") ||
-			strings.Contains(lower, "roosevelt") || strings.Contains(lower, "washington") ||
-			strings.Contains(lower, "vinson") {
-			return contact.Lon, contact.Lat, true
-		}
+	_, contact, ok := c.findCarrierContact()
+	if !ok {
+		return 0, 0, false
 	}
-	return 0, 0, false
+	return contact.Lon, contact.Lat, true
 }
 
 // LookupCallerRelativeToCarrier returns the caller's angels (alt/1000), range
