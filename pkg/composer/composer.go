@@ -755,13 +755,13 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother's weather %s, expect %s recovery%s, altimeter %s, Marshal at angels %s.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother's weather %s, expect %s recovery%s, altimeter %s, Marshal at angels %s, report see me at ten.",
 			callsign, radarStr, wx, recovery, brcStr, alt, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s recovery, mother %s%s, altimeter %s, Marshal at angels %s.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s recovery, mother %s%s, altimeter %s, Marshal at angels %s, report see me at ten.",
 			callsign, radarStr, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s, %s%s, altimeter %s, Marshal at angels %s.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s %s, %s%s, altimeter %s, Marshal at angels %s, report see me at ten.",
 			callsign, radarStr, recovery, wx, brcStr, alt, ang),
-		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother %s, %s recovery%s, altimeter %s, Marshal at angels %s.",
+		fmt.Sprintf("%s, " + c.towerCallsign + ",%s mother %s, %s recovery%s, altimeter %s, Marshal at angels %s, report see me at ten.",
 			callsign, radarStr, wx, recovery, brcStr, alt, ang),
 	})
 }
