@@ -126,6 +126,20 @@ func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) stri
 	})
 }
 
+// HoldForSpacing tells a pilot to hold short because the previous departure
+// was cleared too recently — used by the controller's departure-spacing gate
+// (DepartureSpacingSec). Three variants. secondsLeft is the remaining cooldown
+// in whole seconds.
+func (c *ATCComposer) HoldForSpacing(callsign, runway string, secondsLeft int) string {
+	rwy := spellRunway(runway)
+	secs := numberWord(secondsLeft)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, hold short runway %s, departure spacing in %s seconds.", callsign, c.towerCallsign, rwy, secs),
+		fmt.Sprintf("%s, %s, hold short %s, traffic spacing, will advise in %s seconds.", callsign, c.towerCallsign, rwy, secs),
+		fmt.Sprintf("%s, %s, hold short, departure spacing %s seconds.", callsign, c.towerCallsign, secs),
+	})
+}
+
 // HandoffToCommand issues frequency change to command net — 3 variations.
 func (c *ATCComposer) HandoffToCommand(callsign, handoffCallsign string, freqMHz float64, preset string) string {
 	freq := spellFrequency(freqMHz)

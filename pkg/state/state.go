@@ -179,6 +179,11 @@ type AirfieldState struct {
 	LandingQueue   []*AircraftState
 	DepartureQueue []*AircraftState
 
+	// LastDepartureClearedAt is the wall-clock time of the most recent
+	// successful ClearForTakeoff. Used by the controller to enforce
+	// per-airfield departure spacing — see DepartureSpacingSec.
+	LastDepartureClearedAt time.Time
+
 	// Runway rotation
 	RotationEnabled bool      // when true, runway selection is time-driven, not wind-driven
 	RotationAnchor  time.Time // start of slot 0; slots advance every airfield.RotationSlotDuration
@@ -904,10 +909,24 @@ func (s *AirfieldState) ClearForTakeoff(callsign string) *AircraftState {
 		if ac.Callsign == callsign {
 			ac.Phase = PhaseClearedTakeoff
 			s.DepartureQueue = append(s.DepartureQueue[:i], s.DepartureQueue[i+1:]...)
+			s.LastDepartureClearedAt = time.Now()
 			return ac
 		}
 	}
 	return nil
+}
+
+// TimeSinceLastDeparture returns the time elapsed since the most recent
+// successful ClearForTakeoff. Returns a very large duration (effectively
+// "infinite") if no departure has ever been cleared, so the spacing gate
+// always permits the first one through.
+func (s *AirfieldState) TimeSinceLastDeparture() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.LastDepartureClearedAt.IsZero() {
+		return 24 * time.Hour
+	}
+	return time.Since(s.LastDepartureClearedAt)
 }
 
 // Remove drops an aircraft from all tracking.

@@ -101,6 +101,28 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 
 ---
 
+## 7b. Hold for departure spacing
+
+Fired when a pilot calls `request takeoff` or `holding short` within
+`DepartureSpacingSec` (default 60s) of the most recent successful
+takeoff clearance on the same airfield. Prevents wake-turbulence /
+conflict cascades like the 2026-05-26 Raider 032 + Raider 39
+double-clear 23s apart.
+
+The pilot stays in the departure queue — the controller's proactive
+monitor will re-attempt the clearance on its next tick once the
+spacing window elapses, so the pilot does not need to re-request.
+
+**`{SECS_LEFT}`** — remaining cooldown in whole seconds, spelled
+(e.g. `forty five`).
+
+**Responses (`HoldForSpacing`):**
+1. `{CALLSIGN}, {TOWER}, hold short runway {RUNWAY}, departure spacing in {SECS_LEFT} seconds.`
+2. `{CALLSIGN}, {TOWER}, hold short {RUNWAY}, traffic spacing, will advise in {SECS_LEFT} seconds.`
+3. `{CALLSIGN}, {TOWER}, hold short, departure spacing {SECS_LEFT} seconds.`
+
+---
+
 ## 8. Departure release / clear of pattern
 
 **Triggers:** `clear traffic` · `clear of traffic` · `airborne` · `departing` · `seven dme` · `7 dme` · `seven miles` · `cleared airspace` · `five miles`

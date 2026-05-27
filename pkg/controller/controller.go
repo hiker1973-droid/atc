@@ -37,6 +37,13 @@ const (
 	// state churn (Remove → GetOrCreate resets the per-aircraft GoAroundWarned
 	// flag, so a controller-level debounce is the durable guard).
 	GoAroundCooldown = 60 * time.Second
+	// DepartureSpacingSec — minimum gap between successive takeoff clearances
+	// on the same airfield. Prevents wake-turbulence / conflict cascades like
+	// the 2026-05-26 Raider 032 + Raider 39 double-clear 23s apart that fed
+	// into the Venom 211 inbound conflict. Pilot-triggered requests inside
+	// the window get a HoldForSpacing response; the proactive monitor skips
+	// silently and retries on the next tick.
+	DepartureSpacingSec = 60 * time.Second
 	// TrafficAdvisoryRadiusNm — report traffic to inbounds within this range.
 	TrafficAdvisoryRadiusNm = 10.0
 	// MonitorInterval is how often the background conflict monitor runs.
@@ -558,6 +565,19 @@ func (c *ATCController) handleTakeoffRequest(
 		)
 	}
 
+	// Departure-spacing gate — hold this one if a takeoff was cleared less
+	// than DepartureSpacingSec ago. Aircraft stays enqueued so the proactive
+	// monitor can clear them once the window expires.
+	if elapsed := s.TimeSinceLastDeparture(); elapsed < DepartureSpacingSec {
+		s.EnqueueDeparture(ac) // idempotent
+		secsLeft := int((DepartureSpacingSec - elapsed).Seconds())
+		log.Info().
+			Str("callsign", callsign).
+			Int("secondsLeft", secsLeft).
+			Msg("departure held — spacing window")
+		return c.composer.HoldForSpacing(callsign, s.ActiveRunway, secsLeft)
+	}
+
 	// No conflict — clear for takeoff. If this is the first call and the
 	// aircraft was never in the departure queue, enqueue then immediately
 	// clear: an empty runway with no inbound conflict means no reason to
@@ -615,6 +635,18 @@ func (c *ATCController) handleHoldingShortRequest(
 			callsign, s.ActiveRunway,
 			closest.Aircraft.Callsign, closest.DistanceNm,
 		)
+	}
+
+	// Departure-spacing gate — same as handleTakeoffRequest. This is the
+	// path that fired yesterday's 19:30:44 / 19:31:07 double-clear (23s
+	// apart) which then cascaded into the Venom 211 go-around storm.
+	if elapsed := s.TimeSinceLastDeparture(); elapsed < DepartureSpacingSec {
+		secsLeft := int((DepartureSpacingSec - elapsed).Seconds())
+		log.Info().
+			Str("callsign", callsign).
+			Int("secondsLeft", secsLeft).
+			Msg("holding short — departure spacing window")
+		return c.composer.HoldForSpacing(callsign, s.ActiveRunway, secsLeft)
 	}
 
 	// No conflict — proceed to runway, cleared for takeoff.
@@ -756,8 +788,9 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 
 	// ── Departure release check ───────────────────────────────────────────────
 	// If a departure is held short and all inbounds have cleared the hold-short
-	// radius, proactively clear the first departure for takeoff.
-	if s.DepartureQueueLen() > 0 {
+	// radius, proactively clear the first departure for takeoff. Silently
+	// skip when inside the departure-spacing window — next tick will retry.
+	if s.DepartureQueueLen() > 0 && s.TimeSinceLastDeparture() >= DepartureSpacingSec {
 		inboundsNear := s.InboundsWithinNm(HoldShortRadiusNm)
 		if len(inboundsNear) == 0 {
 			next := s.NextDeparture()
