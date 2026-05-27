@@ -70,11 +70,13 @@ very fast call that's getting dropped, let us know — we can dial it back.
   generic "Carrier strike group" label when both are visible.
 - DME position reports are recognized inbound: *"Marshal, Raider 39, 7 DME"*
   gets a radar-confirmed ack.
-- **LSO handoff happens on "commencing"** (post-v1.2.0). Marshal acks AND
-  hands you to paddles in one call: *"Raider 39, Marshal, copy commencing,
-  state 5.0, contact paddles."* The 3-nm "initial" call still works as a
-  fallback if you skip commencing — same destination, also no TACAN cited
-  ("push button 72" was dropped since pilots know to switch).
+- **Commencing acks + sends you to the 3-nm initial; "initial" is the
+  paddles handoff.** Marshal acks commencing and instructs you to check
+  in at the 3-mile initial: *"Raider 39, Marshal, copy commencing, state
+  5.0, check in three mile initial, paddles handoff."* You stay on
+  Marshal freq, continue the approach, and call *"Marshal, Raider 39,
+  initial"* at 3 nm — Marshal then hands off to paddles. No TACAN
+  button cited ("push button 72" was dropped since pilots know to switch).
 
 ### Quality-of-life
 - Go-around storm fix — Tower no longer repeats a go-around clearance multiple

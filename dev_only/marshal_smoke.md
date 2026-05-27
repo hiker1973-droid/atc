@@ -85,15 +85,15 @@ Radio: **`Marshal, Raider 99, established angels 5.`**
 
 Expected (deck clear → Charlie): `Raider 99, Marshal, signal Charlie.` (or variant)
 
-## §5 Commencing → LSO handoff
+## §5 Commencing (ack + check-in instruction; pilot stays on Marshal)
 
 Radio: **`Marshal, Raider 99, commencing, state 5.0.`**
 
-Expected: response acks commencing AND hands off to paddles in one call.
-Three variants — any of:
-- `Raider 99, Marshal, copy commencing, state 5.0, contact paddles.`
-- `Raider 99, Marshal, commencing, state 5.0, switch to paddles, good luck.`
-- `Raider 99, Marshal, roger commencing, state 5.0, paddles has you.`
+Expected: response acks commencing and instructs pilot to call 3-mile
+initial for the actual paddles handoff. Three variants — any of:
+- `Raider 99, Marshal, copy commencing, state 5.0, check in three mile initial, paddles handoff.`
+- `Raider 99, Marshal, commencing, state 5.0, report three mile initial for paddles.`
+- `Raider 99, Marshal, roger commencing, state 5.0, call three mile initial, paddles will have you.`
 
 Log check: `Marshal: stack step-down (internal, no TX)` info line if other
 aircraft were in stack — collapse should NOT transmit.
@@ -102,7 +102,7 @@ aircraft were in stack — collapse should NOT transmit.
 
 Radio: **`Marshal, Raider 99, initial.`**
 
-Expected: same destination as §5 (paddles), no TACAN button. Three variants — any of:
+Expected: actual paddles handoff (after §5 commencing ack). No TACAN button. Three variants — any of:
 - `Raider 99, Marshal, contact paddles, good luck.`
 - `Raider 99, Marshal, switch to paddles, good luck.`
 - `Raider 99, Marshal, paddles has you, good luck.`
