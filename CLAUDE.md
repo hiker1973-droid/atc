@@ -30,13 +30,18 @@ DCS-gRPC is not externalized — `:50051` is stable across boxes.
 ## Sites and roles
 Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
 
-| Log file | Site | Tower freq | Extra roles |
+| Log file | Site | Tower freq | Extra roles in this log |
 |---|---|---|---|
 | `atc-omal.log` | OMAL / Al Ain | 250.7 | — |
 | `atc-omam.log` | OMAM / Al Dhafra | 251.1 | — |
-| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | Marshal (306.3, "Union Marshal", `onyx`), Deckboss (128.6, "Deckboss", `ash`) |
+| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | **Deckboss** (128.6, "Deckboss", `ash`) — interleaved |
+| `atc-marshal.log` | — | — | Marshal only (306.3, "Union Marshal", `onyx`) |
+| `atc-command.log` | — | — | Command only (282.0, "vSFG-7-Command", `sage`) |
+| `atc-atis.log` | — | — | All 5 ATIS stations |
 
-Role names in logs: `Tower`, `Deckboss`, `Marshal` (single L). User's verbal "Marshall" = the `Marshal` role. When the user says "monitor towers / deckboss / marshal", tail all three log files filtering on `heard`, `TX`, role lifecycle (`online`/`offline`/`stack online`/`registered on SRS`), and all warn/error levels. Prefix each event with the site code so the user can tell which instance produced it.
+Log slug is set in `cmd/atc/main.go:231` — `--marshal-only` / `--command-only` / `--atis-only` get their own file; otherwise the log goes to `atc-<airfield>.log`. Deckboss has no `--deckboss-only` flag (it runs as `--airfield OMDM --deckboss-freq 128.6`), so its events mix into `atc-omdm.log` alongside Minhad Tower — filter on `Deckboss`/`128.6` when monitoring.
+
+Role names in logs: `Tower`, `Deckboss`, `Marshal` (single L). User's verbal "Marshall" = the `Marshal` role. When the user says "monitor towers / deckboss / marshal", prefer **`tools/tail-all.ps1`** (canonical, site-prefixed, filters on `heard`/`TX`/role lifecycle/warn/error). Older `tmp_tail*.ps1` files at repo root are throwaway scaffolding from prior sessions — superseded.
 
 Common fault signatures: `level=warn` + `SRS disconnected` · `level=error` + `ExternalAudio file error` · `TTS prewarm failed` · `Whisper returned empty transcription` · `SRS TCP failed`.
 
@@ -80,18 +85,17 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
 ## Recent context (2026-05-27)
-- **v1.1.1 cut and pushed** — controller hygiene patch covering the 2026-05-26 OMDM post-mortem. Five commits since `7574d1b`:
+- **v1.1.1 cut and pushed** at `f5e0ec4` — controller hygiene patch covering the 2026-05-26 OMDM post-mortem, plus the deckboss STT fix. Commits in this release:
+  - `b401f3f` — Deckboss address-led guard hardened. Whisper renders "Deck boss" as one word often enough ("TechBoss", "DuckBoss") that the spaced-only `addrPrefixes` list in `cmd/atc/deckboss.go:98` silently dropped legitimate §1/§2/§6 calls as self-echo — pilot would call comm-check and Deckboss would never respond. Added no-space variants (`techboss`, `duckboss`, `decboss`, `checkboss`). **General rule:** when adding a Whisper-defensive prefix, add both spaced and no-space forms.
   - `f161c01` — callsign extractor strips leading filler ("this is"/"i am") and trailing connectors (is/was/now) after the trigger cut. Added triggers: `declaring`, `in-flight`, `clear of`, `is clear`. Fixes the "Venom 2-0-0 is, Al Minhad Tower, ..." TX bleed that recurred in three different shapes yesterday.
   - `f161c01` — go-around debounce: 60s per-callsign cooldown via `goAroundLastTx` map on `ATCController`, plus reapply `fresh.GoAroundWarned=true` after `Remove`/`GetOrCreate` re-enqueue. Root cause of the 6×-in-70s storm was the per-aircraft flag silently zero-resetting on the new struct.
   - `73f0bd3` — `findCarrierContact` logs at info only on chosen-callsign **transition** (with `prev` field), debug otherwise. Replaces the uncommitted Debug→Info diagnostic that was sitting in the working tree since the CVN-naming work in `7574d1b`.
   - `f770223` — Whisper min-frame floor bumped from `> 3` (≈60ms) to `> 9` (≈200ms) across all four srsLoops (main / command / marshal / deckboss). Driven by the 22 hallucinations dropped in yesterday's OMDM window. **Tuning knob** — if pilots report rushed short calls being dropped, dial back to `> 6`. Not yet validated live.
   - `f5e0ec4` — `dev_only/marshal_smoke.md` — manual §1-§6 Case 1 Recovery checklist for exercising `findCarrierContact` after CVN-naming changes.
 - **Versioning** — v1.1.1 is a **patch** (hygiene/safety), not the v1.2.0 line. Next minor still scoped for Deckboss-live + DME-style feature work.
-- **Open work — departure queue improvements (planned, not implemented):**
-  1. Min-spacing timer between departure clearances (`DepartureSpacingSec=60s`). Yesterday's 19:30:44 / 19:31:07 Raider 032 + Raider 39 double-clear (23s apart) is the case study.
-  2. Tacview position gate before promoting queue head to "number 1" (`HoldShortValidationNm=0.5`, behind a flag).
-  3. Queue-join announcement at enqueue time for positions 2-3 (needs `departure_responses.md` spec update first per the "spec docs are source of truth" rule).
-  4. Departure altitude range bug — `composer.go:119` hardcodes `5 + rand.Intn(3)` (yields 5/6/7); user wants 3-6 (`3 + rand.Intn(4)`). Per-airfield `DepartureAngels` config is currently ignored — composer randomizes regardless. TTS prewarm cache at `main.go:1460-1468` also needs the new range. Quick win to ship first.
+- **Restart procedure validated** — full rebuild + role-restart cycle (ATIS → Towers → Marshal → Command → Deckboss). When `build.bat` fails with "atc.exe being used by another process", kill all `atc.exe` PIDs first. Launcher is `launcher.exe` (separate binary, separate process) — `build.bat` rebuilds both, so kill it too if a launcher is running.
+- **Duplicate Tower processes** observed pre-restart (two each of OMAL/OMAM/OMDM, same dashboard ports). Cause unknown — likely a `start_towers.bat` re-run without first stopping the previous set. Only one of each pair can bind its dashboard port; the other is a zombie. Resolved by killing all six and re-running `start_towers.bat` once.
+- **Departure queue improvements landed** post-v1.1.1: `a2bf187` angels 3-6 (was 5-7), `8eb1782` 60s `DepartureSpacingSec`, `cce8296` queue-position suffix on hold responses, `2ad751a` Tacview hold-short position gate behind `--position-check`. Worth verifying live after the next mission cycle.
 
 ## Recent context (2026-05-17)
 - **Deckboss live on 128.6** (DCS carrier UHF, was 306.2). Brought up with: IPv6 UDP fix (`net.ResolveUDPAddr` + `net.DialUDP` like Marshal — `net.Dial("udp", ...)` was binding `::1` and silently dropping audio), §1/§2 trigger alignment with `deckboss_responses.md` (now accepts `request taxi`/`green jet` and `(tension|ready)+cat`), self-echo guard on §1/§2/§6, voice default `ash` via new `--deckboss-voice` flag, `Clea to launch` typo fixed. Commits `716e588` / `7b95c74` / `fe792d8`.
