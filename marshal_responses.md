@@ -133,34 +133,41 @@ Pilot must still lead the transmission with the address word ("Marshal, …") �
 
 ---
 
-## 5. Commencing approach
+## 5. Commencing approach → LSO handoff
 
 **Triggers:** `commencing`
 
+Commencing IS the LSO handoff in our flow. The response acks commencing
+AND hands off to paddles in a single call. Prior version stopped at "copy
+commencing" and relied on the separate §6 "initial" call to do the
+handoff with a TACAN button number; we've dropped the TACAN reference
+since pilots know to switch.
+
 **If pilot also reports state:**
-1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}.`
-2. `{CALLSIGN}, Marshal, commencing, state {STATE}, copy.`
-3. `{CALLSIGN}, Marshal, roger, commencing, state {STATE}.`
+1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, contact paddles.`
+2. `{CALLSIGN}, Marshal, commencing, state {STATE}, switch to paddles, good luck.`
+3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, paddles has you.`
 
 **Without state:**
-1. `{CALLSIGN}, Marshal, copy commencing.`
-2. `{CALLSIGN}, Marshal, commencing, copy.`
-3. `{CALLSIGN}, Marshal, roger, commencing.`
+1. `{CALLSIGN}, Marshal, copy commencing, contact paddles.`
+2. `{CALLSIGN}, Marshal, commencing, switch to paddles, good luck.`
+3. `{CALLSIGN}, Marshal, roger commencing, paddles has you.`
 
 ---
 
-## 6. 3NM Initial → push button (TACAN handoff)
+## 6. 3NM Initial → LSO handoff (no TACAN)
 
 **Triggers:** `initial`
 
-Per Case 1 Recovery comms (vSFG-7 07.png): pilot calls `[MODEX], INITIAL` at 3nm; Marshal hands off to LSO/Paddles. This is Marshal's final transmission to the pilot — the subsequent "pushing button XX" / "checking in" / "contact" exchange happens on the LSO freq (not yet implemented).
+Kept as a separate intent for pilots who skip "commencing" and only say
+"initial" at 3nm. Same destination as §5 — hand off to paddles. Prior
+version cited a TACAN button (`push button 72`); dropped since pilots
+know to switch and the explicit button number was unnecessary friction.
 
 **Responses (`MarshalPushButton`):**
-1. `{CALLSIGN}, Marshal, push button {TACAN_CH}, check in.`
-2. `{CALLSIGN}, Marshal, button {TACAN_CH}, check in.`
-3. `{CALLSIGN}, Marshal, push button {TACAN_CH} and check in.`
-
-(`marshalTacanChannel` constant is currently 72 in marshal.go — let me know if you want a different default or a flag.)
+1. `{CALLSIGN}, Marshal, contact paddles, good luck.`
+2. `{CALLSIGN}, Marshal, switch to paddles, good luck.`
+3. `{CALLSIGN}, Marshal, paddles has you, good luck.`
 
 ---
 
@@ -213,6 +220,6 @@ When an aircraft commences, its slot frees and the rest of the stack **collapses
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |
-| Commencing | `commencing, state [XX]` | copy commencing (state collapses silently — see §8) | ✅ §5, §8 |
-| 3NM Initial | `initial` | push button [XX], check in | ✅ §6 |
+| Commencing | `commencing, state [XX]` | copy commencing + LSO handoff (state collapses silently — see §8) | ✅ §5, §8 |
+| 3NM Initial | `initial` | contact paddles, good luck (no TACAN cited) | ✅ §6 |
 | Push freq | `pushing button [XX]` / `checking in` | LSO `contact` (separate role/freq) | ⏳ LSO not implemented |

@@ -47,8 +47,7 @@ func extractDMEDistance(lower string) int {
 }
 
 const (
-	marshalCallsign     = "Union Marshal"
-	marshalTacanChannel = 72
+	marshalCallsign = "Union Marshal"
 	// Stack altitude band — Marshal assigns the lowest unoccupied angel in
 	// [marshalMinAngels, marshalMaxAngels]. "Unoccupied" considers both stack
 	// reservations and any Tacview contact within 50nm of the carrier.
@@ -408,9 +407,10 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 
 	case containsAny(lower, "initial"):
 		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.
-		// Marshal's last call before pilot pushes to the LSO freq.
-		log.Info().Str("callsign", callsign).Int("button", marshalTacanChannel).Msg("Marshal: 3nm initial, handing off to LSO")
-		transmit(comp.MarshalPushButton(callsign, marshalTacanChannel))
+		// Marshal's last call before pilot pushes to the LSO freq. TACAN
+		// button reference was dropped — pilots know to switch.
+		log.Info().Str("callsign", callsign).Msg("Marshal: 3nm initial, handing off to LSO")
+		transmit(comp.MarshalPushButton(callsign))
 
 	}
 }

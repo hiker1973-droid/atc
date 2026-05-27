@@ -883,30 +883,35 @@ func (c *ATCComposer) MarshalSignalCharlie(callsign string) string {
 	})
 }
 
-// MarshalCopyCommencing — pilot is commencing approach.
+// MarshalCopyCommencing — pilot is commencing approach. Commencing IS the
+// LSO handoff in our flow: the response acks commencing AND hands off to
+// paddles in one call. Prior version stopped at "copy commencing" and
+// relied on the §6 "initial" call to do the handoff with a TACAN button
+// number; we've dropped the TACAN since pilots know to switch.
 func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) string {
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s.", callsign, s),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, copy.", callsign, s),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", roger, commencing, state %s.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s, contact paddles.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, switch to paddles, good luck.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, state %s, paddles has you.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, copy.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, commencing.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, contact paddles.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, switch to paddles, good luck.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, paddles has you.", callsign),
 	})
 }
 
-// MarshalPushButton — at 3nm initial, tells pilot to push to TACAN.
-func (c *ATCComposer) MarshalPushButton(callsign string, tacanChannel int) string {
-	ch := numberWord(tacanChannel)
+// MarshalPushButton — at 3nm initial, hands off to LSO. No longer cites a
+// TACAN button (pilots know to switch); kept as a separate intent for
+// pilots who skip "commencing" and only say "initial" at 3nm.
+func (c *ATCComposer) MarshalPushButton(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", push button %s, check in.", callsign, ch),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", button %s, check in.", callsign, ch),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", push button %s and check in.", callsign, ch),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", contact paddles, good luck.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", switch to paddles, good luck.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", paddles has you, good luck.", callsign),
 	})
 }
 
