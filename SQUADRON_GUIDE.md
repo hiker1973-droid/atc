@@ -79,6 +79,53 @@ very fast call that's getting dropped, let us know — we can dial it back.
 
 ---
 
+## Known issues (v1.2.0)
+
+Things that work most of the time but have caveats this release. Different from
+the "Known limits" section below (which is "feature doesn't exist") — these are
+"feature exists but watch for X."
+
+- **Carrier match not live-validated.** The CVN-named-ship preference (CVN-72,
+  CVN-73, etc. winning over generic "Carrier strike group" labels) only got
+  test coverage, not real-mission exercise. If Marshal addresses the wrong
+  ship or seems confused about which boat is yours, **drop the exact transcript
+  in chat** so we can dial in the keyword priority.
+
+- **`--position-check` is opt-in.** Tower's Tacview hold-short validation
+  defaults off. If the operator enables it for your session and you get
+  *"unable to confirm hold-short position, say position"* — that means either
+  you're still on the taxiway, or the runway-threshold coordinates in our
+  config are off. Verify visually and re-call; ping if it persists.
+
+- **Very short calls (sub-200ms) can be dropped.** STT min-audio was tightened
+  to suppress Whisper hallucinations. A rushed *"Tower-callsign-holding-short"*
+  delivered as one syllable might not register. **Slow down half a beat** and
+  it'll land cleanly.
+
+- **No LSO/Paddles role yet.** After Marshal pushes you to button 72, the
+  LSO freq is silent — no "call the ball" / waveoff calls. Land using
+  visual ball + lineup judgment. Planned for a later release.
+
+- **Departure-spacing only via pilot-triggered calls.** v1.2.0's 60-second
+  spacing gate fires when you call "request takeoff" or "holding short" —
+  that's the normal flow and is correct. The proactive monitor path (Tower
+  clears the queue automatically when no one's asking) is dormant for an
+  unrelated state-flag wiring gap. Doesn't affect normal ops; flagged here
+  because it's documented in CLAUDE.md for the operator.
+
+- **Pilot-to-pilot chatter sometimes shows up in operator logs.** When you
+  talk to your wingman on a Tower freq, Tower transcribes it but **doesn't
+  respond** (the address-led guard catches it correctly). Operators will see
+  "intent miss" log entries — that's expected, not a bug.
+
+- **Whisper mishears that haven't been auto-corrected yet.** New patterns
+  surface every session. Recent catches: *"Reader"* / *"Radar"* → Raider;
+  *"Mahat Tower"* / *"Manhattan Tower"* → Al Minhad. If you keep getting a
+  consistent mishear that doesn't get fixed within one call, ping with the
+  exact word Whisper heard so we can add it to the normalizer.
+
+---
+
 ## What you can say
 
 ### To Tower (250.10 / 250.70 / 251.10)
