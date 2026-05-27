@@ -167,6 +167,41 @@ Other still-running roles keep their loaded `atc.exe.old` image until they exit.
 
 ---
 
+## Known issues (v1.2.0, 2026-05-27)
+
+Release-specific caveats — read before running a live mission with v1.2.0.
+
+1. **Duplicate Tower processes after a re-run.** Observed two each of OMAL/OMAM/OMDM running concurrently after a `start_towers.bat` re-launch without stopping the previous set. Only one of each pair binds its dashboard port (6001/6002/6003); the others are zombie connections to SRS. Symptom: tower dashboards work but a second voice sometimes overlaps the first on TX.
+   - **Fix:** before re-running `start_towers.bat`, kill all existing `atc.exe` PIDs OR use the launcher dashboard "Stop" buttons. The current `start_towers.bat` doesn't pre-clean.
+
+2. **`build.bat` lock conflicts.** Windows holds `atc.exe` and `launcher.exe` while they run; rebuild fails with "being used by another process". Three options:
+   - **Best:** stop all roles first (launcher dashboard Stop All, or kill `atc.exe`/`launcher.exe` PIDs).
+   - **Hot rebuild for atc only:** `move atc.exe atc.exe.old && build.bat` (per gotcha #2 above) — but doesn't help with launcher.exe.
+   - **Brute force:** `taskkill /F /IM atc.exe /IM launcher.exe` then build. Kills all roles; expect to restart from scratch.
+
+3. **`--position-check` not validated live.** New opt-in flag on `atc.exe` that uses Tacview to confirm a pilot calling "holding short" is actually within 0.5 nm of the runway threshold. **Off by default.** Before promoting to the `.bat` files:
+   - Enable on a single tower for one session: `start_towers.bat` → edit the OMDM line to add `--position-check`
+   - Watch logs for `level=warn ... position check — pilot claims hold-short but Tacview shows them elsewhere`
+   - Each warn is either a real catch OR a threshold-coordinate mismatch in `pkg/airfield/*.go` you need to fix
+   - Once a clean session passes, add `--position-check` to all three tower lines in `start_towers.bat`
+
+4. **Dormant proactive departure monitor.** The proactive clearance path in `controller.go:792+` requires `next.HoldingShort==true`, but `state.SetHoldingShort` is never called from controller code. So the monitor path is currently dead code. **v1.2.0's spacing timer and position gate still work** via the pilot-triggered paths (`handleHoldingShortRequest` / `handleTakeoffRequest`) — that covers the common case. If a future fix wires `SetHoldingShort` into the `RequestHoldingShort` case, the proactive path will activate automatically and you should re-validate spacing behavior.
+
+5. **Whisper min-frame floor at 200ms.** Bumped from 60ms in v1.2.0 to suppress trigger-word hallucinations. Side effect: very short pilot calls may not register. If pilots report rushed short calls being dropped, dial back:
+   - `cmd/atc/main.go:1125` — change `len(tx.opusFrames) > 9` to `> 6` (≈120ms)
+   - Mirror the same change in `cmd/atc/command.go`, `marshal.go`, `deckboss.go`
+   - Rebuild. Track hallucinations vs dropped legit calls and pick the floor that minimizes both.
+
+6. **Marshal CVN-naming not live-validated.** The `findCarrierContact` preference for CVN-named units over generic "Carrier strike group" labels (commit `7574d1b`) has only test-suite coverage, not real-mission exercise. Use `dev_only/marshal_smoke.md` to drive a smoke test next time you have a Tacview feed with both label types visible.
+
+7. **Carrier-match log transitions.** v1.2.0 logs at info-level only when `findCarrierContact`'s chosen callsign changes. If you see frequent `carrier match (transition)` lines flapping between two callsigns, that's two units tying on the lower() keyword match — investigate which Tacview units are competing and refine the keyword priority in `findCarrierContact`.
+
+8. **Pilot-to-pilot chatter in logs as "intent miss".** When pilots talk to each other on a Tower freq, Tower transcribes it but the address-led guard correctly drops it (no TX). The `intent miss` log line is expected, not a bug. Filter it out of operator dashboards if it's noise.
+
+9. **Old `tmp_tail*.ps1` files at repo root** are scaffolding from prior sessions, superseded by `tools/tail-all.ps1`. Safe to delete; not pulled into any operational script.
+
+---
+
 ## Useful commands
 
 ```bat
