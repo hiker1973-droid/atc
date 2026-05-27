@@ -126,6 +126,19 @@ func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) stri
 	})
 }
 
+// QueuePositionSuffix returns a short sentence to append to a hold response
+// when an aircraft is at position 2 or 3 in the departure queue. Capped at
+// position 3 (handler-side); positions 4+ get nothing since they'll hear the
+// ones ahead of them get cleared first. Three variants.
+func (c *ATCComposer) QueuePositionSuffix(position int, aheadCallsign string) string {
+	pos := numberWord(position)
+	return pick([]string{
+		fmt.Sprintf(" You're number %s for departure behind %s.", pos, aheadCallsign),
+		fmt.Sprintf(" Number %s in sequence behind %s.", pos, aheadCallsign),
+		fmt.Sprintf(" Sequence number %s, behind %s.", pos, aheadCallsign),
+	})
+}
+
 // HoldForSpacing tells a pilot to hold short because the previous departure
 // was cleared too recently — used by the controller's departure-spacing gate
 // (DepartureSpacingSec). Three variants. secondsLeft is the remaining cooldown

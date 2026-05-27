@@ -107,6 +107,10 @@ type AircraftState struct {
 	FuelState float64
 	// GoAroundWarned tracks whether a proactive go-around has been issued
 	GoAroundWarned bool
+	// AnnouncedQueuePos tracks whether this aircraft has already been told
+	// its sequence number on a hold response. Used by the controller's
+	// queue-position suffix to avoid re-announcing on every retry.
+	AnnouncedQueuePos bool
 }
 
 // HasPosition returns true if this aircraft has a fresh telemetry position
@@ -914,6 +918,34 @@ func (s *AirfieldState) ClearForTakeoff(callsign string) *AircraftState {
 		}
 	}
 	return nil
+}
+
+// DeparturePosition returns the 1-based position of callsign in the
+// DepartureQueue, or 0 if not present. Used by the queue-position suffix
+// to tell pilots where they are in line.
+func (s *AirfieldState) DeparturePosition(callsign string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i, ac := range s.DepartureQueue {
+		if ac.Callsign == callsign {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// DepartureAheadOf returns the callsign immediately ahead of the given
+// callsign in the DepartureQueue, or "" if the given aircraft is first
+// or not in queue.
+func (s *AirfieldState) DepartureAheadOf(callsign string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i, ac := range s.DepartureQueue {
+		if ac.Callsign == callsign && i > 0 {
+			return s.DepartureQueue[i-1].Callsign
+		}
+	}
+	return ""
 }
 
 // TimeSinceLastDeparture returns the time elapsed since the most recent

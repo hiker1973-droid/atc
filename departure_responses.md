@@ -101,6 +101,27 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 
 ---
 
+## 7a. Queue-position suffix
+
+Appended to §5 (Line up and wait), §6/7 hold variants, and §7b (Hold for
+spacing) responses when the aircraft is at position 2 or 3 in the
+departure queue. Capped at position 3 — positions 4+ get nothing since
+they'll hear the ones ahead get cleared first. Once announced, the
+`AircraftState.AnnouncedQueuePos` flag is set so subsequent retries
+don't re-announce on the same airplane.
+
+**Extra placeholders:** `{POS}` (spelled position, e.g. `two`), `{AHEAD}`
+(callsign immediately ahead in queue, e.g. `Raider 032`).
+
+**Suffix variants (appended to the primary hold response):**
+1. ` You're number {POS} for departure behind {AHEAD}.`
+2. ` Number {POS} in sequence behind {AHEAD}.`
+3. ` Sequence number {POS}, behind {AHEAD}.`
+
+**Example combined TX:** `Raider 39, Al Minhad Tower, hold short runway zero niner, departure spacing in forty five seconds. You're number two for departure behind Raider 032.`
+
+---
+
 ## 7b. Hold for departure spacing
 
 Fired when a pilot calls `request takeoff` or `holding short` within

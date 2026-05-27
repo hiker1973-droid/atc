@@ -44,6 +44,10 @@ const (
 	// the window get a HoldForSpacing response; the proactive monitor skips
 	// silently and retries on the next tick.
 	DepartureSpacingSec = 60 * time.Second
+	// MaxAnnouncedQueuePosition caps queue-position suffix at this rank.
+	// Positions beyond will hear the ones ahead get cleared first, so
+	// announcing 4+ adds chatter without value.
+	MaxAnnouncedQueuePosition = 3
 	// TrafficAdvisoryRadiusNm — report traffic to inbounds within this range.
 	TrafficAdvisoryRadiusNm = 10.0
 	// MonitorInterval is how often the background conflict monitor runs.
@@ -204,6 +208,31 @@ func (c *ATCController) recordGoAround(callsign string) {
 	c.goAroundMu.Lock()
 	defer c.goAroundMu.Unlock()
 	c.goAroundLastTx[callsign] = time.Now()
+}
+
+// maybeAppendQueuePositionSuffix conditionally appends a position-in-line
+// sentence to a hold response. Returns the response unchanged if the
+// aircraft is first in queue, already been announced, beyond the cap, or
+// the position can't be resolved. On success, sets AnnouncedQueuePos so
+// subsequent retries don't re-announce.
+func (c *ATCController) maybeAppendQueuePositionSuffix(
+	response string,
+	ac *state.AircraftState,
+	s *state.AirfieldState,
+) string {
+	if ac == nil || ac.AnnouncedQueuePos {
+		return response
+	}
+	pos := s.DeparturePosition(ac.Callsign)
+	if pos < 2 || pos > MaxAnnouncedQueuePosition {
+		return response
+	}
+	ahead := s.DepartureAheadOf(ac.Callsign)
+	if ahead == "" {
+		return response
+	}
+	ac.AnnouncedQueuePos = true
+	return response + c.composer.QueuePositionSuffix(pos, ahead)
 }
 
 // Run starts the background weather, prune, and conflict-monitor loops.
@@ -557,12 +586,13 @@ func (c *ATCController) handleTakeoffRequest(
 			Msg("departure held short — inbound traffic within hold-short radius")
 
 		s.EnqueueDeparture(ac)
-		return c.composer.HoldShortTraffic(
+		response := c.composer.HoldShortTraffic(
 			callsign,
 			s.ActiveRunway,
 			closest.Aircraft.Callsign,
 			closest.DistanceNm,
 		)
+		return c.maybeAppendQueuePositionSuffix(response, ac, s)
 	}
 
 	// Departure-spacing gate — hold this one if a takeoff was cleared less
@@ -575,7 +605,8 @@ func (c *ATCController) handleTakeoffRequest(
 			Str("callsign", callsign).
 			Int("secondsLeft", secsLeft).
 			Msg("departure held — spacing window")
-		return c.composer.HoldForSpacing(callsign, s.ActiveRunway, secsLeft)
+		response := c.composer.HoldForSpacing(callsign, s.ActiveRunway, secsLeft)
+		return c.maybeAppendQueuePositionSuffix(response, ac, s)
 	}
 
 	// No conflict — clear for takeoff. If this is the first call and the
@@ -617,10 +648,11 @@ func (c *ATCController) handleHoldingShortRequest(
 				Str("conflict", closest.Aircraft.Callsign).
 				Float64("distNm", closest.DistanceNm).
 				Msg("holding short — inbound within hold-short radius")
-			return c.composer.HoldShortTraffic(
+			response := c.composer.HoldShortTraffic(
 				callsign, s.ActiveRunway,
 				closest.Aircraft.Callsign, closest.DistanceNm,
 			)
+			return c.maybeAppendQueuePositionSuffix(response, ac, s)
 		}
 
 		// Inbound is between LineUpWaitRadiusNm and HoldShortRadiusNm —
@@ -631,10 +663,11 @@ func (c *ATCController) handleHoldingShortRequest(
 			Float64("distNm", closest.DistanceNm).
 			Msg("line up and wait — inbound in outer zone")
 		s.EnqueueDeparture(ac)
-		return c.composer.LineUpAndWait(
+		response := c.composer.LineUpAndWait(
 			callsign, s.ActiveRunway,
 			closest.Aircraft.Callsign, closest.DistanceNm,
 		)
+		return c.maybeAppendQueuePositionSuffix(response, ac, s)
 	}
 
 	// Departure-spacing gate — same as handleTakeoffRequest. This is the
@@ -646,7 +679,8 @@ func (c *ATCController) handleHoldingShortRequest(
 			Str("callsign", callsign).
 			Int("secondsLeft", secsLeft).
 			Msg("holding short — departure spacing window")
-		return c.composer.HoldForSpacing(callsign, s.ActiveRunway, secsLeft)
+		response := c.composer.HoldForSpacing(callsign, s.ActiveRunway, secsLeft)
+		return c.maybeAppendQueuePositionSuffix(response, ac, s)
 	}
 
 	// No conflict — proceed to runway, cleared for takeoff.
