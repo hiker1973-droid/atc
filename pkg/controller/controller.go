@@ -32,6 +32,11 @@ const (
 	// GoAroundRadiusNm — if an inbound is within this distance and a departure
 	// is rolling/cleared, issue a proactive go-around.
 	GoAroundRadiusNm = 5.0
+	// GoAroundCooldown — minimum gap between go-around transmissions to the
+	// same callsign. Defends against the conflict-monitor re-firing after
+	// state churn (Remove → GetOrCreate resets the per-aircraft GoAroundWarned
+	// flag, so a controller-level debounce is the durable guard).
+	GoAroundCooldown = 60 * time.Second
 	// TrafficAdvisoryRadiusNm — report traffic to inbounds within this range.
 	TrafficAdvisoryRadiusNm = 10.0
 	// MonitorInterval is how often the background conflict monitor runs.
@@ -138,6 +143,10 @@ type ATCController struct {
 	// Zero until the first Tacview tick lands. Stored via atomic.Value so reads on
 	// the dashboard hot path don't contend with the Tacview writer.
 	missionTime atomic.Value // time.Time
+
+	// goAroundLastTx debounces go-around transmissions per callsign.
+	goAroundMu     sync.Mutex
+	goAroundLastTx map[string]time.Time
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -153,6 +162,7 @@ func NewATCController(
 		composer:           composer.NewATCComposer(airfieldCallsign),
 			stalePruneInterval: 2 * time.Minute,
 		staleThreshold:     10 * time.Minute,
+		goAroundLastTx:     make(map[string]time.Time),
 	}
 }
 
@@ -161,6 +171,26 @@ func (c *ATCController) SetTransmitFn(fn func(ctx context.Context, text string))
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.transmitFn = fn
+}
+
+// canIssueGoAround returns true if no go-around has been transmitted to this
+// callsign within GoAroundCooldown. Belt-and-braces for the AircraftState
+// GoAroundWarned flag, which is lost on Remove → GetOrCreate cycles.
+func (c *ATCController) canIssueGoAround(callsign string) bool {
+	c.goAroundMu.Lock()
+	defer c.goAroundMu.Unlock()
+	last, ok := c.goAroundLastTx[callsign]
+	if !ok {
+		return true
+	}
+	return time.Since(last) >= GoAroundCooldown
+}
+
+// recordGoAround stamps a go-around TX time for the callsign.
+func (c *ATCController) recordGoAround(callsign string) {
+	c.goAroundMu.Lock()
+	defer c.goAroundMu.Unlock()
+	c.goAroundLastTx[callsign] = time.Now()
 }
 
 // Run starts the background weather, prune, and conflict-monitor loops.
@@ -687,6 +717,9 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 			if ac.GoAroundWarned {
 				continue // Already issued — don't repeat
 			}
+			if !c.canIssueGoAround(ac.Callsign) {
+				continue // Controller-level debounce: same callsign warned recently
+			}
 			departure := departures[0]
 			log.Warn().
 				Str("inbound", ac.Callsign).
@@ -695,11 +728,16 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 				Msg("conflict detected — issuing go-around")
 
 			ac.GoAroundWarned = true
-			// Re-enqueue as inbound after go-around
+			// Re-enqueue as inbound after go-around. State.Remove + GetOrCreate
+			// returns a fresh AircraftState with zero-valued fields, so we must
+			// re-set GoAroundWarned on the new object — otherwise the next
+			// monitor tick re-fires (root cause of the 2026-05-26 6×-storm).
 			s.Remove(ac.Callsign)
 			fresh := s.GetOrCreate(ac.Callsign)
 			fresh.Airframe = ac.Airframe
+			fresh.GoAroundWarned = true
 			s.EnqueueLanding(fresh)
+			c.recordGoAround(ac.Callsign)
 
 			response := c.composer.GoAroundConflict(
 				ac.Callsign,
@@ -1039,6 +1077,7 @@ func normalizeCallsign(text string) string {
 
 func extractCallsign(text, towerCallsign string) string {
 	text = normalizeCallsign(text)
+	text = stripLeadingFiller(text)
 	lower := strings.ToLower(text)
 	towerLower := strings.ToLower(towerCallsign)
 	idx := strings.Index(lower, towerLower)
@@ -1112,8 +1151,9 @@ func trimTrailingTriggers(cs string) string {
 		"downwind", "turning downwind",
 		"base", "turning base",
 		"overhead", "initial",
-		"clear active", "cleared active", "clear the active", "clear of runway", "runway vacated",
+		"clear active", "cleared active", "clear the active", "clear of runway", "clear of", "is clear", "runway vacated",
 		"going around", "go around", "missed approach",
+		"declaring", "in-flight", "in flight",
 		// distance / handoff
 		"pushing command", "switching command", "switching over to command", "switching over", "push command",
 		"taxiing", "taxying",
@@ -1130,7 +1170,52 @@ func trimTrailingTriggers(cs string) string {
 			cut = i
 		}
 	}
-	return strings.TrimSpace(strings.Trim(cs[:cut], ", ."))
+	return stripTrailingConnectors(strings.TrimSpace(strings.Trim(cs[:cut], ", .")))
+}
+
+// stripLeadingFiller drops common preamble phrases that pilots prepend before
+// their callsign ("this is Viper 27..."). Run before extractCallsign's tower
+// lookup so the trailing extracted callsign isn't polluted with filler.
+func stripLeadingFiller(text string) string {
+	prefixes := []string{
+		"this is ", "i am ", "i'm ", "we are ", "we're ",
+	}
+	for _, p := range prefixes {
+		lower := strings.ToLower(text)
+		for {
+			idx := strings.Index(lower, p)
+			if idx < 0 {
+				break
+			}
+			text = text[:idx] + text[idx+len(p):]
+			lower = strings.ToLower(text)
+		}
+	}
+	return text
+}
+
+// stripTrailingConnectors removes linking verbs and articles left on the tail
+// after trimTrailingTriggers cuts at an intent word — pilots say "Venom 200 is
+// airborne" so "airborne" gets cut but "is" trails. Apply iteratively to chew
+// through "Venom 200 is now" → "Venom 200".
+func stripTrailingConnectors(cs string) string {
+	connectors := []string{"is", "was", "are", "were", "now", "currently", "the", "a", "an"}
+	for {
+		trimmed := strings.TrimRight(cs, " ,.\t")
+		lowerTrim := strings.ToLower(trimmed)
+		matched := false
+		for _, c := range connectors {
+			if strings.HasSuffix(lowerTrim, " "+c) {
+				trimmed = trimmed[:len(trimmed)-len(c)-1]
+				matched = true
+				break
+			}
+		}
+		cs = strings.TrimRight(trimmed, " ,.\t")
+		if !matched {
+			return cs
+		}
+	}
 }
 
 func extractAirframe(lower string) string {
