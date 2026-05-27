@@ -329,7 +329,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			case <-flushTicker.C:
 				now := time.Now()
 				for origin, tx := range transmissions {
-					if now.Sub(tx.lastPacket) > 400*time.Millisecond && len(tx.opusFrames) > 3 {
+					if now.Sub(tx.lastPacket) > 400*time.Millisecond && len(tx.opusFrames) > 9 {
 						if until := atomic.LoadInt64(txCooldown); until > 0 && time.Now().UnixNano() < until {
 							delete(transmissions, origin)
 							continue

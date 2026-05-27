@@ -239,7 +239,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 				for origin, tx := range transmissions {
 					silent := now.Sub(tx.lastPacket) > 400*time.Millisecond
 					tooLong := !tx.firstPacket.IsZero() && now.Sub(tx.firstPacket) > 20*time.Second
-					if (silent || tooLong) && len(tx.opusFrames) > 3 {
+					if (silent || tooLong) && len(tx.opusFrames) > 9 {
 						if until := atomic.LoadInt64(&txCooldown); until > 0 && time.Now().UnixNano() < until {
 							delete(transmissions, origin)
 							continue

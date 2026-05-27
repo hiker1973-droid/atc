@@ -1122,7 +1122,7 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 					for origin, tx := range transmissions {
 						silent := now.Sub(tx.lastPacket) > 400*time.Millisecond
 						tooLong := !tx.firstPacket.IsZero() && now.Sub(tx.firstPacket) > 20*time.Second
-						if (silent || tooLong) && len(tx.opusFrames) > 3 {
+						if (silent || tooLong) && len(tx.opusFrames) > 9 {
 							frames := tx.opusFrames
 							log.Info().Str("origin", origin).Int("frames", len(frames)).Msg("flushing transmission to Whisper")
 							delete(transmissions, origin)
