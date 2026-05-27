@@ -128,15 +128,17 @@ Marshal handles the inbound stack to the boat — case recovery info, BRC, stack
    - ATC, deck busy: *"…roger, hold angels 3"*
    - Triggers: `established angels` · `established at angels`
 
-5. **Commencing** — pushing from the stack.
+5. **Commencing → LSO handoff** (Marshal hands you to paddles here).
    - Pilot: *"Marshal, Raider 1, commencing"* (optionally with state)
-   - ATC: *"…copy commencing"*
+   - ATC: *"…copy commencing, state 5.0, contact paddles"* — switch to LSO/Paddles freq.
    - Internal: stack collapses silently — no step-down radio call.
+   - Note: prior versions stopped at "copy commencing" and relied on §6 below for the handoff. Now §5 hands off in one call.
 
-6. **3-mile initial → LSO handoff** (Marshal's last call to you).
+6. **3-mile initial → LSO handoff** (fallback if you skipped commencing).
    - Pilot: *"Marshal, Raider 1, initial"*
-   - ATC: *"…push button 72, check in"* — switch to the LSO/Paddles freq.
+   - ATC: *"…contact paddles, good luck"* — switch to the LSO/Paddles freq.
    - Trigger: `initial`
+   - Note: prior versions cited "push button 72" — dropped since pilots know to switch.
 
 ---
 

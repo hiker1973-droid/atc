@@ -70,6 +70,11 @@ very fast call that's getting dropped, let us know — we can dial it back.
   generic "Carrier strike group" label when both are visible.
 - DME position reports are recognized inbound: *"Marshal, Raider 39, 7 DME"*
   gets a radar-confirmed ack.
+- **LSO handoff happens on "commencing"** (post-v1.2.0). Marshal acks AND
+  hands you to paddles in one call: *"Raider 39, Marshal, copy commencing,
+  state 5.0, contact paddles."* The 3-nm "initial" call still works as a
+  fallback if you skip commencing — same destination, also no TACAN cited
+  ("push button 72" was dropped since pilots know to switch).
 
 ### Quality-of-life
 - Go-around storm fix — Tower no longer repeats a go-around clearance multiple
@@ -102,8 +107,9 @@ the "Known limits" section below (which is "feature doesn't exist") — these ar
   delivered as one syllable might not register. **Slow down half a beat** and
   it'll land cleanly.
 
-- **No LSO/Paddles role yet.** After Marshal pushes you to button 72, the
-  LSO freq is silent — no "call the ball" / waveoff calls. Land using
+- **No LSO/Paddles role yet.** Marshal hands you off to paddles on
+  "commencing" (or "initial" if you skipped commencing), but the LSO
+  freq itself is silent — no "call the ball" / waveoff calls. Land using
   visual ball + lineup judgment. Planned for a later release.
 
 - **Departure-spacing only via pilot-triggered calls.** v1.2.0's 60-second
@@ -161,8 +167,8 @@ Post-landing:
 - `Marshal, [callsign], see you at ten` (radar contact request at 10 nm)
 - `Marshal, [callsign], state [N.N]` (fuel update)
 - `Marshal, [callsign], established angels [X]` (in stack, ready for Charlie)
-- `Marshal, [callsign], commencing` · `commencing, state [N.N]`
-- `Marshal, [callsign], initial` (3 nm push to LSO/Paddles)
+- `Marshal, [callsign], commencing` · `commencing, state [N.N]` — Marshal acks AND hands off to paddles in one call
+- `Marshal, [callsign], initial` — fallback handoff at 3 nm if you skipped commencing
 
 ### To Deckboss (128.60 — carrier deck)
 - `Deckboss, [callsign], radio check`
@@ -203,8 +209,9 @@ but always safer to use the full name.
 
 ## Known limits
 
-- **No LSO/Paddles role yet** — after Marshal pushes you to button 72,
-  the "ball" call and waveoff response go nowhere (planned, not built).
+- **No LSO/Paddles role yet** — Marshal hands you to paddles on
+  "commencing", but there's nothing on the LSO freq to answer (planned,
+  not built).
 - **No taxiway routing** — Tower clears you to a runway, not via specific
   taxiways. Use the airfield diagram + sense.
 - **Single-ship voice** — wingmen ack on their own callsign each. No

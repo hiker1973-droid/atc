@@ -85,20 +85,29 @@ Radio: **`Marshal, Raider 99, established angels 5.`**
 
 Expected (deck clear → Charlie): `Raider 99, Marshal, signal Charlie.` (or variant)
 
-## §5 Commencing
+## §5 Commencing → LSO handoff
 
 Radio: **`Marshal, Raider 99, commencing, state 5.0.`**
 
-Expected: `Raider 99, Marshal, copy commencing, state 5.0.`
+Expected: response acks commencing AND hands off to paddles in one call.
+Three variants — any of:
+- `Raider 99, Marshal, copy commencing, state 5.0, contact paddles.`
+- `Raider 99, Marshal, commencing, state 5.0, switch to paddles, good luck.`
+- `Raider 99, Marshal, roger commencing, state 5.0, paddles has you.`
 
 Log check: `Marshal: stack step-down (internal, no TX)` info line if other
 aircraft were in stack — collapse should NOT transmit.
 
-## §6 3NM Initial
+## §6 3NM Initial → LSO handoff (no TACAN)
 
 Radio: **`Marshal, Raider 99, initial.`**
 
-Expected: `Raider 99, Marshal, push button 72, check in.` (channel constant in marshal.go).
+Expected: same destination as §5 (paddles), no TACAN button. Three variants — any of:
+- `Raider 99, Marshal, contact paddles, good luck.`
+- `Raider 99, Marshal, switch to paddles, good luck.`
+- `Raider 99, Marshal, paddles has you, good luck.`
+
+Prior version cited "push button 72, check in" — dropped 2026-05-27.
 
 ## Failure modes to watch for
 
