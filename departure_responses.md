@@ -105,7 +105,7 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 
 **Triggers:** `clear traffic` · `clear of traffic` · `airborne` · `departing` · `seven dme` · `7 dme` · `seven miles` · `cleared airspace` · `five miles`
 
-**Extra placeholders:** `{DIST}` (word form, e.g. `seven` — pulled from airfield config, currently `7` for all towers), `{ANGELS}` (random 5/6/7 per call)
+**Extra placeholders:** `{DIST}` (word form, e.g. `seven` — pulled from airfield config, currently `7` for all towers), `{ANGELS}` (random 3/4/5/6 per call — angels 7 was too high in live ops vs UAE MOA/CAS floors, range narrowed 2026-05-27)
 
 **Responses:**
 1. `{CALLSIGN}, {TOWER}, proceed to angels {ANGELS}, contact tower at {DIST} DME.`

@@ -1456,16 +1456,20 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 		"Say again your request.",
 		"Unable to copy, say again.",
 		"You were broken, say again.",
-		// Departure release bodies (new short form: "proceed to angels {N}, contact tower at seven DME.")
+		// Departure release bodies (short form: "proceed to angels {N}, contact tower at seven DME.")
+		// Angels range is 3-6 — kept in sync with composer.DepartureRelease.
+		"Proceed to angels three, contact tower at seven DME.",
+		"Proceed to angels four, contact tower at seven DME.",
 		"Proceed to angels five, contact tower at seven DME.",
 		"Proceed to angels six, contact tower at seven DME.",
-		"Proceed to angels seven, contact tower at seven DME.",
+		"Climb to angels three, contact tower at seven DME.",
+		"Climb to angels four, contact tower at seven DME.",
 		"Climb to angels five, contact tower at seven DME.",
 		"Climb to angels six, contact tower at seven DME.",
-		"Climb to angels seven, contact tower at seven DME.",
+		"Angels three, contact tower at seven DME.",
+		"Angels four, contact tower at seven DME.",
 		"Angels five, contact tower at seven DME.",
 		"Angels six, contact tower at seven DME.",
-		"Angels seven, contact tower at seven DME.",
 	}
 	// NOTE: prewarm cache is keyed by exact text. Today the hot-path TX is
 	// "{callsign}, {tower}, {body}." so these bare-body entries only hit if

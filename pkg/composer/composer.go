@@ -111,12 +111,14 @@ func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromM
 }
 
 // DepartureRelease confirms post-takeoff departure — 3 variations.
-// The angels arg is ignored; we randomize 5–7 per call so successive
-// departures don't all get assigned the same altitude. Pilot is told to
-// call tower back at distNm DME for the Command handoff.
+// The angels arg is ignored; we randomize 3–6 per call so successive
+// departures don't all get assigned the same altitude. Range chosen
+// to stay below typical MOA/CAS floors at the UAE training fields —
+// angels 7 was too high in live ops. Pilot is told to call tower
+// back at distNm DME for the Command handoff.
 func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) string {
 	dist := numberWord(distNm)
-	ang := numberWord(5 + rand.Intn(3))
+	ang := numberWord(3 + rand.Intn(4))
 	return pick([]string{
 		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
 		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower passing %s DME.", callsign, c.towerCallsign, ang, dist),
