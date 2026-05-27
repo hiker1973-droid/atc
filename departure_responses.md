@@ -101,6 +101,28 @@ Used when pilot has been holding and tower issues combined "proceed and cleared"
 
 ---
 
+## 6b. Verify hold-short position (Tacview position gate)
+
+Fired when `--position-check` is on AND a pilot calls "holding short" but
+Tacview shows them more than `HoldShortValidationNm` (0.5 nm) from the
+active runway's threshold. Pilot is NOT enqueued — they need to verify
+position and re-call. Pilots without Tacview telemetry are not penalized
+(the helper fails open).
+
+**Off by default** (`--position-check=false`). Enable for a single
+session to observe behavior before relying on it — depends on runway
+threshold coordinates being accurate in `pkg/airfield/`.
+
+**Responses (`VerifyHoldShortPosition`):**
+1. `{CALLSIGN}, {TOWER}, unable to confirm hold-short position runway {RUNWAY}, say position.`
+2. `{CALLSIGN}, {TOWER}, your position does not appear to be at the hold short of runway {RUNWAY}, verify and report.`
+3. `{CALLSIGN}, {TOWER}, do not see you at the hold short, runway {RUNWAY}, confirm position.`
+
+A corresponding `level=warn` log line is emitted with the actual distance
+so the operator can spot threshold-data mismatches.
+
+---
+
 ## 7a. Queue-position suffix
 
 Appended to §5 (Line up and wait), §6/7 hold variants, and §7b (Hold for

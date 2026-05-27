@@ -126,6 +126,18 @@ func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) stri
 	})
 }
 
+// VerifyHoldShortPosition asks the pilot to confirm their position when
+// Tacview shows them too far from the runway threshold to be holding short.
+// Used by the --position-check gate. Three variants.
+func (c *ATCComposer) VerifyHoldShortPosition(callsign, runway string) string {
+	rwy := spellRunway(runway)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, unable to confirm hold-short position runway %s, say position.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, your position does not appear to be at the hold short of runway %s, verify and report.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, do not see you at the hold short, runway %s, confirm position.", callsign, c.towerCallsign, rwy),
+	})
+}
+
 // QueuePositionSuffix returns a short sentence to append to a hold response
 // when an aircraft is at position 2 or 3 in the departure queue. Capped at
 // position 3 (handler-side); positions 4+ get nothing since they'll hear the

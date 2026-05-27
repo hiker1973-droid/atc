@@ -48,6 +48,12 @@ const (
 	// Positions beyond will hear the ones ahead get cleared first, so
 	// announcing 4+ adds chatter without value.
 	MaxAnnouncedQueuePosition = 3
+	// HoldShortValidationNm — radius around the active runway threshold
+	// within which a pilot calling "holding short" is considered legit.
+	// Used when --position-check is on. 0.5 nm covers typical taxiway
+	// dispersion at UAE training fields without rejecting pilots stacked
+	// behind another aircraft at the hold-short line.
+	HoldShortValidationNm = 0.5
 	// TrafficAdvisoryRadiusNm — report traffic to inbounds within this range.
 	TrafficAdvisoryRadiusNm = 10.0
 	// MonitorInterval is how often the background conflict monitor runs.
@@ -164,6 +170,11 @@ type ATCController struct {
 	// findCarrierContact; logging every match would spam under live ops).
 	carrierChoiceMu   sync.Mutex
 	lastCarrierChoice string
+
+	// positionCheck enables the Tacview hold-short position gate. Default
+	// false; set via SetPositionCheck (wired to --position-check CLI flag).
+	// When off, isPilotAtHoldShort is not called and behavior is unchanged.
+	positionCheck bool
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -208,6 +219,41 @@ func (c *ATCController) recordGoAround(callsign string) {
 	c.goAroundMu.Lock()
 	defer c.goAroundMu.Unlock()
 	c.goAroundLastTx[callsign] = time.Now()
+}
+
+// SetPositionCheck enables/disables the Tacview hold-short position gate.
+// Wired to the --position-check CLI flag in cmd/atc/main.go.
+func (c *ATCController) SetPositionCheck(enabled bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.positionCheck = enabled
+}
+
+// isPilotAtHoldShort returns true if Tacview shows the caller within
+// HoldShortValidationNm of the active runway's threshold. Fails open:
+// returns true when Tacview has no contact for the callsign or when the
+// airfield config has no matching runway designator, so a misconfiguration
+// can't wedge the queue. Pilots without telemetry get the benefit of the
+// doubt.
+func (c *ATCController) isPilotAtHoldShort(callsign, runway string) bool {
+	contact := c.lookupContact(callsign)
+	if contact == nil {
+		return true
+	}
+	threshold, ok := c.airfieldState.Airfield.ThresholdFor(runway)
+	if !ok {
+		return true
+	}
+	dist := haversineNm(orb.Point{contact.Lon, contact.Lat}, threshold)
+	if dist <= HoldShortValidationNm {
+		return true
+	}
+	log.Warn().
+		Str("callsign", callsign).
+		Str("runway", runway).
+		Float64("distNm", dist).
+		Msg("position check — pilot claims hold-short but Tacview shows them elsewhere")
+	return false
 }
 
 // maybeAppendQueuePositionSuffix conditionally appends a position-in-line
@@ -636,6 +682,14 @@ func (c *ATCController) handleHoldingShortRequest(
 	ac *state.AircraftState,
 	s *state.AirfieldState,
 ) string {
+	// Tacview hold-short position gate (off by default; --position-check).
+	// If on and the pilot doesn't appear at the runway threshold, ask them
+	// to verify position rather than enqueuing — avoids clearing pilots who
+	// claim hold-short while still on a distant taxiway.
+	if c.positionCheck && !c.isPilotAtHoldShort(callsign, s.ActiveRunway) {
+		return c.composer.VerifyHoldShortPosition(callsign, s.ActiveRunway)
+	}
+
 	inbounds := s.InboundsWithinNm(HoldShortRadiusNm)
 
 	if len(inbounds) > 0 {
@@ -828,6 +882,10 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 		inboundsNear := s.InboundsWithinNm(HoldShortRadiusNm)
 		if len(inboundsNear) == 0 {
 			next := s.NextDeparture()
+			if next != nil && c.positionCheck && !c.isPilotAtHoldShort(next.Callsign, s.ActiveRunway) {
+				// Skip: position-check gate says queue head isn't at hold-short.
+				next = nil
+			}
 			if next != nil && !next.TakeoffCleared && next.HoldingShort {
 				// Mark cleared before transmitting to prevent double-issue
 				next.TakeoffCleared = true

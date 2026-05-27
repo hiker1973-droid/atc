@@ -94,6 +94,7 @@ var (
 	flagPprofPort           int
 	flagRunwayRotation      bool
 	flagRunwaySlot          time.Duration
+	flagPositionCheck       bool
 )
 
 func main() {
@@ -194,6 +195,8 @@ func main() {
 		"Rotate active runway every 4h instead of selecting by wind. Disable with --runway-rotation=false to fall back to wind-driven selection.")
 	f.DurationVar(&flagRunwaySlot, "runway-slot", 4*time.Hour,
 		"Length of one runway-rotation slot. Default 4h matches production cadence; shorten (e.g. 60s) for live verification of slot rolls.")
+	f.BoolVar(&flagPositionCheck, "position-check", false,
+		"Validate via Tacview that a pilot calling 'holding short' is actually within HoldShortValidationNm of the runway threshold. Off by default — enable for a session to observe before relying on it.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -340,6 +343,10 @@ func run(cmd *cobra.Command, args []string) error {
 	atcCtrl := controller.NewATCController(callsign, af)
 	if !flagRunwayRotation {
 		atcCtrl.DisableRunwayRotation()
+	}
+	if flagPositionCheck {
+		atcCtrl.SetPositionCheck(true)
+		log.Info().Msg("Tacview hold-short position check enabled (--position-check)")
 	}
 	// Seed weather from --static-* flags so dashboard /status reports real
 	// values instead of zeros. UpdateFlightConditions wires CeilingFt /

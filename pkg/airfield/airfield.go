@@ -70,6 +70,21 @@ type Airfield struct {
 	BreakDirections map[string]string
 }
 
+// ThresholdFor returns the landing threshold of the runway with the given
+// designator. The boolean is false if no runway matches — callers should
+// fall open when this happens (treat the position check as a no-op).
+func (a *Airfield) ThresholdFor(designator string) (orb.Point, bool) {
+	for _, pair := range a.RunwayPairs {
+		if pair.Primary.Designator == designator {
+			return pair.Primary.ThresholdLatLon, true
+		}
+		if pair.Reciprocal.Designator == designator {
+			return pair.Reciprocal.ThresholdLatLon, true
+		}
+	}
+	return orb.Point{}, false
+}
+
 // ActiveRunway returns the runway end most into-wind given a magnetic wind-from
 // direction and speed. Returns the primary runway of the first pair when calm.
 func (a *Airfield) ActiveRunway(windFromMag float64, windKts float64) Runway {
