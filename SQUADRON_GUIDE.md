@@ -154,7 +154,7 @@ Pattern / inbound:
 - `Tower, [callsign], request landing`
 
 Emergency:
-- `Tower, [callsign], declaring emergency` · `mayday` · `pan pan`
+- `Tower, [callsign], declaring emergency` · `mayday` · 
 
 Post-landing:
 - `Tower, [callsign], clear of the active` · `runway vacated`
