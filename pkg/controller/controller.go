@@ -147,6 +147,12 @@ type ATCController struct {
 	// goAroundLastTx debounces go-around transmissions per callsign.
 	goAroundMu     sync.Mutex
 	goAroundLastTx map[string]time.Time
+
+	// lastCarrierChoice remembers the last carrier callsign findCarrierContact
+	// returned so we only log at info on transitions (each pilot call invokes
+	// findCarrierContact; logging every match would spam under live ops).
+	carrierChoiceMu   sync.Mutex
+	lastCarrierChoice string
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -1546,14 +1552,31 @@ func (c *ATCController) findCarrierContact() (callsign string, contact *TacviewC
 		}
 	}
 	if primary != nil {
-		log.Debug().Strs("candidates", candidates).Str("chosen", primaryCS).Msg("carrier match")
+		c.logCarrierChoice(primaryCS, candidates, "carrier match")
 		return primaryCS, primary, true
 	}
 	if fallback != nil {
-		log.Debug().Strs("candidates", candidates).Str("chosen", fallbackCS).Msg("carrier match (group-label fallback)")
+		c.logCarrierChoice(fallbackCS, candidates, "carrier match (group-label fallback)")
 		return fallbackCS, fallback, true
 	}
 	return "", nil, false
+}
+
+// logCarrierChoice emits an info-level log only when the chosen carrier
+// callsign changes since the last findCarrierContact call. Steady-state
+// matches stay at debug level — keeps the signal-to-noise ratio sane
+// under live ops where every Marshal/Deckboss intent resolves a carrier.
+func (c *ATCController) logCarrierChoice(chosen string, candidates []string, msg string) {
+	c.carrierChoiceMu.Lock()
+	changed := chosen != c.lastCarrierChoice
+	prev := c.lastCarrierChoice
+	c.lastCarrierChoice = chosen
+	c.carrierChoiceMu.Unlock()
+	if changed {
+		log.Info().Strs("candidates", candidates).Str("chosen", chosen).Str("prev", prev).Msg(msg + " (transition)")
+		return
+	}
+	log.Debug().Strs("candidates", candidates).Str("chosen", chosen).Msg(msg)
 }
 
 // GetCarrierBRC returns the carrier's Base Recovery Course (bow direction) from
