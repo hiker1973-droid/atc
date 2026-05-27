@@ -79,6 +79,20 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
+## Recent context (2026-05-27)
+- **v1.1.1 cut and pushed** — controller hygiene patch covering the 2026-05-26 OMDM post-mortem. Five commits since `7574d1b`:
+  - `f161c01` — callsign extractor strips leading filler ("this is"/"i am") and trailing connectors (is/was/now) after the trigger cut. Added triggers: `declaring`, `in-flight`, `clear of`, `is clear`. Fixes the "Venom 2-0-0 is, Al Minhad Tower, ..." TX bleed that recurred in three different shapes yesterday.
+  - `f161c01` — go-around debounce: 60s per-callsign cooldown via `goAroundLastTx` map on `ATCController`, plus reapply `fresh.GoAroundWarned=true` after `Remove`/`GetOrCreate` re-enqueue. Root cause of the 6×-in-70s storm was the per-aircraft flag silently zero-resetting on the new struct.
+  - `73f0bd3` — `findCarrierContact` logs at info only on chosen-callsign **transition** (with `prev` field), debug otherwise. Replaces the uncommitted Debug→Info diagnostic that was sitting in the working tree since the CVN-naming work in `7574d1b`.
+  - `f770223` — Whisper min-frame floor bumped from `> 3` (≈60ms) to `> 9` (≈200ms) across all four srsLoops (main / command / marshal / deckboss). Driven by the 22 hallucinations dropped in yesterday's OMDM window. **Tuning knob** — if pilots report rushed short calls being dropped, dial back to `> 6`. Not yet validated live.
+  - `f5e0ec4` — `dev_only/marshal_smoke.md` — manual §1-§6 Case 1 Recovery checklist for exercising `findCarrierContact` after CVN-naming changes.
+- **Versioning** — v1.1.1 is a **patch** (hygiene/safety), not the v1.2.0 line. Next minor still scoped for Deckboss-live + DME-style feature work.
+- **Open work — departure queue improvements (planned, not implemented):**
+  1. Min-spacing timer between departure clearances (`DepartureSpacingSec=60s`). Yesterday's 19:30:44 / 19:31:07 Raider 032 + Raider 39 double-clear (23s apart) is the case study.
+  2. Tacview position gate before promoting queue head to "number 1" (`HoldShortValidationNm=0.5`, behind a flag).
+  3. Queue-join announcement at enqueue time for positions 2-3 (needs `departure_responses.md` spec update first per the "spec docs are source of truth" rule).
+  4. Departure altitude range bug — `composer.go:119` hardcodes `5 + rand.Intn(3)` (yields 5/6/7); user wants 3-6 (`3 + rand.Intn(4)`). Per-airfield `DepartureAngels` config is currently ignored — composer randomizes regardless. TTS prewarm cache at `main.go:1460-1468` also needs the new range. Quick win to ship first.
+
 ## Recent context (2026-05-17)
 - **Deckboss live on 128.6** (DCS carrier UHF, was 306.2). Brought up with: IPv6 UDP fix (`net.ResolveUDPAddr` + `net.DialUDP` like Marshal — `net.Dial("udp", ...)` was binding `::1` and silently dropping audio), §1/§2 trigger alignment with `deckboss_responses.md` (now accepts `request taxi`/`green jet` and `(tension|ready)+cat`), self-echo guard on §1/§2/§6, voice default `ash` via new `--deckboss-voice` flag, `Clea to launch` typo fixed. Commits `716e588` / `7b95c74` / `fe792d8`.
 - **DME position report §1b wired** in Marshal — "Marshal, Raider 39, 7 DME" → ack with radar confirm if Tacview has the caller. Commit `793837e`.
