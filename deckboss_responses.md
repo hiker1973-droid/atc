@@ -63,7 +63,9 @@ Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both
 
 **Triggers:** automatic — fires 5 seconds after a successful §2 `DeckbossUnderTension` response. Not pilot-initiated.
 
-Shooter's launch signal. Not callsigned (addresses the cat, deck-wide). **After the shoot call, Deckboss immediately frees the cat slot and pulls the next pilot from the conga onto it** (or, if conga is empty, leaves the slot open for the next §1 `Request Taxi` caller). The cat-clear ack to next-up TXes right after the shoot call so the player hears the slot assignment without waiting for the launching pilot's airborne call.
+Shooter's launch signal. Not callsigned (addresses the cat, deck-wide). **After the shoot call, Deckboss frees the cat slot and pulls the next pilot from the conga onto it** (or, if conga is empty, leaves the slot open for the next §1 `Request Taxi` caller). The cat-clear ack to next-up TXes **10 seconds after the shoot call** (T+15 from the under-tension ack) — gives the launching aircraft time to taxi off the cat / clear the deck so the slot is realistically open when next-up hears it. Next-up gets their slot assignment without waiting for the launching pilot's airborne call.
+
+**Timeline:** T+0 under tension → T+5 shoot → T+15 cat clear to next-up.
 
 **Responses (`DeckbossShoot`):**
 1. `Cat {CAT}, fly.`

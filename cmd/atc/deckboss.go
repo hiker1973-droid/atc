@@ -171,8 +171,14 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 						if next != "" {
 							deck.AssignCat(next)
 							nx, fn := next, freed
+							// 10s gap after the shoot call before announcing to
+							// next-up — gives the launching aircraft time to
+							// taxi off the cat / clear the deck so the slot is
+							// realistically open when next-up hears it. Lands
+							// at T+15 from the under-tension ack (T+0 tension,
+							// T+5 shoot, T+15 cat clear).
 							go func() {
-								time.Sleep(3 * time.Second)
+								time.Sleep(10 * time.Second)
 								transmit(fmt.Sprintf("%s, %s", nx, comp.DeckbossCatClear(fn)))
 							}()
 						}
