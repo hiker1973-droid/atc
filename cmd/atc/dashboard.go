@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -172,6 +173,7 @@ func (ds *dashboardServer) run(ctx context.Context) {
 
 	mux.HandleFunc("/status", cors(ds.handleStatus))
 	mux.HandleFunc("/runway", cors(ds.handleRunway))
+	mux.HandleFunc("/weather", cors(ds.handleWeather))
 	mux.HandleFunc("/ws/log", ds.handleWSLog)
 	mux.HandleFunc("/health", cors(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -359,6 +361,67 @@ func (ds *dashboardServer) handleRunway(w http.ResponseWriter, r *http.Request) 
 	log.Info().Str("rwy", to).Str("icao", ds.af.ICAO).Msg("Active runway set via dashboard")
 	broadcastLog("sys", "Active runway: "+to+" ("+ds.af.ICAO+")")
 	json.NewEncoder(w).Encode(map[string]string{"activeRunway": to})
+}
+
+// handleWeather lets the dashboard push a manual weather override.
+// POST /weather?windDir=&windKts=&ceilFt=&visNm=&altInHg=
+// All five params required. Routes through SetFullWeather; isNight is
+// preserved from current state (mission time drives night on /status anyway).
+func (ds *dashboardServer) handleWeather(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	q := r.URL.Query()
+	parse := func(key string, lo, hi float64) (float64, error) {
+		v := q.Get(key)
+		if v == "" {
+			return 0, fmt.Errorf("missing '%s'", key)
+		}
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, fmt.Errorf("'%s' not a number: %v", key, err)
+		}
+		if f < lo || f > hi {
+			return 0, fmt.Errorf("'%s'=%v out of range [%v,%v]", key, f, lo, hi)
+		}
+		return f, nil
+	}
+	windDir, err := parse("windDir", 0, 360)
+	if err == nil {
+		var windKts, ceilFt, visNm, altInHg float64
+		windKts, err = parse("windKts", 0, 200)
+		if err == nil {
+			ceilFt, err = parse("ceilFt", 0, 60000)
+			if err == nil {
+				visNm, err = parse("visNm", 0, 50)
+				if err == nil {
+					altInHg, err = parse("altInHg", 25.0, 32.0)
+					if err == nil {
+						snap := ds.atcCtrl.GetAirfieldStateSnapshot()
+						ds.atcCtrl.SetFullWeather(windDir, windKts, ceilFt, visNm, altInHg, snap.IsNight)
+						log.Info().
+							Float64("windDir", windDir).
+							Float64("windKts", windKts).
+							Float64("ceilFt", ceilFt).
+							Float64("visNm", visNm).
+							Float64("altInHg", altInHg).
+							Str("icao", ds.af.ICAO).
+							Msg("Weather set via dashboard")
+						broadcastLog("sys", fmt.Sprintf("Weather set: %03.0f@%02.0f, %.0fft, %.1fnm, %.2f\" (%s)",
+							windDir, windKts, ceilFt, visNm, altInHg, ds.af.ICAO))
+						json.NewEncoder(w).Encode(map[string]interface{}{
+							"windDir": windDir, "windKts": windKts,
+							"ceilFt": ceilFt, "visNm": visNm, "altInHg": altInHg,
+						})
+						return
+					}
+				}
+			}
+		}
+	}
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 // handleWSLog streams log entries to connected WebSocket clients.

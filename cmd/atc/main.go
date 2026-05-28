@@ -35,6 +35,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/vsfg7/atc/pkg/airfield"
 	"github.com/vsfg7/atc/pkg/controller"
+	"github.com/vsfg7/atc/pkg/miz"
 	"github.com/vsfg7/atc/pkg/state"
 )
 
@@ -71,6 +72,8 @@ var (
 	flagStaticAltInHg   float64
 	flagStaticTempC     float64
 	flagStaticNight     bool
+	flagMizPath         string
+	flagMizDir          string
 	flagTacviewAddr     string
 	flagATISFreq        string
 	flagATISBroadcast   bool
@@ -131,6 +134,8 @@ func main() {
 	f.Float64Var(&flagStaticAltInHg, "static-alt-inhg", 29.92, "Static altimeter inHg (Training VM)")
 	f.Float64Var(&flagStaticTempC,   "static-temp-c",   15, "Static temperature Celsius (Training VM)")
 	f.BoolVar(&flagStaticNight,      "static-night",    false, "Treat mission as night (sets IsNight + 'VFR Night' mode). Real-world server clock is unrelated to DCS mission time, so this must be set explicitly.")
+	f.StringVar(&flagMizPath, "miz-path", "", "Path to a specific .miz to read weather from at boot (overrides --miz-dir)")
+	f.StringVar(&flagMizDir,  "miz-dir",  `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for the newest .miz when --miz-path is empty. Empty disables .miz auto-load.")
 	f.BoolVar(&flagCommandOnly, "command-only", false,
 		"Run as command channel only — no tower, no ATIS, no marshal")
 	f.StringVar(&flagCommandVoice, "command-voice", "onyx",
@@ -348,12 +353,45 @@ func run(cmd *cobra.Command, args []string) error {
 		atcCtrl.SetPositionCheck(true)
 		log.Info().Msg("Tacview hold-short position check enabled (--position-check)")
 	}
-	// Seed weather from --static-* flags so dashboard /status reports real
-	// values instead of zeros. UpdateFlightConditions wires CeilingFt /
-	// VisibilityNm / IsNight, which UpdateWeather alone does not. IsNight is
-	// only the initial seed — once Tacview ReferenceTime + #offset arrive, the
-	// dashboard derives day/night from mission time directly.
-	atcCtrl.SetFullWeather(flagStaticWindDir, flagStaticWindKts, flagStaticCeilFt, flagStaticVisSm, flagStaticAltInHg, flagStaticNight)
+	// Seed weather. Priority: explicit --miz-path > newest .miz in --miz-dir >
+	// --static-* flags. .miz wind is true degrees (controller applies MagVar
+	// internally). IsNight always comes from --static-night until Tacview's
+	// mission time overrides it on the dashboard side.
+	seedFromMiz := func() bool {
+		var mizPath string
+		switch {
+		case flagMizPath != "":
+			mizPath = flagMizPath
+		case flagMizDir != "":
+			if p, err := miz.FindNewestMiz(flagMizDir); err == nil {
+				mizPath = p
+			} else {
+				log.Warn().Err(err).Str("dir", flagMizDir).Msg("no .miz found — using --static-* flags")
+				return false
+			}
+		default:
+			return false
+		}
+		w, err := miz.ReadMizWeather(mizPath)
+		if err != nil {
+			log.Warn().Err(err).Str("miz", mizPath).Msg(".miz weather read failed — using --static-* flags")
+			return false
+		}
+		atcCtrl.SetFullWeather(w.WindDirTrue, w.WindKts, w.CeilFt, w.VisNm, w.AltInHg, flagStaticNight)
+		log.Info().
+			Str("miz", filepath.Base(mizPath)).
+			Float64("windDirTrue", w.WindDirTrue).
+			Float64("windKts", w.WindKts).
+			Float64("ceilFt", w.CeilFt).
+			Float64("visNm", w.VisNm).
+			Float64("altInHg", w.AltInHg).
+			Float64("tempC", w.TempC).
+			Msg("Weather loaded from .miz")
+		return true
+	}
+	if !seedFromMiz() {
+		atcCtrl.SetFullWeather(flagStaticWindDir, flagStaticWindKts, flagStaticCeilFt, flagStaticVisSm, flagStaticAltInHg, flagStaticNight)
+	}
 	marshStack := state.NewMarshalStack()
 
 	// ATIS-only mode — Training VM, static weather

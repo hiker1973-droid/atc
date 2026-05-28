@@ -24,6 +24,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vsfg7/atc/pkg/miz"
 )
 
 //go:embed ui.html
@@ -34,6 +36,7 @@ var (
 	flagRoot        = flag.String("root", "", "SkyeyeATC root dir (default: directory of this binary)")
 	flagSRSAddr     = flag.String("srs-addr", "192.168.1.221:5004", "SRS address for health probe")
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
+	flagMizDir      = flag.String("miz-dir", `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for newest .miz when answering /api/miz-weather")
 )
 
 // Role is one spawned vSFG-7 process: a single `start "Title" cmd /k "..."`
@@ -90,6 +93,7 @@ func main() {
 	mux.HandleFunc("/api/restart", handleRestart)
 	mux.HandleFunc("/api/log", handleLog)
 	mux.HandleFunc("/api/rescan", handleRescan)
+	mux.HandleFunc("/api/miz-weather", handleMizWeather)
 
 	if err := http.ListenAndServe(*flagListen, mux); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -400,6 +404,33 @@ func handleRescan(w http.ResponseWriter, _ *http.Request) {
 	n := len(roles)
 	rolesMu.Unlock()
 	writeJSON(w, map[string]int{"roles": n})
+}
+
+// handleMizWeather finds the newest .miz in flagMizDir, parses its weather
+// block, and returns the values in the same shape the Set-Weather modal
+// expects. windDir is true degrees — the dashboard /weather endpoint already
+// treats its incoming windDir as true.
+func handleMizWeather(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	path, err := miz.FindNewestMiz(*flagMizDir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	wx, err := miz.ReadMizWeather(path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]interface{}{
+		"mizName": filepath.Base(path),
+		"windDir": wx.WindDirTrue,
+		"windKts": wx.WindKts,
+		"ceilFt":  wx.CeilFt,
+		"visNm":   wx.VisNm,
+		"altInHg": wx.AltInHg,
+		"tempC":   wx.TempC,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

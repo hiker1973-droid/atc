@@ -53,6 +53,51 @@ func fetchTowerRunway(icao string) string {
 	return data.Tower.ActiveRunway
 }
 
+type towerWeather struct {
+	WindDir, WindKts, CeilFt, VisNm, AltInHg float64
+	IsNight                                  bool
+}
+
+// fetchTowerWeather pulls the live weather block from the paired tower's
+// /status. Returns ok=false for Liwa/Khasab (no paired tower) or any HTTP
+// failure. Sanity-guarded — altimeter outside [25,32] inHg means the tower
+// hasn't seeded weather yet, so we skip rather than zero out the ATIS state.
+func fetchTowerWeather(icao string) (towerWeather, bool) {
+	var zero towerWeather
+	port, ok := towerDashboardPortByICAO[icao]
+	if !ok {
+		return zero, false
+	}
+	client := http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/status", port))
+	if err != nil {
+		return zero, false
+	}
+	defer resp.Body.Close()
+	var data struct {
+		Tower struct {
+			CeilingFt     float64 `json:"ceilingFt"`
+			VisibNm       float64 `json:"visibNm"`
+			AltimeterInHg float64 `json:"altimeterInHg"`
+			WindDir       float64 `json:"windDir"`
+			WindKts       float64 `json:"windKts"`
+			IsNight       bool    `json:"isNight"`
+		} `json:"tower"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return zero, false
+	}
+	t := data.Tower
+	if t.AltimeterInHg < 25.0 || t.AltimeterInHg > 32.0 {
+		return zero, false
+	}
+	return towerWeather{
+		WindDir: t.WindDir, WindKts: t.WindKts,
+		CeilFt: t.CeilingFt, VisNm: t.VisibNm,
+		AltInHg: t.AltimeterInHg, IsNight: t.IsNight,
+	}, true
+}
+
 type atisStation struct {
 	Name      string
 	FreqMHz   float64
@@ -144,6 +189,12 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 			return
 		}
 		defer broadcasting.Unlock()
+		// Sync weather from the paired tower before reading our own controller
+		// state. Stations with no paired tower (Liwa, Khasab) keep the boot
+		// --static-* values. Mirrors the runway-poll pattern below.
+		if tw, ok := fetchTowerWeather(station.ICAO); ok {
+			atcCtrl.SetFullWeather(tw.WindDir, tw.WindKts, tw.CeilFt, tw.VisNm, tw.AltInHg, tw.IsNight)
+		}
 		state.mu.Lock()
 		// Update weather from controller
 		ceil, alt := atcCtrl.GetWeatherState()

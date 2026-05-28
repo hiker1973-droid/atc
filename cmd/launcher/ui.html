@@ -144,6 +144,19 @@
   /* Existing log modal */
   #logModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10; }
   #logModal.open { display: flex; align-items: center; justify-content: center; }
+
+  /* Weather override modal */
+  #wxModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 11; }
+  #wxModal.open { display: flex; align-items: center; justify-content: center; }
+  #wxInner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; width: 460px; padding: 1.2rem 1.4rem; }
+  #wxInner h3 { margin: 0 0 0.8rem; }
+  #wxInner .row { display: flex; justify-content: space-between; align-items: center; margin: 0.45rem 0; }
+  #wxInner label { color: var(--muted); }
+  #wxInner input { width: 110px; background: #11151a; color: #d7e3f0; border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.4rem; font-family: inherit; text-align: right; }
+  #wxInner .actions { margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
+  #wxNote { color: var(--muted); font-size: 0.85em; margin-top: 0.6rem; }
+  #wxStatus { color: var(--muted); font-size: 0.85em; margin-top: 0.4rem; min-height: 1.1em; }
+  .wx-set-btn { float: right; padding: 0.15rem 0.6rem; font-size: 0.82em; }
   #logInner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
   #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   #logTitle { font-weight: 500; }
@@ -170,7 +183,7 @@
   <!-- Row 2: Weather / Marshal Stack / Catapults -->
   <section class="row-2">
     <div class="panel">
-      <h3>Weather — OMDM <span class="case-pill" id="wxCase">CASE 1</span></h3>
+      <h3>Weather — OMDM <span class="case-pill" id="wxCase">CASE 1</span><button class="btn info wx-set-btn" onclick="openWeatherModal()">Set Weather</button></h3>
       <div class="weather-grid" id="wxGrid">
         <div class="cell"><div class="lbl">Ceiling</div><div class="val" id="wxCeil">—</div></div>
         <div class="cell"><div class="lbl">Visibility</div><div class="val" id="wxVis">—</div></div>
@@ -224,7 +237,6 @@
         <button class="btn warn"  onclick="restartRole('Al Minhad Tower')">Restart Al Minhad</button>
         <button class="btn start" onclick="startRole('Deckboss')">Start Deckboss</button>
         <button class="btn stop"  onclick="stopRole('Deckboss')">Stop Deckboss</button>
-        <button class="btn info"  onclick="alert('Refresh Weather endpoint not wired yet — phase 2.')">Refresh Weather</button>
         <button class="btn info"  onclick="document.querySelector('.row-2').scrollIntoView({behavior:'smooth'})">Marshal Stack</button>
         <button class="btn info"  onclick="openLogModal()">Full Log</button>
       </div>
@@ -244,6 +256,25 @@
     <div class="log" id="logFeed"></div>
   </section>
 </main>
+
+<!-- Weather override modal -->
+<div id="wxModal" onclick="if(event.target===this)closeWeatherModal()">
+  <div id="wxInner">
+    <h3>Set Weather — applies to all towers + Marshal + Deckboss</h3>
+    <div class="row"><label>Wind direction (° true)</label><input id="wxInDir"  type="number" min="0" max="360" step="1"></div>
+    <div class="row"><label>Wind speed (kts)</label>     <input id="wxInKts"  type="number" min="0" max="200" step="1"></div>
+    <div class="row"><label>Ceiling (ft)</label>          <input id="wxInCeil" type="number" min="0" max="60000" step="100"></div>
+    <div class="row"><label>Visibility (nm)</label>       <input id="wxInVis"  type="number" min="0" max="50" step="0.5"></div>
+    <div class="row"><label>Altimeter (inHg)</label>      <input id="wxInAlt"  type="number" min="25" max="32" step="0.01"></div>
+    <div id="wxNote">Applies to all 3 towers + Marshal + Deckboss immediately. Dhafra / Minhad / Al Ain ATIS pick up the change on their next 45s broadcast cycle by polling the paired tower. Liwa & Khasab ATIS stay on boot weather (no paired tower). Current values prefilled from OMDM.</div>
+    <div id="wxStatus"></div>
+    <div class="actions">
+      <button class="btn info"  onclick="readMizWeather()">Read from .miz</button>
+      <button class="btn"       onclick="closeWeatherModal()">Cancel</button>
+      <button class="btn start" onclick="applyWeather()">Apply</button>
+    </div>
+  </div>
+</div>
 
 <!-- Full log modal (existing functionality) -->
 <div id="logModal" onclick="if(event.target===this)closeLogModal()">
@@ -415,7 +446,7 @@ function renderWeather() {
   }
   const t = st.tower;
   $('wxCeil').textContent  = t.ceilingFt ? `${Math.round(t.ceilingFt)} ft` : '—';
-  $('wxVis').textContent   = t.visibNm   ? `${t.visibNm} nm` : '—';
+  $('wxVis').textContent   = t.visibNm   ? `${t.visibNm.toFixed(1)} nm` : '—';
   $('wxAlt').textContent   = t.altimeterInHg ? Number(t.altimeterInHg).toFixed(2) : '—';
   $('wxWind').textContent  = (t.windKts || t.windDir) ? `${Math.round(t.windDir||0)}° / ${Math.round(t.windKts||0)} kt` : '—';
   $('wxTemp').textContent  = '—'; // not exposed yet
@@ -551,6 +582,63 @@ async function setRunway(port, runway) {
     if (!r.ok) alert(`Runway change failed: ${await r.text()}`);
   } catch (e) { alert('Runway change failed: ' + e.message); }
   setTimeout(refreshAll, 500);
+}
+
+// Weather override modal — POSTs to every dashboard (3 towers + Marshal + Deckboss)
+const WX_TARGET_PORTS = [6001, 6002, 6003, 6004, 6005];
+async function openWeatherModal() {
+  try {
+    const r = await fetch('http://localhost:6001/status');
+    if (r.ok) {
+      const s = await r.json();
+      const t = s.tower || {};
+      if (t.windDir != null)       $('wxInDir').value  = Math.round(t.windDir);
+      if (t.windKts != null)       $('wxInKts').value  = Math.round(t.windKts);
+      if (t.ceilingFt != null)     $('wxInCeil').value = Math.round(t.ceilingFt);
+      if (t.visibNm != null)       $('wxInVis').value  = t.visibNm.toFixed(1);
+      if (t.altimeterInHg != null) $('wxInAlt').value  = t.altimeterInHg.toFixed(2);
+    }
+  } catch (e) { /* leave blank if OMDM dashboard unreachable */ }
+  $('wxStatus').textContent = '';
+  $('wxModal').classList.add('open');
+}
+function closeWeatherModal() { $('wxModal').classList.remove('open'); }
+async function readMizWeather() {
+  $('wxStatus').textContent = 'Reading .miz…';
+  try {
+    const r = await fetch('/api/miz-weather');
+    if (!r.ok) { $('wxStatus').textContent = 'Failed: ' + (await r.text()).trim(); return; }
+    const w = await r.json();
+    $('wxInDir').value  = Math.round(w.windDir);
+    $('wxInKts').value  = Math.round(w.windKts);
+    $('wxInCeil').value = Math.round(w.ceilFt);
+    $('wxInVis').value  = (Math.round(w.visNm * 10) / 10);
+    $('wxInAlt').value  = w.altInHg.toFixed(2);
+    $('wxStatus').textContent = `Loaded from ${w.mizName} (wind is true; click Apply to propagate).`;
+  } catch (e) { $('wxStatus').textContent = 'Failed: ' + e.message; }
+}
+async function applyWeather() {
+  const q = new URLSearchParams({
+    windDir: $('wxInDir').value,
+    windKts: $('wxInKts').value,
+    ceilFt:  $('wxInCeil').value,
+    visNm:   $('wxInVis').value,
+    altInHg: $('wxInAlt').value,
+  });
+  $('wxStatus').textContent = 'Applying…';
+  const results = await Promise.all(WX_TARGET_PORTS.map(async (port) => {
+    try {
+      const r = await fetch(`http://localhost:${port}/weather?${q.toString()}`, { method: 'POST' });
+      return { port, ok: r.ok, msg: r.ok ? '' : await r.text() };
+    } catch (e) { return { port, ok: false, msg: e.message }; }
+  }));
+  const failed = results.filter(r => !r.ok);
+  if (failed.length === 0) {
+    $('wxStatus').textContent = `Applied to ${results.length} dashboards.`;
+    setTimeout(() => { closeWeatherModal(); refreshAll(); }, 700);
+  } else {
+    $('wxStatus').textContent = `Failed on ports: ${failed.map(f => f.port + ' (' + f.msg.trim() + ')').join(', ')}`;
+  }
 }
 async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch('/api/start?name=' + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
 async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch('/api/stop?name=' + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
