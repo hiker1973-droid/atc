@@ -660,13 +660,27 @@ func (c *ATCComposer) DeckbossShoot(catNum int) string {
 	})
 }
 
-// DeckbossCatClear — cat has cleared after launch, advance conga.
+// DeckbossCatClear — cat has cleared after launch, advance conga. Handler
+// prepends the next-up pilot callsign so the full TX comes out as
+// "Raider 04, Deckboss, cat one is clear." — role identifier inside the
+// response makes it unambiguous to the next-up pilot who's calling them.
 func (c *ATCComposer) DeckbossCatClear(catNum int) string {
 	cat := numberWord(catNum)
 	return pick([]string{
-		fmt.Sprintf("Cat %s is clear.", cat),
-		fmt.Sprintf("Cat %s clear, deck is moving.", cat),
-		fmt.Sprintf("Cat %s off the deck.", cat),
+		fmt.Sprintf("Deckboss, cat %s is clear.", cat),
+		fmt.Sprintf("Deckboss, cat %s clear, deck is moving.", cat),
+		fmt.Sprintf("Deckboss, cat %s off the deck.", cat),
+	})
+}
+
+// DeckbossBolterPattern — pilot remaining in bolter pattern for trap
+// practice. Pure ack with the standard 600ft / 1nm pattern parameters;
+// no state change.
+func (c *ATCComposer) DeckbossBolterPattern(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, Deckboss, copy bolter pattern, stay six hundred feet, one mile out.", callsign),
+		fmt.Sprintf("%s, Deckboss, roger bolter, maintain six hundred feet, one mile abeam.", callsign),
+		fmt.Sprintf("%s, Deckboss, in the bolter, six hundred feet, one mile out.", callsign),
 	})
 }
 
