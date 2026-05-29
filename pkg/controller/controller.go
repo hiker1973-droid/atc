@@ -1196,7 +1196,11 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestStartup
 	case containsAny(lower, "pushing command", "pushing to command",
 		"switching command", "switching to command", "switching over to command", "switching over",
-		"push command"):
+		"push command",
+		// "channel four" / button 4 is the Command preset on all three towers
+		// (pkg/airfield/{omdm,omam,omal}.go HandoffPreset). Pilots routinely
+		// shorten the §9 handoff response to "pushing button 4" / "pushing 4".
+		"pushing button", "pushing channel", "pushing 4", "pushing four"):
 		// Pilot is announcing a freq change to Command — courtesy ack, no
 		// need to re-issue freq/preset (handoff was already given at 7 DME).
 		req.Type = RequestPushingCommand
@@ -1347,6 +1351,7 @@ func trimTrailingTriggers(cs string) string {
 		"declaring", "in-flight", "in flight",
 		// distance / handoff
 		"pushing command", "switching command", "switching over to command", "switching over", "push command",
+		"pushing button", "pushing channel", "pushing 4", "pushing four",
 		"taxiing", "taxying",
 		"7 dme", "seven dme", "cleared airspace",
 		// Whisper often inserts "mile" between the number and "dme"

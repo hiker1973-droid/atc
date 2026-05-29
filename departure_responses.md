@@ -202,7 +202,9 @@ Fires after departure release (`7 DME` / `cleared airspace` etc).
 
 Pilot-initiated courtesy call announcing they're already switching to Command. Short ack only — freq/preset not reissued (already given in #9).
 
-**Triggers:** `pushing command` · `pushing to command` · `switching command` · `switching to command` · `push command`
+**Triggers:** `pushing command` · `pushing to command` · `switching command` · `switching to command` · `push command` · `pushing button` · `pushing channel` · `pushing 4` · `pushing four`
+
+The `pushing button` / `pushing channel` / `pushing 4` / `pushing four` triggers cover pilots shortening the §9 handoff response — `HandoffPreset` is `channel four` on all three towers (`pkg/airfield/{omdm,omam,omal}.go`), so on this rig "button 4" unambiguously means Command. If a tower's HandoffPreset ever moves off channel four, the digit triggers here need to follow.
 
 **Responses:**
 1. `{CALLSIGN}, {TOWER}, cleared handoff to command, good day.`
