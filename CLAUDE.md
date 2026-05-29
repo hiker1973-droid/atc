@@ -64,7 +64,7 @@ Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use 
 ### Training 1 active roles (2026-05-19)
 **Tower**, **ATIS**, **Marshal** (306.3), **Command** (282.0), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files at repo root: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_deckboss.bat`, `start_launcher.bat`. Post-reboot one-shot: **`start_all.bat`** fires ATIS → towers → marshal → command → deckboss → launcher in order.
 
-Voices: all roles use `onyx` except Deckboss which uses `ash` (calm authoritative) for audible differentiation. Switchable via `--deckboss-voice <echo|ballad|sage|onyx|…>` without rebuilds.
+Voices are differentiated per role for audible separation on cockpit comms — all female / female-leaning, all six unique. Set via `--tts-voice` in `start_towers.bat` (per-tower override) and per-role voice flags elsewhere: OMDM Tower `nova`, OMAM Tower `shimmer`, OMAL Tower `alloy`, Marshal `coral` (`start_marshal.bat` `--marshal-voice`), Command `sage` (`start_command.bat` `--command-voice`), Deckboss `fable` (`start_deckboss.bat` `--deckboss-voice`). Reassigned 2026-05-29 from prior all-nova-towers / ash-Deckboss. Switchable in the bat files without rebuilds.
 
 Still parked under `dev_only/` (do not launch on Training 1):
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
