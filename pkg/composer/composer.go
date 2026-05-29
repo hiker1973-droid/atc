@@ -78,6 +78,19 @@ func (c *ATCComposer) HoldShortTraffic(callsign, activeRunway, trafficCallsign s
 	})
 }
 
+// HoldShortLineUpAndWait acks a holding-short call with no traffic on final —
+// TX1 of the two-stage auto-release flow. The controller fires ClearedForTakeoff
+// as TX2 after AutoReleaseDelay. Three variants. (For the with-traffic LUAW
+// variant see LineUpAndWait.)
+func (c *ATCComposer) HoldShortLineUpAndWait(callsign, activeRunway string) string {
+	rwy := spellRunway(activeRunway)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, runway %s, line up and wait.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, line up and wait runway %s.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, runway %s line up and wait, will advise.", callsign, c.towerCallsign, rwy),
+	})
+}
+
 // LineUpAndWait enters aircraft onto runway without takeoff clearance — 3 variations.
 func (c *ATCComposer) LineUpAndWait(callsign, activeRunway, trafficCallsign string, trafficDistNm float64) string {
 	rwy := spellRunway(activeRunway)

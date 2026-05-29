@@ -111,6 +111,10 @@ type AircraftState struct {
 	// its sequence number on a hold response. Used by the controller's
 	// queue-position suffix to avoid re-announcing on every retry.
 	AnnouncedQueuePos bool
+	// AutoReleaseAt is the wall-clock time after which the LUAW auto-release
+	// path is eligible to fire ClearedForTakeoff for this aircraft. Set by
+	// handleHoldingShortRequest on the no-traffic path; zero = not awaiting.
+	AutoReleaseAt time.Time
 }
 
 // HasPosition returns true if this aircraft has a fresh telemetry position

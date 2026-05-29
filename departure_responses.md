@@ -40,14 +40,20 @@ Triggers come from `pkg/controller/controller.go` (the intent classifier). Respo
 
 ---
 
-## 3. Hold short (no traffic)
+## 3. Hold short (no traffic) — two-stage LUAW + auto-release
 
 **Triggers:** `holding short` · `hold short` · `short of runway` · `at the hold`  *(when no inbound traffic conflict)*
 
-**Responses:**
-1. `{CALLSIGN}, {TOWER}, hold short runway {RUNWAY}, number one, advise ready.`
-2. `{CALLSIGN}, {TOWER}, hold short of runway {RUNWAY}, standby.`
-3. `{CALLSIGN}, {TOWER}, hold your position short of runway {RUNWAY}, you are next for departure.`
+Replaces the legacy single-TX "advise ready" ack: pilot no longer has to make a second "ready for takeoff" call. The controller acks with TX1 (line up and wait) and fires TX2 (cleared for takeoff) automatically after `AutoReleaseDelay` (5s, `pkg/controller/controller.go`). At fire time the auto-release re-checks: no new inbound within `HoldShortRadiusNm`, `DepartureSpacingSec` window honored, this aircraft still at the head of the departure queue, not already cleared by another path. If any re-check fails, the goroutine silently skips and the existing proactive departure-release monitor takes over.
+
+**TX1 (`HoldShortLineUpAndWait`) variants:**
+1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, line up and wait.`
+2. `{CALLSIGN}, {TOWER}, line up and wait runway {RUNWAY}.`
+3. `{CALLSIGN}, {TOWER}, runway {RUNWAY} line up and wait, will advise.`
+
+**TX2 (`ClearedForTakeoff` at T+5s)** — same composer used by §6.
+
+**Vestigial:** the prior single-TX `HoldShort` composer method (`hold short runway X, number one, advise ready` / `standby` / `you are next for departure`) is left in place at `pkg/composer/composer.go` for a possible future `--no-auto-release` opt-out flag, but no controller path calls it.
 
 ---
 

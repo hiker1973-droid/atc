@@ -44,6 +44,11 @@ const (
 	// the window get a HoldForSpacing response; the proactive monitor skips
 	// silently and retries on the next tick.
 	DepartureSpacingSec = 60 * time.Second
+	// AutoReleaseDelay — gap between the LUAW ack (TX1) and the auto-issued
+	// ClearedForTakeoff (TX2) on the no-traffic holding-short path. Realistic
+	// tower cadence: pilot calls hold-short, tower acks "line up and wait"
+	// while it scans final, then clears for takeoff a few seconds later.
+	AutoReleaseDelay = 5 * time.Second
 	// MaxAnnouncedQueuePosition caps queue-position suffix at this rank.
 	// Positions beyond will hear the ones ahead get cleared first, so
 	// announcing 4+ adds chatter without value.
@@ -737,12 +742,63 @@ func (c *ATCController) handleHoldingShortRequest(
 		return c.maybeAppendQueuePositionSuffix(response, ac, s)
 	}
 
-	// No conflict — proceed to runway, cleared for takeoff.
+	// No conflict — two-stage flow. TX1 is LUAW; scheduleAutoRelease fires
+	// ClearedForTakeoff (TX2) after AutoReleaseDelay with re-checked conditions
+	// (no new inbound conflict, spacing window honored, still queue head). The
+	// HoldingShort flag opens the existing proactive departure-release path as
+	// a fallback if the goroutine is cancelled mid-sleep; the AutoReleaseAt
+	// time-gate in checkConflicts prevents that path from firing inside the
+	// 5s LUAW gap.
+	s.EnqueueDeparture(ac)
+	ac.HoldingShort = true
+	ac.AutoReleaseAt = time.Now().Add(AutoReleaseDelay)
+	go c.scheduleAutoRelease(ctx, callsign)
+	return c.composer.HoldShortLineUpAndWait(callsign, s.ActiveRunway)
+}
+
+// scheduleAutoRelease waits AutoReleaseDelay and then issues ClearedForTakeoff
+// to the named callsign if conditions still permit. Called as a goroutine from
+// handleHoldingShortRequest's no-traffic path. Skips silently when the aircraft
+// has gone, was already cleared by another path, has a new inbound conflict,
+// is inside the departure-spacing window, or is no longer at the queue head —
+// the proactive monitor takes over from there.
+func (c *ATCController) scheduleAutoRelease(ctx context.Context, callsign string) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(AutoReleaseDelay):
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := c.airfieldState
+	ac := s.Get(callsign)
+	if ac == nil || ac.TakeoffCleared {
+		return
+	}
+	if s.TimeSinceLastDeparture() < DepartureSpacingSec {
+		return
+	}
+	if len(s.InboundsWithinNm(HoldShortRadiusNm)) > 0 {
+		return
+	}
+	if next := s.NextDeparture(); next == nil || next.Callsign != callsign {
+		return
+	}
+	ac.TakeoffCleared = true
+	cleared := s.ClearForTakeoff(callsign)
+	if cleared == nil {
+		return
+	}
 	trafficOnFinal := s.LandingQueueLen()
-	s.ClearForTakeoff(callsign)
-	return c.composer.ProceedToRunway(
-		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, trafficOnFinal, len(s.ActiveDepartures()),
+	response := c.composer.ClearedForTakeoff(
+		callsign, s.ActiveRunway, s.WindFromMag, s.WindKts,
+		trafficOnFinal, len(s.ActiveDepartures()),
 	)
+	log.Info().
+		Str("callsign", callsign).
+		Str("runway", s.ActiveRunway).
+		Msg("auto-release after LUAW")
+	c.transmit(ctx, response)
 }
 
 // monitorLoop runs on MonitorInterval and issues proactive calls:
@@ -884,6 +940,10 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 			next := s.NextDeparture()
 			if next != nil && c.positionCheck && !c.isPilotAtHoldShort(next.Callsign, s.ActiveRunway) {
 				// Skip: position-check gate says queue head isn't at hold-short.
+				next = nil
+			}
+			if next != nil && !next.AutoReleaseAt.IsZero() && time.Now().Before(next.AutoReleaseAt) {
+				// Inside the LUAW gap — scheduleAutoRelease owns this release.
 				next = nil
 			}
 			if next != nil && !next.TakeoffCleared && next.HoldingShort {
