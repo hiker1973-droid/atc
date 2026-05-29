@@ -37,24 +37,23 @@ All frequencies are **AM**, encryption **off**.
    - ATC: *"…taxi to runway 27, altimeter 29.92, hold short, advise ready"*
    - Triggers: `request taxi` · `request ground` · `taxi to` · `ready to taxi`
 
-4. **Hold short** — at the hold line.
+4. **Hold short → cleared for takeoff (auto, v1.4.0)** — at the hold line. No second call needed: Tower acks with line-up-and-wait, then issues the takeoff clearance ~5 s later once it's scanned final.
    - Pilot: *"Al Minhad Tower, Raider 1, holding short runway 27"*
-   - ATC: *"…hold short runway 27, number one, advise ready"* (or line-up-and-wait if traffic on final is far enough out)
+   - ATC (TX1, immediate): *"Raider 1, Al Minhad Tower, runway two seven, line up and wait"*
+   - ATC (TX2, T+5 s): *"Raider 1, Al Minhad Tower, wind two seven zero at one zero, runway two seven, cleared for takeoff. Report airborne when clear."*
    - Triggers: `holding short` · `hold short` · `short of runway` · `at the hold`
+   - If a new inbound shows up inside the 5 s gap, the auto-release skips silently and the proactive monitor picks it up once the field clears. If you're inside the 60 s departure-spacing window, you'll hear *"…departure spacing in forty five seconds"* instead — wait, don't re-ask.
+   - **Manual path still works** (skip the hold-short, or nudge if held): *"…request takeoff"* / *"…ready for departure"* — Tower clears the same way. Triggers: `request takeoff` · `request departure` · `ready for departure` · `ready for takeoff` · `lineup`.
 
-5. **Takeoff** — when ready.
-   - Pilot: *"Al Minhad Tower, Raider 1, request takeoff"*
-   - ATC: *"…wind 270 at 8, runway 27, cleared for takeoff"*
-   - Triggers: `request takeoff` · `request departure` · `ready for departure` · `ready for takeoff` · `lineup`
-
-6. **Departure release** — once airborne and clear of pattern.
+5. **Departure release** — once airborne and clear of pattern.
    - Pilot: *"Al Minhad Tower, Raider 1, airborne"*
    - ATC: *"…proceed seven miles, climb angels 3, frequency change approved, good day"*
    - Triggers: `airborne` · `departing` · `clear traffic` · `clear of traffic` · `7 miles` · `cleared airspace`
 
-7. **Switch to Command** — Tower hands off:
+6. **Switch to Command** — Tower hands off:
    - ATC: *"…contact vSFG-7-Command, two eight two point zero, channel four"*
    - Tune **282.0**.
+   - Optional courtesy call back on Tower freq: *"…pushing channel 4"* / *"…pushing button 4"* / *"…pushing 4"* — Tower acks *"…roger pushing command, good day"* (new in v1.4.0; the `pushing command` / `switching command` wordings still work too).
 
 ---
 

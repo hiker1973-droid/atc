@@ -1,7 +1,7 @@
 # SkyeyeATC — Squadron Guide
 
 vSFG-7 pilot-facing overview of the AI ATC system on Training 1. Quick reference
-for what to say, what's new in **v1.2.0**, and how the roles differ. For a
+for what to say, what's new in **v1.4.0**, and how the roles differ. For a
 step-by-step "cold start to RTB" walkthrough see `PILOT_WORKFLOW.md`.
 
 ---
@@ -17,14 +17,54 @@ Six roles, all live on Training 1:
 
 | Role | Frequency | Voice | Purpose |
 |---|---|---|---|
-| ATIS × 5 stations | 248.20 / 248.30 / 248.50 / 248.55 / 248.85 | onyx | Weather + active runway broadcast, ~every 45s |
-| Tower × 3 fields | 250.10 / 250.70 / 251.10 | onyx | Ground + tower for OMDM / OMAL / OMAM |
-| Marshal | 306.30 | ballad | Carrier inbound stack |
-| Deckboss | 128.60 | ash | Carrier deck ops (cat assignments, launch) |
+| ATIS × 5 stations | 248.20 / 248.30 / 248.50 / 248.55 / 248.85 | nova | Weather + active runway broadcast, ~every 45s |
+| Al Minhad Tower (OMDM) | 250.10 | nova | Ground + tower |
+| Al Ain Tower (OMAL) | 250.70 | alloy | Ground + tower |
+| Al Dhafra Tower (OMAM) | 251.10 | shimmer | Ground + tower |
+| Marshal | 306.30 | coral | Carrier inbound stack |
+| Deckboss | 128.60 | fable | Carrier deck ops (cat assignments, launch) |
 | Command | 282.00 | sage | Squadron command / mission handoff |
 
-Voices differ on purpose — even if you miss the callsign you can tell roles
-apart by ear.
+As of v1.4.0 every live role has a distinct voice (all female-leaning) — even
+if you miss the callsign you can tell which role is talking, and which tower
+when you've got two fields up in parallel. ATIS shares its voice with Minhad
+Tower (nova) but you hear them on different freqs so it doesn't collide
+in practice.
+
+---
+
+## What's new in v1.4.0
+
+### Holding short → cleared for takeoff (no second call)
+Call *"Tower, [callsign], holding short runway 27"* and Tower now runs the
+two-stage clearance automatically:
+
+1. Immediate ack: *"…runway two seven, line up and wait."* — you taxi onto
+   the runway and hold position.
+2. ~5 seconds later: *"…wind two seven zero at one zero, runway two seven,
+   cleared for takeoff. Report airborne when clear."*
+
+You no longer have to call *"request takeoff"* / *"ready for departure"* as
+a second transmission — Tower clears you on its own once it's scanned final.
+The manual *"request takeoff"* trigger still works (§6) if you skipped the
+hold-short call or got held for spacing and want to nudge.
+
+The 5 s gap is real: Tower re-checks no new inbound within hold-short range
+and that the 60 s departure-spacing window has passed before TX2 fires.
+If a new inbound shows up inside the gap, the auto-clearance is skipped
+silently and the proactive monitor takes over from there.
+
+### "Pushing button 4" now acks
+The §9 handoff says *"…contact vSFG-7-Command, two eight two point zero,
+channel four"*. Pilots who shortform the response as *"…pushing button 4"*
+/ *"…pushing channel 4"* / *"…pushing 4"* now get a courtesy ack instead
+of silence. Previous wording (*"pushing command"* / *"switching command"*)
+still works.
+
+### Distinct voice per role
+Each live role gets its own voice (see table above). Two birds in parallel
+on different tower freqs are now audibly distinguishable. Deckboss moved
+off `ash` (male) to `fable` to match the rest of the female-leaning roster.
 
 ---
 
@@ -114,12 +154,13 @@ the "Known limits" section below (which is "feature doesn't exist") — these ar
   freq itself is silent — no "call the ball" / waveoff calls. Land using
   visual ball + lineup judgment. Planned for a later release.
 
-- **Departure-spacing only via pilot-triggered calls.** v1.2.0's 60-second
-  spacing gate fires when you call "request takeoff" or "holding short" —
-  that's the normal flow and is correct. The proactive monitor path (Tower
-  clears the queue automatically when no one's asking) is dormant for an
-  unrelated state-flag wiring gap. Doesn't affect normal ops; flagged here
-  because it's documented in CLAUDE.md for the operator.
+- **Proactive departure monitor wired via the LUAW path.** v1.4.0's auto-
+  release sets the `HoldingShort` flag the proactive monitor was waiting on
+  in v1.2.0. So if scheduleAutoRelease misses its window (e.g. a new inbound
+  appeared inside the 5 s gap), the proactive monitor will fire the clearance
+  on its next tick once the field clears. The `request takeoff` /
+  `request departure` path doesn't set the flag and still relies on
+  pilot-triggered calls — same as v1.2.0.
 
 - **Pilot-to-pilot chatter sometimes shows up in operator logs.** When you
   talk to your wingman on a Tower freq, Tower transcribes it but **doesn't
@@ -147,7 +188,7 @@ Pre-flight:
 Departure:
 - `Tower, [callsign], airborne` · `departing` · `clear of traffic`
 - `Tower, [callsign], 7 DME` · `7 miles` · `cleared airspace`
-- `Tower, [callsign], switching to command`
+- `Tower, [callsign], switching to command` · `pushing command` · `pushing button 4` · `pushing channel 4` · `pushing 4`
 
 Pattern / inbound:
 - `Tower, [callsign], inbound, [N] miles, heading [HHH]`
@@ -190,12 +231,15 @@ runway, and altimeter.
 ---
 
 ## Voice cues
-- **onyx** (deep, neutral) → Tower or ATIS
-- **ballad** (warmer, smoother) → Marshal
-- **ash** (calm, authoritative) → Deckboss
-- **sage** (clipped, businesslike) → Command
+- **nova** → ATIS broadcasts AND Al Minhad Tower (different freqs, no collision)
+- **shimmer** → Al Dhafra Tower
+- **alloy** → Al Ain Tower
+- **coral** → Marshal
+- **fable** → Deckboss
+- **sage** → Command
 
-If you hear "ballad" on what you thought was Tower, you're on the wrong freq.
+If two Tower voices sound the same to you, you're not on what you think
+you're on — check the freq.
 
 ---
 
