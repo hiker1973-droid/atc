@@ -1683,6 +1683,12 @@ func (c *ATCController) GetPatternAircraft() []*state.AircraftState {
 	return c.airfieldState.GetLandingQueueSnapshot()
 }
 
+// GetDepartureQueue returns aircraft currently in the departure queue,
+// head-of-slice first (slot 1 = next to depart).
+func (c *ATCController) GetDepartureQueue() []*state.AircraftState {
+	return c.airfieldState.GetDepartureQueueSnapshot()
+}
+
 // IsAircraftAirborne returns true if Tacview shows the aircraft above 500ft AGL and climbing.
 func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 	c.allPositionsMu.RLock()

@@ -845,6 +845,19 @@ func (s *AirfieldState) GetLandingQueueSnapshot() []*AircraftState {
 	return result
 }
 
+// GetDepartureQueueSnapshot returns a safe copy of the departure queue
+// (head of slice = next to depart, slot 1).
+func (s *AirfieldState) GetDepartureQueueSnapshot() []*AircraftState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*AircraftState, len(s.DepartureQueue))
+	for i, ac := range s.DepartureQueue {
+		copy := *ac
+		result[i] = &copy
+	}
+	return result
+}
+
 // LandingQueueLen returns the number of aircraft in the landing queue.
 func (s *AirfieldState) LandingQueueLen() int {
 	s.mu.RLock()

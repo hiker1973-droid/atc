@@ -103,6 +103,18 @@
   .bar.lo > span { background: var(--orange); }
   .bar.crit > span { background: var(--red); }
 
+  /* Row departures: full-width strip above row 3 */
+  .row-departures { display: grid; grid-template-columns: 1fr; gap: 0.7rem; }
+  .pill-state { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 500; }
+  .pill-state.cleared    { background: rgba(63,185,80,0.15);  color: var(--green);  border: 1px solid var(--green-dim); }
+  .pill-state.luaw       { background: rgba(240,136,62,0.20); color: var(--orange); border: 1px solid var(--orange); }
+  .pill-state.hold-short { background: rgba(240,136,62,0.10); color: var(--orange); border: 1px solid #7d4818; }
+  .pill-state.queued     { background: var(--panel-2);        color: var(--muted);  border: 1px solid var(--border); }
+  .airfield-cell { font-weight: 500; }
+  .airfield-cell.OMDM { color: #b794f4; }
+  .airfield-cell.OMAM { color: #f9a8d4; }
+  .airfield-cell.OMAL { color: #fcd34d; }
+
   /* Row 3: pattern / freqs / controls */
   .row-3 { display: grid; grid-template-columns: 1.9fr 1fr 1.7fr; gap: 0.7rem; }
   .freq-list { font-size: 0.78rem; }
@@ -202,6 +214,14 @@
     <div class="panel">
       <h3>Catapults — CVN-72 <span class="sub" id="catsHdrSub"></span></h3>
       <div id="catsTbl"><div class="empty">Phase 2 — Deckboss process needs dashboard port wired.</div></div>
+    </div>
+  </section>
+
+  <!-- Departures: on runway + hold-short queue across all towers -->
+  <section class="row-departures">
+    <div class="panel">
+      <h3>Departures — Hold Short &amp; Takeoff Queue <span class="sub" id="depSub">0 in queue</span></h3>
+      <div id="depTbl"><div class="empty">No departures queued.</div></div>
     </div>
   </section>
 
@@ -535,6 +555,46 @@ function renderCats() {
     </table>${congaRow}`;
 }
 
+function renderDepartures() {
+  // Aggregate departure queue across all three towers. Each tower's /status
+  // returns its queue head-first (slot 1 = next out). Display as a single
+  // table with Airfield, Slot, Callsign, State.
+  const all = [];
+  for (const t of TOWERS) {
+    const st = towerStatus[t.icao];
+    if (st && Array.isArray(st.departures)) {
+      for (const dep of st.departures) all.push({ ...dep, icao: t.icao });
+    }
+  }
+  $('depSub').textContent = `${all.length} in queue`;
+  if (!all.length) {
+    $('depTbl').innerHTML = '<div class="empty">No departures queued.</div>';
+    return;
+  }
+  const stateLabel = {
+    'cleared':    'CLEARED FOR T/O',
+    'luaw':       'LINE UP & WAIT',
+    'hold-short': 'HOLD SHORT',
+    'queued':     'QUEUED',
+  };
+  const rows = all.map(d => {
+    const lbl = stateLabel[d.state] || (d.state || '').toUpperCase();
+    const cd  = d.state === 'luaw' && d.secsToGo > 0 ? ` <span class="num">(${d.secsToGo}s)</span>` : '';
+    return `
+      <tr>
+        <td class="airfield-cell ${esc(d.icao)}">${esc(d.icao)}</td>
+        <td class="num">#${d.slot}</td>
+        <td>${esc(d.callsign||'')}</td>
+        <td><span class="pill-state ${esc(d.state)}">${lbl}</span>${cd}</td>
+      </tr>`;
+  }).join('');
+  $('depTbl').innerHTML = `
+    <table>
+      <thead><tr><th>Airfield</th><th>Slot</th><th>Callsign</th><th>State</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function renderPattern() {
   // Aggregate pattern aircraft across all three towers.
   const all = [];
@@ -734,6 +794,7 @@ async function refreshAll() {
   renderCards();
   renderMissionClock();
   renderWeather();
+  renderDepartures();
   renderPattern();
   renderMarshalStack();
   renderCats();

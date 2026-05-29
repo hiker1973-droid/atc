@@ -100,6 +100,22 @@ type PatternAircraft struct {
 	FuelState float64 `json:"fuelState"`
 }
 
+// DepartureEntry is one row in the departure queue, ordered slot 1 = head.
+// State is computed from the aircraft's flag bits:
+//   cleared    — TakeoffCleared (TX2 issued, rolling)
+//   luaw       — HoldingShort + AutoReleaseAt is in the future (TX1 acked,
+//                inside the 5s LUAW gap before auto-release)
+//   hold-short — HoldingShort + AutoReleaseAt is past or zero (waiting on
+//                the proactive monitor; e.g. spacing window or traffic gate
+//                held the auto-release)
+//   queued     — in the queue but not yet at the hold short
+type DepartureEntry struct {
+	Callsign  string `json:"callsign"`
+	Slot      int    `json:"slot"`      // 1-indexed position; slot 1 = next out
+	State     string `json:"state"`     // queued | hold-short | luaw | cleared
+	SecsToGo  int    `json:"secsToGo"`  // seconds remaining on LUAW auto-release, 0 if not in luaw
+}
+
 type MarshalEntry struct {
 	Callsign     string  `json:"callsign"`
 	Position     int     `json:"position"`
@@ -123,6 +139,7 @@ type StatusSnapshot struct {
 	MissionTimeLocal string            `json:"missionTimeLocal,omitempty"` // airfield-local HH:MM
 	Tower            TowerStatus       `json:"tower"`
 	Pattern     []PatternAircraft `json:"pattern"`
+	Departures  []DepartureEntry  `json:"departures"`
 	Marshal     []MarshalEntry    `json:"marshal"`
 	Cats        []CatEntry        `json:"cats"`
 	CongaLine   []string          `json:"congaLine"`
@@ -268,6 +285,30 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
+	// Departure queue — slot 1 is head of slice. State derived from the
+	// holding-short/auto-release/cleared flag bits set by handleHoldingShortRequest
+	// and scheduleAutoRelease. See DepartureEntry doc for state semantics.
+	now := time.Now()
+	departures := []DepartureEntry{}
+	for i, ac := range ds.atcCtrl.GetDepartureQueue() {
+		entry := DepartureEntry{
+			Callsign: ac.Callsign,
+			Slot:     i + 1,
+		}
+		switch {
+		case ac.TakeoffCleared:
+			entry.State = "cleared"
+		case ac.HoldingShort && !ac.AutoReleaseAt.IsZero() && now.Before(ac.AutoReleaseAt):
+			entry.State = "luaw"
+			entry.SecsToGo = int(ac.AutoReleaseAt.Sub(now).Round(time.Second).Seconds())
+		case ac.HoldingShort:
+			entry.State = "hold-short"
+		default:
+			entry.State = "queued"
+		}
+		departures = append(departures, entry)
+	}
+
 	// Marshal stack — augment each entry with live alt + distance to mother.
 	// LookupCallerRelativeToCarrier returns angels (current alt / 1000), range
 	// nm and bearing from the carrier; the assigned stack altitude stays in
@@ -319,6 +360,7 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		MissionTimeLocal: missionTimeLocal,
 		Tower:            tower,
 		Pattern:          pattern,
+		Departures:       departures,
 		Marshal:          marshal,
 		Cats:             cats,
 		CongaLine:        conga,
