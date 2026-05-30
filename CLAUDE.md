@@ -69,6 +69,9 @@ Voices are differentiated per role for audible separation on cockpit comms — a
 Still parked under `dev_only/` (do not launch on Training 1):
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
 
+Pending plans / decisions captured under `dev_only/` (not executable, just notes):
+- `dev_only/web_access_plan.md` — remote browser access to the launcher dashboard. Options A/B/C/D discussed 2026-05-29, deferred ("we will start in a while"). Read this before resuming that work.
+
 The role *code* for all parked roles stays on `main`; only the launch scripts are gated.
 
 **Dev-only Marshal test mode:** `start_marshal_test.bat` (root, local-only on dev rig — not pushed) launches Marshal with `--marshal-test-tx`, which transmits "test" on 306.3 every 30s. Used for SRS routing diagnostics. Do not run on Training 1 — it would broadcast test traffic on the carrier freq during live missions.
