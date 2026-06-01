@@ -100,6 +100,20 @@ Each live role gets its own voice (see table above). Two birds in parallel
 on different tower freqs are now audibly distinguishable. Deckboss moved
 off `ash` (male) to `fable` to match the rest of the female-leaning roster.
 
+### Departure queue visible on the operator dashboard
+The launcher dashboard (operator screen at `http://localhost:7000/`) now has a
+full-width "Departures — Hold Short & Takeoff Queue" panel above the
+landing-pattern row. Aggregates all three towers; per-aircraft state pill is
+one of `queued` / `hold-short` / `luaw` / `cleared`, with a live countdown
+on the LUAW gap. Per-airfield colour cue (OMDM purple, OMAM pink, OMAL gold).
+
+What this means for pilots: the operator can now actually see you stacked
+in the departure queue — slot number, state, and "X seconds to takeoff
+clearance" while you're in the LUAW gap. If something looks stuck, the
+operator has the full picture without tailing logs. **If a call seems to
+have missed and you're holding short, give it the 5 s gap before re-calling
+— the operator can see whether you're already in the auto-release window.**
+
 ---
 
 ## What's new in v1.2.0
@@ -160,11 +174,11 @@ very fast call that's getting dropped, let us know — we can dial it back.
 
 ---
 
-## Known issues (v1.2.0)
+## Known issues (current)
 
-Things that work most of the time but have caveats this release. Different from
+Things that work most of the time but have caveats. Different from
 the "Known limits" section below (which is "feature doesn't exist") — these are
-"feature exists but watch for X."
+"feature exists but watch for X." Entries are tagged by the release they apply to.
 
 - **Carrier match not live-validated.** The CVN-named-ship preference (CVN-72,
   CVN-73, etc. winning over generic "Carrier strike group" labels) only got
