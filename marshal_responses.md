@@ -250,9 +250,50 @@ No Charlie / hold-for-Charlie in Case 3 — the pilot commences on the EAT clock
 
 If the aircraft was originally checked in under Case 1/2 and the case flipped mid-flight (so `EAT` was never assigned), the handler computes one at established-time using the current stack position.
 
-### Not yet wired (Phase 2/3)
-- §5 `commencing` — still uses the Case 1 `MarshalCopyCommencing` (3-mile initial, paddles handoff). Case 3 should reference platform / final bearing instead.
-- §new `platform` — pilot passing 5000ft on descent. No trigger or composer method yet.
+### §5 Case 3 Commencing (`MarshalCopyCommencingCase3`)
+
+Pilot reports `commencing` at their EAT. Marshal removes them from the stack
+(triggering the silent collapse for remaining aircraft) and directs them to
+the CV-1 descent profile: platform 5000 ft on the **final bearing** (BRC −
+`marshalFinalBearingOffset`, default 9°). No 3-mile-initial / paddles tail
+— in Case 3 the next pilot call is `platform`, not `initial`.
+
+**Final bearing** = `(BRC - 9 + 360) % 360`, spelled 3-digit. When carrier is
+off scope (`brc < 0`) the final bearing falls back to `000`. Tune the offset
+via the `marshalFinalBearingOffset` const in `cmd/atc/marshal.go`.
+
+**With state:**
+1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, descend to platform five thousand, final bearing {FB}, report platform.`
+2. `{CALLSIGN}, Marshal, commencing, state {STATE}, platform five thousand, final bearing {FB}, report platform.`
+3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, descend platform, final bearing {FB}, call platform.`
+
+**Without state:**
+1. `{CALLSIGN}, Marshal, copy commencing, descend to platform five thousand, final bearing {FB}, report platform.`
+2. `{CALLSIGN}, Marshal, commencing, platform five thousand, final bearing {FB}, report platform.`
+3. `{CALLSIGN}, Marshal, roger commencing, descend platform, final bearing {FB}, call platform.`
+
+### §5a Platform (`MarshalAtPlatform`)
+
+**Triggers:** `platform` · `passing five thousand` · `passing 5000` · `at platform`
+
+Pilot reports passing 5000 ft on descent, typically inside 20 nm of mother.
+Marshal acks with dirty-up reminder, 12-mile gate, and re-recites the final
+bearing. The pilot continues to glideslope intercept (1200 ft at 12 DME per
+the kneeboard) and hands off to LSO at ball call — Marshal's job effectively
+ends here in Case 3.
+
+The trigger is wired regardless of recovery case (rare false-fire in Case 1
+is harmless — the pilot still gets a sensible ack). Phase is set to
+`platform` on the stack entry, but by this point `commencing` has already
+removed the aircraft so the SetPhase is a noop — kept for forward
+compatibility if we re-track post-commence aircraft later.
+
+**Responses (`MarshalAtPlatform`):**
+1. `{CALLSIGN}, Marshal, roger platform, dirty up, twelve mile gate, final bearing {FB}.`
+2. `{CALLSIGN}, Marshal, copy platform, configure for approach, final bearing {FB}.`
+3. `{CALLSIGN}, Marshal, platform, dirty up by twelve, final bearing {FB}, continue.`
+
+### Not yet wired (Phase 3)
 - "say needles" / ball call — LSO/CATCC territory, parked for the LSO role.
 - Case 3 departure flow (airborne / 10-DME arc / departure radial / popeye / on top / kilo) — not wired; Marshal does not currently own departure routing.
 

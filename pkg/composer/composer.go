@@ -877,6 +877,42 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 	})
 }
 
+// MarshalCopyCommencingCase3 — Case 3 commencing ack. Pilot is leaving the
+// stack at EAT and starting the CV-1 descent profile; Marshal directs them
+// to platform 5000 ft on the final bearing (BRC minus offset). No
+// "3-mile initial paddles handoff" tail — in Case 3 the pilot reports
+// platform next, then continues to the LSO ball call.
+// finalBearing is 0-359 (spelled 3-digit). fuelState > 0 → state included.
+func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState float64, finalBearing int) string {
+	fb := spellDigits3(finalBearing)
+	if fuelState > 0 {
+		s := fmt.Sprintf("%.1f", fuelState)
+		return pick([]string{
+			fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, state %s, descend to platform five thousand, final bearing %s, report platform.", callsign, s, fb),
+			fmt.Sprintf("%s, "+c.towerCallsign+", commencing, state %s, platform five thousand, final bearing %s, report platform.", callsign, s, fb),
+			fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, state %s, descend platform, final bearing %s, call platform.", callsign, s, fb),
+		})
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, descend to platform five thousand, final bearing %s, report platform.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", commencing, platform five thousand, final bearing %s, report platform.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, descend platform, final bearing %s, call platform.", callsign, fb),
+	})
+}
+
+// MarshalAtPlatform — Case 3 platform ack. Pilot is passing 5000 ft descending
+// inside ~20 nm. Marshal acks, reminds of dirty-up + 12-mile gate, and
+// re-recites the final bearing. From here the pilot continues to glideslope
+// intercept and ball call (LSO territory).
+func (c *ATCComposer) MarshalAtPlatform(callsign string, finalBearing int) string {
+	fb := spellDigits3(finalBearing)
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger platform, dirty up, twelve mile gate, final bearing %s.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy platform, configure for approach, final bearing %s.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", platform, dirty up by twelve, final bearing %s, continue.", callsign, fb),
+	})
+}
+
 // MarshalEstablishedAckCase3 — Case 3 established-in-hold ack. References EAT
 // rather than Charlie/hold-for-Charlie — in Case 3 the commence trigger is the
 // EAT clock, not deck-clear status. assignedRadial is 0-359, eatMinute 0-59.

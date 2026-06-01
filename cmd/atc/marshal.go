@@ -58,6 +58,10 @@ const (
 	// aircraft; lead gives the pilot time to enter the hold.
 	marshalCase3LeadTimeMin = 10
 	marshalCase3IntervalMin = 1
+	// Final bearing = BRC - offset (deck-angle compensation so the lineup
+	// lands on the angled runway, not the bow). Typical Case 3 offset is
+	// 9-10° left of BRC.
+	marshalFinalBearingOffset = 9
 )
 
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
@@ -433,13 +437,39 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	case containsAny(lower, "commencing"):
 		stack.SetPhase(callsign, "commencing")
 		stack.Remove(callsign)
-		transmit(comp.MarshalCopyCommencing(callsign, fuelState))
+		if atcCtrl.GetRecoveryCase() == state.CaseThree {
+			brc := atcCtrl.GetCarrierBRC()
+			finalBearing := 0
+			if brc >= 0 {
+				finalBearing = ((int(brc) - marshalFinalBearingOffset) + 360) % 360
+			}
+			log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
+			transmit(comp.MarshalCopyCommencingCase3(callsign, fuelState, finalBearing))
+		} else {
+			transmit(comp.MarshalCopyCommencing(callsign, fuelState))
+		}
 		// Internal stack collapse only — pack remaining aircraft down to fill
 		// the vacated slot so the next "marking moms" gets the correct angels.
 		// Per 07.png Marshal does not transmit step-down clearances.
 		for _, sd := range stack.CollapseStack(marshalMinAngels) {
 			log.Info().Str("callsign", sd.Callsign).Int("from", sd.OldAngels).Int("to", sd.NewAngels).Msg("Marshal: stack step-down (internal, no TX)")
 		}
+
+	case containsAny(lower, "platform", "passing five thousand", "passing 5000", "at platform"):
+		// Case 3 platform call — pilot is descending through 5000 ft inside
+		// ~20 nm. Ack with final bearing + dirty-up reminder. No state
+		// transition needed; pilot continues to glideslope intercept and
+		// hands off to LSO at ball call. Only meaningful in Case 3; in Case
+		// 1/2 we still ack (rare but harmless) on the same final bearing
+		// math so the pilot isn't ignored.
+		brc := atcCtrl.GetCarrierBRC()
+		finalBearing := 0
+		if brc >= 0 {
+			finalBearing = ((int(brc) - marshalFinalBearingOffset) + 360) % 360
+		}
+		stack.SetPhase(callsign, "platform")
+		log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
+		transmit(comp.MarshalAtPlatform(callsign, finalBearing))
 
 	case containsAny(lower, "initial"):
 		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.
