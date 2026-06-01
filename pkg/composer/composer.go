@@ -861,55 +861,60 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 		rDist := milesToWord(radarDistNm)
 		rBrg := bearingWord(radarBearingDeg)
 		radarStr = pick([]string{
-			fmt.Sprintf(" radar contact, angels %s, range %s, bearing %s from mother,", rAng, rDist, rBrg),
-			fmt.Sprintf(" I have you on radar, angels %s, %s from mother, bearing %s,", rAng, rDist, rBrg),
-			fmt.Sprintf(" radar contact angels %s, %s on the %s,", rAng, rDist, rBrg),
+			fmt.Sprintf(" radar contact, angels %s, range %s from the Abe, bearing %s,", rAng, rDist, rBrg),
+			fmt.Sprintf(" I have you on radar, angels %s, %s from the Abe, bearing %s,", rAng, rDist, rBrg),
+			fmt.Sprintf(" radar contact angels %s, %s from the Abe on the %s,", rAng, rDist, rBrg),
 		})
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, hold on the %s at angels %s, expected approach time %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, hold on the %s at angels %s, commence at %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, holding radial %s, angels %s, expect approach time %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, holding radial %s, angels %s, commence at %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your hold is the %s at angels %s, EAT %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your hold is the %s at angels %s, commence at %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
 	})
 }
 
 // MarshalCopyCommencingCase3 — Case 3 commencing ack. Pilot is leaving the
 // stack at EAT and starting the CV-1 descent profile; Marshal directs them
-// to platform 5000 ft on the final bearing (BRC minus offset). No
-// "3-mile initial paddles handoff" tail — in Case 3 the pilot reports
-// platform next, then continues to the LSO ball call.
-// finalBearing is 0-359 (spelled 3-digit). fuelState > 0 → state included.
-func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState float64, finalBearing int) string {
+// to platform 5000 ft on the final bearing (BRC minus offset) and recites
+// the current BRC for confirmation. No "3-mile initial paddles handoff"
+// tail — in Case 3 the pilot reports platform next, then continues to the
+// LSO ball call.
+// finalBearing and brcDeg are 0-359 (spelled 3-digit). brcDeg < 0 → the
+// BRC-confirm clause is omitted. fuelState > 0 → state included.
+func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState float64, finalBearing, brcDeg int) string {
 	fb := spellDigits3(finalBearing)
+	brcStr := ""
+	if brcDeg >= 0 {
+		brcStr = fmt.Sprintf(", confirm BRC %s", spellDigits3(brcDeg))
+	}
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, state %s, descend to platform five thousand, final bearing %s, report platform.", callsign, s, fb),
-			fmt.Sprintf("%s, "+c.towerCallsign+", commencing, state %s, platform five thousand, final bearing %s, report platform.", callsign, s, fb),
-			fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, state %s, descend platform, final bearing %s, call platform.", callsign, s, fb),
+			fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, state %s, descend to platform five thousand, final bearing %s%s, report platform.", callsign, s, fb, brcStr),
+			fmt.Sprintf("%s, "+c.towerCallsign+", commencing, state %s, platform five thousand, final bearing %s%s, report platform.", callsign, s, fb, brcStr),
+			fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, state %s, descend platform, final bearing %s%s, call platform.", callsign, s, fb, brcStr),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, descend to platform five thousand, final bearing %s, report platform.", callsign, fb),
-		fmt.Sprintf("%s, "+c.towerCallsign+", commencing, platform five thousand, final bearing %s, report platform.", callsign, fb),
-		fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, descend platform, final bearing %s, call platform.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, descend to platform five thousand, final bearing %s%s, report platform.", callsign, fb, brcStr),
+		fmt.Sprintf("%s, "+c.towerCallsign+", commencing, platform five thousand, final bearing %s%s, report platform.", callsign, fb, brcStr),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, descend platform, final bearing %s%s, call platform.", callsign, fb, brcStr),
 	})
 }
 
 // MarshalAtPlatform — Case 3 platform ack. Pilot is passing 5000 ft descending
-// inside ~20 nm. Marshal acks, reminds of dirty-up + 12-mile gate, and
-// re-recites the final bearing. From here the pilot continues to glideslope
-// intercept and ball call (LSO territory).
+// inside ~20 nm. Marshal acks and re-recites the final bearing; from here
+// the pilot continues to glideslope intercept and ball call (LSO territory).
 func (c *ATCComposer) MarshalAtPlatform(callsign string, finalBearing int) string {
 	fb := spellDigits3(finalBearing)
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", roger platform, dirty up, twelve mile gate, final bearing %s.", callsign, fb),
-		fmt.Sprintf("%s, "+c.towerCallsign+", copy platform, configure for approach, final bearing %s.", callsign, fb),
-		fmt.Sprintf("%s, "+c.towerCallsign+", platform, dirty up by twelve, final bearing %s, continue.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy platform, final bearing %s.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger platform, final bearing %s.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", platform, final bearing %s.", callsign, fb),
 	})
 }
 

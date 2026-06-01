@@ -43,6 +43,8 @@ Pilot's first call to Marshal. Composer also appends a stack-summary line (`Stac
 
 If Tacview has no fresh contact for the caller (or carrier position unknown), `{RADAR}` is empty.
 
+The Case 3 variant (`MarshalMarkingMomCase3`) substitutes "from the Abe" (CVN-72 callname) for "from mother" in all three radar variants. Case 1/2 marking moms still uses the generic "from mother" wording.
+
 **Responses (`MarshalMarkingMom`):**
 1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, expect {CASE} recovery, BRC {BRC}, altimeter {ALTIMETER}, Marshal angels {ANGELS}, report see me at ten.`
 2. `{CALLSIGN}, Marshal,{RADAR} {CASE} recovery, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, stack angels {ANGELS}, report see me at ten.`
@@ -233,11 +235,11 @@ Issues a holding clearance instead of "Marshal at angels N, see me at ten":
 State side-effects: `MarshalStack` now stores `AssignedRadial` and `EAT` per aircraft so the §4 established ack can recite the same values.
 
 **Responses:**
-1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, hold on the {RADIAL} at angels {ANGELS}, expected approach time {EAT}, report established.`
-2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, holding radial {RADIAL}, angels {ANGELS}, expect approach time {EAT}, report established.`
-3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your hold is the {RADIAL} at angels {ANGELS}, EAT {EAT}, report established.`
+1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, hold on the {RADIAL} at angels {ANGELS}, commence at {EAT}, report established.`
+2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, holding radial {RADIAL}, angels {ANGELS}, commence at {EAT}, report established.`
+3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your hold is the {RADIAL} at angels {ANGELS}, commence at {EAT}, report established.`
 
-`{RADAR}` follows the Case 1 logic (same three random variants when Tacview has the caller, empty otherwise). BRC clause is omitted when carrier is off scope; radial falls back to spoken `zero zero zero` in that case.
+`{RADAR}` uses the Case 3 "from the Abe" variant (same three shapes, mother → Abe). BRC clause is omitted when carrier is off scope; radial falls back to spoken `zero zero zero` in that case. Case 3 uses "commence at {EAT}" phrasing rather than "expected approach time {EAT}" so §1 and §4 stay consistent ("commence at" appears in both).
 
 ### §4 Case 3 Established (`MarshalEstablishedAckCase3`)
 
@@ -262,25 +264,28 @@ the CV-1 descent profile: platform 5000 ft on the **final bearing** (BRC −
 off scope (`brc < 0`) the final bearing falls back to `000`. Tune the offset
 via the `marshalFinalBearingOffset` const in `cmd/atc/marshal.go`.
 
+A "confirm BRC {BRC}" clause is appended after final bearing so the pilot reads back the current carrier heading along with the platform-descent setup. BRC clause is omitted when carrier is off scope (`brcDeg < 0`).
+
 **With state:**
-1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, descend to platform five thousand, final bearing {FB}, report platform.`
-2. `{CALLSIGN}, Marshal, commencing, state {STATE}, platform five thousand, final bearing {FB}, report platform.`
-3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, descend platform, final bearing {FB}, call platform.`
+1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, descend to platform five thousand, final bearing {FB}, confirm BRC {BRC}, report platform.`
+2. `{CALLSIGN}, Marshal, commencing, state {STATE}, platform five thousand, final bearing {FB}, confirm BRC {BRC}, report platform.`
+3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, descend platform, final bearing {FB}, confirm BRC {BRC}, call platform.`
 
 **Without state:**
-1. `{CALLSIGN}, Marshal, copy commencing, descend to platform five thousand, final bearing {FB}, report platform.`
-2. `{CALLSIGN}, Marshal, commencing, platform five thousand, final bearing {FB}, report platform.`
-3. `{CALLSIGN}, Marshal, roger commencing, descend platform, final bearing {FB}, call platform.`
+1. `{CALLSIGN}, Marshal, copy commencing, descend to platform five thousand, final bearing {FB}, confirm BRC {BRC}, report platform.`
+2. `{CALLSIGN}, Marshal, commencing, platform five thousand, final bearing {FB}, confirm BRC {BRC}, report platform.`
+3. `{CALLSIGN}, Marshal, roger commencing, descend platform, final bearing {FB}, confirm BRC {BRC}, call platform.`
 
 ### §5a Platform (`MarshalAtPlatform`)
 
 **Triggers:** `platform` · `passing five thousand` · `passing 5000` · `at platform`
 
 Pilot reports passing 5000 ft on descent, typically inside 20 nm of mother.
-Marshal acks with dirty-up reminder, 12-mile gate, and re-recites the final
-bearing. The pilot continues to glideslope intercept (1200 ft at 12 DME per
-the kneeboard) and hands off to LSO at ball call — Marshal's job effectively
-ends here in Case 3.
+Marshal acks and re-recites the final bearing — that's it. The pilot
+continues to glideslope intercept (1200 ft at 12 DME per the kneeboard)
+and hands off to LSO at ball call; Marshal's job effectively ends here in
+Case 3. (Dirty-up and 12-mile-gate hints were dropped — pilots know the
+profile from the kneeboard; brevity wins on the radio.)
 
 The trigger is wired regardless of recovery case (rare false-fire in Case 1
 is harmless — the pilot still gets a sensible ack). Phase is set to
@@ -289,9 +294,9 @@ removed the aircraft so the SetPhase is a noop — kept for forward
 compatibility if we re-track post-commence aircraft later.
 
 **Responses (`MarshalAtPlatform`):**
-1. `{CALLSIGN}, Marshal, roger platform, dirty up, twelve mile gate, final bearing {FB}.`
-2. `{CALLSIGN}, Marshal, copy platform, configure for approach, final bearing {FB}.`
-3. `{CALLSIGN}, Marshal, platform, dirty up by twelve, final bearing {FB}, continue.`
+1. `{CALLSIGN}, Marshal, copy platform, final bearing {FB}.`
+2. `{CALLSIGN}, Marshal, roger platform, final bearing {FB}.`
+3. `{CALLSIGN}, Marshal, platform, final bearing {FB}.`
 
 ### Not yet wired (Phase 3)
 - "say needles" / ball call — LSO/CATCC territory, parked for the LSO role.

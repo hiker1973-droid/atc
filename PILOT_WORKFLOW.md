@@ -140,6 +140,43 @@ Marshal handles the inbound stack to the boat — case recovery info, BRC, stack
 
 ---
 
+## Carrier ops — Case 3 variations (night / IMC)
+
+When weather drops the recovery to **Case 3** (night, or ceiling <1500 ft, or visibility <3 nm — Marshal auto-detects from mission time + weather) the §1 marking moms and §4 / §5 / §new platform calls use **different phraseology** from Case 1. The trigger words are the same — what changes is what Marshal says back.
+
+Marshal will also broadcast a stack-wide advisory when the case flips mid-recovery (e.g. dusk crossing 18:00 mission-local). Listen for *"All marshal aircraft, recovery is now Case Three, acknowledge on next push."*
+
+1. **Marking mom (Case 3).** Same trigger.
+   - ATC: *"…Case Three recovery, BRC 088, altimeter 29.92, hold on the two six eight at angels seven, commence at three six, report established."*
+   - You get an **assigned radial** (reciprocal of BRC) to hold on, not a "see me at ten" instruction. The kneeboard's race-track hold is 250 kts, 1-min legs, 6 nm DME.
+   - **Commence at NN** = minute-of-hour when you leave the hold and start descent. Note it — you call commencing at that time, not when the deck clears.
+
+2. **Established in hold (Case 3).** Same trigger.
+   - ATC: *"…roger established angels seven on the two six eight, commence at three six."*
+   - No "signal Charlie" / "hold for Charlie" — Case 3 commences on the clock, not on deck status.
+
+3. **Commencing (Case 3).** Same trigger.
+   - ATC: *"…copy commencing, descend to platform five thousand, final bearing zero seven niner, confirm BRC zero eight eight, report platform."*
+   - **Final bearing** ≈ BRC − 9° (deck-angle offset). Fly that for the lineup.
+   - **Confirm BRC** — read it back as part of your next transmission so Marshal knows you copied.
+   - No 3-mile initial / paddles handoff in Case 3 — your next call is **platform**.
+
+4. **Platform (Case 3 — new).** Passing 5000 ft descending.
+   - Pilot: *"Marshal, Raider 1, platform"* (or *"passing five thousand"* / *"passing 5000"* / *"at platform"*)
+   - ATC: *"…copy platform, final bearing zero seven niner."*
+   - From here continue the CV-1 descent profile: 1200 ft at 12 DME, fly the needles to glideslope intercept, ball call at 0.7 nm. Ball call goes to LSO/Paddles — Marshal stops talking to you after platform.
+
+**Case 1 vs Case 3 quick diff:**
+| Pilot call | Case 1 response | Case 3 response |
+|---|---|---|
+| `marking moms` | stack angels, see me at ten | radial + angels + **commence at NN** |
+| `established angels` | signal Charlie *or* hold | **commence at NN** (no Charlie) |
+| `commencing` | check in 3-mile initial, paddles handoff | descend platform 5000, **final bearing**, **confirm BRC** |
+| `platform` | (rare; gets a sensible ack anyway) | copy platform, **final bearing** — fly the CV-1 profile |
+| `initial` | contact paddles | (don't use in Case 3 — call platform instead) |
+
+---
+
 ## Special intents (any tower freq)
 
 | Intent | What to say |

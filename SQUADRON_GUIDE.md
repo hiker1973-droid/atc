@@ -33,6 +33,40 @@ in practice.
 
 ---
 
+## What's new since v1.4.0 — Case 3 carrier recovery
+
+Marshal now understands **Case 3 (night / IMC) recovery**. The flow and triggers
+are the same as Case 1; the phraseology changes to match the kneeboard's CV-1
+descent profile.
+
+Marshal auto-detects the recovery case from mission time + ceiling + visibility:
+- **Case 1** — day, ceiling ≥ 3000 ft, vis ≥ 5 nm (default flow)
+- **Case 2** — marginal day (ceiling 1500–3000 ft *or* vis 3–5 nm)
+- **Case 3** — **night, or** ceiling < 1500 ft, *or* vis < 3 nm
+
+The case can flip mid-recovery (dusk, weather change with new `--static-*`
+flags on relaunch). When it does, you'll hear a stack-wide advisory:
+*"All marshal aircraft, recovery is now Case Three, acknowledge on next push."*
+
+**Case 3 phraseology differences:**
+
+| Pilot call | Case 1 | Case 3 |
+|---|---|---|
+| `marking moms` | stack angels, see me at ten | radial + angels + **commence at NN** |
+| `established angels N` | signal Charlie *or* hold | **commence at NN** (no Charlie) |
+| `commencing` | check 3-mile initial, paddles handoff | descend platform 5000, **final bearing**, **confirm BRC** |
+| `platform` (new) | — | copy platform, **final bearing** |
+| `initial` | contact paddles | (don't use — call platform) |
+
+- **Assigned radial** = BRC + 180 (reciprocal). 250 kt holding pattern, 1-min legs, 6 nm DME inbound leg per the kneeboard.
+- **Commence at NN** = minute-of-hour you leave the hold. First aircraft gets +10 min lead, each subsequent slot adds 1 min.
+- **Final bearing** = BRC − 9° (deck-angle offset).
+- **From the Abe** wording — Case 3 radar callouts reference CVN-72 ("the Abe") instead of generic "from mother".
+
+The full Case 3 walkthrough is in `PILOT_WORKFLOW.md` under "Carrier ops — Case 3 variations". The phraseology spec is in `marshal_responses.md`.
+
+---
+
 ## What's new in v1.4.0
 
 ### Holding short → cleared for takeoff (no second call)
@@ -207,11 +241,13 @@ Post-landing:
 - `Marshal, [callsign], radio check`
 - `Marshal, [callsign], marking moms, [N] DME, angels [X], state [N.N]`
 - `Marshal, [callsign], [N] DME` (en-route position report)
-- `Marshal, [callsign], see you at ten` (radar contact request at 10 nm)
+- `Marshal, [callsign], see you at ten` (Case 1 — radar contact at 10 nm)
 - `Marshal, [callsign], state [N.N]` (fuel update)
-- `Marshal, [callsign], established angels [X]` (in stack, ready for Charlie)
-- `Marshal, [callsign], commencing` · `commencing, state [N.N]` — Marshal acks AND hands off to paddles in one call
-- `Marshal, [callsign], initial` — fallback handoff at 3 nm if you skipped commencing
+- `Marshal, [callsign], established angels [X]` (in stack — Charlie in Case 1, EAT push in Case 3)
+- `Marshal, [callsign], commencing` · `commencing, state [N.N]` (leaving stack — Case 1 to 3-mile initial, Case 3 to platform)
+- `Marshal, [callsign], platform` (Case 3 only — passing 5000 ft descending)
+- `Marshal, [callsign], initial` (Case 1 only — paddles handoff at 3 nm)
+- `Marshal, [callsign], say BRC` · `request BRC` (mother's heading)
 
 ### To Deckboss (128.60 — carrier deck)
 - `Deckboss, [callsign], radio check`

@@ -440,11 +440,13 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		if atcCtrl.GetRecoveryCase() == state.CaseThree {
 			brc := atcCtrl.GetCarrierBRC()
 			finalBearing := 0
+			brcDeg := -1
 			if brc >= 0 {
 				finalBearing = ((int(brc) - marshalFinalBearingOffset) + 360) % 360
+				brcDeg = int(brc)
 			}
 			log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
-			transmit(comp.MarshalCopyCommencingCase3(callsign, fuelState, finalBearing))
+			transmit(comp.MarshalCopyCommencingCase3(callsign, fuelState, finalBearing, brcDeg))
 		} else {
 			transmit(comp.MarshalCopyCommencing(callsign, fuelState))
 		}
