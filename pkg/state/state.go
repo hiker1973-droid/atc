@@ -424,12 +424,15 @@ func (ds *DeckbossState) CongaLen() int {
 
 // CatStatus tracks a single catapult.
 type MarshalAircraft struct {
-	Callsign    string
-	Position    int     // 1 = #1, 2 = #2, etc
-	Angels      int     // assigned stack altitude
-	FuelState   float64
-	Phase       string  // "inbound", "holding", "charlie", "commencing", "initial", "pushing"
-	UpdatedAt   time.Time
+	Callsign       string
+	Position       int     // 1 = #1, 2 = #2, etc
+	Angels         int     // assigned stack altitude
+	FuelState      float64
+	Phase          string  // "inbound", "holding", "charlie", "commencing", "initial", "pushing"
+	UpdatedAt      time.Time
+	// Case 3 holding fields. Zero values when assigned under Case 1/2.
+	AssignedRadial int       // 0-359, holding radial from CV TACAN (reciprocal of BRC)
+	EAT            time.Time // expected approach time — when this aircraft commences
 }
 
 // MarshalStack manages the carrier recovery stack.
@@ -565,6 +568,24 @@ func (s *MarshalStack) SetAngels(callsign string, angels int) {
 	defer s.mu.Unlock()
 	if ac, ok := s.aircraft[callsign]; ok {
 		ac.Angels = angels
+	}
+}
+
+// SetAssignedRadial stores the Case 3 holding radial for an aircraft.
+func (s *MarshalStack) SetAssignedRadial(callsign string, radial int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ac, ok := s.aircraft[callsign]; ok {
+		ac.AssignedRadial = radial
+	}
+}
+
+// SetEAT stores the expected approach time for an aircraft.
+func (s *MarshalStack) SetEAT(callsign string, eat time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ac, ok := s.aircraft[callsign]; ok {
+		ac.EAT = eat
 	}
 }
 

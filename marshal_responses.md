@@ -211,6 +211,53 @@ Range is configured by `marshalMinAngels` / `marshalMaxAngels` in `cmd/atc/marsh
 
 When an aircraft commences, its slot frees and the rest of the stack **collapses down internally** (see Section 8): aircraft are sorted by their current angels and reassigned to `marshalMinAngels`, `marshalMinAngels+1`, … in order. The reassignment is state-only — no radio call goes out. The next inbound to call `marking moms` lands on the lowest free slot above the collapsed stack.
 
+## Case 3 Recovery — phraseology overrides (vSFG-7 10vSFG7_Case3_Kneeboard.jpg)
+
+Case 3 (night or IMC — ceiling <1000 ft, visibility <5 miles, or any night
+recovery) replaces the wording of §1 marking moms and §4 established angels.
+Other intents (radio check, DME, state, commencing, initial) still use the
+Case 1 composer methods for now — those will be revisited in Phase 2.
+
+**Trigger detection is unchanged.** The handler branches on
+`atcCtrl.GetRecoveryCase()` at TX time; the recovery-case watcher already
+broadcasts on Case 1↔3 transitions so an in-flight pilot will hear the
+change announcement before their next call.
+
+### §1 Case 3 Marking mom (`MarshalMarkingMomCase3`)
+
+Issues a holding clearance instead of "Marshal at angels N, see me at ten":
+- **assigned radial** = `(BRC + 180) mod 360`, spelled 3-digit (e.g. `two eight seven`)
+- **assigned angels** = lowest unoccupied slot in `[marshalMinAngels, marshalMaxAngels]` (same logic as Case 1)
+- **EAT** = `now + leadMin + (pos-1)*intervalMin`, minute-of-hour spelled 2-digit. Defaults: lead = 10 min, interval = 1 min. Tunable in `cmd/atc/marshal.go`.
+
+State side-effects: `MarshalStack` now stores `AssignedRadial` and `EAT` per aircraft so the §4 established ack can recite the same values.
+
+**Responses:**
+1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, hold on the {RADIAL} at angels {ANGELS}, expected approach time {EAT}, report established.`
+2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, holding radial {RADIAL}, angels {ANGELS}, expect approach time {EAT}, report established.`
+3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your hold is the {RADIAL} at angels {ANGELS}, EAT {EAT}, report established.`
+
+`{RADAR}` follows the Case 1 logic (same three random variants when Tacview has the caller, empty otherwise). BRC clause is omitted when carrier is off scope; radial falls back to spoken `zero zero zero` in that case.
+
+### §4 Case 3 Established (`MarshalEstablishedAckCase3`)
+
+No Charlie / hold-for-Charlie in Case 3 — the pilot commences on the EAT clock, regardless of deck status.
+
+**Responses:**
+1. `{CALLSIGN}, Marshal, roger established angels {ANGELS} on the {RADIAL}, commence at {EAT}.`
+2. `{CALLSIGN}, Marshal, copy established radial {RADIAL} angels {ANGELS}, your push time is {EAT}.`
+3. `{CALLSIGN}, Marshal, in the hold angels {ANGELS} on the {RADIAL}, expect commence at {EAT}.`
+
+If the aircraft was originally checked in under Case 1/2 and the case flipped mid-flight (so `EAT` was never assigned), the handler computes one at established-time using the current stack position.
+
+### Not yet wired (Phase 2/3)
+- §5 `commencing` — still uses the Case 1 `MarshalCopyCommencing` (3-mile initial, paddles handoff). Case 3 should reference platform / final bearing instead.
+- §new `platform` — pilot passing 5000ft on descent. No trigger or composer method yet.
+- "say needles" / ball call — LSO/CATCC territory, parked for the LSO role.
+- Case 3 departure flow (airborne / 10-DME arc / departure radial / popeye / on top / kilo) — not wired; Marshal does not currently own departure routing.
+
+---
+
 ## Case 1 Recovery comms coverage (vSFG-7 07.png)
 
 | Stage | Pilot call | Marshal response | Wired? |

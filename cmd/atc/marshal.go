@@ -53,6 +53,11 @@ const (
 	// reservations and any Tacview contact within 50nm of the carrier.
 	marshalMinAngels = 2
 	marshalMaxAngels = 9
+	// Case 3 EAT scheduling — first aircraft commences at now+lead, each
+	// subsequent slot adds interval. Standard Case 3 spacing is ~1 min per
+	// aircraft; lead gives the pilot time to enter the hold.
+	marshalCase3LeadTimeMin = 10
+	marshalCase3IntervalMin = 1
 )
 
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
@@ -353,15 +358,32 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		// Pull live recovery case from state so phraseology stays in sync with
 		// any mid-recovery transition the watcher already announced.
-		caseLabel := composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))
-		log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
+		recCase := atcCtrl.GetRecoveryCase()
+		caseLabel := composer.CaseLabel(int(recCase))
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
 		if len(all) > 1 {
 			stackInfo = fmt.Sprintf(" Stack has %d aircraft.", len(all))
 		}
-		transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
+		if recCase == state.CaseThree {
+			// Case 3: assign holding radial (reciprocal of BRC) and an EAT
+			// keyed off stack position. If BRC unknown (carrier off scope)
+			// fall back to radial 0 — composer still spells it, and the
+			// BRC clause is omitted in the response.
+			radial := 0
+			if brc >= 0 {
+				radial = (int(brc) + 180) % 360
+			}
+			eat := time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin) * time.Minute)
+			stack.SetAssignedRadial(callsign, radial)
+			stack.SetEAT(callsign, eat)
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Msg("Marshal: Case 3 aircraft checking in")
+			transmit(comp.MarshalMarkingMomCase3(callsign, stackAngels, radial, eat.Minute(), altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
+		} else {
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
+			transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
+		}
 
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))
@@ -383,11 +405,25 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		stack.SetPhase(callsign, "holding")
 		angels := 6
 		position := 1
+		radial := 0
+		var eat time.Time
 		if ac, ok := stack.GetAircraft(callsign); ok {
 			angels = ac.Angels
 			position = ac.Position
+			radial = ac.AssignedRadial
+			eat = ac.EAT
 		}
-		if atcCtrl.IsDeckClear() {
+		if atcCtrl.GetRecoveryCase() == state.CaseThree {
+			// Case 3: commence on EAT, not Charlie. If EAT was never set
+			// (Case 3 transition mid-recovery, pilot never got a Case 3
+			// marking-mom), compute one now from current stack position.
+			if eat.IsZero() {
+				eat = time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(position-1)*marshalCase3IntervalMin) * time.Minute)
+				stack.SetEAT(callsign, eat)
+			}
+			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Msg("Marshal: Case 3 established in hold")
+			transmit(comp.MarshalEstablishedAckCase3(callsign, angels, radial, eat.Minute()))
+		} else if atcCtrl.IsDeckClear() {
 			stack.SetPhase(callsign, "charlie")
 			transmit(comp.MarshalSignalCharlie(callsign))
 		} else {

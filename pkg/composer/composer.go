@@ -834,6 +834,63 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 	})
 }
 
+// MarshalMarkingMomCase3 — Case 3 (night/IMC) marking-mom variant. Issues the
+// holding clearance per the kneeboard: assigned radial (reciprocal of BRC),
+// assigned angels, expected approach time (minutes past the hour). No
+// "Marshal at angels N, report see me at ten" tail — in Case 3 the pilot
+// flies the holding pattern on the radial and reports established, not
+// visual on mother. assignedRadial is 0-359 (spelled 3-digit). eatMinute is
+// 0-59 (spelled 2-digit). brc < 0 → BRC clause omitted.
+func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assignedRadial, eatMinute int,
+	altimeterInHg, ceilingFt, visNm, brc float64,
+	radarAngels, radarDistNm, radarBearingDeg int, radarFound bool) string {
+	ang := numberWord(stackAngels)
+	alt := formatAltimeter(altimeterInHg)
+	wx := marshalWeatherPhrase(ceilingFt, visNm)
+	rad := spellDigits3(assignedRadial)
+	eat := spellDigits(eatMinute)
+
+	brcStr := ""
+	if brc >= 0 {
+		brcStr = fmt.Sprintf(", BRC %03.0f", brc)
+	}
+
+	radarStr := ""
+	if radarFound {
+		rAng := numberWord(radarAngels)
+		rDist := milesToWord(radarDistNm)
+		rBrg := bearingWord(radarBearingDeg)
+		radarStr = pick([]string{
+			fmt.Sprintf(" radar contact, angels %s, range %s, bearing %s from mother,", rAng, rDist, rBrg),
+			fmt.Sprintf(" I have you on radar, angels %s, %s from mother, bearing %s,", rAng, rDist, rBrg),
+			fmt.Sprintf(" radar contact angels %s, %s on the %s,", rAng, rDist, rBrg),
+		})
+	}
+
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, hold on the %s at angels %s, expected approach time %s, report established.",
+			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, holding radial %s, angels %s, expect approach time %s, report established.",
+			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your hold is the %s at angels %s, EAT %s, report established.",
+			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
+	})
+}
+
+// MarshalEstablishedAckCase3 — Case 3 established-in-hold ack. References EAT
+// rather than Charlie/hold-for-Charlie — in Case 3 the commence trigger is the
+// EAT clock, not deck-clear status. assignedRadial is 0-359, eatMinute 0-59.
+func (c *ATCComposer) MarshalEstablishedAckCase3(callsign string, angels, assignedRadial, eatMinute int) string {
+	ang := numberWord(angels)
+	rad := spellDigits3(assignedRadial)
+	eat := spellDigits(eatMinute)
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger established angels %s on the %s, commence at %s.", callsign, ang, rad, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy established radial %s angels %s, your push time is %s.", callsign, rad, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", in the hold angels %s on the %s, expect commence at %s.", callsign, ang, rad, eat),
+	})
+}
+
 // MarshalSayBRC responds to a pilot's "say BRC" / "request BRC" call.
 // Returns the carrier's current Base Recovery Course (bow direction) as
 // a 3-digit spoken heading, e.g. "three five seven". Falls back to
@@ -1116,6 +1173,24 @@ func spellDigits(n int) string {
 		'4': "four", '5': "five", '6': "six", '7': "seven",
 		'8': "eight", '9': "niner",
 	}
+	for i, d := range digits {
+		words[i] = dw[d]
+	}
+	return strings.Join(words, " ")
+}
+
+// spellDigits3 spells an integer as 3 digit words, left-padded with zeros.
+// Used for headings/radials (e.g. 87 → "zero eight seven", 287 → "two eight
+// seven"). Values are taken modulo 360 to keep the spoken value canonical.
+func spellDigits3(n int) string {
+	n = ((n % 360) + 360) % 360
+	digits := fmt.Sprintf("%03d", n)
+	dw := map[rune]string{
+		'0': "zero", '1': "one", '2': "two", '3': "three",
+		'4': "four", '5': "five", '6': "six", '7': "seven",
+		'8': "eight", '9': "niner",
+	}
+	words := make([]string, len(digits))
 	for i, d := range digits {
 		words[i] = dw[d]
 	}
