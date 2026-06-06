@@ -753,9 +753,9 @@ func run(cmd *cobra.Command, args []string) error {
 				Advisory: "vSFG-7 traffic in area. Advise information on initial contact.",
 			},
 			{
-				Name: "Khasab ATIS", FreqMHz: 248.500, Voice: "fable",
-				ICAO: "OOKB", TACAN: "", ILS: "ILS 110.30 runway 08.",
-				Advisory: "Active runway takeoff 01 landing 19. Landing aircraft have priority. vSFG-7 traffic in area. Advise information on initial contact.",
+				Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable",
+				ICAO: "OIBK", TACAN: "", ILS: "",
+				Advisory: "vSFG-7 traffic in area. Advise information on initial contact.",
 			},
 		}
 		for i, station := range atisStations {
@@ -2070,7 +2070,7 @@ func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64,
 		// - Tower callsigns end in "-ATC" (e.g. OMAM-ATC) → heavier static
 		//   for that punchy ATC sound.
 		// - ATIS station callsigns end with " ATIS" (e.g. "Liwa ATIS",
-		//   "Khasab ATIS") → kept clean since it's a recorded loop.
+		//   "Kish ATIS") → kept clean since it's a recorded loop.
 		// - Everything else (OMDM-MSH, OMDM-DKB, vSFG-7-Command) gets the
 		//   general operational intensity.
 		intensity := flagRadioIntensity

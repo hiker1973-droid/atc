@@ -29,7 +29,7 @@ var towerDashboardPortByICAO = map[string]int{
 
 // fetchTowerRunway returns the active runway reported by the tower /status
 // endpoint for the given ICAO, or "" when there's no paired tower (Liwa,
-// Khasab) or the tower is offline. Short timeout — we never want ATIS to
+// Kish) or the tower is offline. Short timeout — we never want ATIS to
 // stall its broadcast cadence on a hung HTTP call.
 func fetchTowerRunway(icao string) string {
 	port, ok := towerDashboardPortByICAO[icao]
@@ -59,7 +59,7 @@ type towerWeather struct {
 }
 
 // fetchTowerWeather pulls the live weather block from the paired tower's
-// /status. Returns ok=false for Liwa/Khasab (no paired tower) or any HTTP
+// /status. Returns ok=false for Liwa/Kish (no paired tower) or any HTTP
 // failure. Sanity-guarded — altimeter outside [25,32] inHg means the tower
 // hasn't seeded weather yet, so we skip rather than zero out the ATIS state.
 func fetchTowerWeather(icao string) (towerWeather, bool) {
@@ -190,7 +190,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		}
 		defer broadcasting.Unlock()
 		// Sync weather from the paired tower before reading our own controller
-		// state. Stations with no paired tower (Liwa, Khasab) keep the boot
+		// state. Stations with no paired tower (Liwa, Kish) keep the boot
 		// --static-* values. Mirrors the runway-poll pattern below.
 		if tw, ok := fetchTowerWeather(station.ICAO); ok {
 			atcCtrl.SetFullWeather(tw.WindDir, tw.WindKts, tw.CeilFt, tw.VisNm, tw.AltInHg, tw.IsNight)
@@ -206,7 +206,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		state.activeRwy = atcCtrl.GetActiveRunway()
 		// Prefer the paired tower's active runway when it's reachable — that
 		// lets the launcher /runway dropdown propagate into the next ATIS
-		// broadcast. Stations with no paired tower (Liwa, Khasab) keep the
+		// broadcast. Stations with no paired tower (Liwa, Kish) keep the
 		// atcCtrl value.
 		if rwy := fetchTowerRunway(station.ICAO); rwy != "" && rwy != state.activeRwy {
 			log.Info().Str("station", station.Name).Str("icao", station.ICAO).
@@ -440,10 +440,10 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 			Advisory: "Active runway 19. vSFG-7 training flights in area. Advise information on initial contact.",
 		},
 		{
-			Name: "Khasab ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OOKB",
+			Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OIBK",
 			TACAN: "",
-			ILS: "ILS 110.30 runway 08.",
-			Advisory: "Active runway: takeoff 01, landing 19. Landing aircraft have priority. vSFG-7 training flights in area. Advise information on initial contact.",
+			ILS: "",
+			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
 		},
 	}
 
