@@ -1025,8 +1025,8 @@ func (c *ATCController) pruneLoop(ctx context.Context) {
 // towerKeywordAliases returns common Whisper misrecognitions for a tower callsign.
 func towerKeywordAliases(callsign string) []string {
 	aliases := map[string][]string{
-		"al minhad tower": {"almanad", "al-minhad", "minhad", "minot", "minhot", "el minhad", "el minha", "elmina", "elm and", "helm a", "el mina", "alma nad", "al minad", "helmet", "helmet on", "helmont", "el menad", "elman", "elma", "el menon", "elmenon", "el menod", "elmena", "almena"},
-		"al dhafra tower": {"dhafra", "al dhafra", "alfra", "al-dhafra", "ldaf", "ldafa", "ldot", "el dhafra", "delta for", "delta offer", "delta tower", "al dafra", "dafra", "altitude", "altitude offer", "al dafna", "dafna"},
+		"al minhad tower": {"almanad", "al-minhad", "minhad", "minot", "minhot", "el minhad", "el minha", "elmina", "elm and", "helm a", "el mina", "alma nad", "al minad", "helmet", "helmet on", "helmont", "el menad", "elman", "elma", "el menon", "elmenon", "el menod", "elmena", "almena", "almanar", "almanan", "almanon", "al manan", "manan", "manar", "manon"},
+		"al dhafra tower": {"dhafra", "al dhafra", "alfra", "al-dhafra", "ldaf", "ldafa", "ldot", "ldar", "ldar for", "eldar", "eldar for", "el dhafra", "delta for", "delta offer", "delta tower", "al dafra", "dafra", "altitude", "altitude offer", "al dafna", "dafna"},
 		"al ain tower":    {"al ain", "alain", "al-ain", "aline", "alan", "el ain"},
 	}
 	lower := strings.ToLower(callsign)
