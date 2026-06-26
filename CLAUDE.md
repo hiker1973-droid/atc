@@ -12,7 +12,7 @@ All `.bat` scripts read four env vars and fail fast if any is missing. Same scri
 |---|---|---|---|
 | `OPENAI_API_KEY` | sk-proj-... | sk-proj-... | `atc.exe` directly (Whisper STT + TTS) |
 | `SRS_EAM` | (rotate before mission) | (same) | All `start_*.bat`, passed as `--eam-password` |
-| `SKYEYE_SRS` | `localhost:5004` | `localhost:5004` | All `start_*.bat`, passed as `--srs-addr` |
+| `SKYEYE_SRS` | `localhost:5008` | `localhost:5008` | All `start_*.bat`, passed as `--srs-addr` |
 | `SKYEYE_TACVIEW` | `localhost:42676` | `localhost:42676` | Tower / Marshal / Scudwatch / Launcher, passed as `--tacview-addr` |
 
 Set with `setx VAR value`, then open a new cmd so the new values are in scope (setx doesn't affect the running shell). Symptom of a missing var: each script aborts at the top with `ERROR: <VAR> env var not set`.
@@ -25,7 +25,7 @@ DCS-gRPC is not externalized — `:50051` is stable across boxes.
 - `cmd/logtail/` — log tail/filter CLI
 - `pkg/airfield/` — OMDM, OMAM, OMAL definitions (runways, freqs, elev)
 - `pkg/state/`, `pkg/controller/`, `pkg/composer/` — state machine, intent + conflict detection, ICAO phraseology
-- `configs/{alain,dhafra,minhad}.yaml` — per-airfield configs (still hardcode `localhost:5008` — stale; SRS server actually listens on 5004 here, but these YAMLs are not currently read by `atc.exe` so the mismatch is cosmetic)
+- `configs/{alain,dhafra,minhad}.yaml` — per-airfield configs (hardcode `localhost:5008`, which matches the live SRS server — verified 2026-06-26: `SRS-Server.exe` listens on `:5008` and `SKYEYE_SRS=localhost:5008`. These YAMLs are not currently read by `atc.exe` anyway.)
 
 ## Sites and roles
 Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
