@@ -132,6 +132,37 @@ func identWord(n int) string {
 	return words[n]
 }
 
+// spellRunwayWords verbalizes a runway designator ("27" -> "two seven",
+// "31L" -> "three one left") for ATIS speech. Mirrors composer.spellRunway,
+// which is unexported, to keep ATIS runway phrasing identical to the tower's.
+func spellRunwayWords(designator string) string {
+	suffix := ""
+	digits := designator
+	switch {
+	case strings.HasSuffix(designator, "L"):
+		suffix = " left"
+		digits = designator[:len(designator)-1]
+	case strings.HasSuffix(designator, "R"):
+		suffix = " right"
+		digits = designator[:len(designator)-1]
+	case strings.HasSuffix(designator, "C"):
+		suffix = " center"
+		digits = designator[:len(designator)-1]
+	}
+	dw := map[rune]string{
+		'0': "zero", '1': "one", '2': "two", '3': "three",
+		'4': "four", '5': "five", '6': "six", '7': "seven",
+		'8': "eight", '9': "niner",
+	}
+	spoken := make([]string, 0, len(digits))
+	for _, d := range digits {
+		if w, ok := dw[d]; ok {
+			spoken = append(spoken, w)
+		}
+	}
+	return strings.Join(spoken, " ") + suffix
+}
+
 func buildATISText(station *atisStation, state *atisState) string {
 	ident := identWord(state.ident)
 	windStr := fmt.Sprintf("wind %03.0f at %d", state.windFrom, int(state.windKts))
@@ -141,14 +172,18 @@ func buildATISText(station *atisStation, state *atisState) string {
 	if state.ceilingFt > 0 && state.ceilingFt < 9999 {
 		ceilStr = fmt.Sprintf(", ceiling %d", int(state.ceilingFt/100)*100)
 	}
-	rwy := state.activeRwy
-	if rwy == "" { rwy = "in use" }
-
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("%s information %s. ", station.Name, ident))
 	if station.TACAN != "" { sb.WriteString(station.TACAN + " ") }
 	if station.ILS != "" { sb.WriteString(station.ILS + " ") }
 	sb.WriteString(fmt.Sprintf("%s%s. Altimeter %s. ", windStr, ceilStr, altStr))
+	// Announce the live active runway pulled from the paired tower (state.activeRwy
+	// is synced via fetchTowerRunway each broadcast). Only stations that have a
+	// paired tower get a runway line — Liwa/Kish are advisory-only and have no
+	// authoritative runway to mirror.
+	if _, paired := towerDashboardPortByICAO[station.ICAO]; paired && state.activeRwy != "" {
+		sb.WriteString(fmt.Sprintf("Active runway %s. ", spellRunwayWords(state.activeRwy)))
+	}
 	sb.WriteString(station.Advisory + " ")
 	sb.WriteString(fmt.Sprintf("Advise on initial contact you have information %s.", ident))
 	text := sb.String()
@@ -421,13 +456,13 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 			Name: "Al Dhafra ATIS", FreqMHz: 248.200, Voice: "nova", ICAO: "OMAM",
 			TACAN: "TACAN 96X. VOR 114.9.",
 			ILS: "ILS 111.10 runway 13 left. ILS 109.10 runway 31 left.",
-			Advisory: "Active runway 31 left. vSFG-7 training flights in area. Advise information on initial contact.",
+			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
 		},
 		{
 			Name: "Al Minhad ATIS", FreqMHz: 248.300, Voice: "shimmer", ICAO: "OMDM",
 			TACAN: "TACAN 99X.",
 			ILS: "ILS 110.70 runway 09. ILS 110.75 runway 27.",
-			Advisory: "Active runway 27. vSFG-7 training flights in area. Advise information on initial contact.",
+			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
 		},
 		{
 			Name: "Liwa ATIS", FreqMHz: 248.550, Voice: "alloy", ICAO: "OMAB",
@@ -437,7 +472,7 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 		{
 			Name: "Al Ain ATIS", FreqMHz: 248.850, Voice: "echo", ICAO: "OMAL",
 			TACAN: "TACAN 79X. VOR 112.6.", ILS: "",
-			Advisory: "Active runway 19. vSFG-7 training flights in area. Advise information on initial contact.",
+			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
 		},
 		{
 			Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OIBK",

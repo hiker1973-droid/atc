@@ -883,7 +883,6 @@ func isWhisperHallucination(text string) bool {
 	compound := []string{
 		"radio check, request taxi",
 		"holding short, runway, cleared",
-		"base, final, runway",
 		"tower, al ain tower",
 		"raider, venom, radio",
 	}
