@@ -97,7 +97,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		}
 
 		log.Info().Str("addr", srsAddr).Msg("Command: connecting to SRS")
-		tcpConn, err := net.DialTimeout("tcp", srsAddr, 10*time.Second)
+		tcpConn, err := dialSRSKeepAlive(ctx, srsAddr)
 		if err != nil {
 			log.Warn().Err(err).Str("addr", srsAddr).Msg("Command: SRS connect failed, retrying in 10s")
 			select {

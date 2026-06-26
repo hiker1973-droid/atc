@@ -260,7 +260,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		default:
 		}
 
-		tcpConn, err := net.DialTimeout("tcp", srsAddr, 10*time.Second)
+		tcpConn, err := dialSRSKeepAlive(ctx, srsAddr)
 		if err != nil {
 			log.Debug().Msg("Deckboss: SRS connect failed, retrying in 10s")
 			select {

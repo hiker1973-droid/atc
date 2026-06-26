@@ -1049,6 +1049,27 @@ func normalizeCallsignLocal(text string) string {
 	return text
 }
 
+// dialSRSKeepAlive dials the SRS TCP endpoint with OS-level TCP keepalive enabled.
+// SRS audio roles otherwise only notice a dropped server via the 90s read deadline,
+// so a peer that vanishes without a clean FIN (DCS crash, VM pause, network blip)
+// leaves the role silently deaf for up to 90s before it reconnects. Kernel keepalive
+// probes (idle 15s, then 3 probes 5s apart) tear the socket down in ~30s, which
+// makes the blocked Read return an error and triggers the reconnect. Keepalive ACKs
+// are handled by the kernel and never delivered to the app, so they don't reset the
+// application read deadline — this adds no false-disconnect risk on idle links.
+func dialSRSKeepAlive(ctx context.Context, addr string) (net.Conn, error) {
+	d := net.Dialer{
+		Timeout: 10 * time.Second,
+		KeepAliveConfig: net.KeepAliveConfig{
+			Enable:   true,
+			Idle:     15 * time.Second,
+			Interval: 5 * time.Second,
+			Count:    3,
+		},
+	}
+	return d.DialContext(ctx, "tcp", addr)
+}
+
 func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey, eamPassword string, txCooldown *int64, atcCtrl *controller.ATCController) {
 	freqHz := freqMHz * 1e6
 	guid := "vsfg7atc" + fmt.Sprintf("%014d", time.Now().UnixNano()%100000000000000)
@@ -1068,8 +1089,8 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 
 		log.Info().Str("addr", addr).Msg("connecting to SRS")
 
-		// TCP connection
-		tcpConn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+		// TCP connection (OS keepalive — see dialSRSKeepAlive)
+		tcpConn, err := dialSRSKeepAlive(ctx, addr)
 		if err != nil {
 			log.Warn().Err(err).Msg("SRS TCP failed — retrying in 10s")
 			select {

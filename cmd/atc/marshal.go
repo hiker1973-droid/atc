@@ -134,7 +134,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		default:
 		}
 
-		tcpConn, err := net.DialTimeout("tcp", srsAddr, 10*time.Second)
+		tcpConn, err := dialSRSKeepAlive(ctx, srsAddr)
 		if err != nil {
 			log.Debug().Msg("Marshal: SRS connect failed, retrying in 10s")
 			select {
