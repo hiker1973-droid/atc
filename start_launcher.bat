@@ -10,6 +10,8 @@ if not defined SKYEYE_TACVIEW (
     pause
     exit /b 1
 )
-start "vSFG-7 Launcher" cmd /c "%~dp0launcher.exe --listen :7000 --srs-addr %SKYEYE_SRS% --tacview-addr %SKYEYE_TACVIEW%"
+set MIZ_FLAG=
+if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
+start "vSFG-7 Launcher" cmd /c "%~dp0launcher.exe --listen :7000 --srs-addr %SKYEYE_SRS% --tacview-addr %SKYEYE_TACVIEW% %MIZ_FLAG%"
 %SystemRoot%\System32\timeout.exe /t 2 /nobreak >nul
 start http://localhost:7000/

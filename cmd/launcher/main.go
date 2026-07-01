@@ -36,7 +36,8 @@ var (
 	flagRoot        = flag.String("root", "", "SkyeyeATC root dir (default: directory of this binary)")
 	flagSRSAddr     = flag.String("srs-addr", "192.168.1.221:5004", "SRS address for health probe")
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
-	flagMizDir      = flag.String("miz-dir", `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for newest .miz when answering /api/miz-weather")
+	flagMizDir      = flag.String("miz-dir", `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for newest .miz when --miz-path is empty")
+	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
 )
 
 // Role is one spawned vSFG-7 process: a single `start "Title" cmd /k "..."`
@@ -412,10 +413,18 @@ func handleRescan(w http.ResponseWriter, _ *http.Request) {
 // treats its incoming windDir as true.
 func handleMizWeather(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	path, err := miz.FindNewestMiz(*flagMizDir)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+	// Priority mirrors atc.exe's boot seed (cmd/atc/main.go): an explicit
+	// --miz-path (fed SKYEYE_MIZ by start_launcher.bat) wins, so the dashboard
+	// weather widget reflects the same mission the roles actually loaded rather
+	// than whatever .miz was saved most recently on disk.
+	path := *flagMizPath
+	if path == "" {
+		p, err := miz.FindNewestMiz(*flagMizDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		path = p
 	}
 	wx, err := miz.ReadMizWeather(path)
 	if err != nil {
