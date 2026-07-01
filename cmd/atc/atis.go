@@ -114,10 +114,11 @@ type atisState struct {
 	altimeter   float64
 	windFrom    float64
 	windKts     float64
-	ceilingFt   float64
-	activeRwy   string
-	cachedMP3   []byte
-	cachePath   string
+	ceilingFt    float64
+	activeRwy    string
+	lastTowerRwy string // last non-empty runway the paired tower reported; held across a blip
+	cachedMP3    []byte
+	cachePath    string
 }
 
 func (s *atisState) weatherKey() string {
@@ -239,17 +240,41 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		state.windFrom = atcCtrl.GetWindFrom()
 		state.windKts  = atcCtrl.GetWindKts()
 		state.activeRwy = atcCtrl.GetActiveRunway()
-		// Prefer the paired tower's active runway when it's reachable — that
-		// lets the launcher /runway dropdown propagate into the next ATIS
-		// broadcast. Stations with no paired tower (Liwa, Kish) keep the
-		// atcCtrl value.
-		if rwy := fetchTowerRunway(station.ICAO); rwy != "" && rwy != state.activeRwy {
-			log.Info().Str("station", station.Name).Str("icao", station.ICAO).
-				Str("from", state.activeRwy).Str("to", rwy).
-				Msg("ATIS picked up runway change from tower dashboard")
-			state.activeRwy = rwy
-		} else if rwy != "" {
-			state.activeRwy = rwy
+		// The paired tower is the single source of truth for the active runway
+		// (wind-driven in UpdateWeather, or set via the launcher /runway
+		// dropdown). Mirror it so ATIS and ATC never disagree. Stations with no
+		// paired tower (Liwa, Kish) have no authority to mirror and keep the
+		// atcCtrl value — buildATISText suppresses their runway line anyway.
+		if _, paired := towerDashboardPortByICAO[station.ICAO]; paired {
+			rwy := fetchTowerRunway(station.ICAO)
+			switch {
+			case rwy != "":
+				// Tower reachable — adopt its runway and remember it. Log only
+				// on an actual change (not first acquisition) so runway
+				// transitions are traceable in the log.
+				if state.lastTowerRwy != "" && rwy != state.lastTowerRwy {
+					log.Info().Str("station", station.Name).Str("icao", station.ICAO).
+						Str("from", state.lastTowerRwy).Str("to", rwy).
+						Msg("ATIS picked up runway change from tower")
+				}
+				state.lastTowerRwy = rwy
+				state.activeRwy = rwy
+			case state.lastTowerRwy != "":
+				// Tower momentarily unreachable — hold the last runway it
+				// reported rather than fall back to atcCtrl, whose shared
+				// static controller is pinned to OMDM's airfield/wind and would
+				// broadcast a runway the tower is not using. Converges on the
+				// next reachable poll.
+				log.Warn().Str("station", station.Name).Str("icao", station.ICAO).
+					Str("runway", state.lastTowerRwy).
+					Msg("paired tower unreachable — holding last known runway for ATIS")
+				state.activeRwy = state.lastTowerRwy
+			default:
+				// Never reached the tower yet (ATIS starts before the towers).
+				// Suppress the runway line rather than speak the cross-airfield
+				// static fallback; buildATISText skips it when empty.
+				state.activeRwy = ""
+			}
 		}
 
 		currentKey := state.weatherKey()
