@@ -22,5 +22,7 @@ set LOG=info
 set GOMAXPROCS=2
 set GOGC=50
 set GOMEMLIMIT=256MiB
+set MIZ_FLAG=
+if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice fable --no-atis --dashboard-port 6005 --log-level %LOG%"
+start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice fable --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"

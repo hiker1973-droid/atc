@@ -22,5 +22,7 @@ set LOG=info
 set GOMAXPROCS=2
 set GOGC=50
 set GOMEMLIMIT=256MiB
+set MIZ_FLAG=
+if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-start "vSFG-7 Command" cmd /c "%~dp0atc.exe --command-only --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% --pprof-port 7770 --log-level %LOG%"
+start "vSFG-7 Command" cmd /c "%~dp0atc.exe --command-only --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"

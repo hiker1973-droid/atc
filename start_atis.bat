@@ -16,5 +16,7 @@ set LOG=info
 set GOMAXPROCS=2
 set GOGC=50
 set GOMEMLIMIT=256MiB
-start "vSFG-7 ATIS" cmd /c "%~dp0atc.exe --atis-only --srs-addr %SRS% --eam-password %EAM% --log-level %LOG%"
+set MIZ_FLAG=
+if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
+start "vSFG-7 ATIS" cmd /c "%~dp0atc.exe --atis-only --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%"
 

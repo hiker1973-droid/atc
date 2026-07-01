@@ -14,8 +14,11 @@ All `.bat` scripts read four env vars and fail fast if any is missing. Same scri
 | `SRS_EAM` | (rotate before mission) | (same) | All `start_*.bat`, passed as `--eam-password` |
 | `SKYEYE_SRS` | `localhost:5008` | `localhost:5008` | All `start_*.bat`, passed as `--srs-addr` |
 | `SKYEYE_TACVIEW` | `localhost:42676` | `localhost:42676` | Tower / Marshal / Scudwatch / Launcher, passed as `--tacview-addr` |
+| `SKYEYE_MIZ` | (set per mission) | (same) | All `start_*.bat`, passed as `--miz-path` for the boot weather seed. **Optional** — unset = fall back to newest `.miz` in `--miz-dir`. |
 
-Set with `setx VAR value`, then open a new cmd so the new values are in scope (setx doesn't affect the running shell). Symptom of a missing var: each script aborts at the top with `ERROR: <VAR> env var not set`.
+Set with `setx VAR value`, then open a new cmd so the new values are in scope (setx doesn't affect the running shell). Symptom of a missing var: each script aborts at the top with `ERROR: <VAR> env var not set` (except `SKYEYE_MIZ`, which is optional and silently falls back).
+
+**Weather seeding (`SKYEYE_MIZ`).** Every `atc.exe` role seeds boot weather with priority `--miz-path` → newest `.miz` in `--miz-dir` (default `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`) → `--static-*` flags (`cmd/atc/main.go:356`). Because "newest `.miz`" picks whatever was saved last on disk — **not** the running mission — it silently grabbed the wrong file (e.g. `IronHammer_v0_46` outranked the older Training `.miz`s, so every role broadcast Iron Hammer weather, 2026-07-01). Set `SKYEYE_MIZ` to the exact training `.miz` full path (spaces/parens OK — scripts quote it) to pin the source deterministically. Rotate it per mission like `SRS_EAM`. This is only the *boot* seed; towers do not appear to update weather live from Tacview, so the seed persists for the session.
 
 DCS-gRPC is not externalized — `:50051` is stable across boxes.
 
