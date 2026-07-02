@@ -752,6 +752,7 @@ func (c *ATCController) handleHoldingShortRequest(
 	s.EnqueueDeparture(ac)
 	ac.HoldingShort = true
 	ac.AutoReleaseAt = time.Now().Add(AutoReleaseDelay)
+	log.Info().Str("callsign", callsign).Dur("delay", AutoReleaseDelay).Msg("LUAW issued — auto-release armed")
 	go c.scheduleAutoRelease(ctx, callsign)
 	return c.composer.HoldShortLineUpAndWait(callsign, s.ActiveRunway)
 }
@@ -765,6 +766,10 @@ func (c *ATCController) handleHoldingShortRequest(
 func (c *ATCController) scheduleAutoRelease(ctx context.Context, callsign string) {
 	select {
 	case <-ctx.Done():
+		// Expected only on process shutdown — ctx is the long-lived srsLoop
+		// context, not a per-request one. Logged so a short-ctx regression
+		// (which would silently kill every auto-release) is visible.
+		log.Info().Str("callsign", callsign).Msg("auto-release skipped — context cancelled during LUAW wait")
 		return
 	case <-time.After(AutoReleaseDelay):
 	}
@@ -772,21 +777,41 @@ func (c *ATCController) scheduleAutoRelease(ctx context.Context, callsign string
 	defer c.mu.Unlock()
 	s := c.airfieldState
 	ac := s.Get(callsign)
-	if ac == nil || ac.TakeoffCleared {
+	// Each early return below is logged: the two-stage LUAW's TX2 silently
+	// failing to fire (2026-07-01 Raider 311) was undiagnosable because these
+	// were bare returns. Reasons are mutually exclusive, so exactly one fires
+	// per skipped release.
+	if ac == nil {
+		log.Info().Str("callsign", callsign).Msg("auto-release skipped — aircraft no longer tracked")
 		return
 	}
-	if s.TimeSinceLastDeparture() < DepartureSpacingSec {
+	if ac.TakeoffCleared {
+		log.Info().Str("callsign", callsign).Msg("auto-release skipped — already cleared by another path")
 		return
 	}
-	if len(s.InboundsWithinNm(HoldShortRadiusNm)) > 0 {
+	if elapsed := s.TimeSinceLastDeparture(); elapsed < DepartureSpacingSec {
+		log.Info().Str("callsign", callsign).Dur("sinceLastDeparture", elapsed).Msg("auto-release skipped — inside departure-spacing window")
+		return
+	}
+	if inbounds := s.InboundsWithinNm(HoldShortRadiusNm); len(inbounds) > 0 {
+		log.Info().Str("callsign", callsign).Int("inbounds", len(inbounds)).Msg("auto-release skipped — inbound traffic within hold-short radius")
 		return
 	}
 	if next := s.NextDeparture(); next == nil || next.Callsign != callsign {
+		queueHead := "<nil>"
+		if next != nil {
+			queueHead = next.Callsign
+		}
+		log.Info().Str("callsign", callsign).Str("queueHead", queueHead).Msg("auto-release skipped — not at departure-queue head")
 		return
 	}
 	ac.TakeoffCleared = true
 	cleared := s.ClearForTakeoff(callsign)
 	if cleared == nil {
+		// Should be unreachable — we just confirmed callsign is the queue head.
+		// If it fires, EnqueueDeparture/ClearForTakeoff disagree on the callsign
+		// key (the prime suspect for the Raider 311 stall).
+		log.Warn().Str("callsign", callsign).Msg("auto-release skipped — ClearForTakeoff found no matching queue entry")
 		return
 	}
 	trafficOnFinal := s.LandingQueueLen()
