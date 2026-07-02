@@ -1,6 +1,7 @@
 # Build artifacts
 *.exe
 *.exe~
+*.exe.new
 
 # Runtime artifacts
 logs/
