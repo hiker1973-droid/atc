@@ -4,8 +4,9 @@ Adds the vSFG-7 **Black Sea AOR** (Caucasus) as a second theatre alongside the
 Persian Gulf. Source: `CA KNEEBOARD/` (March 2026). Carrier ops (Marshal /
 Deckboss / LSO) are theatre-agnostic and reused as-is.
 
-Status: **airfield definitions written** (`pkg/airfield/ug*.go`). Wiring +
-ATIS + start scripts are the next phase, gated on the decisions in §5.
+Status: **airfields + registry wiring + CA ATIS set + start scripts done** on
+branch `feat/caucasus-map`. Runnable pending the carrier-freq decision (§5.2)
+and live data verification (§5.3). PG production is unchanged.
 
 ---
 
@@ -80,15 +81,23 @@ This is a **bat-file config change only** (per-role `--marshal-freq` /
 3. **Confirm the flagged data** — Batumi ILS runway/freq, MagVar, and whether
    break directions are left-pattern at all four fields.
 
-## 6. Remaining work (after decisions)
+## 6. Work status
 
-- [ ] Wire the four `Airfield` vars into the selector (registry or switch).
-- [ ] Dashboard ports: extend `towerDashboardPortByICAO` (UGSB→6001… or a CA range).
-- [ ] CA ATIS station set (Batumi/Kobuleti/Kutaisi/Senaki) — 45s cadence, staggered.
-- [ ] `start_towers_caucasus.bat` + `start_atis` CA set + carrier freq overrides;
-      or a `SKYEYE_MAP` env var driving `start_all.bat`.
+Done (branch `feat/caucasus-map`):
+- [x] Airfield registry — `airfield.ByICAO` + `FieldsForMap` (`pkg/airfield/registry.go`);
+      `--airfield` switch replaced with the registry lookup.
+- [x] `--map pg|caucasus` flag (`cmd/atc/main.go`) driving the ATIS set + Command handoff scan.
+- [x] Dashboard ports: `towerDashboardPortByICAO` extended (UGSB→6011 … UGKO→6014).
+- [x] CA ATIS station set via `atisStationsForMap` (Batumi/Kobuleti/Kutaisi/Senaki), 45s staggered.
+- [x] Command proactive handoff now scans `FieldsForMap(flagMap)`.
+- [x] Start scripts: `start_towers_caucasus.bat`, `start_atis_caucasus.bat`,
+      `start_command_caucasus.bat`, `start_all_caucasus.bat`.
+
+Remaining:
+- [ ] Carrier ops CA scripts (Marshal/Deckboss) — blocked on the §5.2 freq decision.
 - [ ] Point `SKYEYE_MIZ` at the Caucasus mission `.miz` when running Black Sea.
-- [ ] Live validation on a CA mission (runway selection, ATIS mirror, handoff).
+- [ ] Live validation on a CA mission (runway selection, ATIS mirror, handoff),
+      then confirm the §5.3 flagged data (Batumi ILS, MagVar, break sides).
 
 ## 7. What's reused unchanged
 

@@ -225,7 +225,7 @@ func runCommandHandoffWatch(
 	store *tacviewPositions,
 	tx func(text, callsign string),
 ) {
-	fields := []*airfield.Airfield{airfield.OMDM, airfield.OMAM, airfield.OMAL}
+	fields := airfield.FieldsForMap(flagMap)
 	ticker := time.NewTicker(handoffCheckInterval)
 	defer ticker.Stop()
 	for {

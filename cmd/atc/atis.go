@@ -22,9 +22,15 @@ import (
 // to keep the broadcasted runway aligned with whatever the tower's dashboard
 // has set, since the two processes don't share an ATCController.
 var towerDashboardPortByICAO = map[string]int{
+	// Persian Gulf towers
 	"OMDM": 6001,
 	"OMAM": 6002,
 	"OMAL": 6003,
+	// Caucasus / Black Sea towers (own range — 6004/6005 are Marshal/Deckboss)
+	"UGSB": 6011,
+	"UG5X": 6012,
+	"UGKS": 6013,
+	"UGKO": 6014,
 }
 
 // fetchTowerRunway returns the active runway reported by the tower /status
@@ -464,7 +470,40 @@ func isNightTime(t time.Time) bool {
 // Handles: check-in, on-station, off-station, radio check.
 
 
-// atisOnlyLoop runs all 5 ATIS stations with static weather — for Training VM.
+// atisStationsForMap returns the ATIS station set for a theatre. Paired-tower
+// stations (those whose ICAO is in towerDashboardPortByICAO) mirror their
+// tower's live runway; advisory-only stations (Liwa/Kish) keep static text.
+func atisStationsForMap(m string) []*atisStation {
+	const advisory = "vSFG-7 training flights in area. Advise information on initial contact."
+	switch strings.ToLower(strings.TrimSpace(m)) {
+	case "ca", "caucasus", "blacksea", "black-sea", "black sea":
+		return []*atisStation{
+			{Name: "Batumi ATIS", FreqMHz: 230.000, Voice: "nova", ICAO: "UGSB",
+				TACAN: "TACAN 16X.", ILS: "ILS 110.30 runway 13.", Advisory: advisory},
+			{Name: "Kobuleti ATIS", FreqMHz: 232.000, Voice: "shimmer", ICAO: "UG5X",
+				TACAN: "TACAN 67X.", ILS: "ILS 111.50 runway 07.", Advisory: advisory},
+			{Name: "Kutaisi ATIS", FreqMHz: 233.000, Voice: "alloy", ICAO: "UGKO",
+				TACAN: "TACAN 44X.", ILS: "ILS 109.75 runway 07.", Advisory: advisory},
+			{Name: "Senaki ATIS", FreqMHz: 234.000, Voice: "echo", ICAO: "UGKS",
+				TACAN: "TACAN 31X.", ILS: "ILS 108.90 runway 09.", Advisory: advisory},
+		}
+	default: // Persian Gulf
+		return []*atisStation{
+			{Name: "Al Dhafra ATIS", FreqMHz: 248.200, Voice: "nova", ICAO: "OMAM",
+				TACAN: "TACAN 96X. VOR 114.9.",
+				ILS:   "ILS 111.10 runway 13 left. ILS 109.10 runway 31 left.", Advisory: advisory},
+			{Name: "Al Minhad ATIS", FreqMHz: 248.300, Voice: "shimmer", ICAO: "OMDM",
+				TACAN: "TACAN 99X.", ILS: "ILS 110.70 runway 09. ILS 110.75 runway 27.", Advisory: advisory},
+			{Name: "Liwa ATIS", FreqMHz: 248.550, Voice: "alloy", ICAO: "OMAB",
+				TACAN: "TACAN 121X. VOR 117.4.", Advisory: advisory},
+			{Name: "Al Ain ATIS", FreqMHz: 248.850, Voice: "echo", ICAO: "OMAL",
+				TACAN: "TACAN 79X. VOR 112.6.", Advisory: advisory},
+			{Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OIBK", Advisory: advisory},
+		}
+	}
+}
+
+// atisOnlyLoop runs the theatre's ATIS station set with static weather.
 func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 	// Static weather from flags
 	windDir  := flagStaticWindDir
@@ -476,36 +515,7 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 	if ceilFt < 0   { ceilFt = 8202 }
 	if altInHg <= 0 { altInHg = 29.88 }
 
-	stations := []*atisStation{
-		{
-			Name: "Al Dhafra ATIS", FreqMHz: 248.200, Voice: "nova", ICAO: "OMAM",
-			TACAN: "TACAN 96X. VOR 114.9.",
-			ILS: "ILS 111.10 runway 13 left. ILS 109.10 runway 31 left.",
-			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
-		},
-		{
-			Name: "Al Minhad ATIS", FreqMHz: 248.300, Voice: "shimmer", ICAO: "OMDM",
-			TACAN: "TACAN 99X.",
-			ILS: "ILS 110.70 runway 09. ILS 110.75 runway 27.",
-			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
-		},
-		{
-			Name: "Liwa ATIS", FreqMHz: 248.550, Voice: "alloy", ICAO: "OMAB",
-			TACAN: "TACAN 121X. VOR 117.4.", ILS: "",
-			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
-		},
-		{
-			Name: "Al Ain ATIS", FreqMHz: 248.850, Voice: "echo", ICAO: "OMAL",
-			TACAN: "TACAN 79X. VOR 112.6.", ILS: "",
-			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
-		},
-		{
-			Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OIBK",
-			TACAN: "",
-			ILS: "",
-			Advisory: "vSFG-7 training flights in area. Advise information on initial contact.",
-		},
-	}
+	stations := atisStationsForMap(flagMap)
 
 	var atcCtrl *controller.ATCController
 	if windDir >= 0 {

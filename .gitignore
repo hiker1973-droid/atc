@@ -21,3 +21,7 @@ global.cfg
 
 # Claude Code per-machine state
 .claude/settings.local.json
+
+# Squadron kneeboard reference images (large binaries — keep local)
+CA KNEEBOARD/
+PG KNEEBOARD/

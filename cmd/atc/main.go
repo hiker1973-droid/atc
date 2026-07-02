@@ -48,6 +48,7 @@ type transmission struct {
 
 var (
 	flagAirfield      string
+	flagMap           string
 	flagCallsign      string
 	flagSRSAddr       string
 	flagFreqMHz       float64
@@ -112,7 +113,8 @@ func main() {
 		RunE:  run,
 	}
 	f := root.Flags()
-	f.StringVar(&flagAirfield, "airfield", "OMDM", "ICAO: OMDM, OMAM, OMAL")
+	f.StringVar(&flagAirfield, "airfield", "OMDM", "ICAO: OMDM/OMAM/OMAL (PG) · UGSB/UG5X/UGKS/UGKO (Caucasus)")
+	f.StringVar(&flagMap, "map", "pg", "Theatre for ATIS station set + Command handoff scan: pg | caucasus")
 	f.StringVar(&flagCallsign, "callsign", "", "Tower callsign (auto from airfield)")
 	f.StringVar(&flagSRSAddr, "srs-addr", "localhost:5004", "SRS server address:port")
 	f.Float64Var(&flagFreqMHz, "freq", 0, "Override tower frequency MHz")
@@ -272,15 +274,8 @@ func run(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
-	var af *airfield.Airfield
-	switch flagAirfield {
-	case "OMDM":
-		af = airfield.OMDM
-	case "OMAM":
-		af = airfield.OMAM
-	case "OMAL":
-		af = airfield.OMAL
-	default:
+	af := airfield.ByICAO(flagAirfield)
+	if af == nil {
 		return fmt.Errorf("unknown airfield %q", flagAirfield)
 	}
 
