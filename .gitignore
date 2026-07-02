@@ -6,6 +6,7 @@
 logs/
 atis_cache/
 launcher.log
+tools/.watch-offsets.json
 
 # Editor / OS junk
 New Text Document.txt
