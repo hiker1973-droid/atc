@@ -268,7 +268,7 @@ Post-landing:
 - `Deckboss, [callsign], request taxi` · `green jet` (ready for cat assignment)
 - `Deckboss, [callsign], ready cat [N]` · `tension cat [N]` · `shoot` (under tension)
 - `[callsign], airborne` (post-launch ack — slot is already cleared after shoot, so this is optional)
-- `Deckboss, [callsign], remain in bolter pattern` (trap practice — Deckboss replies "stay 600 ft, 1 mile out")
+- `Deckboss, [callsign], remain in bolter [pattern]` (trap practice — Deckboss acks and hands off to LSO)
 - `Deckboss, [callsign], say BRC` · `request BRC` (mother's heading)
 
 ### To Command (282.00 — squadron net)

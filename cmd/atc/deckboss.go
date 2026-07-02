@@ -227,15 +227,17 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				}
 			}
 
-		case containsAny(lower, "remain in bolter pattern", "bolter pattern", "remain bolter", "staying in bolter", "in the bolter"):
+		case containsAny(lower, "remain in bolter pattern", "remain in bolter", "bolter pattern", "remain bolter", "staying in bolter", "in the bolter"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §8 bolter dropped — not address-led, likely self-echo")
 				return
 			}
 			// §8 bolter pattern: pilot doing trap practice, staying in the
-			// touch-and-go pattern. Pure ack with the standard 600ft / 1nm
-			// pattern parameters; no state change. Address-led to avoid
-			// self-echo since our response also contains "bolter".
+			// touch-and-go pattern. Deckboss acks and hands off to the LSO
+			// (who owns the recovery pattern); no deck state change. Address-led
+			// to avoid self-echo since our response also contains "bolter".
+			// "remain in bolter" (no "pattern") added 2026-07-02 after a live
+			// call in that form got no response.
 			transmit(comp.DeckbossBolterPattern(callsign))
 
 		case containsAny(lower, "radio check", "comm check", "comms check", "com check", "com-check", "comm-check", "how copy", "five by five", "five by"):

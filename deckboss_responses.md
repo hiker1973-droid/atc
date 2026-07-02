@@ -143,18 +143,18 @@ Address-led guard applies — pilot must lead with `Deckboss, ...`.
 
 ## 8. Remain in bolter pattern (trap practice)
 
-**Triggers:** `remain in bolter pattern` · `bolter pattern` · `remain bolter` · `staying in bolter` · `in the bolter`
+**Triggers:** `remain in bolter pattern` · `remain in bolter` · `bolter pattern` · `remain bolter` · `staying in bolter` · `in the bolter`
 
-Post-launch intent from pilots doing touch-and-go trap practice. Pilot announces they're not departing the area — they'll stay in the carrier bolter pattern (touch the deck on the next pass, no trap, climb out and circle back). Standard bolter pattern is **600 ft AGL, 1 mile abeam** the carrier. Deckboss acks with the pattern parameters; no state change, no slot management.
+Post-launch intent from pilots doing touch-and-go trap practice. Pilot announces they're not departing the area — they'll stay in the carrier bolter pattern (touch the deck on the next pass, no trap, climb out and circle back). Deckboss owns the deck, not the recovery pattern, so it acks and **hands the pilot off to the LSO**, who works and grades the passes; no deck state change, no slot management.
 
 Typically called right after §4 airborne / shoot, but accepted any time the pilot transmits the trigger.
 
 **Responses (`DeckbossBolterPattern`):**
-1. `{CALLSIGN}, Deckboss, copy bolter pattern, stay six hundred feet, one mile out.`
-2. `{CALLSIGN}, Deckboss, roger bolter, maintain six hundred feet, one mile abeam.`
-3. `{CALLSIGN}, Deckboss, in the bolter, six hundred feet, one mile out.`
+1. `{CALLSIGN}, Deckboss, copy remain in bolter, contact LSO.`
+2. `{CALLSIGN}, Deckboss, roger bolter pattern, hand off to LSO.`
+3. `{CALLSIGN}, Deckboss, copy bolter, switch to LSO.`
 
-Address-led guard applies — pilot must lead with `Deckboss, ...` to avoid self-echo (Deckboss's own response contains "bolter" / "six hundred" which could otherwise re-trigger).
+Address-led guard applies — pilot must lead with `Deckboss, ...` to avoid self-echo (Deckboss's own response contains "bolter" which could otherwise re-trigger).
 
 ---
 

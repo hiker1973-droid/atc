@@ -89,7 +89,7 @@ Don't call `initial` in Case 3 — call `platform` instead.
 | `ready cat [N]` / `tension cat [N]` / `shoot` | under tension, then auto-shoot 5 s later |
 | (auto) cat clear | next conga pilot pulled onto cat at T+15 s |
 | `airborne` (post-launch) | copy, good hunting (optional) |
-| `remain in bolter pattern` | stay 600 ft, 1 mile out |
+| `remain in bolter [pattern]` | copy, hand off to LSO |
 | `say BRC` / `request BRC` | mother's BRC |
 
 ---

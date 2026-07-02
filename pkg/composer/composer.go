@@ -687,13 +687,13 @@ func (c *ATCComposer) DeckbossCatClear(catNum int) string {
 }
 
 // DeckbossBolterPattern — pilot remaining in bolter pattern for trap
-// practice. Pure ack with the standard 600ft / 1nm pattern parameters;
-// no state change.
+// practice. Deckboss acks and hands the pilot to the LSO, who owns the
+// recovery pattern and grades the passes; no state change on the deck.
 func (c *ATCComposer) DeckbossBolterPattern(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, Deckboss, copy bolter pattern, stay six hundred feet, one mile out.", callsign),
-		fmt.Sprintf("%s, Deckboss, roger bolter, maintain six hundred feet, one mile abeam.", callsign),
-		fmt.Sprintf("%s, Deckboss, in the bolter, six hundred feet, one mile out.", callsign),
+		fmt.Sprintf("%s, Deckboss, copy remain in bolter, contact LSO.", callsign),
+		fmt.Sprintf("%s, Deckboss, roger bolter pattern, hand off to LSO.", callsign),
+		fmt.Sprintf("%s, Deckboss, copy bolter, switch to LSO.", callsign),
 	})
 }
 
