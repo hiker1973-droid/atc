@@ -227,7 +227,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				}
 			}
 
-		case containsAny(lower, "remain in bolter pattern", "remain in bolter", "bolter pattern", "remain bolter", "staying in bolter", "in the bolter",
+		case containsAny(lower, "bolter",
 			"remain in bold", "remaining in bold", "staying in bold", "in the bold", "bold pattern"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §8 bolter dropped — not address-led, likely self-echo")
@@ -237,10 +237,14 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			// touch-and-go pattern. Deckboss acks and hands off to the LSO
 			// (who owns the recovery pattern); no deck state change. Address-led
 			// to avoid self-echo since our response also contains "bolter".
-			// "remain in bolter" (no "pattern") added 2026-07-02 after a live
-			// call in that form got no response.
-			// "bold" variants added 2026-07-05 — Whisper renders "bolter" as
-			// "bold" ("remaining in bold" from Raider 311 got no response).
+			// Matches the bare word "bolter" (rare enough it won't false-fire,
+			// and the address guard covers self-echo) so every inflection lands
+			// — "remain in bolter", "remaining in bolter", "in the bolter", etc.
+			// The earlier enumerated list missed "remaining in bolter" (the -ing
+			// form is not a superstring of "remain in bolter"); collapsed to the
+			// bare token 2026-07-05.
+			// "bold" phrase variants also 2026-07-05 — Whisper renders "bolter"
+			// as "bold" ("remaining in bold" from Raider 311 got no response).
 			// Scoped to phrases, never a bare "bold", so ball-flying chatter
 			// ("looking good") can't false-fire it.
 			transmit(comp.DeckbossBolterPattern(callsign))
