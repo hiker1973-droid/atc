@@ -88,6 +88,9 @@ func (c *ATCComposer) HoldShortLineUpAndWait(callsign, activeRunway string) stri
 		fmt.Sprintf("%s, %s, runway %s, line up and wait.", callsign, c.towerCallsign, rwy),
 		fmt.Sprintf("%s, %s, line up and wait runway %s.", callsign, c.towerCallsign, rwy),
 		fmt.Sprintf("%s, %s, runway %s line up and wait, will advise.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, runway %s, line up and wait, hold for release.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, taxi up to runway %s, line up and wait.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, line up and wait runway %s, standby for takeoff.", callsign, c.towerCallsign, rwy),
 	})
 }
 
@@ -120,6 +123,12 @@ func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromM
 		fmt.Sprintf("%s, %s, runway %s, wind %s%s, you are cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, cleared for takeoff runway %s, wind %s%s, report airborne when clear, have a good flight.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, you are number %s for takeoff, runway %s, wind %s%s. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, runway %s, wind %s%s, cleared for takeoff, report airborne.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, wind %s, cleared for takeoff runway %s%s, report airborne when clear.", callsign, c.towerCallsign, wind, rwy, trafficNote),
+		fmt.Sprintf("%s, %s, clear for departure runway %s, wind %s%s, report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, winds %s, runway %s%s, you're cleared for takeoff, good hunting, report airborne.", callsign, c.towerCallsign, wind, rwy, trafficNote),
+		fmt.Sprintf("%s, %s, runway %s, wind %s%s, cleared for departure, report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, wind %s, you are cleared for departure runway %s%s, report airborne.", callsign, c.towerCallsign, wind, rwy, trafficNote),
 	})
 }
 
