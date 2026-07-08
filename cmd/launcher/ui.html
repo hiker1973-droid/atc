@@ -173,6 +173,25 @@
   #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   #logTitle { font-weight: 500; }
   #logBody { flex: 1; overflow: auto; padding: 0.8rem 1rem; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; color: #b1bac4; }
+  .theatre-switch { display: flex; align-items: center; gap: 0.4rem; margin: 0 1rem; }
+  .theatre-label { color: var(--muted); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.2rem; }
+  .theatre-btn { background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.7rem; font-size: 0.85em; cursor: pointer; }
+  .theatre-btn:hover { color: #e6edf3; }
+  .theatre-btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  /* Per-airfield takeoff/landing traffic */
+  #trafficTbl { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0.8rem; }
+  .af-traffic { border: 1px solid var(--border); border-radius: 7px; padding: 0.5rem 0.6rem; background: var(--bg); }
+  .af-traffic-head { font-weight: 600; font-size: 0.95em; margin-bottom: 0.4rem; }
+  .af-traffic-head .sub { color: var(--muted); font-weight: 400; font-size: 0.75em; margin-left: 0.3rem; }
+  .af-traffic-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .af-col-title { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 0.25rem; }
+  .af-col table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+  .af-col th { text-align: left; color: var(--muted); font-weight: 500; font-size: 0.9em; padding: 0.1rem 0.3rem; }
+  .af-col td { padding: 0.12rem 0.3rem; border-top: 1px solid var(--border); }
+  .af-col .hint { color: var(--muted); font-style: italic; }
+  /* Caucasus airfield accent colours (mirror PG cells) */
+  .airfield-cell.UGSB { color: #7ee787; } .airfield-cell.UG5X { color: #79c0ff; }
+  .airfield-cell.UGKS { color: #ffa657; } .airfield-cell.UGKO { color: #d2a8ff; }
 </style>
 </head>
 <body>
@@ -181,6 +200,11 @@
     <span class="logo">vSFG-7</span>
     <span class="title">AI Tower ATC Control Portal</span>
     <span class="beta">BETA</span>
+  </div>
+  <div class="theatre-switch" id="theatreSwitch">
+    <span class="theatre-label">Theatre</span>
+    <button class="theatre-btn active" data-theatre="pg" onclick="switchTheatre('pg')">Persian Gulf</button>
+    <button class="theatre-btn" data-theatre="caucasus" onclick="switchTheatre('caucasus')">Caucasus</button>
   </div>
   <div class="server">
     <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
@@ -195,7 +219,7 @@
   <!-- Row 2: Weather / Marshal Stack / Catapults -->
   <section class="row-2">
     <div class="panel">
-      <h3>Weather — OMDM <span class="case-pill" id="wxCase">CASE 1</span><button class="btn info wx-set-btn" onclick="openWeatherModal()">Set Weather</button></h3>
+      <h3>Weather — <span id="wxPrimary">OMDM</span> <span class="case-pill" id="wxCase">CASE 1</span><button class="btn info wx-set-btn" onclick="openWeatherModal()">Set Weather</button></h3>
       <div class="weather-grid" id="wxGrid">
         <div class="cell"><div class="lbl">Ceiling</div><div class="val" id="wxCeil">—</div></div>
         <div class="cell"><div class="lbl">Visibility</div><div class="val" id="wxVis">—</div></div>
@@ -217,11 +241,11 @@
     </div>
   </section>
 
-  <!-- Departures: on runway + hold-short queue across all towers -->
+  <!-- Per-airfield takeoff & landing lines (Marshal-stack style) -->
   <section class="row-departures">
     <div class="panel">
-      <h3>Departures — Hold Short &amp; Takeoff Queue <span class="sub" id="depSub">0 in queue</span></h3>
-      <div id="depTbl"><div class="empty">No departures queued.</div></div>
+      <h3>Airfield Traffic — Takeoff &amp; Landing Lines <span class="sub" id="trafficSub"></span></h3>
+      <div id="trafficTbl"><div class="empty">No airfield traffic.</div></div>
     </div>
   </section>
 
@@ -230,23 +254,6 @@
     <div class="panel">
       <h3>Aircraft In Pattern <span class="sub" id="patternSub">0 contacts</span></h3>
       <div id="patternTbl"><div class="empty">No aircraft in pattern.</div></div>
-    </div>
-
-    <div class="panel">
-      <h3>Frequencies</h3>
-      <div class="freq-list">
-        <div class="row"><span class="name">Al Minhad Tower</span><span class="num">250.100</span></div>
-        <div class="row"><span class="name">Al Minhad ATIS</span> <span class="num">248.300</span></div>
-        <div class="row"><span class="name">Al Dhafra Tower</span><span class="num">251.100</span></div>
-        <div class="row"><span class="name">Al Dhafra ATIS</span> <span class="num">248.200</span></div>
-        <div class="row"><span class="name">Al Ain Tower</span>   <span class="num">250.700</span></div>
-        <div class="row"><span class="name">Al Ain ATIS</span>    <span class="num">248.850</span></div>
-        <div class="row"><span class="name">Liwa ATIS</span>      <span class="num">248.550</span></div>
-        <div class="row"><span class="name">Khasab ATIS</span>    <span class="num">248.500</span></div>
-        <div class="row"><span class="name">Command</span>        <span class="num">282.000</span></div>
-        <div class="row"><span class="name">Marshal</span>        <span class="num">306.300</span></div>
-        <div class="row"><span class="name">Deckboss</span>       <span class="num">128.600</span></div>
-      </div>
     </div>
 
     <div class="panel">
@@ -319,11 +326,35 @@
 // ──────────────────────────────────────────────────────────────────────────
 // Config — role → tower port + window-title mapping
 // ──────────────────────────────────────────────────────────────────────────
-const TOWERS = [
-  { icao: 'OMDM', label: 'Al Minhad', freq: '250.100', port: 6001, role: 'Al Minhad Tower' },
-  { icao: 'OMAM', label: 'Al Dhafra', freq: '251.100', port: 6002, role: 'Al Dhafra Tower' },
-  { icao: 'OMAL', label: 'Al Ain',    freq: '250.700', port: 6003, role: 'Al Ain Tower' },
-];
+// Two theatres. The launcher backend auto-discovers start/stop roles from every
+// bat, but the tower-status / weather / departures panels key off this list, so
+// it swaps when the operator flips the Theatre toggle. TOWERS[0] is the primary
+// (its /status feeds the weather panel + Set-Weather prefill).
+const THEATRES = {
+  pg: {
+    label: 'Persian Gulf', primaryLabel: 'OMDM',
+    towers: [
+      { icao: 'OMDM', label: 'Al Minhad', freq: '250.100', port: 6001, role: 'Al Minhad Tower' },
+      { icao: 'OMAM', label: 'Al Dhafra', freq: '251.100', port: 6002, role: 'Al Dhafra Tower' },
+      { icao: 'OMAL', label: 'Al Ain',    freq: '250.700', port: 6003, role: 'Al Ain Tower' },
+    ],
+    // 3 towers + Marshal (6004) + Deckboss (6005)
+    wxPorts: [6001, 6002, 6003, 6004, 6005],
+  },
+  caucasus: {
+    label: 'Caucasus', primaryLabel: 'Batumi (UGSB)',
+    towers: [
+      { icao: 'UGSB', label: 'Batumi',   freq: '260.000', port: 6011, role: 'Batumi Tower' },
+      { icao: 'UG5X', label: 'Kobuleti', freq: '262.000', port: 6012, role: 'Kobuleti Tower' },
+      { icao: 'UGKS', label: 'Senaki',   freq: '261.000', port: 6013, role: 'Senaki Tower' },
+      { icao: 'UGKO', label: 'Kutaisi',  freq: '263.000', port: 6014, role: 'Kutaisi Tower' },
+    ],
+    // CA carrier roles not wired yet — target the four towers only.
+    wxPorts: [6011, 6012, 6013, 6014],
+  },
+};
+let currentTheatre = 'pg';
+let TOWERS = THEATRES[currentTheatre].towers;
 // Non-tower roles each get their own card.
 const COMBO_CARDS = [
   { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · BRC 275°', roles: ['Marshal'],        stopLabel: 'Stop Marshal' },
@@ -412,7 +443,6 @@ function renderCards() {
           <span class="name">${t.label}</span>
           <span class="status-dot ${running ? 'up' : 'down'}"></span>
         </div>
-        <div class="freq">${t.freq} MHz</div>
         <span class="pill">${esc(mode)}</span>
         <div class="extra">${rwySelect}</div>
         <div class="actions">
@@ -434,7 +464,6 @@ function renderCards() {
           <span class="name">${c.label}</span>
           <span class="status-dot ${dotCls}"></span>
         </div>
-        <div class="freq">${c.freq} MHz</div>
         <span class="pill">${stateLabel}</span>
         <div class="extra">${esc(c.extras)}</div>
         <div class="actions">
@@ -458,8 +487,8 @@ function renderMissionClock() {
 }
 
 function renderWeather() {
-  // Mockup shows OMDM weather; use OMDM /status.
-  const st = towerStatus['OMDM'];
+  // Weather panel mirrors the theatre's primary tower (TOWERS[0]).
+  const st = towerStatus[TOWERS[0].icao];
   if (!st || !st.tower) {
     ['wxCeil','wxVis','wxAlt','wxWind','wxTemp','wxNight'].forEach(id => $(id).textContent = '—');
     return;
@@ -555,44 +584,60 @@ function renderCats() {
     </table>${congaRow}`;
 }
 
-function renderDepartures() {
-  // Aggregate departure queue across all three towers. Each tower's /status
-  // returns its queue head-first (slot 1 = next out). Display as a single
-  // table with Airfield, Slot, Callsign, State.
-  const all = [];
+// Per-airfield takeoff & landing lines, Marshal-stack style. Takeoff = the
+// tower's departure queue (slot order, next-out first). Landing = pattern
+// aircraft ordered by proximity to touchdown (final → base → downwind → …).
+const LANDING_PHASE_ORDER = [
+  ['short final',0],['final',0],['base',1],['downwind',2],
+  ['crosswind',3],['upwind',4],['inbound',5],['entering',6],['overhead',6],
+];
+function landingRank(phase) {
+  const p = (phase||'').toLowerCase();
+  for (const [k,v] of LANDING_PHASE_ORDER) if (p.includes(k)) return v;
+  return 9;
+}
+const DEP_STATE_LABEL = { 'cleared':'CLEARED', 'luaw':'LUAW', 'hold-short':'HOLD SHORT', 'queued':'QUEUED' };
+
+function renderAirfieldTraffic() {
+  const blocks = [];
+  let totT = 0, totL = 0;
   for (const t of TOWERS) {
     const st = towerStatus[t.icao];
-    if (st && Array.isArray(st.departures)) {
-      for (const dep of st.departures) all.push({ ...dep, icao: t.icao });
-    }
+    const deps = (st && Array.isArray(st.departures)) ? st.departures.slice() : [];
+    const pat  = (st && Array.isArray(st.pattern))    ? st.pattern.slice()    : [];
+    deps.sort((a,b) => (a.slot||99) - (b.slot||99));
+    pat.sort((a,b) => landingRank(a.phase) - landingRank(b.phase));
+    totT += deps.length; totL += pat.length;
+
+    const depRows = deps.length ? deps.map((d,i) => {
+      const lbl = DEP_STATE_LABEL[d.state] || (d.state||'').toUpperCase();
+      const cd  = d.state === 'luaw' && d.secsToGo > 0 ? ` <span class="num">(${d.secsToGo}s)</span>` : '';
+      return `<tr><td class="num">${i+1}</td><td>${esc(d.callsign||'')}</td>
+        <td><span class="pill-state ${esc(d.state||'')}">${esc(lbl)}</span>${cd}</td></tr>`;
+    }).join('') : `<tr><td colspan="3" class="hint">— none —</td></tr>`;
+
+    const patRows = pat.length ? pat.map((a,i) =>
+      `<tr><td class="num">${i+1}</td><td>${esc(a.callsign||'')}</td>
+        <td>${esc(a.phase||'—')}</td><td class="num">${fmtNum(a.altFt,0)}</td></tr>`
+    ).join('') : `<tr><td colspan="4" class="hint">— none —</td></tr>`;
+
+    blocks.push(`
+      <div class="af-traffic">
+        <div class="af-traffic-head airfield-cell ${esc(t.icao)}">${esc(t.label)}<span class="sub">${esc(t.icao)}</span></div>
+        <div class="af-traffic-cols">
+          <div class="af-col">
+            <div class="af-col-title">↑ Takeoff line (${deps.length})</div>
+            <table><thead><tr><th>#</th><th>Callsign</th><th>State</th></tr></thead><tbody>${depRows}</tbody></table>
+          </div>
+          <div class="af-col">
+            <div class="af-col-title">↓ Landing line (${pat.length})</div>
+            <table><thead><tr><th>#</th><th>Callsign</th><th>Phase</th><th>Alt</th></tr></thead><tbody>${patRows}</tbody></table>
+          </div>
+        </div>
+      </div>`);
   }
-  $('depSub').textContent = `${all.length} in queue`;
-  if (!all.length) {
-    $('depTbl').innerHTML = '<div class="empty">No departures queued.</div>';
-    return;
-  }
-  const stateLabel = {
-    'cleared':    'CLEARED FOR T/O',
-    'luaw':       'LINE UP & WAIT',
-    'hold-short': 'HOLD SHORT',
-    'queued':     'QUEUED',
-  };
-  const rows = all.map(d => {
-    const lbl = stateLabel[d.state] || (d.state || '').toUpperCase();
-    const cd  = d.state === 'luaw' && d.secsToGo > 0 ? ` <span class="num">(${d.secsToGo}s)</span>` : '';
-    return `
-      <tr>
-        <td class="airfield-cell ${esc(d.icao)}">${esc(d.icao)}</td>
-        <td class="num">#${d.slot}</td>
-        <td>${esc(d.callsign||'')}</td>
-        <td><span class="pill-state ${esc(d.state)}">${lbl}</span>${cd}</td>
-      </tr>`;
-  }).join('');
-  $('depTbl').innerHTML = `
-    <table>
-      <thead><tr><th>Airfield</th><th>Slot</th><th>Callsign</th><th>State</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  $('trafficSub').textContent = `${totT} for takeoff · ${totL} landing`;
+  $('trafficTbl').innerHTML = blocks.length ? blocks.join('') : '<div class="empty">No airfield traffic.</div>';
 }
 
 function renderPattern() {
@@ -636,6 +681,23 @@ function renderPattern() {
 async function startRole(name)   { await fetch('/api/start?name='   + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
 async function stopRole(name)    { await fetch('/api/stop?name='    + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
 async function restartRole(name) { await fetch('/api/restart?name=' + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
+// Flip the dashboard between theatres. Backend role start/stop is unaffected
+// (it auto-discovers all bats); this only re-points the tower-status, weather,
+// departures and pattern panels at the selected theatre's towers.
+function switchTheatre(name) {
+  if (!THEATRES[name] || name === currentTheatre) return;
+  currentTheatre = name;
+  const cfg = THEATRES[name];
+  TOWERS = cfg.towers;
+  WX_TARGET_PORTS = cfg.wxPorts;
+  towerStatus = {};                       // drop stale other-theatre status
+  document.querySelectorAll('.theatre-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.theatre === name));
+  $('wxPrimary').textContent = cfg.primaryLabel;
+  TOWERS.forEach(connectLog);             // no-op for already-connected towers
+  refreshAll();
+}
+
 async function setRunway(port, runway) {
   try {
     const r = await fetch(`http://localhost:${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
@@ -644,11 +706,12 @@ async function setRunway(port, runway) {
   setTimeout(refreshAll, 500);
 }
 
-// Weather override modal — POSTs to every dashboard (3 towers + Marshal + Deckboss)
-const WX_TARGET_PORTS = [6001, 6002, 6003, 6004, 6005];
+// Weather override modal — POSTs to every dashboard in the active theatre.
+// Reassigned by switchTheatre (PG: 3 towers + Marshal + Deckboss; CA: 4 towers).
+let WX_TARGET_PORTS = THEATRES[currentTheatre].wxPorts;
 async function openWeatherModal() {
   try {
-    const r = await fetch('http://localhost:6001/status');
+    const r = await fetch(`http://localhost:${TOWERS[0].port}/status`);
     if (r.ok) {
       const s = await r.json();
       const t = s.tower || {};
@@ -794,7 +857,7 @@ async function refreshAll() {
   renderCards();
   renderMissionClock();
   renderWeather();
-  renderDepartures();
+  renderAirfieldTraffic();
   renderPattern();
   renderMarshalStack();
   renderCats();
