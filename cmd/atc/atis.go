@@ -289,8 +289,10 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		// Regenerate TTS if weather changed or no cache yet
 		if weatherChanged || state.cachedMP3 == nil {
 			enText := buildATISText(station, state)
+			secondLang, wantSecond := atisSecondLangForMap(flagMap)
 			log.Info().Str("station", station.Name).Str("ident", identWord(state.ident)).
-				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio (EN+AR)")
+				Str("secondLang", secondLang).
+				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio (EN + local)")
 
 			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, station.Voice, 0.97)
 			if err != nil {
@@ -299,32 +301,34 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 				return
 			}
 
-			// Translate to Arabic and synthesize. Failures degrade gracefully
-			// to English-only — no broadcast disruption.
-			var arMP3 []byte
-			if arText, terr := translateToArabic(ctx, apiKey, enText); terr != nil {
-				log.Warn().Err(terr).Str("station", station.Name).Msg("ATIS Arabic translate failed — broadcasting English only")
-			} else if mp3, mErr := synthesizeSpeechAPI(ctx, apiKey, arText, station.Voice, 0.97); mErr != nil {
-				log.Warn().Err(mErr).Str("station", station.Name).Msg("ATIS Arabic TTS failed — broadcasting English only")
-			} else {
-				arMP3 = mp3
+			// Translate to the theatre's local language and synthesize. Failures
+			// degrade gracefully to English-only — no broadcast disruption.
+			var l2MP3 []byte
+			if wantSecond {
+				if l2Text, terr := translateATIS(ctx, apiKey, enText, secondLang); terr != nil {
+					log.Warn().Err(terr).Str("station", station.Name).Str("lang", secondLang).Msg("ATIS local-language translate failed — broadcasting English only")
+				} else if mp3, mErr := synthesizeSpeechAPI(ctx, apiKey, l2Text, station.Voice, 0.97); mErr != nil {
+					log.Warn().Err(mErr).Str("station", station.Name).Str("lang", secondLang).Msg("ATIS local-language TTS failed — broadcasting English only")
+				} else {
+					l2MP3 = mp3
+				}
 			}
 
-			// Merge EN+AR through ffmpeg so the result is a single re-encoded
-			// MP3 stream. The previous byte-concat approach (two MP3 files
-			// stitched at the byte level) caused DCS-SR-ExternalAudio's
+			// Merge EN + local through ffmpeg so the result is a single
+			// re-encoded MP3 stream. The previous byte-concat approach (two MP3
+			// files stitched at the byte level) caused DCS-SR-ExternalAudio's
 			// decoder to play both languages simultaneously — apparently
 			// because the second file's ID3 header looked like a new parallel
 			// stream. Re-encoding via ffmpeg with a brief silence guarantees
 			// serial playback. On ffmpeg failure fall back to EN-only rather
 			// than risk the overlap bug.
 			combined := enMP3
-			if arMP3 != nil {
-				if merged, mErr := concatMP3WithSilence(enMP3, arMP3, flagFFmpeg, 1.2); mErr == nil {
+			if l2MP3 != nil {
+				if merged, mErr := concatMP3WithSilence(enMP3, l2MP3, flagFFmpeg, 1.2); mErr == nil {
 					combined = merged
 				} else {
 					log.Warn().Err(mErr).Str("station", station.Name).
-						Msg("EN+AR ffmpeg concat failed — broadcasting English only")
+						Msg("EN + local ffmpeg concat failed — broadcasting English only")
 				}
 			}
 
@@ -469,6 +473,20 @@ func isNightTime(t time.Time) bool {
 //
 // Handles: check-in, on-station, off-station, radio check.
 
+
+// atisSecondLangForMap returns the non-English language the ATIS also
+// broadcasts for a given theatre, plus whether a second pass is wanted at all.
+// Persian Gulf → Arabic (local language of the UAE fields); Caucasus → Russian
+// (the regional aviation lingua franca on the Black Sea / Georgia map). Keep
+// the map aliases in sync with atisStationsForMap.
+func atisSecondLangForMap(m string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(m)) {
+	case "ca", "caucasus", "blacksea", "black-sea", "black sea":
+		return "Russian", true
+	default: // Persian Gulf
+		return "Arabic", true
+	}
+}
 
 // atisStationsForMap returns the ATIS station set for a theatre. Paired-tower
 // stations (those whose ICAO is in towerDashboardPortByICAO) mirror their

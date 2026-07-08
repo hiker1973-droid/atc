@@ -1609,14 +1609,17 @@ func synthesizeSpeech(ctx context.Context, apiKey, text, voice string, speed flo
 // Uses gpt-4o-mini-tts for more natural cadence than the legacy tts-1 model.
 // Voice list is unchanged: alloy, ash, ballad, coral, echo, fable, onyx, nova,
 // sage, shimmer, verse.
-// translateToArabic asks OpenAI to translate aviation ATIS text to Arabic.
-// Returns the translated string, or an error if the API call fails. Caller is
-// responsible for falling back gracefully (e.g. broadcast English only).
-func translateToArabic(ctx context.Context, apiKey, text string) (string, error) {
+// translateATIS asks OpenAI to translate aviation ATIS text into the named
+// language (e.g. "Arabic", "Russian"). Returns the translated string, or an
+// error if the API call fails. Caller is responsible for falling back
+// gracefully (e.g. broadcast English only). The second-language choice is
+// theatre-driven — see atisSecondLangForMap.
+func translateATIS(ctx context.Context, apiKey, text, language string) (string, error) {
+	sysPrompt := fmt.Sprintf("Translate the following aviation ATIS broadcast to %s. Use ICAO phraseology conventions where applicable. Numbers should be spelled out as %s words for clear TTS pronunciation. Return ONLY the %s translation, no preamble or explanation.", language, language, language)
 	body := map[string]interface{}{
 		"model": "gpt-4o-mini",
 		"messages": []map[string]string{
-			{"role": "system", "content": "Translate the following aviation ATIS broadcast to modern standard Arabic. Use ICAO phraseology conventions where applicable. Numbers should be spelled out as Arabic words for clear TTS pronunciation. Return ONLY the Arabic translation, no preamble or explanation."},
+			{"role": "system", "content": sysPrompt},
 			{"role": "user", "content": text},
 		},
 		"temperature": 0.2,
