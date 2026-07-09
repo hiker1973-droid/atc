@@ -428,7 +428,11 @@ function renderCards() {
 
   for (const t of TOWERS) {
     const st = towerStatus[t.icao];
-    const running = roleStatus[t.role] === 'running';
+    // A reachable /status is ground truth that the tower is up, even if the
+    // launcher's cmd-window-title match misses it (e.g. relaunched without the
+    // `cmd /c` wrapper). Fall back to the role-window status when /status is
+    // unreachable (tower still booting, or dashboard port not up yet).
+    const running = !!st || roleStatus[t.role] === 'running';
     const mode = (st && st.tower && st.tower.flightMode) ? st.tower.flightMode : '—';
     const current = (st && st.tower && st.tower.activeRunway) || '';
     const available = (st && st.tower && st.tower.availableRunways) || [];
