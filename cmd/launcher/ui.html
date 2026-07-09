@@ -403,7 +403,7 @@ async function refreshRoles() {
 async function refreshTowers() {
   await Promise.all(TOWERS.map(async t => {
     try {
-      const r = await fetch(`http://localhost:${t.port}/status`, { cache: 'no-store' });
+      const r = await fetch(`/tower/${t.port}/status`, { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       towerStatus[t.icao] = await r.json();
     } catch { towerStatus[t.icao] = null; }
@@ -413,7 +413,7 @@ async function refreshTowers() {
 async function refreshCarrier() {
   await Promise.all(CARRIER.map(async c => {
     try {
-      const r = await fetch(`http://localhost:${c.port}/status`, { cache: 'no-store' });
+      const r = await fetch(`/tower/${c.port}/status`, { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       carrierStatus[c.key] = await r.json();
     } catch { carrierStatus[c.key] = null; }
@@ -704,7 +704,7 @@ function switchTheatre(name) {
 
 async function setRunway(port, runway) {
   try {
-    const r = await fetch(`http://localhost:${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
+    const r = await fetch(`/tower/${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
     if (!r.ok) alert(`Runway change failed: ${await r.text()}`);
   } catch (e) { alert('Runway change failed: ' + e.message); }
   setTimeout(refreshAll, 500);
@@ -715,7 +715,7 @@ async function setRunway(port, runway) {
 let WX_TARGET_PORTS = THEATRES[currentTheatre].wxPorts;
 async function openWeatherModal() {
   try {
-    const r = await fetch(`http://localhost:${TOWERS[0].port}/status`);
+    const r = await fetch(`/tower/${TOWERS[0].port}/status`);
     if (r.ok) {
       const s = await r.json();
       const t = s.tower || {};
@@ -755,7 +755,7 @@ async function applyWeather() {
   $('wxStatus').textContent = 'Applying…';
   const results = await Promise.all(WX_TARGET_PORTS.map(async (port) => {
     try {
-      const r = await fetch(`http://localhost:${port}/weather?${q.toString()}`, { method: 'POST' });
+      const r = await fetch(`/tower/${port}/weather?${q.toString()}`, { method: 'POST' });
       return { port, ok: r.ok, msg: r.ok ? '' : await r.text() };
     } catch (e) { return { port, ok: false, msg: e.message }; }
   }));
@@ -780,7 +780,7 @@ const sources = {};
 function connectLog(t) {
   if (sources[t.icao]) return;
   try {
-    const es = new EventSource(`http://localhost:${t.port}/ws/log`);
+    const es = new EventSource(`/tower/${t.port}/ws/log`);
     sources[t.icao] = es;
     es.onmessage = ev => {
       try {

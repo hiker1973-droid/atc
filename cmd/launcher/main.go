@@ -17,10 +17,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -95,6 +98,7 @@ func main() {
 	mux.HandleFunc("/api/log", handleLog)
 	mux.HandleFunc("/api/rescan", handleRescan)
 	mux.HandleFunc("/api/miz-weather", handleMizWeather)
+	mux.HandleFunc("/tower/", handleTowerProxy)
 
 	if err := http.ListenAndServe(*flagListen, mux); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -323,6 +327,42 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(data)
+}
+
+// proxyPorts is the allowlist of local dashboard ports the launcher will
+// reverse-proxy. Restricting to known role ports keeps /tower/ from being
+// abused as an open proxy to arbitrary localhost services. Covers both
+// theatres: PG towers 6001-6003 + Marshal 6004 + Deckboss 6005, and Caucasus
+// towers 6011-6014.
+var proxyPorts = map[int]bool{
+	6001: true, 6002: true, 6003: true, 6004: true, 6005: true,
+	6011: true, 6012: true, 6013: true, 6014: true,
+}
+
+// handleTowerProxy reverse-proxies /tower/<port>/<rest> to http://127.0.0.1:<port>/<rest>
+// so a remote browser only ever talks to the launcher (:7000) — the per-tower
+// dashboards need not be exposed. This is what makes the dashboard work behind
+// a single Cloudflare Tunnel hostname. Streams (SSE /ws/log) pass through via
+// FlushInterval=-1. Port is allowlist-checked.
+func handleTowerProxy(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/tower/")
+	slash := strings.IndexByte(rest, '/')
+	if slash <= 0 {
+		http.Error(w, "bad tower path — want /tower/<port>/<path>", http.StatusBadRequest)
+		return
+	}
+	port, err := strconv.Atoi(rest[:slash])
+	if err != nil || !proxyPorts[port] {
+		http.Error(w, "tower port not allowed", http.StatusForbidden)
+		return
+	}
+	target := &url.URL{Scheme: "http", Host: fmt.Sprintf("127.0.0.1:%d", port)}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.FlushInterval = -1 // stream immediately for SSE (/ws/log)
+	// Rewrite the path to drop the /tower/<port> prefix; NewSingleHostReverseProxy's
+	// director keeps r.URL.Path (target.Path is empty) and preserves RawQuery.
+	r.URL.Path = "/" + rest[slash+1:]
+	proxy.ServeHTTP(w, r)
 }
 
 func handleRoles(w http.ResponseWriter, _ *http.Request) {

@@ -69,3 +69,4 @@ So the *only* thing keeping squadron members from loading `http://<rig-IP>:7000/
 ## Decision log
 
 - 2026-05-29: options A/B/C/D presented. User: "make notes. we will start in a while." → this file.
+- 2026-07-09: **resumed.** Chosen: public internet + full control + **Cloudflare Access with Discord login** (edge auth, restricted to the vSFG-7 guild), fronted by Cloudflare Tunnel. Launcher now reverse-proxies the tower dashboards under `/tower/<port>/…` (allowlisted) so only `:7000` is exposed and the panels work remotely. Full runbook: **`REMOTE_ACCESS.md`** at repo root. Note discovered during setup: Discord is **not** a Cloudflare-native OIDC IdP — needs the `Erisa/discord-oidc-worker` shim (Discord OAuth2 isn't OIDC-compliant).
