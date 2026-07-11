@@ -49,6 +49,7 @@ var (
 type Role struct {
 	Name          string `json:"name"`
 	Bat           string `json:"bat"`
+	Region        string `json:"region"` // pg | caucasus | germany (from bat name)
 	Airfield      string `json:"airfield"`
 	LogFile       string `json:"logFile"`
 	DashboardPort int    `json:"dashboardPort,omitempty"`
@@ -94,6 +95,8 @@ func main() {
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/start", handleStart)
 	mux.HandleFunc("/api/stop", handleStop)
+	mux.HandleFunc("/api/start-region", handleStartRegion)
+	mux.HandleFunc("/api/stop-region", handleStopRegion)
 	mux.HandleFunc("/api/restart", handleRestart)
 	mux.HandleFunc("/api/log", handleLog)
 	mux.HandleFunc("/api/rescan", handleRescan)
@@ -156,7 +159,7 @@ func discoverRoles() {
 }
 
 func roleFromCmd(bat, title, cmd string) Role {
-	r := Role{Name: title, Bat: bat, Airfield: "OMDM"} // atc.exe default
+	r := Role{Name: title, Bat: bat, Region: regionForBat(bat), Airfield: "OMDM"} // atc.exe default
 	if m := reAirfield.FindStringSubmatch(cmd); m != nil {
 		r.Airfield = strings.ToUpper(m[1])
 	}
@@ -165,6 +168,22 @@ func roleFromCmd(bat, title, cmd string) Role {
 	}
 	r.LogFile = "atc-" + strings.ToLower(r.Airfield) + ".log"
 	return r
+}
+
+// regionForBat maps a role's source bat filename to its theatre. Region-specific
+// bats carry a suffix (_caucasus / _germany); the un-suffixed PG bats
+// (start_towers.bat, start_atis.bat, start_marshal.bat, ...) default to "pg".
+// Keep the keys in sync with regionBats and the ui.html THEATRES config.
+func regionForBat(bat string) string {
+	l := strings.ToLower(bat)
+	switch {
+	case strings.Contains(l, "caucasus"):
+		return "caucasus"
+	case strings.Contains(l, "germany"):
+		return "germany"
+	default:
+		return "pg"
+	}
 }
 
 // ── Process detection (Windows tasklist) ─────────────────────────────────────
@@ -313,6 +332,61 @@ func stopRole(name string) error {
 	return killTree(pid)
 }
 
+// regionBats maps a theatre to its single-shot launcher bat (ATIS + towers +
+// command, and Marshal/Deckboss for PG). These deliberately do NOT call
+// start_launcher.bat — the launcher is already running when the dashboard
+// triggers a region start. Keep keys in sync with regionForBat + ui.html.
+var regionBats = map[string]string{
+	"pg":       "start_region_pg.bat",
+	"caucasus": "start_region_caucasus.bat",
+	"germany":  "start_region_germany.bat",
+}
+
+// startRegion runs a theatre's region bat, spawning all of its role windows in
+// one shot (same `cmd /c start "" <bat>` mechanism as startRole).
+func startRegion(region string) error {
+	bat, ok := regionBats[region]
+	if !ok {
+		return fmt.Errorf("unknown region: %s", region)
+	}
+	full := filepath.Join(rootDir, bat)
+	if _, err := os.Stat(full); err != nil {
+		return fmt.Errorf("region bat missing: %s", bat)
+	}
+	cmd := exec.Command("cmd", "/c", "start", "", full)
+	cmd.Dir = rootDir
+	return cmd.Start()
+}
+
+// stopRegion kills every running role window belonging to the region. Returns
+// the number of roles killed so the dashboard can report "nothing was running".
+func stopRegion(region string) (int, error) {
+	rolesMu.Lock()
+	var names []string
+	for i := range roles {
+		if roles[i].Region == region {
+			names = append(names, roles[i].Name)
+		}
+	}
+	rolesMu.Unlock()
+
+	wins := enumerateCmdWindows()
+	killed := 0
+	var firstErr error
+	for _, n := range names {
+		if pid, ok := findWindowPID(wins, n); ok {
+			if err := killTree(pid); err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			killed++
+		}
+	}
+	return killed, firstErr
+}
+
 // ── HTTP handlers ─────────────────────────────────────────────────────────────
 
 func serveUI(w http.ResponseWriter, r *http.Request) {
@@ -406,6 +480,23 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"status": "stopped"})
+}
+
+func handleStartRegion(w http.ResponseWriter, r *http.Request) {
+	if err := startRegion(r.URL.Query().Get("region")); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "started"})
+}
+
+func handleStopRegion(w http.ResponseWriter, r *http.Request) {
+	killed, err := stopRegion(r.URL.Query().Get("region"))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "stopped", "killed": killed})
 }
 
 func handleRestart(w http.ResponseWriter, r *http.Request) {

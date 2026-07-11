@@ -178,6 +178,13 @@
   .theatre-btn { background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.7rem; font-size: 0.85em; cursor: pointer; }
   .theatre-btn:hover { color: #e6edf3; }
   .theatre-btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  .region-sep { width: 1px; height: 1.2rem; background: var(--border); margin: 0 0.5rem; }
+  .region-btn { border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.7rem; font-size: 0.85em; cursor: pointer; font-weight: 600; }
+  .region-btn.start { background: #196c2e33; color: #7ee787; border-color: #2ea04366; }
+  .region-btn.start:hover { background: #2ea04366; color: #fff; }
+  .region-btn.stop { background: #6e111133; color: #ff9492; border-color: #da363366; margin-left: 0.35rem; }
+  .region-btn.stop:hover { background: #da363366; color: #fff; }
+  .region-btn:disabled { opacity: 0.5; cursor: default; }
   /* Per-airfield takeoff/landing traffic */
   #trafficTbl { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0.8rem; }
   .af-traffic { border: 1px solid var(--border); border-radius: 7px; padding: 0.5rem 0.6rem; background: var(--bg); }
@@ -211,6 +218,9 @@
     <button class="theatre-btn active" data-theatre="pg" onclick="switchTheatre('pg')">Persian Gulf</button>
     <button class="theatre-btn" data-theatre="caucasus" onclick="switchTheatre('caucasus')">Caucasus</button>
     <button class="theatre-btn" data-theatre="germany" onclick="switchTheatre('germany')">Germany</button>
+    <span class="region-sep"></span>
+    <button class="region-btn start" id="startRegionBtn" onclick="startRegion()" title="Start every role in the selected theatre">▶ Start</button>
+    <button class="region-btn stop" id="stopRegionBtn" onclick="stopRegion()" title="Stop every role in the selected theatre">■ Stop</button>
   </div>
   <div class="server">
     <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
@@ -719,8 +729,45 @@ function switchTheatre(name) {
   document.querySelectorAll('.theatre-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.theatre === name));
   $('wxPrimary').textContent = cfg.primaryLabel;
+  updateRegionButtons();
   TOWERS.forEach(connectLog);             // no-op for already-connected towers
   refreshAll();
+}
+
+// Region Start/Stop — launch or kill every role in the selected theatre in one
+// click. Start runs the theatre's start_region_*.bat (all its ATIS/towers/
+// command windows); Stop kills every running window whose bat belongs to the
+// theatre. Backend endpoints: /api/start-region, /api/stop-region.
+function updateRegionButtons() {
+  const cfg = THEATRES[currentTheatre];
+  $('startRegionBtn').textContent = '▶ Start ' + cfg.label;
+  $('stopRegionBtn').textContent  = '■ Stop ' + cfg.label;
+}
+async function startRegion() {
+  const cfg = THEATRES[currentTheatre];
+  const btn = $('startRegionBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/start-region?region=' + encodeURIComponent(currentTheatre), { method: 'POST' });
+    if (!r.ok) alert(`Start ${cfg.label} failed: ${await r.text()}`);
+  } catch (e) { alert('Start region failed: ' + e.message); }
+  setTimeout(() => { btn.disabled = false; refreshAll(); }, 1500);
+}
+async function stopRegion() {
+  const cfg = THEATRES[currentTheatre];
+  if (!confirm(`Stop ALL ${cfg.label} roles (ATIS, towers, command)? This kills them mid-mission.`)) return;
+  const btn = $('stopRegionBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/stop-region?region=' + encodeURIComponent(currentTheatre), { method: 'POST' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.killed === 0) alert(`No running ${cfg.label} roles to stop.`);
+    } else {
+      alert(`Stop ${cfg.label} failed: ${await r.text()}`);
+    }
+  } catch (e) { alert('Stop region failed: ' + e.message); }
+  setTimeout(() => { btn.disabled = false; refreshAll(); }, 1200);
 }
 
 async function setRunway(port, runway) {
@@ -889,6 +936,7 @@ async function refreshAll() {
 }
 
 // Boot
+updateRegionButtons();
 refreshAll();
 setInterval(refreshAll, 3000);
 TOWERS.forEach(connectLog);
