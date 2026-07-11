@@ -113,8 +113,8 @@ func main() {
 		RunE:  run,
 	}
 	f := root.Flags()
-	f.StringVar(&flagAirfield, "airfield", "OMDM", "ICAO: OMDM/OMAM/OMAL (PG) · UGSB/UG5X/UGKS/UGKO (Caucasus)")
-	f.StringVar(&flagMap, "map", "pg", "Theatre for ATIS station set + Command handoff scan: pg | caucasus")
+	f.StringVar(&flagAirfield, "airfield", "OMDM", "ICAO: OMDM/OMAM/OMAL (PG) · UGSB/UG5X/UGKS/UGKO (Caucasus) · ETAR/ETAD/EDFH/EDDF/EDDK/EDDL/EDDV/EDDH (Germany)")
+	f.StringVar(&flagMap, "map", "pg", "Theatre for ATIS station set + Command handoff scan: pg | caucasus | germany")
 	f.StringVar(&flagCallsign, "callsign", "", "Tower callsign (auto from airfield)")
 	f.StringVar(&flagSRSAddr, "srs-addr", "localhost:5004", "SRS server address:port")
 	f.Float64Var(&flagFreqMHz, "freq", 0, "Override tower frequency MHz")

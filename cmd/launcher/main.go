@@ -332,11 +332,13 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 // proxyPorts is the allowlist of local dashboard ports the launcher will
 // reverse-proxy. Restricting to known role ports keeps /tower/ from being
 // abused as an open proxy to arbitrary localhost services. Covers both
-// theatres: PG towers 6001-6003 + Marshal 6004 + Deckboss 6005, and Caucasus
-// towers 6011-6014.
+// theatres: PG towers 6001-6003 + Marshal 6004 + Deckboss 6005, Caucasus
+// towers 6011-6014, and Cold War Germany towers 6021-6028.
 var proxyPorts = map[int]bool{
 	6001: true, 6002: true, 6003: true, 6004: true, 6005: true,
 	6011: true, 6012: true, 6013: true, 6014: true,
+	6021: true, 6022: true, 6023: true, 6024: true,
+	6025: true, 6026: true, 6027: true, 6028: true,
 }
 
 // handleTowerProxy reverse-proxies /tower/<port>/<rest> to http://127.0.0.1:<port>/<rest>

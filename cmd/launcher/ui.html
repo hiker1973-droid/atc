@@ -192,6 +192,11 @@
   /* Caucasus airfield accent colours (mirror PG cells) */
   .airfield-cell.UGSB { color: #7ee787; } .airfield-cell.UG5X { color: #79c0ff; }
   .airfield-cell.UGKS { color: #ffa657; } .airfield-cell.UGKO { color: #d2a8ff; }
+  /* Cold War Germany airfield accent colours (8 recovery bases) */
+  .airfield-cell.ETAR { color: #7ee787; } .airfield-cell.ETAD { color: #79c0ff; }
+  .airfield-cell.EDFH { color: #ffa657; } .airfield-cell.EDDF { color: #d2a8ff; }
+  .airfield-cell.EDDK { color: #f778ba; } .airfield-cell.EDDL { color: #ffdf5d; }
+  .airfield-cell.EDDV { color: #56d4dd; } .airfield-cell.EDDH { color: #ff9492; }
 </style>
 </head>
 <body>
@@ -205,6 +210,7 @@
     <span class="theatre-label">Theatre</span>
     <button class="theatre-btn active" data-theatre="pg" onclick="switchTheatre('pg')">Persian Gulf</button>
     <button class="theatre-btn" data-theatre="caucasus" onclick="switchTheatre('caucasus')">Caucasus</button>
+    <button class="theatre-btn" data-theatre="germany" onclick="switchTheatre('germany')">Germany</button>
   </div>
   <div class="server">
     <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
@@ -351,6 +357,21 @@ const THEATRES = {
     ],
     // CA carrier roles not wired yet — target the four towers only.
     wxPorts: [6011, 6012, 6013, 6014],
+  },
+  germany: {
+    label: 'Germany', primaryLabel: 'Ramstein (ETAR)',
+    towers: [
+      { icao: 'ETAR', label: 'Ramstein',    freq: '133.200', port: 6021, role: 'Ramstein Tower' },
+      { icao: 'ETAD', label: 'Spangdahlem', freq: '122.200', port: 6022, role: 'Spangdahlem Tower' },
+      { icao: 'EDFH', label: 'Hahn',        freq: '119.500', port: 6023, role: 'Hahn Tower' },
+      { icao: 'EDDF', label: 'Frankfurt',   freq: '127.300', port: 6024, role: 'Frankfurt Tower' },
+      { icao: 'EDDK', label: 'Cologne',     freq: '119.700', port: 6025, role: 'Cologne Tower' },
+      { icao: 'EDDL', label: 'Dusseldorf',  freq: '118.300', port: 6026, role: 'Dusseldorf Tower' },
+      { icao: 'EDDV', label: 'Hannover',    freq: '120.200', port: 6027, role: 'Hannover Tower' },
+      { icao: 'EDDH', label: 'Hamburg',     freq: '126.850', port: 6028, role: 'Hamburg Tower' },
+    ],
+    // Land-based theatre — no carrier roles; target the eight towers only.
+    wxPorts: [6021, 6022, 6023, 6024, 6025, 6026, 6027, 6028],
   },
 };
 let currentTheatre = 'pg';

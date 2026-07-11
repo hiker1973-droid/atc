@@ -31,6 +31,15 @@ var towerDashboardPortByICAO = map[string]int{
 	"UG5X": 6012,
 	"UGKS": 6013,
 	"UGKO": 6014,
+	// Cold War Germany towers (8 recovery bases, own range 6021-6028)
+	"ETAR": 6021,
+	"ETAD": 6022,
+	"EDFH": 6023,
+	"EDDF": 6024,
+	"EDDK": 6025,
+	"EDDL": 6026,
+	"EDDV": 6027,
+	"EDDH": 6028,
 }
 
 // fetchTowerRunway returns the active runway reported by the tower /status
@@ -483,6 +492,8 @@ func atisSecondLangForMap(m string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(m)) {
 	case "ca", "caucasus", "blacksea", "black-sea", "black sea":
 		return "Russian", true
+	case "germany", "de", "coldwargermany", "cold-war-germany", "cwg":
+		return "German", true
 	default: // Persian Gulf
 		return "Arabic", true
 	}
@@ -504,6 +515,25 @@ func atisStationsForMap(m string) []*atisStation {
 				TACAN: "TACAN 44X.", ILS: "ILS 109.75 runway 07.", Advisory: advisory},
 			{Name: "Senaki ATIS", FreqMHz: 234.000, Voice: "echo", ICAO: "UGKS",
 				TACAN: "TACAN 31X.", ILS: "ILS 108.90 runway 09.", Advisory: advisory},
+		}
+	case "germany", "de", "coldwargermany", "cold-war-germany", "cwg":
+		return []*atisStation{
+			{Name: "Ramstein ATIS", FreqMHz: 248.00, Voice: "nova", ICAO: "ETAR",
+				TACAN: "TACAN 81X.", ILS: "ILS 111.50 runway 09. ILS 110.75 runway 27.", Advisory: advisory},
+			{Name: "Spangdahlem ATIS", FreqMHz: 248.05, Voice: "shimmer", ICAO: "ETAD",
+				TACAN: "TACAN 32X.", ILS: "ILS 109.15 runway 05. ILS 108.10 runway 23.", Advisory: advisory},
+			{Name: "Hahn ATIS", FreqMHz: 248.15, Voice: "alloy", ICAO: "EDFH",
+				TACAN: "TACAN 24X.", ILS: "ILS 109.30 runway 03. ILS 111.30 runway 21.", Advisory: advisory},
+			{Name: "Frankfurt ATIS", FreqMHz: 248.60, Voice: "echo", ICAO: "EDDF",
+				TACAN: "TACAN 89X.", ILS: "ILS 110.70 runway 07 left. ILS 110.10 runway 25 right.", Advisory: advisory},
+			{Name: "Cologne ATIS", FreqMHz: 248.65, Voice: "fable", ICAO: "EDDK",
+				TACAN: "TACAN 25X.", ILS: "ILS 110.90 runway 14 left. ILS 111.10 runway 32 right.", Advisory: advisory},
+			{Name: "Dusseldorf ATIS", FreqMHz: 248.70, Voice: "coral", ICAO: "EDDL",
+				TACAN: "VOR 115.15.", ILS: "ILS 111.50 runway 05. ILS 109.90 runway 23.", Advisory: advisory},
+			{Name: "Hannover ATIS", FreqMHz: 248.85, Voice: "sage", ICAO: "EDDV",
+				ILS: "ILS 109.50 runway 09. ILS 108.70 runway 27.", Advisory: advisory},
+			{Name: "Hamburg ATIS", FreqMHz: 248.80, Voice: "ash", ICAO: "EDDH",
+				TACAN: "VOR 115.80.", ILS: "ILS 110.50 runway 05. ILS 111.50 runway 23.", Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{
