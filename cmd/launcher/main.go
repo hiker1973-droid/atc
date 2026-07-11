@@ -435,6 +435,15 @@ func handleTowerProxy(w http.ResponseWriter, r *http.Request) {
 	target := &url.URL{Scheme: "http", Host: fmt.Sprintf("127.0.0.1:%d", port)}
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.FlushInterval = -1 // stream immediately for SSE (/ws/log)
+	// A tower whose process isn't running refuses the connection — a normal
+	// "role stopped" state, not a launcher fault. httputil's default handler
+	// logs "http: proxy error: ..." on every dashboard poll (~every 3s per
+	// down tower), which floods the console when a theatre's roles aren't up.
+	// Return a quiet 503 instead; the UI already renders a non-OK /status as
+	// tower-down.
+	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, _ error) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
 	// Rewrite the path to drop the /tower/<port> prefix; NewSingleHostReverseProxy's
 	// director keeps r.URL.Path (target.Path is empty) and preserves RawQuery.
 	r.URL.Path = "/" + rest[slash+1:]
