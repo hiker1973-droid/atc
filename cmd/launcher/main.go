@@ -31,7 +31,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html
+//go:embed ui.html fleet.html
 var uiFS embed.FS
 
 var (
@@ -41,7 +41,10 @@ var (
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
 	flagMizDir      = flag.String("miz-dir", `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for newest .miz when --miz-path is empty")
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
+	flagFleet       = flag.String("fleet", "dev@192.168.1.231:7000,training1@192.168.1.220:7000,vm@192.168.1.221:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
 )
+
+var fleetRigs []Rig
 
 // Role is one spawned vSFG-7 process: a single `start "Title" cmd /k "..."`
 // line inside a .bat file. Multi-role bats (start_towers.bat) produce several
@@ -87,10 +90,13 @@ func main() {
 	fmt.Printf("Open http://localhost%s/ in a browser.\n", *flagListen)
 
 	discoverRoles()
+	fleetRigs = parseFleet(*flagFleet)
 	go healthLoop()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", serveUI)
+	mux.HandleFunc("/fleet", serveFleetUI)
+	mux.HandleFunc("/api/fleet", handleFleet)
 	mux.HandleFunc("/api/roles", handleRoles)
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/start", handleStart)
@@ -295,6 +301,134 @@ func openaiProbe(timeout time.Duration) bool {
 	}
 	resp.Body.Close()
 	return resp.StatusCode < 500
+}
+
+// ── Fleet monitor ─────────────────────────────────────────────────────────────
+
+// Rig is one box in the vSFG-7 fleet the /fleet monitor polls.
+type Rig struct {
+	Name string `json:"name"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
+}
+
+// parseFleet parses "name@host:port,name@host:port,..." into a rig list.
+// A bare "host" or "host:port" (no name) uses the host as the name; a missing
+// port defaults to 7000 (the launcher port).
+func parseFleet(s string) []Rig {
+	var rigs []Rig
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		name, addr := part, part
+		if at := strings.IndexByte(part, '@'); at >= 0 {
+			name, addr = part[:at], part[at+1:]
+		}
+		host, portStr, err := net.SplitHostPort(addr)
+		if err != nil {
+			host, portStr = addr, "7000"
+		}
+		port, _ := strconv.Atoi(portStr)
+		if port == 0 {
+			port = 7000
+		}
+		if name == part { // "host:port" with no name → name after the port strip
+			name = host
+		}
+		rigs = append(rigs, Rig{Name: name, Host: host, Port: port})
+	}
+	return rigs
+}
+
+// RigStatus is a point-in-time health snapshot of one rig for the fleet view.
+type RigStatus struct {
+	Name       string    `json:"name"`
+	Host       string    `json:"host"`
+	Port       int       `json:"port"`
+	HostUp     bool      `json:"hostUp"`
+	LauncherUp bool      `json:"launcherUp"`
+	Health     *Health   `json:"health,omitempty"`
+	RolesTotal int       `json:"rolesTotal"`
+	Running    []Role    `json:"running,omitempty"`
+	Err        string    `json:"err,omitempty"`
+	At         time.Time `json:"at"`
+}
+
+var fleetClient = &http.Client{Timeout: 2500 * time.Millisecond}
+
+func fleetGetJSON(url string, v any) error {
+	resp, err := fleetClient.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+// pollRig fetches a rig's launcher /api/health + /api/roles. If the launcher is
+// unreachable it falls back to a TCP probe of SMB 445 so we can still tell
+// "host up, launcher down" from "host offline".
+func pollRig(rig Rig) RigStatus {
+	rs := RigStatus{Name: rig.Name, Host: rig.Host, Port: rig.Port, At: time.Now()}
+	base := fmt.Sprintf("http://%s:%d", rig.Host, rig.Port)
+
+	var h Health
+	if err := fleetGetJSON(base+"/api/health", &h); err == nil {
+		rs.LauncherUp, rs.HostUp = true, true
+		rs.Health = &h
+	} else {
+		rs.Err = err.Error()
+		if c, e := net.DialTimeout("tcp", net.JoinHostPort(rig.Host, "445"), 1500*time.Millisecond); e == nil {
+			c.Close()
+			rs.HostUp = true
+		}
+	}
+	if rs.LauncherUp {
+		var roles []Role
+		if err := fleetGetJSON(base+"/api/roles", &roles); err == nil {
+			rs.RolesTotal = len(roles)
+			for _, r := range roles {
+				if r.Status == "running" {
+					rs.Running = append(rs.Running, r)
+				}
+			}
+		}
+	}
+	return rs
+}
+
+// pollFleet polls every rig concurrently and preserves flag order.
+func pollFleet(rigs []Rig) []RigStatus {
+	out := make([]RigStatus, len(rigs))
+	var wg sync.WaitGroup
+	for i, rig := range rigs {
+		wg.Add(1)
+		go func(i int, rig Rig) {
+			defer wg.Done()
+			out[i] = pollRig(rig)
+		}(i, rig)
+	}
+	wg.Wait()
+	return out
+}
+
+func handleFleet(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, pollFleet(fleetRigs))
+}
+
+func serveFleetUI(w http.ResponseWriter, _ *http.Request) {
+	data, err := uiFS.ReadFile("fleet.html")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
 }
 
 // ── Role actions ──────────────────────────────────────────────────────────────

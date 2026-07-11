@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vSFG-7 Fleet Monitor</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #c9d1d9;
+    --muted: #8b949e; --green: #3fb950; --amber: #d29922; --red: #f85149; --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 1.4rem;
+    border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  header .logo { font-weight: 800; color: var(--blue); letter-spacing: 0.03em; }
+  header .title { font-size: 1.05rem; font-weight: 600; }
+  header .spacer { flex: 1; }
+  header .updated { color: var(--muted); font-size: 0.8rem; }
+  header a.back { color: var(--muted); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--border);
+    padding: 0.25rem 0.7rem; border-radius: 5px; }
+  header a.back:hover { color: var(--text); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; padding: 1.2rem; }
+  .rig { border: 1px solid var(--border); border-radius: 9px; background: var(--panel); overflow: hidden; }
+  .rig-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); }
+  .rig-name { font-size: 1.05rem; font-weight: 700; }
+  .rig-host { color: var(--muted); font-size: 0.8rem; }
+  .badge { margin-left: auto; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 0.2rem 0.6rem; border-radius: 20px; white-space: nowrap; }
+  .badge.online { background: #23863633; color: var(--green); border: 1px solid #2386364d; }
+  .badge.degraded { background: #9e6a0333; color: var(--amber); border: 1px solid #9e6a034d; }
+  .badge.offline { background: #6e111133; color: var(--red); border: 1px solid #da36334d; }
+  .rig-body { padding: 0.8rem 1rem; }
+  .dots { display: flex; gap: 1.1rem; margin-bottom: 0.7rem; flex-wrap: wrap; }
+  .dot { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--muted); }
+  .dot i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--muted); }
+  .dot.up i { background: var(--green); box-shadow: 0 0 6px #3fb95088; }
+  .dot.down i { background: var(--red); }
+  .roles-line { font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .roles-line b { color: var(--text); }
+  .region { margin-top: 0.5rem; }
+  .region-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; }
+  .role-pill { display: inline-block; font-size: 0.75rem; background: #1f6feb22; color: var(--blue);
+    border: 1px solid #1f6feb44; border-radius: 5px; padding: 0.1rem 0.45rem; margin: 0 0.3rem 0.3rem 0; }
+  .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+  .err { color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; word-break: break-word; }
+  .foot { color: var(--muted); font-size: 0.72rem; margin-top: 0.6rem; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">vSFG-7</span>
+  <span class="title">Fleet Monitor</span>
+  <span class="spacer"></span>
+  <span class="updated" id="updated">—</span>
+  <a class="back" href="/">← Dashboard</a>
+</header>
+<div class="grid" id="grid"></div>
+<script>
+const REGION_LABEL = { pg: 'Persian Gulf', caucasus: 'Caucasus', germany: 'Germany' };
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function dot(label, up) {
+  const cls = up === null ? '' : (up ? 'up' : 'down');
+  return `<span class="dot ${cls}"><i></i>${label}</span>`;
+}
+
+function rigCard(r) {
+  let badge, cls;
+  if (r.launcherUp) { badge = 'Online'; cls = 'online'; }
+  else if (r.hostUp) { badge = 'Launcher down'; cls = 'degraded'; }
+  else { badge = 'Offline'; cls = 'offline'; }
+
+  let body = '';
+  if (r.launcherUp && r.health) {
+    const h = r.health;
+    body += `<div class="dots">
+      ${dot('SRS', !!h.srs)}
+      ${dot('Tacview', !!h.tacview)}
+      ${dot('Viewer', !!h.tacview64)}
+      ${dot('OpenAI', !!h.openai)}
+    </div>`;
+  }
+
+  if (r.launcherUp) {
+    const running = r.running || [];
+    body += `<div class="roles-line"><b>${running.length}</b> running <span class="rig-host">/ ${r.rolesTotal||0} defined</span></div>`;
+    if (running.length) {
+      const byRegion = {};
+      running.forEach(role => { (byRegion[role.region] = byRegion[role.region] || []).push(role); });
+      Object.keys(byRegion).sort().forEach(reg => {
+        const pills = byRegion[reg].map(role =>
+          `<span class="role-pill">${esc(role.name)}${role.dashboardPort ? ' :'+role.dashboardPort : ''}</span>`).join('');
+        body += `<div class="region"><div class="region-title">${REGION_LABEL[reg] || reg}</div>${pills}</div>`;
+      });
+    } else {
+      body += `<div class="empty">no roles running</div>`;
+    }
+  } else {
+    body += `<div class="empty">${r.hostUp ? 'host reachable, launcher not responding' : 'host unreachable'}</div>`;
+    if (r.err) body += `<div class="err">${esc(r.err)}</div>`;
+  }
+
+  const when = r.at ? new Date(r.at).toLocaleTimeString() : '';
+  body += `<div class="foot">polled ${when}</div>`;
+
+  return `<div class="rig">
+    <div class="rig-head">
+      <span class="rig-name">${esc(r.name)}</span>
+      <span class="rig-host">${esc(r.host)}:${r.port}</span>
+      <span class="badge ${cls}">${badge}</span>
+    </div>
+    <div class="rig-body">${body}</div>
+  </div>`;
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/fleet', { cache: 'no-store' });
+    const rigs = await res.json();
+    document.getElementById('grid').innerHTML = rigs.map(rigCard).join('');
+    document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('updated').textContent = 'refresh failed: ' + e.message;
+  }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
