@@ -182,6 +182,8 @@
   .region-btn { border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.7rem; font-size: 0.85em; cursor: pointer; font-weight: 600; }
   .region-btn.start { background: #196c2e33; color: #7ee787; border-color: #2ea04366; }
   .region-btn.start:hover { background: #2ea04366; color: #fff; }
+  .region-btn.atis { background: #1f3a5f33; color: #79c0ff; border-color: #1f6feb66; margin-left: 0.35rem; }
+  .region-btn.atis:hover { background: #1f6feb66; color: #fff; }
   .region-btn.stop { background: #6e111133; color: #ff9492; border-color: #da363366; margin-left: 0.35rem; }
   .region-btn.stop:hover { background: #da363366; color: #fff; }
   .region-btn:disabled { opacity: 0.5; cursor: default; }
@@ -220,6 +222,7 @@
     <button class="theatre-btn" data-theatre="germany" onclick="switchTheatre('germany')">Germany</button>
     <span class="region-sep"></span>
     <button class="region-btn start" id="startRegionBtn" onclick="startRegion()" title="Start every role in the selected theatre">▶ Start</button>
+    <button class="region-btn atis" id="startAtisBtn" onclick="startAtis()" title="Start only the ATIS set for the selected theatre">🔊 ATIS</button>
     <button class="region-btn stop" id="stopRegionBtn" onclick="stopRegion()" title="Stop every role in the selected theatre">■ Stop</button>
   </div>
   <div class="server">
@@ -348,7 +351,7 @@
 // (its /status feeds the weather panel + Set-Weather prefill).
 const THEATRES = {
   pg: {
-    label: 'Persian Gulf', primaryLabel: 'OMDM',
+    label: 'Persian Gulf', primaryLabel: 'OMDM', atisRole: 'vSFG-7 ATIS',
     towers: [
       { icao: 'OMDM', label: 'Al Minhad', freq: '250.100', port: 6001, role: 'Al Minhad Tower' },
       { icao: 'OMAM', label: 'Al Dhafra', freq: '251.100', port: 6002, role: 'Al Dhafra Tower' },
@@ -358,7 +361,7 @@ const THEATRES = {
     wxPorts: [6001, 6002, 6003, 6004, 6005],
   },
   caucasus: {
-    label: 'Caucasus', primaryLabel: 'Batumi (UGSB)',
+    label: 'Caucasus', primaryLabel: 'Batumi (UGSB)', atisRole: 'vSFG-7 ATIS (Caucasus)',
     towers: [
       { icao: 'UGSB', label: 'Batumi',   freq: '260.000', port: 6011, role: 'Batumi Tower' },
       { icao: 'UG5X', label: 'Kobuleti', freq: '262.000', port: 6012, role: 'Kobuleti Tower' },
@@ -369,7 +372,7 @@ const THEATRES = {
     wxPorts: [6011, 6012, 6013, 6014],
   },
   germany: {
-    label: 'Germany', primaryLabel: 'Ramstein (ETAR)',
+    label: 'Germany', primaryLabel: 'Ramstein (ETAR)', atisRole: 'vSFG-7 ATIS (Germany)',
     towers: [
       { icao: 'ETAR', label: 'Ramstein',    freq: '133.200', port: 6021, role: 'Ramstein Tower' },
       { icao: 'ETAD', label: 'Spangdahlem', freq: '122.200', port: 6022, role: 'Spangdahlem Tower' },
@@ -742,6 +745,20 @@ function updateRegionButtons() {
   const cfg = THEATRES[currentTheatre];
   $('startRegionBtn').textContent = '▶ Start ' + cfg.label;
   $('stopRegionBtn').textContent  = '■ Stop ' + cfg.label;
+  $('startAtisBtn').textContent   = '🔊 ' + cfg.label + ' ATIS';
+}
+// Start only the ATIS set for the selected theatre (its start_atis_*.bat), via
+// the ATIS role the launcher discovered from that bat.
+async function startAtis() {
+  const cfg = THEATRES[currentTheatre];
+  if (!cfg.atisRole) { alert(`No ATIS role configured for ${cfg.label}.`); return; }
+  const btn = $('startAtisBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/start?name=' + encodeURIComponent(cfg.atisRole), { method: 'POST' });
+    if (!r.ok) alert(`Start ${cfg.label} ATIS failed: ${await r.text()}`);
+  } catch (e) { alert('Start ATIS failed: ' + e.message); }
+  setTimeout(() => { btn.disabled = false; refreshAll(); }, 1200);
 }
 async function startRegion() {
   const cfg = THEATRES[currentTheatre];
