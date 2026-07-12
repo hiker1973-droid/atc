@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -93,12 +94,14 @@ func main() {
 	discoverRoles()
 	fleetRigs = parseFleet(*flagFleet)
 	go healthLoop()
+	go alertLoop()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", serveUI)
 	mux.HandleFunc("/fleet", serveFleetUI)
 	mux.HandleFunc("/api/fleet", handleFleet)
 	mux.HandleFunc("/api/version", handleVersion)
+	mux.HandleFunc("/api/alerts", handleAlerts)
 	mux.HandleFunc("/api/roles", handleRoles)
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/start", handleStart)
@@ -347,6 +350,215 @@ func handleVersion(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, buildVersion())
 }
 
+// ── Fault alerts ────────────────────────────────────────────────────────────
+
+// Alert is one active fault surfaced by the fleet monitor. Sources are a log
+// filename (log-scan alerts), a role name (duplicate process), or a subsystem
+// (SRS/Tacview health while roles run).
+type Alert struct {
+	Level   string    `json:"level"` // "error" | "warn"
+	Source  string    `json:"source"`
+	Message string    `json:"message"`
+	Time    time.Time `json:"time"`
+}
+
+// faultSignatures are the known bad log messages from CLAUDE.md's fault list.
+// Any level=error line also alerts regardless of message.
+var faultSignatures = []string{
+	"SRS disconnected", "SRS TCP failed", "ExternalAudio", "TTS prewarm failed",
+	"Whisper returned empty", "Dashboard server error",
+}
+
+var (
+	cachedAlerts []Alert
+	alertsMu     sync.Mutex
+)
+
+func alertLoop() {
+	for {
+		updateAlerts()
+		time.Sleep(20 * time.Second)
+	}
+}
+
+// updateAlerts recomputes the active-alert set: recent log faults, duplicate
+// role windows, and SRS/Tacview down while roles are running.
+func updateAlerts() {
+	alerts := scanLogAlerts()
+
+	titles := enumerateCmdWindowTitles()
+	rolesMu.Lock()
+	rs := append([]Role(nil), roles...)
+	rolesMu.Unlock()
+	running := 0
+	for _, role := range rs {
+		n := countRoleWindows(titles, role.Name)
+		if n >= 1 {
+			running++
+		}
+		if n > 1 {
+			alerts = append(alerts, Alert{Level: "warn", Source: role.Name,
+				Message: fmt.Sprintf("duplicate process — %d windows for this role", n), Time: time.Now()})
+		}
+	}
+	if running > 0 {
+		healthMu.Lock()
+		h := cachedHealth
+		healthMu.Unlock()
+		if !h.SRS {
+			alerts = append(alerts, Alert{Level: "error", Source: "SRS",
+				Message: "SRS unreachable while roles are running", Time: time.Now()})
+		}
+		if !h.Tacview {
+			alerts = append(alerts, Alert{Level: "warn", Source: "Tacview",
+				Message: "Tacview telemetry unreachable while roles are running", Time: time.Now()})
+		}
+	}
+
+	alertsMu.Lock()
+	cachedAlerts = alerts
+	alertsMu.Unlock()
+}
+
+type logLine struct {
+	Level   string    `json:"level"`
+	Message string    `json:"message"`
+	Time    time.Time `json:"time"`
+}
+
+// scanLogAlerts tails every logs/*.log and returns recent (last 5 min) fault
+// lines, deduped by source+message (keeping the newest), newest-first, capped.
+func scanLogAlerts() []Alert {
+	dir := filepath.Join(rootDir, "logs")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	cutoff := time.Now().Add(-5 * time.Minute)
+	seen := map[string]Alert{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(strings.ToLower(e.Name()), ".log") {
+			continue
+		}
+		for _, ln := range tailLines(filepath.Join(dir, e.Name()), 16*1024) {
+			ln = strings.TrimSpace(ln)
+			if ln == "" {
+				continue
+			}
+			var l logLine
+			if json.Unmarshal([]byte(ln), &l) != nil {
+				continue
+			}
+			if l.Time.Before(cutoff) {
+				continue
+			}
+			fault := l.Level == "error"
+			if !fault {
+				for _, sig := range faultSignatures {
+					if strings.Contains(l.Message, sig) {
+						fault = true
+						break
+					}
+				}
+			}
+			if !fault {
+				continue
+			}
+			key := e.Name() + "|" + l.Message
+			if prev, ok := seen[key]; !ok || l.Time.After(prev.Time) {
+				lvl := l.Level
+				if lvl == "" {
+					lvl = "warn"
+				}
+				seen[key] = Alert{Level: lvl, Source: e.Name(), Message: l.Message, Time: l.Time}
+			}
+		}
+	}
+	out := make([]Alert, 0, len(seen))
+	for _, a := range seen {
+		out = append(out, a)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Time.After(out[j].Time) })
+	if len(out) > 20 {
+		out = out[:20]
+	}
+	return out
+}
+
+// tailLines returns the lines in the last n bytes of a file (dropping the
+// partial first line when the file is larger than n).
+func tailLines(path string, n int64) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil
+	}
+	start := int64(0)
+	if info.Size() > n {
+		start = info.Size() - n
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return nil
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(string(data), "\n")
+	if start > 0 && len(lines) > 0 {
+		lines = lines[1:]
+	}
+	return lines
+}
+
+// enumerateCmdWindowTitles returns every cmd.exe window title (lowercased),
+// duplicates included — enumerateCmdWindows dedupes, which hides zombies.
+func enumerateCmdWindowTitles() []string {
+	out, err := exec.Command("tasklist", "/v", "/fi", "IMAGENAME eq cmd.exe", "/fo", "csv", "/nh").Output()
+	if err != nil {
+		return nil
+	}
+	var titles []string
+	r := csv.NewReader(strings.NewReader(string(out)))
+	r.FieldsPerRecord = -1
+	for {
+		rec, err := r.Read()
+		if err != nil {
+			break
+		}
+		if len(rec) < 9 {
+			continue
+		}
+		titles = append(titles, strings.ToLower(strings.TrimSpace(rec[len(rec)-1])))
+	}
+	return titles
+}
+
+// countRoleWindows counts windows matching a role title (exact or the
+// "<title> - <cmdline>" form newer Windows builds produce).
+func countRoleWindows(titles []string, name string) int {
+	key := strings.ToLower(name)
+	prefix := key + " - "
+	n := 0
+	for _, t := range titles {
+		if t == key || strings.HasPrefix(t, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+func handleAlerts(w http.ResponseWriter, _ *http.Request) {
+	alertsMu.Lock()
+	a := append([]Alert(nil), cachedAlerts...)
+	alertsMu.Unlock()
+	writeJSON(w, a)
+}
+
 // ── Fleet monitor ─────────────────────────────────────────────────────────────
 
 // Rig is one box in the vSFG-7 fleet the /fleet monitor polls.
@@ -397,6 +609,7 @@ type RigStatus struct {
 	Version    *VersionInfo `json:"version,omitempty"`
 	RolesTotal int          `json:"rolesTotal"`
 	Running    []Role       `json:"running,omitempty"`
+	Alerts     []Alert      `json:"alerts,omitempty"`
 	Err        string       `json:"err,omitempty"`
 	At         time.Time    `json:"at"`
 }
@@ -446,6 +659,10 @@ func pollRig(rig Rig) RigStatus {
 		var ver VersionInfo
 		if err := fleetGetJSON(base+"/api/version", &ver); err == nil {
 			rs.Version = &ver
+		}
+		var alerts []Alert
+		if err := fleetGetJSON(base+"/api/alerts", &alerts); err == nil {
+			rs.Alerts = alerts
 		}
 	}
 	return rs

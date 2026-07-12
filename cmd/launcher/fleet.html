@@ -49,6 +49,17 @@
   .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
   .err { color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; word-break: break-word; }
   .foot { color: var(--muted); font-size: 0.72rem; margin-top: 0.6rem; }
+  .rig.hasalert { border-color: #da3633; box-shadow: 0 0 0 1px #da363355; }
+  .alerts { margin-top: 0.7rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
+  .alert { display: flex; gap: 0.4rem; align-items: baseline; font-size: 0.78rem; margin-bottom: 0.3rem; }
+  .alert .lvl { font-weight: 700; text-transform: uppercase; font-size: 0.66rem; padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }
+  .alert .lvl.error { background: #6e111133; color: var(--red); }
+  .alert .lvl.warn { background: #9e6a0333; color: var(--amber); }
+  .alert .src { color: var(--muted); }
+  .alert .msg { color: var(--text); word-break: break-word; }
+  .banner { display: none; margin: 0.9rem 1.2rem -0.4rem; padding: 0.6rem 1rem; border-radius: 8px;
+    background: #6e111133; border: 1px solid #da363366; color: var(--red); font-weight: 600; font-size: 0.9rem; }
+  .banner.show { display: block; }
 </style>
 </head>
 <body>
@@ -59,6 +70,7 @@
   <span class="updated" id="updated">—</span>
   <a class="back" href="/">← Dashboard</a>
 </header>
+<div class="banner" id="banner"></div>
 <div class="grid" id="grid"></div>
 <script>
 const REGION_LABEL = { pg: 'Persian Gulf', caucasus: 'Caucasus', germany: 'Germany' };
@@ -106,6 +118,15 @@ function rigCard(r) {
     if (r.err) body += `<div class="err">${esc(r.err)}</div>`;
   }
 
+  const alerts = r.alerts || [];
+  if (alerts.length) {
+    const rows = alerts.map(a => {
+      const lvl = (a.level === 'error') ? 'error' : 'warn';
+      return `<div class="alert"><span class="lvl ${lvl}">${lvl}</span><span class="src">${esc(a.source)}</span><span class="msg">${esc(a.message)}</span></div>`;
+    }).join('');
+    body += `<div class="alerts">${rows}</div>`;
+  }
+
   const when = r.at ? new Date(r.at).toLocaleTimeString() : '';
   let verFoot = '';
   if (r.version && r.version.short && r.version.short !== 'unknown') {
@@ -115,7 +136,8 @@ function rigCard(r) {
   }
   body += `<div class="foot">polled ${when}${verFoot}</div>`;
 
-  return `<div class="rig">
+  const alertCls = (r.alerts && r.alerts.length) ? ' hasalert' : '';
+  return `<div class="rig${alertCls}">
     <div class="rig-head">
       <span class="rig-name">${esc(r.name)}</span>
       <span class="rig-host">${esc(r.host)}:${r.port}</span>
@@ -130,6 +152,15 @@ async function refresh() {
     const res = await fetch('/api/fleet', { cache: 'no-store' });
     const rigs = await res.json();
     document.getElementById('grid').innerHTML = rigs.map(rigCard).join('');
+    // global alert banner
+    let total = 0, offline = 0;
+    rigs.forEach(r => { total += (r.alerts || []).length; if (!r.launcherUp && !r.hostUp) offline++; });
+    const banner = document.getElementById('banner');
+    const parts = [];
+    if (total) parts.push(`${total} active fault${total === 1 ? '' : 's'} across the fleet`);
+    if (offline) parts.push(`${offline} rig${offline === 1 ? '' : 's'} offline`);
+    if (parts.length) { banner.textContent = '⚠ ' + parts.join(' · '); banner.classList.add('show'); }
+    else { banner.classList.remove('show'); }
     document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
   } catch (e) {
     document.getElementById('updated').textContent = 'refresh failed: ' + e.message;
