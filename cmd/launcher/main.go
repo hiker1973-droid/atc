@@ -33,7 +33,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html
+//go:embed ui.html fleet.html logs.html
 var uiFS embed.FS
 
 var (
@@ -99,9 +99,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", serveUI)
 	mux.HandleFunc("/fleet", serveFleetUI)
+	mux.HandleFunc("/logs", serveLogsUI)
 	mux.HandleFunc("/api/fleet", handleFleet)
 	mux.HandleFunc("/api/version", handleVersion)
 	mux.HandleFunc("/api/alerts", handleAlerts)
+	mux.HandleFunc("/api/rig-log", handleRigLog)
 	mux.HandleFunc("/api/roles", handleRoles)
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/start", handleStart)
@@ -177,7 +179,19 @@ func roleFromCmd(bat, title, cmd string) Role {
 	if m := reDashboardPort.FindStringSubmatch(cmd); m != nil {
 		fmt.Sscanf(m[1], "%d", &r.DashboardPort)
 	}
-	r.LogFile = "atc-" + strings.ToLower(r.Airfield) + ".log"
+	// --airfield defaults to OMDM even in ATIS/Command/Marshal-only modes, so
+	// the mode flag has to win or these roles all read atc-omdm.log. Mirrors the
+	// log-slug switch in cmd/atc/main.go.
+	switch {
+	case strings.Contains(cmd, "--atis-only"):
+		r.LogFile = "atc-atis.log"
+	case strings.Contains(cmd, "--command-only"):
+		r.LogFile = "atc-command.log"
+	case strings.Contains(cmd, "--marshal-only"):
+		r.LogFile = "atc-marshal.log"
+	default:
+		r.LogFile = "atc-" + strings.ToLower(r.Airfield) + ".log"
+	}
 	return r
 }
 
@@ -695,6 +709,51 @@ func serveFleetUI(w http.ResponseWriter, _ *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(data)
+}
+
+func serveLogsUI(w http.ResponseWriter, _ *http.Request) {
+	data, err := uiFS.ReadFile("logs.html")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
+func rigByName(name string) (Rig, bool) {
+	for _, r := range fleetRigs {
+		if strings.EqualFold(r.Name, name) {
+			return r, true
+		}
+	}
+	return Rig{}, false
+}
+
+// handleRigLog proxies a role's recent log (last 32KB) from any fleet rig so the
+// /logs page only ever fetches the local launcher — no cross-origin request to
+// each rig. rig=<name> resolves against the -fleet list; role=<role name>.
+func handleRigLog(w http.ResponseWriter, r *http.Request) {
+	role := r.URL.Query().Get("role")
+	if role == "" {
+		http.Error(w, "missing role", http.StatusBadRequest)
+		return
+	}
+	rig, ok := rigByName(r.URL.Query().Get("rig"))
+	if !ok {
+		http.Error(w, "unknown rig", http.StatusBadRequest)
+		return
+	}
+	target := fmt.Sprintf("http://%s:%d/api/log?name=%s", rig.Host, rig.Port, url.QueryEscape(role))
+	resp, err := fleetClient.Get(target)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // ── Role actions ──────────────────────────────────────────────────────────────

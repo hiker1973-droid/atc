@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vSFG-7 Live Logs</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); display: flex; flex-direction: column;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel); }
+  header .logo { font-weight: 800; color: var(--blue); }
+  header .title { font-weight: 600; margin-right: 0.5rem; }
+  header label { color: var(--muted); font-size: 0.8rem; }
+  select, button { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
+  select:hover, button:hover { border-color: var(--blue); }
+  button.on { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  .spacer { flex: 1; }
+  header .status { color: var(--muted); font-size: 0.78rem; }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; border: 1px solid var(--border);
+    padding: 0.28rem 0.6rem; border-radius: 5px; }
+  header a:hover { color: var(--text); }
+  #pane { flex: 1; overflow-y: auto; margin: 0; padding: 0.6rem 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; line-height: 1.5; }
+  .ln { display: flex; gap: 0.6rem; white-space: pre-wrap; word-break: break-word; padding: 0.02rem 0; }
+  .ln .t { color: var(--muted); flex-shrink: 0; }
+  .ln .lv { flex-shrink: 0; width: 3.2em; text-transform: uppercase; font-size: 0.72rem; font-weight: 700; }
+  .ln .lv.info { color: #6e7681; } .ln .lv.warn { color: var(--amber); } .ln .lv.error { color: var(--red); }
+  .ln .site { flex-shrink: 0; color: var(--blue); min-width: 6em; }
+  .ln .m { color: var(--text); }
+  .ln.error .m { color: #ffb4ad; }
+  .ln.warn .m { color: #f0c674; }
+  .empty { color: var(--muted); font-style: italic; padding: 1rem; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">vSFG-7</span><span class="title">Live Logs</span>
+  <label>Rig</label><select id="rig"></select>
+  <label>Role</label><select id="role"></select>
+  <button id="filterBtn" class="on" onclick="toggleFilter()">Meaningful</button>
+  <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+  <button onclick="clearPane()">Clear</button>
+  <span class="spacer"></span>
+  <span class="status" id="status">—</span>
+  <a href="/fleet">Fleet</a><a href="/">Dashboard</a>
+</header>
+<pre id="pane"><div class="empty">Select a rig and role to start tailing…</div></pre>
+<script>
+const ALL_TOWERS = '__ALL_TOWERS__';
+const MEANINGFUL = /"level":"(warn|error)"|heard|transmit|"tx"|clear|takeoff|hold|pattern|go.?around|"online"|starting|disconnect|\bSRS\b|scudwatch|departure|luaw|marshal|deckboss/i;
+const SKIP = /Tacview nominal/i;
+
+let fleet = [];         // cached rig list from /api/fleet
+let meaningfulOnly = true;
+let paused = false;
+let seen = new Set();
+let timer = null;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function loadFleet() {
+  try {
+    fleet = await (await fetch('/api/fleet', {cache:'no-store'})).json();
+  } catch(e){ fleet = []; }
+  const rigSel = $('rig');
+  const online = fleet.filter(r => r.launcherUp);
+  rigSel.innerHTML = online.map(r => `<option value="${esc(r.name)}">${esc(r.name)} (${esc(r.host)})</option>`).join('')
+    || '<option value="">no rigs online</option>';
+  populateRoles();
+}
+
+function rigData(name){ return fleet.find(r => r.name === name); }
+
+function populateRoles() {
+  const rig = rigData($('rig').value);
+  const roleSel = $('role');
+  const running = (rig && rig.running) || [];
+  const towers = running.filter(r => /tower$/i.test(r.name));
+  let opts = '';
+  if (towers.length) opts += `<option value="${ALL_TOWERS}">— All towers (${towers.length}) —</option>`;
+  opts += running.map(r => `<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+  roleSel.innerHTML = opts || '<option value="">no roles running</option>';
+  resetPane();
+}
+
+function resetPane(){ seen = new Set(); $('pane').innerHTML = ''; }
+function clearPane(){ resetPane(); }
+
+function toggleFilter(){ meaningfulOnly = !meaningfulOnly; $('filterBtn').textContent = meaningfulOnly ? 'Meaningful' : 'All lines';
+  $('filterBtn').classList.toggle('on', meaningfulOnly); resetPane(); }
+function togglePause(){ paused = !paused; $('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+  $('pauseBtn').classList.toggle('on', paused); }
+
+function parseLines(text, site){
+  const out = [];
+  for (const raw of (text||'').split('\n')) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (SKIP.test(s)) continue;
+    if (meaningfulOnly && !MEANINGFUL.test(s)) continue;
+    let level='info', message=s, t=null;
+    try { const o = JSON.parse(s); level=(o.level||'info'); message=(o.message||s);
+      if (o.callsign) message += '  «'+o.callsign+'»'; if (o.text) message += ' — '+o.text;
+      t = o.time ? new Date(o.time) : null; } catch(e){}
+    out.push({ t, level, message, site, key: site+'|'+s });
+  }
+  return out;
+}
+
+async function fetchRole(rig, role){
+  try {
+    const r = await fetch(`/api/rig-log?rig=${encodeURIComponent(rig)}&role=${encodeURIComponent(role)}`, {cache:'no-store'});
+    if (!r.ok) return { text:'', err:`HTTP ${r.status}` };
+    return { text: await r.text() };
+  } catch(e){ return { text:'', err:e.message }; }
+}
+
+async function poll(){
+  if (paused) return;
+  const rig = $('rig').value, role = $('role').value;
+  if (!rig || !role) return;
+  let events = [];
+  if (role === ALL_TOWERS){
+    const rd = rigData(rig);
+    const towers = ((rd && rd.running) || []).filter(r => /tower$/i.test(r.name));
+    const results = await Promise.all(towers.map(t => fetchRole(rig, t.name)));
+    results.forEach((res, i) => { events = events.concat(parseLines(res.text, towers[i].name.replace(/ Tower$/i,''))); });
+  } else {
+    const res = await fetchRole(rig, role);
+    if (res.err) { $('status').textContent = 'fetch: '+res.err; }
+    events = parseLines(res.text, '');
+  }
+  // only unseen, chronological
+  const fresh = events.filter(e => !seen.has(e.key));
+  fresh.forEach(e => seen.add(e.key));
+  fresh.sort((a,b) => (a.t?.getTime()||0) - (b.t?.getTime()||0));
+  appendLines(fresh);
+  $('status').textContent = 'updated ' + new Date().toLocaleTimeString() + (paused?' · paused':'');
+}
+
+function appendLines(lines){
+  if (!lines.length) return;
+  const pane = $('pane');
+  const emptyEl = pane.querySelector('.empty'); if (emptyEl) emptyEl.remove();
+  const atBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 60;
+  const html = lines.map(e => {
+    const ts = e.t ? e.t.toLocaleTimeString() : '';
+    const lv = (e.level==='error'||e.level==='warn') ? e.level : 'info';
+    const site = e.site ? `<span class="site">${esc(e.site)}</span>` : '';
+    return `<div class="ln ${lv}"><span class="t">${ts}</span><span class="lv ${lv}">${lv}</span>${site}<span class="m">${esc(e.message)}</span></div>`;
+  }).join('');
+  pane.insertAdjacentHTML('beforeend', html);
+  // cap DOM
+  while (pane.children.length > 600) pane.removeChild(pane.firstChild);
+  if (atBottom) pane.scrollTop = pane.scrollHeight;
+}
+
+$('rig').addEventListener('change', populateRoles);
+$('role').addEventListener('change', resetPane);
+loadFleet().then(() => { poll(); });
+timer = setInterval(poll, 3000);
+setInterval(loadFleet, 30000); // refresh rig/role lists periodically
+</script>
+</body>
+</html>
