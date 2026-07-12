@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -97,6 +98,7 @@ func main() {
 	mux.HandleFunc("/", serveUI)
 	mux.HandleFunc("/fleet", serveFleetUI)
 	mux.HandleFunc("/api/fleet", handleFleet)
+	mux.HandleFunc("/api/version", handleVersion)
 	mux.HandleFunc("/api/roles", handleRoles)
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/start", handleStart)
@@ -303,6 +305,48 @@ func openaiProbe(timeout time.Duration) bool {
 	return resp.StatusCode < 500
 }
 
+// ── Build version ───────────────────────────────────────────────────────────
+
+// VersionInfo is the deployed build, read from the VCS stamps Go embeds when
+// `go build` runs inside the git tree (no ldflags needed). Lets the fleet
+// monitor show exactly which commit each rig is running.
+type VersionInfo struct {
+	Revision string `json:"revision"`
+	Short    string `json:"short"`
+	Time     string `json:"time"`
+	Modified bool   `json:"modified"`
+	Go       string `json:"go"`
+}
+
+func buildVersion() VersionInfo {
+	v := VersionInfo{Revision: "unknown", Short: "unknown"}
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return v
+	}
+	v.Go = bi.GoVersion
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			v.Revision = s.Value
+			if len(s.Value) >= 7 {
+				v.Short = s.Value[:7]
+			} else if s.Value != "" {
+				v.Short = s.Value
+			}
+		case "vcs.time":
+			v.Time = s.Value
+		case "vcs.modified":
+			v.Modified = s.Value == "true"
+		}
+	}
+	return v
+}
+
+func handleVersion(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, buildVersion())
+}
+
 // ── Fleet monitor ─────────────────────────────────────────────────────────────
 
 // Rig is one box in the vSFG-7 fleet the /fleet monitor polls.
@@ -349,11 +393,12 @@ type RigStatus struct {
 	Port       int       `json:"port"`
 	HostUp     bool      `json:"hostUp"`
 	LauncherUp bool      `json:"launcherUp"`
-	Health     *Health   `json:"health,omitempty"`
-	RolesTotal int       `json:"rolesTotal"`
-	Running    []Role    `json:"running,omitempty"`
-	Err        string    `json:"err,omitempty"`
-	At         time.Time `json:"at"`
+	Health     *Health      `json:"health,omitempty"`
+	Version    *VersionInfo `json:"version,omitempty"`
+	RolesTotal int          `json:"rolesTotal"`
+	Running    []Role       `json:"running,omitempty"`
+	Err        string       `json:"err,omitempty"`
+	At         time.Time    `json:"at"`
 }
 
 var fleetClient = &http.Client{Timeout: 2500 * time.Millisecond}
@@ -397,6 +442,10 @@ func pollRig(rig Rig) RigStatus {
 					rs.Running = append(rs.Running, r)
 				}
 			}
+		}
+		var ver VersionInfo
+		if err := fleetGetJSON(base+"/api/version", &ver); err == nil {
+			rs.Version = &ver
 		}
 	}
 	return rs

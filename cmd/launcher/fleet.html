@@ -31,6 +31,9 @@
   .badge.online { background: #23863633; color: var(--green); border: 1px solid #2386364d; }
   .badge.degraded { background: #9e6a0333; color: var(--amber); border: 1px solid #9e6a034d; }
   .badge.offline { background: #6e111133; color: var(--red); border: 1px solid #da36334d; }
+  .ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.72rem; color: var(--muted);
+    background: #ffffff0a; border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; }
+  .ver.dirty { color: var(--amber); border-color: #9e6a034d; }
   .rig-body { padding: 0.8rem 1rem; }
   .dots { display: flex; gap: 1.1rem; margin-bottom: 0.7rem; flex-wrap: wrap; }
   .dot { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--muted); }
@@ -104,7 +107,13 @@ function rigCard(r) {
   }
 
   const when = r.at ? new Date(r.at).toLocaleTimeString() : '';
-  body += `<div class="foot">polled ${when}</div>`;
+  let verFoot = '';
+  if (r.version && r.version.short && r.version.short !== 'unknown') {
+    const dirty = r.version.modified;
+    const vt = r.version.time ? ' · ' + new Date(r.version.time).toLocaleString() : '';
+    verFoot = ` · build <span class="ver ${dirty ? 'dirty' : ''}">${esc(r.version.short)}${dirty ? '*' : ''}</span>${dirty ? ' (modified)' : ''}<span class="rig-host">${vt}</span>`;
+  }
+  body += `<div class="foot">polled ${when}${verFoot}</div>`;
 
   return `<div class="rig">
     <div class="rig-head">
