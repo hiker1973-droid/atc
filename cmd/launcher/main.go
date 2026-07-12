@@ -93,6 +93,7 @@ func main() {
 
 	discoverRoles()
 	fleetRigs = parseFleet(*flagFleet)
+	cachedVersion = computeVersion()
 	go healthLoop()
 	go alertLoop()
 
@@ -328,6 +329,7 @@ func openaiProbe(timeout time.Duration) bool {
 // `go build` runs inside the git tree (no ldflags needed). Lets the fleet
 // monitor show exactly which commit each rig is running.
 type VersionInfo struct {
+	Version  string `json:"version"` // human: git-describe (e.g. "v1.5.0-18-g6603c5b")
 	Revision string `json:"revision"`
 	Short    string `json:"short"`
 	Time     string `json:"time"`
@@ -335,6 +337,11 @@ type VersionInfo struct {
 	Go       string `json:"go"`
 }
 
+// cachedVersion is computed once at startup (computeVersion shells out to git).
+var cachedVersion VersionInfo
+
+// buildVersion reads the VCS stamps Go embeds during `go build` — accurate to
+// the exact commit the running binary was built from.
 func buildVersion() VersionInfo {
 	v := VersionInfo{Revision: "unknown", Short: "unknown"}
 	bi, ok := debug.ReadBuildInfo()
@@ -360,8 +367,30 @@ func buildVersion() VersionInfo {
 	return v
 }
 
+// computeVersion resolves the binary's build commit to the nearest semver tag
+// via `git describe` (run in rootDir, the repo checkout). Gives a readable
+// version like "v1.5.0-18-g6603c5b"; falls back to the short SHA if git or the
+// tag isn't available. Describing the *build* revision (not HEAD) keeps this
+// honest even when the repo was pulled but not yet rebuilt.
+func computeVersion() VersionInfo {
+	v := buildVersion()
+	ref := v.Revision
+	if ref == "" || ref == "unknown" {
+		ref = "HEAD"
+	}
+	if out, err := exec.Command("git", "-C", rootDir, "describe", "--tags", "--always", ref).Output(); err == nil {
+		if d := strings.TrimSpace(string(out)); d != "" {
+			v.Version = d
+		}
+	}
+	if v.Version == "" {
+		v.Version = v.Short
+	}
+	return v
+}
+
 func handleVersion(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, buildVersion())
+	writeJSON(w, cachedVersion)
 }
 
 // ── Fault alerts ────────────────────────────────────────────────────────────

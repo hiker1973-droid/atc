@@ -130,18 +130,25 @@ function rigCard(r) {
 
   const when = r.at ? new Date(r.at).toLocaleTimeString() : '';
   let verFoot = '';
-  if (r.version && r.version.short && r.version.short !== 'unknown') {
-    const dirty = r.version.modified;
-    const vt = r.version.time ? ' · ' + new Date(r.version.time).toLocaleString() : '';
-    verFoot = ` · build <span class="ver ${dirty ? 'dirty' : ''}">${esc(r.version.short)}${dirty ? '*' : ''}</span>${dirty ? ' (modified)' : ''}<span class="rig-host">${vt}</span>`;
+  if (r.version && r.version.time) {
+    verFoot = ` · built ${new Date(r.version.time).toLocaleString()}`;
   }
   body += `<div class="foot">polled ${when}${verFoot}</div>`;
 
   const alertCls = (r.alerts && r.alerts.length) ? ' hasalert' : '';
+  let verChip = '';
+  if (r.version && (r.version.version || r.version.short) && r.version.short !== 'unknown') {
+    const label = r.version.version || r.version.short;
+    const dirty = r.version.modified;
+    verChip = `<span class="ver ${dirty ? 'dirty' : ''}" title="${esc(r.version.revision || '')}${dirty ? ' (built with local changes)' : ''}">${esc(label)}${dirty ? '*' : ''}</span>`;
+  } else if (r.launcherUp) {
+    verChip = `<span class="ver" title="launcher predates the /api/version endpoint — needs redeploy">no version</span>`;
+  }
   return `<div class="rig${alertCls}">
     <div class="rig-head">
       <span class="rig-name">${esc(r.name)}</span>
       <span class="rig-host">${esc(r.host)}:${r.port}</span>
+      ${verChip}
       <span class="badge ${cls}">${badge}</span>
     </div>
     <div class="rig-body">${body}</div>
