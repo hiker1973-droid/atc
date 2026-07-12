@@ -40,6 +40,18 @@ var towerDashboardPortByICAO = map[string]int{
 	"EDDL": 6026,
 	"EDDV": 6027,
 	"EDDH": 6028,
+	// Iraq towers (9 recovery bases, own range 6031-6039). Only the four with
+	// a dedicated ATIS station (ORAA/ORSH/ORBR/ORBD) are actually polled by an
+	// ATIS loop; the rest are tower-only but keep a port for the dashboard.
+	"ORAA": 6031,
+	"ORSH": 6032,
+	"ORBR": 6033,
+	"ORBI": 6034,
+	"ORBD": 6035,
+	"ORBB": 6036,
+	"ORER": 6037,
+	"ORKK": 6038,
+	"ORSU": 6039,
 }
 
 // fetchTowerRunway returns the active runway reported by the tower /status
@@ -494,6 +506,8 @@ func atisSecondLangForMap(m string) (string, bool) {
 		return "Russian", true
 	case "germany", "de", "coldwargermany", "cold-war-germany", "cwg":
 		return "German", true
+	case "iraq", "iq", "or":
+		return "Arabic", true
 	default: // Persian Gulf
 		return "Arabic", true
 	}
@@ -534,6 +548,20 @@ func atisStationsForMap(m string) []*atisStation {
 				ILS: "ILS 109.50 runway 09. ILS 108.70 runway 27.", Advisory: advisory},
 			{Name: "Hamburg ATIS", FreqMHz: 248.80, Voice: "ash", ICAO: "EDDH",
 				TACAN: "VOR 115.80.", ILS: "ILS 110.50 runway 05. ILS 111.50 runway 23.", Advisory: advisory},
+		}
+	case "iraq", "iq", "or":
+		// Only the four Iraq COMM1 fields with a dedicated ATIS frequency on
+		// the vSFG-7 presets card broadcast. The other five towers (Baghdad,
+		// Bashur, Erbil, Kirkuk, Sulaymaniyah) are tower-only — no ATIS.
+		return []*atisStation{
+			{Name: "Al Asad ATIS", FreqMHz: 230.100, Voice: "nova", ICAO: "ORAA",
+				TACAN: "TACAN 80X.", ILS: "ILS 108.90 runway 09. ILS 108.80 runway 27.", Advisory: advisory},
+			{Name: "Al Sahra ATIS", FreqMHz: 230.200, Voice: "shimmer", ICAO: "ORSH",
+				Advisory: advisory},
+			{Name: "Al Salam ATIS", FreqMHz: 230.300, Voice: "alloy", ICAO: "ORBR",
+				Advisory: advisory},
+			{Name: "Balad ATIS", FreqMHz: 230.700, Voice: "echo", ICAO: "ORBD",
+				TACAN: "VORTAC 114.60.", ILS: "ILS 109.90 runway 15. ILS 109.95 runway 33.", Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{

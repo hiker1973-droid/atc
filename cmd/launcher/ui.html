@@ -206,6 +206,12 @@
   .airfield-cell.EDFH { color: #ffa657; } .airfield-cell.EDDF { color: #d2a8ff; }
   .airfield-cell.EDDK { color: #f778ba; } .airfield-cell.EDDL { color: #ffdf5d; }
   .airfield-cell.EDDV { color: #56d4dd; } .airfield-cell.EDDH { color: #ff9492; }
+  /* Iraq airfield accent colours (9 recovery bases) */
+  .airfield-cell.ORAA { color: #7ee787; } .airfield-cell.ORSH { color: #79c0ff; }
+  .airfield-cell.ORBR { color: #ffa657; } .airfield-cell.ORBI { color: #d2a8ff; }
+  .airfield-cell.ORBD { color: #f778ba; } .airfield-cell.ORBB { color: #ffdf5d; }
+  .airfield-cell.ORER { color: #56d4dd; } .airfield-cell.ORKK { color: #ff9492; }
+  .airfield-cell.ORSU { color: #a5d6ff; }
 </style>
 </head>
 <body>
@@ -220,6 +226,7 @@
     <button class="theatre-btn active" data-theatre="pg" onclick="switchTheatre('pg')">Persian Gulf</button>
     <button class="theatre-btn" data-theatre="caucasus" onclick="switchTheatre('caucasus')">Caucasus</button>
     <button class="theatre-btn" data-theatre="germany" onclick="switchTheatre('germany')">Germany</button>
+    <button class="theatre-btn" data-theatre="iraq" onclick="switchTheatre('iraq')">Iraq</button>
     <span class="region-sep"></span>
     <button class="region-btn start" id="startRegionBtn" onclick="startRegion()" title="Start every role in the selected theatre">▶ Start</button>
     <button class="region-btn atis" id="startAtisBtn" onclick="startAtis()" title="Start only the ATIS set for the selected theatre">🔊 ATIS</button>
@@ -389,6 +396,22 @@ const THEATRES = {
     ],
     // Land-based theatre — no carrier roles; target the eight towers only.
     wxPorts: [6021, 6022, 6023, 6024, 6025, 6026, 6027, 6028],
+  },
+  iraq: {
+    label: 'Iraq', primaryLabel: 'Al Asad (ORAA)', atisRole: 'vSFG-7 ATIS (Iraq)',
+    towers: [
+      { icao: 'ORAA', label: 'Al Asad',      freq: '363.700', port: 6031, role: 'Al Asad Tower' },
+      { icao: 'ORSH', label: 'Al Sahra',     freq: '250.150', port: 6032, role: 'Al Sahra Tower' },
+      { icao: 'ORBR', label: 'Al Salam',     freq: '250.250', port: 6033, role: 'Al Salam Tower' },
+      { icao: 'ORBI', label: 'Baghdad',      freq: '250.300', port: 6034, role: 'Baghdad Tower' },
+      { icao: 'ORBD', label: 'Balad',        freq: '250.550', port: 6035, role: 'Balad Tower' },
+      { icao: 'ORBB', label: 'Bashur',       freq: '250.400', port: 6036, role: 'Bashur Tower' },
+      { icao: 'ORER', label: 'Erbil',        freq: '250.350', port: 6037, role: 'Erbil Tower' },
+      { icao: 'ORKK', label: 'Kirkuk',       freq: '250.050', port: 6038, role: 'Kirkuk Tower' },
+      { icao: 'ORSU', label: 'Sulaymaniyah', freq: '250.500', port: 6039, role: 'Sulaymaniyah Tower' },
+    ],
+    // Land-based theatre — no carrier roles; target the nine towers only.
+    wxPorts: [6031, 6032, 6033, 6034, 6035, 6036, 6037, 6038, 6039],
   },
 };
 let currentTheatre = 'pg';
