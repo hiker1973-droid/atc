@@ -15,7 +15,7 @@ Established **2026-05-01** after switching from `tts-1` → `gpt-4o-mini-tts`. R
 |---|---:|---:|---|
 | Tower TX (OMDM/OMAM/OMAL combined) | 86 | 7,561 | avg ~88 chars per TX |
 | ATIS regenerations (5 stations) | 51 | ~20,400 | est. 400 chars / station; only fires on weather change or first-run |
-| TTS pre-warm (16 phrases per startup × ~30 chars) | varies | ~480 / startup / role | restart-driven, roughly 3 startups today |
+| ~~TTS pre-warm~~ | — | 0 | Removed. It synthesized ~30 bare bodies per startup (doubled under voice rotation) that the cache could never serve, since every tower TX is callsign-led. Pure waste; now zero. |
 | **7-day total** | — | **~30,000 chars** | ~4,300 chars/day equivalent |
 
 ## Pricing reference (verify on your OpenAI billing dashboard)
@@ -39,7 +39,7 @@ Using ~$12/M chars for `gpt-4o-mini-tts`:
 ## Cost levers (in order of leverage, if you ever want to reduce)
 
 1. **TTS in-memory cache** (`globalTTSCache`, 200-item LRU in `cmd/atc/main.go`) — most tower TX hit cache. Bumping to 1000 items would catch more re-uses; memory cost ~25 MB.
-2. **Disk-persist the cache between restarts** — the pre-warm cost (16 phrases × N tower restarts) is purely amortizable. ATIS already does this; tower doesn't.
+2. **Disk-persist the cache between restarts** — tower re-synthesizes its whole working set after every restart. ATIS already persists; tower doesn't. (This used to also cover the pre-warm cost, which is now zero — the pre-warm was removed as unreachable.)
 3. **ATIS `weatherKey()` rounding** — if wind/altimeter rounding is too fine, small fluctuations re-regenerate ATIS. Currently fine for our weather model; revisit if regen count balloons.
 
 ## Revisit log

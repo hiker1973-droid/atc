@@ -70,7 +70,7 @@ tail -F C:\SkyeyeATC\logs\atc-omdm.log C:\SkyeyeATC\logs\atc-omam.log C:\SkyeyeA
 | `"SRS TCP failed"` looping | SRS server down or wrong port | Restart SRS server. Verify role's bat has correct port. |
 | `"ExternalAudio file error"` | DCS-SR-ExternalAudio.exe failed mid-playback | Usually transient (system load). Multiple in 60s = ATIS overlap; stagger broadcasts more. Exit code `0xc000013a` = DLL init failed (likely concurrent ATIS broadcasts on adjacent freqs) |
 | `"Whisper API error: ..."` | OpenAI returned an error | Check `OPENAI_API_KEY` and OpenAI status. 401 = bad key. 429 = rate limit |
-| `"TTS prewarm failed"` | OpenAI TTS unreachable at startup | If transient, role still works — TTS retries inline. If persistent, check OpenAI key + connectivity |
+| `"TTS synthesis failed — dropping TX"` | OpenAI TTS unreachable | Single TX is lost; pilot will repeat. If persistent, check OpenAI key + connectivity |
 
 ---
 

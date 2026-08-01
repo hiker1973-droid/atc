@@ -247,21 +247,10 @@ func (c *ATCComposer) PushingCommandAck(callsign string) string {
 	})
 }
 
-// DistanceInitialAck acknowledges inbound at distance — 3 variations.
-// Carries the 3-10-12 pattern-altitude / direction-of-traffic elements and the
-// report-initial request, same as InboundAck.
-func (c *ATCComposer) DistanceInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, breakDirection string, altimeterInHg float64, trafficAhead int) string {
-	rwy := spellRunway(activeRunway)
-	seq := numberWord(trafficAhead + 1)
-	alt := formatAltimeter(altimeterInHg)
-	pattern := patternClause(patternAltFt, breakDirection)
-	traffic := fmt.Sprintf("Number %s.", seq)
-	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, alt, pattern, traffic),
-		fmt.Sprintf("%s, %s, runway %s in use, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, alt, pattern, traffic),
-		fmt.Sprintf("%s, %s, roger, runway %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, alt, pattern, traffic),
-	})
-}
+// DistanceInitialAck removed — no controller path called it. The ≤15 NM
+// distance-initial call is served by sequencedArrivalResponse, which routes to
+// InboundAck or SequencedInitialAck.
+
 
 // OverheadAck sequences a pilot overhead — 3 variations.
 func (c *ATCComposer) OverheadAck(callsign, activeRunway, breakDirection string, trafficAhead int) string {
@@ -683,21 +672,10 @@ func (c *ATCComposer) AltitudeClearance(callsign, activeRunway string, altimeter
 	})
 }
 
-// SequencedClearedToLand is issued when the previous aircraft has just vacated — 3 var.
-// Same 3-10-5 element order and wheels-down rule as ClearedToLand.
-func (c *ATCComposer) SequencedClearedToLand(callsign, activeRunway string, windFromMag, windKts float64, wheelsCheck bool) string {
-	rwy := spellRunway(activeRunway)
-	wind := formatWind(windFromMag, windKts)
-	gear := ""
-	if wheelsCheck {
-		gear = " check wheels down,"
-	}
-	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s clear, wind %s,%s cleared to land.", callsign, c.towerCallsign, rwy, wind, gear),
-		fmt.Sprintf("%s, %s, runway %s is clear, wind %s,%s cleared to land.", callsign, c.towerCallsign, rwy, wind, gear),
-		fmt.Sprintf("%s, runway %s clear, wind %s,%s cleared to land.", callsign, rwy, wind, gear),
-	})
-}
+// SequencedClearedToLand removed — no controller path called it. The
+// runway-just-vacated case falls through to ClearedToLand, which now carries
+// the wind and the wheels-down check anyway.
+
 
 // CommandFenceIn — 3 aggressive variations per fuel state scenario.
 func (c *ATCComposer) CommandFenceIn(callsign string, fuelState float64) string {
@@ -1225,27 +1203,9 @@ func (c *ATCComposer) IMCContinueApproach(callsign string) string {
 	})
 }
 
-// NightDistanceInitialAck acknowledges inbound at distance for night ops — 3 var.
-func (c *ATCComposer) IFRDistanceInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, altimeterInHg float64, trafficAhead int) string {
-	rwy := spellRunway(activeRunway)
-	ang := numberWord(approachAngels(distNm, patternAltFt))
-	alt := formatAltimeter(altimeterInHg)
-	dist := numberWord(distNm)
-	traffic := ""
-	switch trafficAhead {
-	case 0:
-		traffic = " No traffic ahead."
-	case 1:
-		traffic = " One aircraft in the pattern ahead of you."
-	default:
-		traffic = fmt.Sprintf(" %s aircraft in the pattern ahead of you.", numberWord(trafficAhead))
-	}
-	return pick([]string{
-		fmt.Sprintf("%s, %s, got you at %s mile initial, night ops in effect, runway lights are on, proceed angels %s, altimeter %s, enter pattern runway %s.%s", callsign, c.towerCallsign, dist, ang, alt, rwy, traffic),
-		fmt.Sprintf("%s, %s, %s mile initial, night conditions, field is lit, angels %s, altimeter %s, runway %s active.%s", callsign, c.towerCallsign, dist, ang, alt, rwy, traffic),
-		fmt.Sprintf("%s, %s, roger %s mile initial, night ops, runway %s lights on, altimeter %s, proceed angels %s.%s", callsign, c.towerCallsign, dist, rwy, alt, ang, traffic),
-	})
-}
+// IFRDistanceInitialAck removed — no controller path called it. The IFR/IMC
+// arrival is served by IMCDistanceInitialAck, which redirects to a straight-in.
+
 
 // IMCDistanceInitialAck redirects inbound to straight-in from initial call — 3 var.
 func (c *ATCComposer) IMCDistanceInitialAck(callsign string, distNm int, activeRunway string, altimeterInHg float64, trafficAhead int) string {

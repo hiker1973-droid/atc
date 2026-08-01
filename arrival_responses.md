@@ -35,12 +35,13 @@ text, because the text goes straight to TTS. A bare numeral like `270` is voiced
 2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is active, continue inbound, call {N/2} mile final.[ Number {SEQ} in sequence.]`
 3. `{CALLSIGN}, {TOWER}, copy inbound, plan runway {RUNWAY}, report {N/2} miles.[ Number {SEQ} in sequence.]`
 
-**Day VMC variants** (`DistanceInitialAck`):
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. Number {SEQ}. Report initial.`
-2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} in use, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. Number {SEQ}. Report initial.`
-3. `{CALLSIGN}, {TOWER}, roger, runway {RUNWAY}, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. Number {SEQ}. Report initial.`
+**Day VMC variants** — served by `InboundAck` via
+`ATCController.sequencedArrivalResponse`, which handles both the ≤15 NM distance
+initial here and the general inbound in §2. The exact wording is under §2; a
+`DistanceInitialAck` composer used to be documented here but no controller path
+ever called it, and it has been removed.
 
-**Sequenced (with traffic ahead, Tacview-aware)** — extra `{LEAD_CALLSIGN}`, `{LEAD_DIST}`:
+**Sequenced (with traffic ahead, Tacview-aware)** — `SequencedInitialAck`, extra `{LEAD_CALLSIGN}`, `{LEAD_DIST}`:
 1. `{CALLSIGN}, {TOWER}, number {SEQ}, follow {LEAD_CALLSIGN}, {LEAD_DIST} miles in trail, runway {RUNWAY}, pattern altitude {PATTERN_ALT}, {TURNS}, report initial.`
 2. `{CALLSIGN}, {TOWER}, number {SEQ}, traffic is {LEAD_CALLSIGN}, {LEAD_DIST} miles ahead, runway {RUNWAY}, pattern altitude {PATTERN_ALT}, {TURNS}, report initial.`
 3. `{CALLSIGN}, number {SEQ}, follow {LEAD_CALLSIGN}, runway {RUNWAY}, pattern altitude {PATTERN_ALT}, {TURNS}, report initial.`
@@ -52,12 +53,10 @@ zero seven zero at eight, pattern altitude six thousand, report initial."* Both
 values were already in the airfield config; the composer drops whichever clause
 the config leaves unset (`patternClause`).
 
-**Night/IFR variants:**
-1. `{CALLSIGN}, {TOWER}, got you at {DIST} mile initial, night ops in effect, runway lights are on, proceed angels {ANGELS}, altimeter {ALTIMETER}, enter pattern runway {RUNWAY}.{TRAFFIC}`
-2. `{CALLSIGN}, {TOWER}, {DIST} mile initial, night conditions, field is lit, angels {ANGELS}, altimeter {ALTIMETER}, runway {RUNWAY} active.{TRAFFIC}`
-3. `{CALLSIGN}, {TOWER}, roger {DIST} mile initial, night ops, runway {RUNWAY} lights on, altimeter {ALTIMETER}, proceed angels {ANGELS}.{TRAFFIC}`
+**Night/IFR variants:** removed. These lived in `IFRDistanceInitialAck`, which
+no controller path called — the IFR arrival goes through the IMC redirect below.
 
-**IMC redirect variants** (when ceiling too low for VFR pattern):
+**IMC redirect variants** (`IMCDistanceInitialAck`, when ceiling too low for VFR pattern):
 1. `{CALLSIGN}, {TOWER}, got you at {DIST} miles, IMC conditions in effect, straight-in only runway {RUNWAY}, altimeter {ALTIMETER}[, number {SEQ}], report ten mile final.`
 2. `{CALLSIGN}, {TOWER}, {DIST} miles, IMC in effect, execute straight-in runway {RUNWAY}, altimeter {ALTIMETER}[, number {SEQ}], call ten mile final.`
 3. `{CALLSIGN}, {TOWER}, roger {DIST} miles, no pattern available IMC, straight-in runway {RUNWAY}[, number {SEQ}], altimeter {ALTIMETER}, report ten mile final.`
@@ -201,10 +200,9 @@ clearance is the last thing spoken, so it can't get buried. The optional
 Wind is now spoken — the composer had always received `windFromMag`/`windKts`
 and dropped them.
 
-**Sequenced (previous aircraft just vacated)** — `SequencedClearedToLand`, composed but not currently wired to a controller path:
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY} clear, wind {WIND},[ check wheels down,] cleared to land.`
-2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is clear, wind {WIND},[ check wheels down,] cleared to land.`
-3. `{CALLSIGN}, runway {RUNWAY} clear, wind {WIND},[ check wheels down,] cleared to land.`
+**Sequenced (previous aircraft just vacated):** removed. `SequencedClearedToLand`
+was never wired to a controller path; that case falls through to the variants
+above, which carry the wind and the wheels-down check anyway.
 
 ---
 

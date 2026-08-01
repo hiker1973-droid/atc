@@ -159,7 +159,7 @@ Training 1 is prod. During an active mission, prefer bouncing one role at a time
 | Symptom | Likely cause |
 |---|---|
 | `SRS TCP failed` repeating in logs | SRS not on `:5008`, or wrong host in `start_*.bat` |
-| `TTS prewarm failed` / `OpenAI 401` | `OPENAI_API_KEY` missing in the shell that launched `atc.exe` |
+| `TTS synthesis failed` / `OpenAI 401` | `OPENAI_API_KEY` missing in the shell that launched `atc.exe` |
 | `Whisper returned empty transcription` | OpenAI rate limit or pilot mic muted — usually self-heals |
 | `ExternalAudio file error` | `ffmpeg` not on PATH, or the EAM external-audio path in atc.exe broken |
 | ATIS skipping cycles | Audio longer than 45s — station's broadcasting mutex is blocking. Drop interval back toward 60–90s if you see "broadcast already in progress" warnings |

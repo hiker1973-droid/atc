@@ -82,5 +82,9 @@ runs after the radio effect on every TX.
 can share a voice and rate but sound different, so leaving instructions out of
 the key would let one role serve the other a cached MP3 in the wrong style.
 
-`prewarmTTSCache` builds the same profile the tower hot path uses — if the two
-ever drift, every prewarmed entry lands under a key that is never read.
+There is no prewarm. The old `prewarmTTSCache` synthesized ~30 bare response
+bodies at startup (twice, with rotation on), but every tower TX is callsign-led,
+so no prewarmed entry could ever be read — it cost ~60 TTS calls and ~12s of
+rate-limit sleep per tower start for a guaranteed zero hit rate. Making it work
+needs the composer to stitch a cached body onto a per-callsign+tower prefix; the
+phrase list is in git history if that gets built.

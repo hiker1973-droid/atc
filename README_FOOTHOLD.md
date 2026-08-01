@@ -159,7 +159,7 @@ In `serverSettings.cfg` for the SRS instance on `:5002`:
 |---|---|
 | `ERROR: <VAR> env var not set` at bat startup | One of the four env vars (`OPENAI_API_KEY`, `SRS_EAM`, `SKYEYE_SRS`, `SKYEYE_TACVIEW`) wasn't set, or the bat was launched in a shell that pre-dates the `setx`. Open a fresh shell. |
 | `SRS TCP failed` looping | SRS not listening on the address in `$SKYEYE_SRS`, or value typo. Re-check with `netstat -ano | findstr :5002` |
-| `TTS prewarm failed` / `OpenAI 401` | `OPENAI_API_KEY` missing or invalid in the shell that launched atc.exe |
+| `TTS synthesis failed` / `OpenAI 401` | `OPENAI_API_KEY` missing or invalid in the shell that launched atc.exe |
 | `Whisper returned empty transcription` | OpenAI rate limit or pilot mic muted — usually self-heals |
 | `ExternalAudio file error` | `ffmpeg` not on PATH, or DCS-SR-ExternalAudio.exe path wrong |
 | Tower hands off to Command on a freq nobody is on | Expected — Tower's handoff line is data-driven from `pkg/airfield/*.go` `HandoffFreqMHz` (currently `282.0`). Either ignore it on Foothold (Command isn't deployed) or edit `HandoffFreqMHz` / `HandoffPreset` to suit your op |

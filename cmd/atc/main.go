@@ -851,13 +851,6 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Info().Int("port", flagDashboardPort).Msg("Dashboard server started")
 	}
 
-	// Pre-warm TTS cache in background — don't block startup. Warm both
-	// rotation voices so a flip mid-session doesn't cause a cold-cache spike.
-	go prewarmTTSCache(ctx, apiKey, flagTTSVoice, af.RunwayPairs[0].Primary.Designator)
-	if flagVoiceRotateHrs > 0 && flagTTSVoiceMale != flagTTSVoice {
-		go prewarmTTSCache(ctx, apiKey, flagTTSVoiceMale, af.RunwayPairs[0].Primary.Designator)
-	}
-
 	// Warn if Tacview not connected after startup
 	go func() {
 		time.Sleep(30 * time.Second)
@@ -1538,80 +1531,21 @@ func (c *ttsCache) stats() (hits, misses int64) {
 	return atomic.LoadInt64(&c.hits), atomic.LoadInt64(&c.misses)
 }
 
-// prewarmTTSCache pre-generates MP3s for the most common ATC responses.
-// Called once at startup — saves API calls for high-frequency phrases.
-func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
-	rwy := runway // raw designator e.g. "31L"
-	phrases := []string{
-		// Pattern calls
-		fmt.Sprintf("Number one, report downwind."),
-		fmt.Sprintf("Number one, report base."),
-		fmt.Sprintf("Number one, report final."),
-		fmt.Sprintf("Number two, report downwind."),
-		fmt.Sprintf("Number two, report base."),
-		fmt.Sprintf("Number two, report final."),
-		fmt.Sprintf("Number one."),
-		fmt.Sprintf("Number two."),
-		// Takeoff/landing
-		fmt.Sprintf("Runway %s, cleared for takeoff.", rwy),
-		fmt.Sprintf("Runway %s, cleared to land.", rwy),
-		fmt.Sprintf("Clear, taxi to parking."),
-		fmt.Sprintf("Frequency change approved."),
-		// Radio check
-		"Loud and clear.",
-		"Reading you loud and clear.",
-		"Five by five, go ahead.",
-		// Fallback / unable-to-understand variants (all 3 from composer.UnableToUnderstand)
-		"Say again your request.",
-		"Unable to copy, say again.",
-		"You were broken, say again.",
-		// Departure release bodies (short form: "proceed to angels {N}, contact tower at seven DME.")
-		// Angels range is 3-6 — kept in sync with composer.DepartureRelease.
-		"Proceed to angels three, contact tower at seven DME.",
-		"Proceed to angels four, contact tower at seven DME.",
-		"Proceed to angels five, contact tower at seven DME.",
-		"Proceed to angels six, contact tower at seven DME.",
-		"Climb to angels three, contact tower at seven DME.",
-		"Climb to angels four, contact tower at seven DME.",
-		"Climb to angels five, contact tower at seven DME.",
-		"Climb to angels six, contact tower at seven DME.",
-		"Angels three, contact tower at seven DME.",
-		"Angels four, contact tower at seven DME.",
-		"Angels five, contact tower at seven DME.",
-		"Angels six, contact tower at seven DME.",
-	}
-	// NOTE: prewarm cache is keyed by exact text. Today the hot-path TX is
-	// "{callsign}, {tower}, {body}." so these bare-body entries only hit if
-	// the bot ever transmits them without the prefix (it doesn't). To make
-	// prewarm actually help, the composer needs to stitch a cached body MP3
-	// with a per-callsign+tower prefix MP3 — flagged for follow-up.
-	// Must match the profile the tower hot path uses, or every prewarmed
-	// entry lands under a different cache key and never gets hit.
-	prof := voiceProfile{voice, flagTTSSpeed, flagVoiceStyleTower}
-	log.Info().Int("phrases", len(phrases)).Msg("pre-warming TTS cache")
-	warmed := 0
-	for _, phrase := range phrases {
-		if _, ok := globalTTSCache.get(prof, phrase); ok {
-			continue
-		}
-		mp3, err := synthesizeSpeechAPI(ctx, apiKey, phrase, prof)
-		if err != nil {
-			log.Warn().Err(err).Str("phrase", phrase).Msg("TTS prewarm failed")
-			continue
-		}
-		globalTTSCache.set(prof, phrase, mp3)
-		warmed++
-		// Small delay to avoid rate limiting
-		time.Sleep(200 * time.Millisecond)
-	}
-	log.Info().Int("warmed", warmed).Msg("TTS cache ready")
-}
+// TTS cache prewarm was removed. It synthesized ~30 bare response bodies at
+// startup (twice, when voice rotation was on), but globalTTSCache is keyed by
+// exact text and every tower TX is callsign-led — "{callsign}, {tower}, {body}."
+// — so no prewarmed entry could ever be read. It cost ~60 TTS calls and ~12s of
+// rate-limit sleep per tower start for a guaranteed zero hit rate.
+//
+// To make prewarming actually work the composer would have to stitch a cached
+// body MP3 onto a per-callsign+tower prefix MP3, which is the follow-up the old
+// implementation flagged and never did. Recover the phrase list from git history
+// if that gets built.
 
 // currentTowerVoice picks the tower TTS voice based on a fixed time bucket so
 // pilots hear an alternating female/male controller without operator action.
-// Bucket length is flagVoiceRotateHrs; 0 disables rotation (always returns
-// flagTTSVoice). Both voices are pre-warmed at startup so a flip doesn't
-// produce a cold-cache TX latency spike.
+// Bucket length is flagVoiceRotateHrs; 0 pins the voice to the airfield instead
+// (see below).
 func currentTowerVoice() string {
 	if flagVoiceRotateHrs <= 0 {
 		// Rotation off — pin the voice to the airfield instead of always
