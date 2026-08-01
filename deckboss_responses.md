@@ -95,8 +95,11 @@ Currently **silent** — no transmission, just a debug log. Pilot is going. If t
 
 Pilot's optional airborne callout. In the standard flow the cat slot was already cleared by §2a immediately after shoot, so this is just an ack — no slot management needed. The ack TXes to the launching pilot only; next-up was already pulled at §2a.
 
-**Ack to launching pilot** (always fires):
-- `{CALLSIGN}, Deckboss, copy, good hunting.`
+**Ack to launching pilot** (always fires) — now carries the departure handoff to
+Command, since Deckboss owns the deck and not the departing aircraft. See
+`handoff_responses.md` §3.
+- `{CALLSIGN}, Deckboss, contact {HANDOFF}, {FREQ}, {PRESET}. Good hunting.` (+2 variants)
+- Falls back to `{CALLSIGN}, Deckboss, copy, good hunting.` when `--handoff-command-freq` is `0`.
 
 The ack deliberately omits the word "airborne" so the SRS echo of our own TX doesn't re-trigger §4 in a loop. (§4 skips the address-led guard since pilots don't address Deckboss on quick airborne calls — the self-trigger risk is mitigated by avoiding the trigger word in our response.)
 

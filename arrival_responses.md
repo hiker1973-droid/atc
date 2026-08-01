@@ -10,10 +10,17 @@ Triggers from `pkg/controller/controller.go`. Responses from `pkg/composer/compo
 - `{CALLSIGN}` — pilot callsign (e.g. `Raider 032`)
 - `{TOWER}` — tower callsign (`Al Minhad Tower`, `Al Dhafra Tower`, `Al Ain Tower`)
 - `{RUNWAY}` — active runway, spelled (e.g. `two seven`)
-- `{WIND}` — `[direction] at [knots]` or `calm` if <3 kts
-- `{ALTIMETER}` — `[whole] point [hundredths]`
+- `{WIND}` — direction to the nearest ten degrees as three spelled digits, `at`, then the speed as spelled digits — e.g. `two seven zero at one five`, `zero seven zero at eight`. `calm` below 3 kts. The unit is **not** spoken (FAA JO 7110.65 2-10-1), and 360 stays `three six zero`.
+- `{ALTIMETER}` — four spelled digits, **no decimal point** — `two niner niner two`, `three zero zero one` (7110.65 2-7-2)
+- `{PATTERN_ALT}` — `Airfield.PatternAltFt` spoken per AIM 4-2-9 — `one thousand five hundred`, `two thousand`
+- `{TURNS}` — direction of traffic from `Airfield.BreakDirections[activeRunway]` — `left turns` / `right turns`
 - `{SEQ}` — sequence number spelled (`one`, `two`, `three`...)
 - `{MODEX}` — last-word of callsign (e.g. `032` from `Raider 032`)
+
+**Spoken-number rule:** every number that a controller reads as separate digits
+(wind, altimeter, headings, radials, frequencies) is spelled out in the response
+text, because the text goes straight to TTS. A bare numeral like `270` is voiced
+"two hundred seventy". `pkg/composer/phraseology_test.go` asserts this.
 
 ---
 
@@ -29,14 +36,21 @@ Triggers from `pkg/controller/controller.go`. Responses from `pkg/composer/compo
 3. `{CALLSIGN}, {TOWER}, copy inbound, plan runway {RUNWAY}, report {N/2} miles.[ Number {SEQ} in sequence.]`
 
 **Day VMC variants** (`DistanceInitialAck`):
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, Number {SEQ}.`
-2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} in use, Number {SEQ}.`
-3. `{CALLSIGN}, {TOWER}, roger, runway {RUNWAY}, Number {SEQ}.`
+1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. Number {SEQ}. Report initial.`
+2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} in use, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. Number {SEQ}. Report initial.`
+3. `{CALLSIGN}, {TOWER}, roger, runway {RUNWAY}, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. Number {SEQ}. Report initial.`
 
 **Sequenced (with traffic ahead, Tacview-aware)** — extra `{LEAD_CALLSIGN}`, `{LEAD_DIST}`:
-1. `{CALLSIGN}, {TOWER}, number {SEQ}, follow {LEAD_CALLSIGN}, {LEAD_DIST} miles in trail, runway {RUNWAY}.`
-2. `{CALLSIGN}, {TOWER}, number {SEQ}, traffic is {LEAD_CALLSIGN}, {LEAD_DIST} miles ahead, runway {RUNWAY}.`
-3. `{CALLSIGN}, number {SEQ}, follow {LEAD_CALLSIGN}, runway {RUNWAY}.`
+1. `{CALLSIGN}, {TOWER}, number {SEQ}, follow {LEAD_CALLSIGN}, {LEAD_DIST} miles in trail, runway {RUNWAY}, pattern altitude {PATTERN_ALT}, {TURNS}, report initial.`
+2. `{CALLSIGN}, {TOWER}, number {SEQ}, traffic is {LEAD_CALLSIGN}, {LEAD_DIST} miles ahead, runway {RUNWAY}, pattern altitude {PATTERN_ALT}, {TURNS}, report initial.`
+3. `{CALLSIGN}, number {SEQ}, follow {LEAD_CALLSIGN}, runway {RUNWAY}, pattern altitude {PATTERN_ALT}, {TURNS}, report initial.`
+
+**Why pattern altitude and turns:** FAA JO 7110.65 3-10-12 (Overhead Maneuver)
+requires the arrival call to carry pattern altitude and direction of traffic,
+then request a report at initial — *"Air Force Three Six Eight, Runway Six, wind
+zero seven zero at eight, pattern altitude six thousand, report initial."* Both
+values were already in the airfield config; the composer drops whichever clause
+the config leaves unset (`patternClause`).
 
 **Night/IFR variants:**
 1. `{CALLSIGN}, {TOWER}, got you at {DIST} mile initial, night ops in effect, runway lights are on, proceed angels {ANGELS}, altimeter {ALTIMETER}, enter pattern runway {RUNWAY}.{TRAFFIC}`
@@ -54,10 +68,14 @@ Triggers from `pkg/controller/controller.go`. Responses from `pkg/composer/compo
 
 **Triggers:** `inbound` (without `initial` / `mile`)
 
-**Variants:**
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, wind {WIND}, altimeter {ALTIMETER}. {TRAFFIC} Report final.`
-2. `{CALLSIGN}, {TOWER}, altimeter {ALTIMETER}, active runway {RUNWAY}, wind {WIND}. {TRAFFIC} Report final.`
-3. `{CALLSIGN}, {TOWER}, field information: runway {RUNWAY}, wind {WIND}, altimeter {ALTIMETER}. {TRAFFIC} Call final.`
+**Variants** (`InboundAck` — this is the live path for both §1 ≤15 nm and §2):
+1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, wind {WIND}, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. {TRAFFIC} Report initial.`
+2. `{CALLSIGN}, {TOWER}, altimeter {ALTIMETER}, active runway {RUNWAY}, wind {WIND}, pattern altitude {PATTERN_ALT}, {TURNS}. {TRAFFIC} Report initial.`
+3. `{CALLSIGN}, {TOWER}, field information: runway {RUNWAY}, wind {WIND}, altimeter {ALTIMETER}, pattern altitude {PATTERN_ALT}, {TURNS}. {TRAFFIC} Report initial.`
+
+Report point is **initial**, not final — a VFR arrival here is flying the
+overhead pattern (initial → break → downwind → base → final), and `initial`
+is already a live trigger (§3).
 
 ---
 
@@ -136,15 +154,33 @@ Variants:
 
 **Triggers:** `base` · `turning base` · `right base` · `left base` · `base final`
 
-**Day variants** (use modex only — terse, realistic):
+**Variants** (use modex only — terse, realistic):
 1. `{MODEX}, affirmative.`
 2. `{MODEX}, {TOWER}, affirmative.`
 3. `Affirmative, {MODEX}.`
 
-**Night variants** (with gear reminder):
-1. `{MODEX}, affirmative, check gear down.`
-2. `{MODEX}, {TOWER}, affirmative, gear check.`
-3. `Affirmative, {MODEX}, confirm gear down.`
+**With the wheels-down check** (see below):
+1. `{MODEX}, affirmative, check wheels down.`
+2. `{MODEX}, {TOWER}, affirmative, check wheels down.`
+3. `Affirmative, {MODEX}, check wheels down.`
+
+### Wheels-down check
+
+USA/USAF/USN controllers must issue the check on **every** approach — day and
+night — unless the pilot has already reported gear down, and the mandated
+wording is `CHECK WHEELS DOWN`. This was previously a night-only variant
+(`NightBaseAck` / `NightClearedToLand`) that no controller path ever called, so
+no check went out at all; those two composer methods are deleted.
+
+The base leg is where it fires. `ATCController.oweWheelsCheck` decides:
+
+- Pilot's transmission contains a gear report (`gear down`, `three green`,
+  `wheels down`, `dirty up`, …) → suppressed, and the approach is marked checked
+  so a later call doesn't re-issue it.
+- Already issued on this approach (`AircraftState.WheelsChecked`) → suppressed.
+- Otherwise → issued, and the approach is marked.
+
+`EnqueueLanding` clears the flag, so a go-around and re-entry gets a fresh check.
 
 ---
 
@@ -152,20 +188,23 @@ Variants:
 
 **Triggers:** `on final` · `final` · `request landing` · `cleared to land`
 
-**Day variants:**
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, cleared to land.`
-2. `{CALLSIGN}, {TOWER}, cleared to land runway {RUNWAY}.`
-3. `{CALLSIGN}, runway {RUNWAY}, cleared to land.`
+Element order follows 7110.65 3-10-5: `RUNWAY (number), WIND (direction and
+velocity), CLEARED TO LAND` — the runway always precedes the clearance and the
+clearance is the last thing spoken, so it can't get buried. The optional
+`check wheels down` sits before it when owed (see §6).
 
-**Night variants** (with gear check):
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, check gear, cleared to land.`
-2. `{CALLSIGN}, {TOWER}, gear check, runway {RUNWAY}, cleared to land.`
-3. `{CALLSIGN}, gear down, runway {RUNWAY}, cleared to land.`
+**Variants** (`ClearedToLand`):
+1. `{CALLSIGN}, {TOWER}, runway {RUNWAY}, wind {WIND},[ check wheels down,] cleared to land.`
+2. `{CALLSIGN}, {TOWER}, wind {WIND}, runway {RUNWAY},[ check wheels down,] cleared to land.`
+3. `{CALLSIGN}, runway {RUNWAY}, wind {WIND},[ check wheels down,] cleared to land.`
 
-**Sequenced (previous aircraft just vacated):**
-1. `{CALLSIGN}, {TOWER}, runway {RUNWAY} clear, cleared to land.`
-2. `{CALLSIGN}, {TOWER}, runway clear, cleared to land runway {RUNWAY}.`
-3. `{CALLSIGN}, runway {RUNWAY} clear, cleared to land.`
+Wind is now spoken — the composer had always received `windFromMag`/`windKts`
+and dropped them.
+
+**Sequenced (previous aircraft just vacated)** — `SequencedClearedToLand`, composed but not currently wired to a controller path:
+1. `{CALLSIGN}, {TOWER}, runway {RUNWAY} clear, wind {WIND},[ check wheels down,] cleared to land.`
+2. `{CALLSIGN}, {TOWER}, runway {RUNWAY} is clear, wind {WIND},[ check wheels down,] cleared to land.`
+3. `{CALLSIGN}, runway {RUNWAY} clear, wind {WIND},[ check wheels down,] cleared to land.`
 
 ---
 

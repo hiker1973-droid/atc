@@ -473,6 +473,17 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
 		transmit(comp.MarshalAtPlatform(callsign, finalBearing))
 
+	case containsAny(lower, "pushing paddles", "switching paddles", "push paddles", "switch paddles",
+		"pushing lso", "switching lso", "pushing button", "pushing channel"):
+		// Pilot's courtesy call announcing they're leaving Marshal for the
+		// LSO — the other half of the §6 handoff. Short ack only; the
+		// destination was already issued so repeating it burns radio time.
+		// Deliberately placed after the DME case so a call like
+		// "Marshal, Raider 39, 7 DME, switching channel 4" still reads as a
+		// DME position report.
+		log.Info().Str("callsign", callsign).Msg("Marshal: pilot-initiated paddles handoff ack")
+		transmit(comp.HandoffAck(callsign, "paddles"))
+
 	case containsAny(lower, "initial"):
 		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.
 		// Marshal's last call before pilot pushes to the LSO freq. TACAN

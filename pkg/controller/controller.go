@@ -425,7 +425,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 
 	case RequestLandingClear:
-		response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts)
+		response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, c.oweWheelsCheck(ac, req.Raw))
 
 
 	case RequestStartup:
@@ -487,10 +487,12 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		if ac := s.Get(req.Callsign); ac == nil || ac.SequenceNumber == 0 {
 			s.EnqueueLanding(ac)
 		}
+		// Base is the conventional place for the wheels-down check, so it
+		// fires here and the later landing clearance stays clean.
 		if ac := s.Get(req.Callsign); ac != nil && ac.SequenceNumber > 1 {
-			response = c.composer.BaseAck(req.Callsign, s.ActiveRunway, ac.SequenceNumber)
+			response = c.composer.BaseAck(req.Callsign, s.ActiveRunway, ac.SequenceNumber, c.oweWheelsCheck(ac, req.Raw))
 		} else {
-			response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts)
+			response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, c.oweWheelsCheck(s.Get(req.Callsign), req.Raw))
 		}
 
 	case RequestTrafficInSight:
@@ -1611,15 +1613,59 @@ func (c *ATCController) NearestInboundAhead(callsign string) (string, float64) {
 // sequencedArrivalResponse builds the inbound/3-mile-initial reply with traffic
 // awareness. When seqNum > 1 and Tacview can identify the lead, name them and
 // give the in-trail distance. Otherwise fall back to a generic count.
+// wheelsDownPhrases are the ways a pilot reports the gear is already out. A
+// controller who hears any of these does not issue the wheels-down check.
+var wheelsDownPhrases = []string{
+	"gear down", "gear's down", "gears down", "wheels down",
+	"three down", "three green", "gear check complete", "dirty up", "dirtied up",
+}
+
+// oweWheelsCheck reports whether this transmission should carry the military
+// wheels-down check, and marks it issued when it should. Military controllers
+// owe the check once per approach — day and night — unless the pilot has
+// already reported gear down (FAA JO 7110.65 military procedures).
+//
+// Has a side effect by design: the caller composes exactly one response per
+// transmission, so marking here keeps the "once per approach" bookkeeping next
+// to the decision instead of duplicating it at every call site.
+func (c *ATCController) oweWheelsCheck(ac *state.AircraftState, raw string) bool {
+	lower := strings.ToLower(raw)
+	for _, p := range wheelsDownPhrases {
+		if strings.Contains(lower, p) {
+			// Pilot volunteered it — treat the approach as checked so a later
+			// call in the same approach doesn't re-issue.
+			if ac != nil {
+				ac.WheelsChecked = true
+			}
+			return false
+		}
+	}
+	// No aircraft record (shouldn't happen on a live call) — issue it rather
+	// than silently skip a safety callout.
+	if ac == nil {
+		return true
+	}
+	if ac.WheelsChecked {
+		return false
+	}
+	ac.WheelsChecked = true
+	return true
+}
+
 func (c *ATCController) sequencedArrivalResponse(callsign string, s *state.AirfieldState, seqNum int) string {
+	// Pattern altitude and direction of traffic are required elements of the
+	// arrival call (7110.65 3-10-12). Both come straight off the airfield
+	// config; the composer drops whichever the config leaves unset.
+	patternAlt := s.Airfield.PatternAltFt
+	brk := s.Airfield.BreakDirections[s.ActiveRunway]
 	if seqNum <= 1 {
-		return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, 0)
+		return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, patternAlt, brk, 0)
 	}
 	leadCS, leadDist := c.NearestInboundAhead(callsign)
 	if leadCS != "" {
-		return c.composer.SequencedInitialAck(callsign, 0, s.ActiveRunway, 0, s.AltimeterInHg, seqNum, leadCS, int(leadDist+0.5))
+		return c.composer.SequencedInitialAck(callsign, 0, s.ActiveRunway, patternAlt, brk, s.AltimeterInHg, seqNum, leadCS, int(leadDist+0.5))
 	}
-	return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, seqNum-1)
+	return c.composer.InboundAck(callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg, patternAlt, brk, seqNum-1)
 }
 
 // lookupContact does a case-insensitive lookup against allPositions. Tacview

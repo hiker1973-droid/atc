@@ -62,6 +62,12 @@ var (
 	flagVoiceRotateHrs  int
 	flagMarshalFreq     string
 	flagDeckbossFreq    string
+	// Handoff destinations — see the --handoff-* flag block in init.
+	flagHandoffCommandFreq   float64
+	flagHandoffCommandName   string
+	flagHandoffCommandPreset string
+	flagHandoffMarshalFreq   float64
+	flagHandoffMarshalName   string
 	flagDashboardPort   int
 	flagCommandOnly     bool
 	flagATISOnly        bool
@@ -158,6 +164,22 @@ func main() {
 		"OpenAI TTS voice for Marshal: ballad (default, naval-controller feel), verse, sage, onyx, etc.")
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",
 		"Marshal frequency MHz (OMDM only, e.g. 306.3)")
+
+	// Handoff directory — where each role sends pilots when it's done with
+	// them. A role process only knows its OWN frequency from the flags above
+	// (see start_*.bat), so the destinations it hands off TO are configured
+	// separately. Defaults match the vSFG-7 rig, so the handoffs work with no
+	// extra flags on the existing .bat files.
+	f.Float64Var(&flagHandoffCommandFreq, "handoff-command-freq", 282.0,
+		"Frequency MHz that Deckboss/Marshal send departing pilots to (0=disable that handoff)")
+	f.StringVar(&flagHandoffCommandName, "handoff-command-name", "vSFG-7-Command",
+		"Controller name spoken in the departure handoff")
+	f.StringVar(&flagHandoffCommandPreset, "handoff-command-preset", "channel four",
+		"Spoken preset for the departure handoff (empty to omit)")
+	f.Float64Var(&flagHandoffMarshalFreq, "handoff-marshal-freq", 306.3,
+		"Frequency MHz that Command sends carrier-inbound pilots to (0=disable Marshal handoff)")
+	f.StringVar(&flagHandoffMarshalName, "handoff-marshal-name", "Marshal",
+		"Controller name spoken in the carrier-recovery handoff")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",
 		"OpenAI TTS voice (female slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
 	f.StringVar(&flagTTSVoiceMale, "tts-voice-male", "onyx",

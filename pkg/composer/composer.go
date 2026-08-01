@@ -197,6 +197,45 @@ func (c *ATCComposer) HandoffToCommand(callsign, handoffCallsign string, freqMHz
 	})
 }
 
+// Handoff is the generic radio-communications transfer used by every role.
+// FAA JO 7110.65 2-1-17 phraseology is "CONTACT (facility name or location name
+// and terminal function), (frequency)" — the receiving facility is named first
+// and the frequency last, so the pilot hears the number immediately before
+// switching. The trailing courtesy and the optional preset are the DCS/SRS
+// adaptation (pilots tune presets, not raw frequencies).
+//
+// toName is the receiving controller ("Marshal", "vSFG-7-Command", "Al Minhad
+// Tower"); preset may be empty when the destination has no assigned channel.
+// 3 variations.
+func (c *ATCComposer) Handoff(callsign, toName string, freqMHz float64, preset, courtesy string) string {
+	dest := toName
+	if freqMHz > 0 {
+		dest = fmt.Sprintf("%s, %s", toName, spellFrequency(freqMHz))
+	}
+	if preset != "" {
+		dest = fmt.Sprintf("%s, %s", dest, preset)
+	}
+	if courtesy != "" {
+		courtesy = " " + courtesy
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, contact %s.%s", callsign, c.towerCallsign, dest, courtesy),
+		fmt.Sprintf("%s, %s, switch to %s.%s", callsign, c.towerCallsign, dest, courtesy),
+		fmt.Sprintf("%s, %s, frequency change approved, contact %s.%s", callsign, c.towerCallsign, dest, courtesy),
+	})
+}
+
+// HandoffAck answers a pilot-initiated "pushing <controller>" courtesy call.
+// Short ack only — the frequency was already issued in the Handoff TX, so
+// repeating it just burns radio time. 3 variations.
+func (c *ATCComposer) HandoffAck(callsign, toName string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, cleared handoff to %s, good day.", callsign, c.towerCallsign, toName),
+		fmt.Sprintf("%s, %s, roger pushing %s, good day.", callsign, c.towerCallsign, toName),
+		fmt.Sprintf("%s, %s, copy switch to %s, good day.", callsign, c.towerCallsign, toName),
+	})
+}
+
 // PushingCommandAck answers a pilot-initiated "pushing command" call — short
 // courtesy clearance, no need to re-issue freq/preset since the pilot is
 // already switching. 3 variations.
@@ -209,20 +248,18 @@ func (c *ATCComposer) PushingCommandAck(callsign string) string {
 }
 
 // DistanceInitialAck acknowledges inbound at distance — 3 variations.
-func (c *ATCComposer) DistanceInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, altimeterInHg float64, trafficAhead int) string {
+// Carries the 3-10-12 pattern-altitude / direction-of-traffic elements and the
+// report-initial request, same as InboundAck.
+func (c *ATCComposer) DistanceInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, breakDirection string, altimeterInHg float64, trafficAhead int) string {
 	rwy := spellRunway(activeRunway)
 	seq := numberWord(trafficAhead + 1)
-	var traffic string
-	switch trafficAhead {
-	case 0:
-		traffic = "Number one."
-	default:
-		traffic = fmt.Sprintf("Number %s.", seq)
-	}
+	alt := formatAltimeter(altimeterInHg)
+	pattern := patternClause(patternAltFt, breakDirection)
+	traffic := fmt.Sprintf("Number %s.", seq)
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s, %s", callsign, c.towerCallsign, rwy, traffic),
-		fmt.Sprintf("%s, %s, runway %s in use, %s", callsign, c.towerCallsign, rwy, traffic),
-		fmt.Sprintf("%s, %s, roger, runway %s, %s", callsign, c.towerCallsign, rwy, traffic),
+		fmt.Sprintf("%s, %s, runway %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, alt, pattern, traffic),
+		fmt.Sprintf("%s, %s, runway %s in use, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, alt, pattern, traffic),
+		fmt.Sprintf("%s, %s, roger, runway %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, alt, pattern, traffic),
 	})
 }
 
@@ -296,11 +333,22 @@ func (c *ATCComposer) ExtendDownwind(callsign string) string {
 }
 
 // BaseAck acknowledges base call — 3 variations.
-func (c *ATCComposer) BaseAck(callsign, activeRunway string, seqNum int) string {
+//
+// The base leg is where a military tower issues the wheels-down check, so
+// wheelsCheck normally fires here and the caller suppresses the later
+// ClearedToLand copy. Suppressed only when the pilot already reported gear down.
+func (c *ATCComposer) BaseAck(callsign, activeRunway string, seqNum int, wheelsCheck bool) string {
 	// Extract modex from callsign (last word, e.g. "Raider 032" → "032")
 	modex := callsign
 	if parts := strings.Fields(callsign); len(parts) > 1 {
 		modex = parts[len(parts)-1]
+	}
+	if wheelsCheck {
+		return pick([]string{
+			fmt.Sprintf("%s, affirmative, check wheels down.", modex),
+			fmt.Sprintf("%s, %s, affirmative, check wheels down.", modex, c.towerCallsign),
+			fmt.Sprintf("Affirmative, %s, check wheels down.", modex),
+		})
 	}
 	return pick([]string{
 		fmt.Sprintf("%s, affirmative.", modex),
@@ -310,12 +358,26 @@ func (c *ATCComposer) BaseAck(callsign, activeRunway string, seqNum int) string 
 }
 
 // ClearedToLand issues landing clearance — 3 variations.
-func (c *ATCComposer) ClearedToLand(callsign, activeRunway string, windFromMag, windKts float64) string {
+//
+// Element order follows FAA JO 7110.65 3-10-5: RUNWAY (number), WIND (direction
+// and velocity), CLEARED TO LAND. The runway always precedes the clearance so
+// the clearance itself is the last thing the pilot hears.
+//
+// wheelsCheck inserts the mandatory military wheels-down check. Controllers at
+// USA/USAF/USN fields issue it on every approach — day and night — unless the
+// pilot has already reported gear down, which is what the caller uses to
+// suppress it.
+func (c *ATCComposer) ClearedToLand(callsign, activeRunway string, windFromMag, windKts float64, wheelsCheck bool) string {
 	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	gear := ""
+	if wheelsCheck {
+		gear = " check wheels down,"
+	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s, cleared to land.", callsign, c.towerCallsign, rwy),
-		fmt.Sprintf("%s, %s, cleared to land runway %s.", callsign, c.towerCallsign, rwy),
-		fmt.Sprintf("%s, runway %s, cleared to land.", callsign, rwy),
+		fmt.Sprintf("%s, %s, runway %s, wind %s,%s cleared to land.", callsign, c.towerCallsign, rwy, wind, gear),
+		fmt.Sprintf("%s, %s, wind %s, runway %s,%s cleared to land.", callsign, c.towerCallsign, wind, rwy, gear),
+		fmt.Sprintf("%s, runway %s, wind %s,%s cleared to land.", callsign, rwy, wind, gear),
 	})
 }
 
@@ -342,10 +404,22 @@ func (c *ATCComposer) ContinueInbound(callsign, activeRunway string, distNm, seq
 }
 
 // InboundAck acknowledges inbound and provides field info — 3 variations.
-func (c *ATCComposer) InboundAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64, trafficAhead int) string {
+// InboundAck answers a VFR inbound/initial call with the field information an
+// overhead-maneuver arrival is owed — 3 variations.
+//
+// FAA JO 7110.65 3-10-12 requires the arrival call to carry pattern altitude and
+// direction of traffic, then request a report at initial:
+//
+//	"Air Force Three Six Eight, Runway Six, wind zero seven zero at eight,
+//	 pattern altitude six thousand, report initial."
+//
+// patternAltFt comes from Airfield.PatternAltFt and breakDirection from
+// Airfield.BreakDirections[activeRunway]; both fall back cleanly when unset.
+func (c *ATCComposer) InboundAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64, patternAltFt int, breakDirection string, trafficAhead int) string {
 	rwy := spellRunway(activeRunway)
 	wind := formatWind(windFromMag, windKts)
 	alt := formatAltimeter(altimeterInHg)
+	pattern := patternClause(patternAltFt, breakDirection)
 	traffic := ""
 	switch trafficAhead {
 	case 0:
@@ -356,10 +430,29 @@ func (c *ATCComposer) InboundAck(callsign, activeRunway string, windFromMag, win
 		traffic = fmt.Sprintf("%s aircraft ahead of you.", numberWord(trafficAhead))
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s, wind %s, altimeter %s. %s Report final.", callsign, c.towerCallsign, rwy, wind, alt, traffic),
-		fmt.Sprintf("%s, %s, altimeter %s, active runway %s, wind %s. %s Report final.", callsign, c.towerCallsign, alt, rwy, wind, traffic),
-		fmt.Sprintf("%s, %s, field information: runway %s, wind %s, altimeter %s. %s Call final.", callsign, c.towerCallsign, rwy, wind, alt, traffic),
+		fmt.Sprintf("%s, %s, runway %s, wind %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, wind, alt, pattern, traffic),
+		fmt.Sprintf("%s, %s, altimeter %s, active runway %s, wind %s%s. %s Report initial.", callsign, c.towerCallsign, alt, rwy, wind, pattern, traffic),
+		fmt.Sprintf("%s, %s, field information: runway %s, wind %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, wind, alt, pattern, traffic),
 	})
+}
+
+// patternClause renders the 3-10-12 pattern-altitude and direction-of-traffic
+// elements as a clause ready to append to a field-information reply, e.g.
+// ", pattern altitude one thousand five hundred, left turns". Either element is
+// dropped when the airfield config doesn't supply it; returns "" when neither
+// is known so callers can concatenate unconditionally.
+func patternClause(patternAltFt int, breakDirection string) string {
+	var parts []string
+	if patternAltFt > 0 {
+		parts = append(parts, fmt.Sprintf("pattern altitude %s", spellAltitudeFt(patternAltFt)))
+	}
+	if breakDirection == "left" || breakDirection == "right" {
+		parts = append(parts, fmt.Sprintf("%s turns", breakDirection))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return ", " + strings.Join(parts, ", ")
 }
 
 // HoldForSequence sequences traffic — 3 variations.
@@ -546,14 +639,17 @@ func (c *ATCComposer) MarshalRadarCheckNoContact(callsign string) string {
 }
 
 // SequencedInitialAck — Tacview-aware initial ack with named traffic ahead.
-func (c *ATCComposer) SequencedInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, altimeterInHg float64, seqNum int, leadCallsign string, leadDistNm int) string {
+// Carries the same 3-10-12 pattern-altitude / direction-of-traffic elements as
+// InboundAck, since this is the same arrival call with a lead aircraft named.
+func (c *ATCComposer) SequencedInitialAck(callsign string, distNm int, activeRunway string, patternAltFt int, breakDirection string, altimeterInHg float64, seqNum int, leadCallsign string, leadDistNm int) string {
 	rwy := spellRunway(activeRunway)
 	seq := numberWord(seqNum)
 	lead := numberWord(leadDistNm)
+	pattern := patternClause(patternAltFt, breakDirection)
 	return pick([]string{
-		fmt.Sprintf("%s, %s, number %s, follow %s, %s miles in trail, runway %s.", callsign, c.towerCallsign, seq, leadCallsign, lead, rwy),
-		fmt.Sprintf("%s, %s, number %s, traffic is %s, %s miles ahead, runway %s.", callsign, c.towerCallsign, seq, leadCallsign, lead, rwy),
-		fmt.Sprintf("%s, number %s, follow %s, runway %s.", callsign, seq, leadCallsign, rwy),
+		fmt.Sprintf("%s, %s, number %s, follow %s, %s miles in trail, runway %s%s, report initial.", callsign, c.towerCallsign, seq, leadCallsign, lead, rwy, pattern),
+		fmt.Sprintf("%s, %s, number %s, traffic is %s, %s miles ahead, runway %s%s, report initial.", callsign, c.towerCallsign, seq, leadCallsign, lead, rwy, pattern),
+		fmt.Sprintf("%s, number %s, follow %s, runway %s%s, report initial.", callsign, seq, leadCallsign, rwy, pattern),
 	})
 }
 
@@ -588,12 +684,18 @@ func (c *ATCComposer) AltitudeClearance(callsign, activeRunway string, altimeter
 }
 
 // SequencedClearedToLand is issued when the previous aircraft has just vacated — 3 var.
-func (c *ATCComposer) SequencedClearedToLand(callsign, activeRunway string, windFromMag, windKts float64) string {
+// Same 3-10-5 element order and wheels-down rule as ClearedToLand.
+func (c *ATCComposer) SequencedClearedToLand(callsign, activeRunway string, windFromMag, windKts float64, wheelsCheck bool) string {
 	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	gear := ""
+	if wheelsCheck {
+		gear = " check wheels down,"
+	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s clear, cleared to land.", callsign, c.towerCallsign, rwy),
-		fmt.Sprintf("%s, %s, runway clear, cleared to land runway %s.", callsign, c.towerCallsign, rwy),
-		fmt.Sprintf("%s, runway %s clear, cleared to land.", callsign, rwy),
+		fmt.Sprintf("%s, %s, runway %s clear, wind %s,%s cleared to land.", callsign, c.towerCallsign, rwy, wind, gear),
+		fmt.Sprintf("%s, %s, runway %s is clear, wind %s,%s cleared to land.", callsign, c.towerCallsign, rwy, wind, gear),
+		fmt.Sprintf("%s, runway %s clear, wind %s,%s cleared to land.", callsign, rwy, wind, gear),
 	})
 }
 
@@ -1161,28 +1263,11 @@ func (c *ATCComposer) IMCDistanceInitialAck(callsign string, distNm int, activeR
 	})
 }
 
-// NightClearedToLand adds gear check for night landings — 3 var.
-func (c *ATCComposer) NightClearedToLand(callsign, activeRunway string, windFromMag, windKts float64) string {
-	rwy := spellRunway(activeRunway)
-	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s, check gear, cleared to land.", callsign, c.towerCallsign, rwy),
-		fmt.Sprintf("%s, %s, gear check, runway %s, cleared to land.", callsign, c.towerCallsign, rwy),
-		fmt.Sprintf("%s, gear down, runway %s, cleared to land.", callsign, rwy),
-	})
-}
-
-// NightBaseAck acknowledges base with gear reminder — 3 var.
-func (c *ATCComposer) NightBaseAck(callsign, activeRunway string, seqNum int) string {
-	modex := callsign
-	if parts := strings.Fields(callsign); len(parts) > 1 {
-		modex = parts[len(parts)-1]
-	}
-	return pick([]string{
-		fmt.Sprintf("%s, affirmative, check gear down.", modex),
-		fmt.Sprintf("%s, %s, affirmative, gear check.", modex, c.towerCallsign),
-		fmt.Sprintf("Affirmative, %s, confirm gear down.", modex),
-	})
-}
+// NightClearedToLand / NightBaseAck removed — they carried the gear reminder as
+// a night-only variant and were never wired to a controller path, so no wheels
+// check ever went out. The check is a day-and-night requirement at military
+// fields, so it now lives in ClearedToLand / BaseAck behind a wheelsCheck flag
+// that the controller suppresses once per approach.
 
 // UnableToUnderstand — 3 variations.
 func (c *ATCComposer) UnableToUnderstand(callsign string) string {
@@ -1195,6 +1280,14 @@ func (c *ATCComposer) UnableToUnderstand(callsign string) string {
 
 // ── Formatting helpers ─────────────────────────────────────────────────────────
 
+// formatWind renders surface wind the way a controller speaks it: direction to
+// the nearest ten degrees as three separate digits, the word "at", then the
+// speed as separate digits. FAA JO 7110.65 2-10-1 omits the word "knots" — the
+// unit is implied. Returns "calm" below 3 kt.
+//
+// Emitting spelled digits (not numerals) matters here: the response text is fed
+// straight to TTS, and "270 at 15" is voiced as "two hundred seventy at fifteen"
+// rather than "two seven zero at one five".
 func formatWind(fromMag, kts float64) string {
 	if kts < 3 {
 		return "calm"
@@ -1203,7 +1296,8 @@ func formatWind(fromMag, kts float64) string {
 	if dir == 0 {
 		dir = 360
 	}
-	return fmt.Sprintf("%03d at %d knots", dir, int(math.Round(kts)))
+	// Speed is spoken with no leading zero — "at eight", not "at zero eight".
+	return fmt.Sprintf("%s at %s", spellNumberDigits(dir, 3), spellNumberDigits(int(math.Round(kts)), 1))
 }
 
 func formatAltimeter(inHg float64) string {
@@ -1211,40 +1305,42 @@ func formatAltimeter(inHg float64) string {
 	return spellAltimeter(hundredths/100, hundredths%100)
 }
 
+// spellAltimeter renders an altimeter setting as four separate digits with no
+// decimal — 29.92 becomes "two niner niner two". ATC never voices the decimal
+// point in an altimeter setting (FAA JO 7110.65 2-7-2).
 func spellAltimeter(whole, frac int) string {
-	return fmt.Sprintf("%s point %s", spellDigits(whole), spellDigits(frac))
+	return fmt.Sprintf("%s %s", spellDigits(whole), spellDigits(frac))
 }
 
-func spellDigits(n int) string {
-	digits := fmt.Sprintf("%02d", n)
-	words := make([]string, len(digits))
+// spellNumberDigits spells a non-negative integer digit-by-digit, zero-padded to
+// at least width digits. Unlike spellDigits3 it does not wrap modulo 360, so a
+// wind from 360 stays "three six zero" instead of collapsing to "zero zero zero".
+func spellNumberDigits(n, width int) string {
+	if n < 0 {
+		n = 0
+	}
+	digits := fmt.Sprintf("%0*d", width, n)
 	dw := map[rune]string{
 		'0': "zero", '1': "one", '2': "two", '3': "three",
 		'4': "four", '5': "five", '6': "six", '7': "seven",
 		'8': "eight", '9': "niner",
 	}
+	words := make([]string, len(digits))
 	for i, d := range digits {
 		words[i] = dw[d]
 	}
 	return strings.Join(words, " ")
+}
+
+func spellDigits(n int) string {
+	return spellNumberDigits(n, 2)
 }
 
 // spellDigits3 spells an integer as 3 digit words, left-padded with zeros.
 // Used for headings/radials (e.g. 87 → "zero eight seven", 287 → "two eight
 // seven"). Values are taken modulo 360 to keep the spoken value canonical.
 func spellDigits3(n int) string {
-	n = ((n % 360) + 360) % 360
-	digits := fmt.Sprintf("%03d", n)
-	dw := map[rune]string{
-		'0': "zero", '1': "one", '2': "two", '3': "three",
-		'4': "four", '5': "five", '6': "six", '7': "seven",
-		'8': "eight", '9': "niner",
-	}
-	words := make([]string, len(digits))
-	for i, d := range digits {
-		words[i] = dw[d]
-	}
-	return strings.Join(words, " ")
+	return spellNumberDigits(((n%360)+360)%360, 3)
 }
 
 func spellRunway(designator string) string {
@@ -1298,8 +1394,14 @@ func bearingWord(deg int) string {
 	return strings.Join(parts, " ")
 }
 
-// spellAltitudeFt converts an altitude in feet to spoken form.
-// e.g. 15000 → "fifteen thousand", 2500 → "two thousand five hundred"
+// spellAltitudeFt converts an altitude in feet to spoken form, per AIM 4-2-9:
+// separate digits for the thousands at or above ten thousand, plus the hundreds
+// when non-zero. e.g. 1500 → "one thousand five hundred", 2000 → "two thousand",
+// 15000 → "one five thousand".
+//
+// numberWord only covers zero through ten and falls back to a numeral above
+// that, which used to leak into the audio as "one thousand 500" — the hundreds
+// and the high thousands are spelled explicitly here instead.
 func spellAltitudeFt(ft int) string {
 	if ft <= 0 {
 		return "unknown"
@@ -1308,16 +1410,22 @@ func spellAltitudeFt(ft int) string {
 	hundreds := (ft % 1000) / 100
 	result := ""
 	if thousands > 0 {
-		result = numberWord(thousands) + " thousand"
+		th := numberWord(thousands)
+		if thousands > 10 {
+			// "one five thousand", not "15 thousand".
+			th = spellNumberDigits(thousands, 1)
+		}
+		result = th + " thousand"
 	}
 	if hundreds > 0 {
 		if result != "" {
 			result += " "
 		}
-		result += numberWord(hundreds*100)
+		result += numberWord(hundreds) + " hundred"
 	}
 	if result == "" {
-		result = numberWord(ft)
+		// Below 100 ft — nothing a controller would voice, but keep it spoken.
+		result = spellNumberDigits(ft, 1)
 	}
 	return result
 }
@@ -1367,5 +1475,8 @@ func spellFrequency(mhz float64) string {
 			fracSpoken = fracSpoken[:len(fracSpoken)-5]
 		}
 	}
-	return wholeSpoken + " decimal " + fracSpoken
+	// "point", not "decimal" — decimal is the ICAO convention; US and US
+	// military controllers say point, and every other role on this rig is
+	// US-military flavoured.
+	return wholeSpoken + " point " + fracSpoken
 }

@@ -172,6 +172,18 @@ switch and the explicit number was unnecessary friction).
 2. `{CALLSIGN}, Marshal, switch to paddles, good luck.`
 3. `{CALLSIGN}, Marshal, paddles has you, good luck.`
 
+### 6a. Pilot-initiated paddles handoff ack
+
+**Triggers:** `pushing paddles` · `switching paddles` · `push paddles` · `switch paddles` · `pushing lso` · `switching lso` · `pushing button` · `pushing channel`
+
+Short ack for the pilot's courtesy call on the §6 handoff. Ordered **after** the
+§1b DME case so `Marshal, Raider 39, 7 DME, switching channel 4` still reads as
+a DME report. See `handoff_responses.md` §5.
+
+1. `{CALLSIGN}, Marshal, cleared handoff to paddles, good day.`
+2. `{CALLSIGN}, Marshal, roger pushing paddles, good day.`
+3. `{CALLSIGN}, Marshal, copy switch to paddles, good day.`
+
 ---
 
 ## 7. Marshal contact (LSO confirmation — UNWIRED)

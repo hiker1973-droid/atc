@@ -212,7 +212,18 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			// returns 0 if the slot is already cleared, so the double-fire
 			// guard is free. The ack deliberately omits the word "airborne"
 			// so the SRS echo doesn't re-trigger this same case in a loop.
-			transmit(fmt.Sprintf("%s, Deckboss, copy, good hunting.", callsign))
+			//
+			// The ack also carries the departure handoff. Deckboss owns the
+			// deck, not the departing aircraft — once they're off the bow
+			// they belong to the strike controller, so this is the point the
+			// real flow sends them off the deck freq. Falls back to the bare
+			// ack when --handoff-command-freq is 0.
+			if flagHandoffCommandFreq > 0 {
+				transmit(comp.Handoff(callsign, flagHandoffCommandName,
+					flagHandoffCommandFreq, flagHandoffCommandPreset, "Good hunting."))
+			} else {
+				transmit(fmt.Sprintf("%s, Deckboss, copy, good hunting.", callsign))
+			}
 			catNum := deck.FreeCat(callsign)
 			if catNum > 0 {
 				log.Info().Str("callsign", callsign).Int("cat", catNum).Msg("Deckboss: cat cleared (airborne fallback)")
@@ -226,6 +237,18 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 					}()
 				}
 			}
+
+		case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
+			"pushing strike", "switching strike", "pushing departure", "switching departure"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: handoff ack dropped — not address-led, likely self-echo")
+				return
+			}
+			// Pilot's courtesy call on the departure handoff issued with the
+			// airborne ack. Short ack only. Address-led because our own
+			// handoff TX contains "switch to <command name>".
+			log.Info().Str("callsign", callsign).Msg("Deckboss: pilot-initiated command handoff ack")
+			transmit(comp.HandoffAck(callsign, flagHandoffCommandName))
 
 		case containsAny(lower, "bolter",
 			"remain in bold", "remaining in bold", "staying in bold", "in the bold", "bold pattern"):

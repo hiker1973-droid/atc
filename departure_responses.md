@@ -10,8 +10,8 @@ Triggers come from `pkg/controller/controller.go` (the intent classifier). Respo
 - `{CALLSIGN}` — pilot callsign (e.g. `Raider 032`)
 - `{TOWER}` — tower callsign (e.g. `Al Minhad Tower`, `Al Dhafra Tower`, `Al Ain Tower`)
 - `{RUNWAY}` — active runway, spelled out (e.g. `two seven`)
-- `{WIND}` — `[direction] at [knots]` (e.g. `two seven zero at one five knots`) or `calm` if <3 kts
-- `{ALTIMETER}` — `[whole] point [hundredths]` (e.g. `two niner point niner two`)
+- `{WIND}` — direction to the nearest ten degrees as three spelled digits, `at`, then the speed as spelled digits (e.g. `two seven zero at one five`, `zero seven zero at eight`); `calm` if <3 kts. The unit is not spoken (FAA JO 7110.65 2-10-1) and 360 stays `three six zero`.
+- `{ALTIMETER}` — four spelled digits with **no decimal point** (e.g. `two niner niner two`, `three zero zero one`), per 7110.65 2-7-2
 - `{TRAFFIC}` — counted-aircraft phrase (e.g. `One aircraft in the pattern ahead of you.`)
 
 ---
@@ -189,12 +189,15 @@ spacing window elapses, so the pilot does not need to re-request.
 
 Fires after departure release (`7 DME` / `cleared airspace` etc).
 
-**Extra placeholders:** `{HANDOFF}` (`vSFG-7-Command`), `{FREQ}` (`two eight two point zero`), `{PRESET}` (e.g. `preset 5`)
+**Extra placeholders:** `{HANDOFF}` (`vSFG-7-Command`), `{FREQ}` (`two eight two point zero`), `{PRESET}` (e.g. `channel four`)
 
 **Responses:**
 1. `{CALLSIGN}, {TOWER}, contact {HANDOFF}, {FREQ}, {PRESET}. Good day.`
 2. `{CALLSIGN}, {TOWER}, switch to {HANDOFF}, {FREQ}, {PRESET}. Safe skies.`
 3. `{CALLSIGN}, {TOWER}, frequency change approved, {HANDOFF} on {FREQ}, {PRESET}.`
+
+Frequencies are spoken with **point**, not "decimal" — decimal is the ICAO
+convention and every role on this rig is US-military flavoured.
 
 ---
 

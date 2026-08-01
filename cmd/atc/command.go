@@ -61,6 +61,24 @@ func commandResponse(text, callsign, channelName string) string {
 		})
 	}
 
+	// RTB / recovery request — pilot is heading home and wants the handoff.
+	// Checked before "fence out" so an "RTB, fence out" call reads as the
+	// recovery request rather than the area-exit ack.
+	//
+	// Command can't name the destination here: commandResponse is a pure text
+	// function with no position feed. The Tacview watcher in
+	// command_handoff.go issues the real "contact <facility> on <freq>" TX
+	// when the pilot closes through handoffThresholdNm, so this ack tells them
+	// what to expect rather than guessing a field.
+	if containsAny(lower, "rtb", "returning to base", "request recovery", "request handoff",
+		"request tower", "request marshal", "inbound home plate", "bingo home plate") {
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, copy RTB, expect recovery handoff at three zero miles, continue.", callsign, channelName),
+			fmt.Sprintf("%s, %s, roger returning to base, stand by for handoff inside three zero miles.", callsign, channelName),
+			fmt.Sprintf("%s, %s, copy RTB, remain this frequency, I'll pass you to recovery at three zero miles.", callsign, channelName),
+		})
+	}
+
 	// Fence out — leaving combat/training area (check before fence in/check
 	// so "fence out" isn't swallowed by a looser "fence" match).
 	if containsAny(lower, "fence out", "fence-out", "fenceout") {

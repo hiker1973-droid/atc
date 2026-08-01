@@ -114,10 +114,25 @@ Current code lives in `cmd/atc/command.go:23-83` (function `commandResponse`). W
 
 ---
 
-## Proactive Tower handoff (Tacview-driven, no trigger phrase)
+## Proactive recovery handoff (Tacview-driven, no trigger phrase)
 
-When `--tacview-addr` is set on Command, a background watcher (`cmd/atc/command_handoff.go`) tracks every pilot who has transmitted to Command. Each 30s it checks their position; when one crosses from outside 30 NM to inside 30 NM of any of OMDM/OMAM/OMAL (whichever is nearest), Command TXs **once**:
+When `--tacview-addr` is set on Command, a background watcher (`cmd/atc/command_handoff.go`) tracks every pilot who has transmitted to Command. Each 30s it checks their position against the nearest land field **and** the carrier, and TXs **once** when the pilot crosses from outside 30 NM to inside:
 
 > `{CALLSIGN}, vSFG-7-Command, contact {TOWER NAME} tower on {FREQ}, switching now approved, good landing.`
+>
+> `{CALLSIGN}, vSFG-7-Command, contact Marshal on {FREQ}, switching now approved, call marking mom.`
 
-Each pilot is handed off at most once per Command session; the watcher forgets pilots after 60 min of radio silence.
+Each pilot is handed off at most once per Command session; the watcher forgets pilots after 60 min of radio silence. Full detail — including the RTB request intent (§5 below) and the `--handoff-*` flags — is in `handoff_responses.md`.
+
+---
+
+## 5. RTB / recovery request
+
+**Trigger phrases:** `rtb` · `returning to base` · `request recovery` · `request handoff` · `request tower` · `request marshal` · `inbound home plate` · `bingo home plate`
+
+Matched **before** fence out so "RTB, fence out" reads as the recovery request.
+
+**Responses:**
+1. `{CALLSIGN}, {CHANNEL}, copy RTB, expect recovery handoff at three zero miles, continue.`
+2. `{CALLSIGN}, {CHANNEL}, roger returning to base, stand by for handoff inside three zero miles.`
+3. `{CALLSIGN}, {CHANNEL}, copy RTB, remain this frequency, I'll pass you to recovery at three zero miles.`

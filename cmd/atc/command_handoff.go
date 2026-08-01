@@ -95,6 +95,34 @@ func (t *tacviewPositions) Remove(cs string) {
 	delete(t.pos, cs)
 }
 
+// Carrier returns the carrier's position if one is on scope. Mirrors the
+// two-tier match in controller.findCarrierContact: prefer a named CVN, fall
+// back to a generic "carrier" group label, since missions export the ship
+// either way ("CVN-72 ABE" vs "Carrier strike group-5").
+func (t *tacviewPositions) Carrier() (orb.Point, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	var fallback orb.Point
+	var haveFallback bool
+	for name, p := range t.pos {
+		lower := strings.ToLower(name)
+		switch {
+		case strings.Contains(lower, "cvn"),
+			strings.Contains(lower, "lincoln"),
+			strings.Contains(lower, "stennis"),
+			strings.Contains(lower, "roosevelt"),
+			strings.Contains(lower, "washington"),
+			strings.Contains(lower, "vinson"):
+			return p, true
+		case strings.Contains(lower, "carrier"):
+			if !haveFallback {
+				fallback, haveFallback = p, true
+			}
+		}
+	}
+	return fallback, haveFallback
+}
+
 // runMiniTacview is a stripped-down Tacview consumer for Command. It only
 // maintains a callsign → lat/lon map — no phase detection, conflict logic,
 // or controller wiring. Mirrors the connection/handshake of the main
@@ -257,21 +285,43 @@ func runCommandHandoffWatch(
 					nearestFld = fld
 				}
 			}
+			// A pilot recovering to the boat is closing on the carrier, not a
+			// field, and belongs to Marshal rather than a tower. Take whichever
+			// recovery point is nearer so the handoff names the right facility.
+			recoveryName, recoveryFreq, recoveryKind := "", 0.0, "tower"
+			if nearestFld != nil {
+				recoveryName = nearestFld.Name + " tower"
+				recoveryFreq = nearestFld.TowerFreqMHz
+			}
+			if carrierPos, ok := store.Carrier(); ok && flagHandoffMarshalFreq > 0 {
+				if d := haversineNm(pos, carrierPos); d < nearestDist {
+					nearestDist = d
+					recoveryName = flagHandoffMarshalName
+					recoveryFreq = flagHandoffMarshalFreq
+					recoveryKind = "marshal"
+				}
+			}
 			// Trigger only when closing through the threshold — prevents
 			// firing when pilot starts a sortie already within range, and
 			// prevents repeat fires when they orbit at the edge.
-			if pilot.lastDistNm > handoffThresholdNm && nearestDist <= handoffThresholdNm {
+			if recoveryName != "" && pilot.lastDistNm > handoffThresholdNm && nearestDist <= handoffThresholdNm {
+				// FAA 2-1-17 order: name the facility, then the frequency.
+				tail := "switching now approved, good landing."
+				if recoveryKind == "marshal" {
+					tail = "switching now approved, call marking mom."
+				}
 				text := fmt.Sprintf(
-					"%s, vSFG-7-Command, contact %s tower on %s, switching now approved, good landing.",
-					cs, nearestFld.Name, formatFreqMHz(nearestFld.TowerFreqMHz),
+					"%s, vSFG-7-Command, contact %s on %s, %s",
+					cs, recoveryName, formatFreqMHz(recoveryFreq), tail,
 				)
 				tx(text, cs)
 				pilot.handedOff = true
 				log.Info().
 					Str("callsign", cs).
-					Str("tower", nearestFld.Name).
+					Str("to", recoveryName).
+					Str("kind", recoveryKind).
 					Float64("dist", nearestDist).
-					Msg("Command: proactive tower handoff issued")
+					Msg("Command: proactive recovery handoff issued")
 			}
 			pilot.lastDistNm = nearestDist
 		}

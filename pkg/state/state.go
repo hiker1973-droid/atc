@@ -111,6 +111,12 @@ type AircraftState struct {
 	// its sequence number on a hold response. Used by the controller's
 	// queue-position suffix to avoid re-announcing on every retry.
 	AnnouncedQueuePos bool
+	// WheelsChecked tracks whether the mandatory military wheels-down check has
+	// gone out on this approach. USA/USAF/USN controllers issue it once per
+	// approach, day or night, unless the pilot already reported gear down. Set
+	// when a base ack or landing clearance carries the check; cleared by
+	// EnqueueLanding so a go-around and re-entry gets a fresh check.
+	WheelsChecked bool
 	// AutoReleaseAt is the wall-clock time after which the LUAW auto-release
 	// path is eligible to fire ClearedForTakeoff for this aircraft. Set by
 	// handleHoldingShortRequest on the no-traffic path; zero = not awaiting.
@@ -899,6 +905,8 @@ func (s *AirfieldState) EnqueueLanding(ac *AircraftState) int {
 	ac.SequenceNumber = len(s.LandingQueue)
 	ac.Phase = PhaseSequenced
 	ac.Runway = s.ActiveRunway
+	// New approach — the wheels-down check is owed again.
+	ac.WheelsChecked = false
 	return ac.SequenceNumber
 }
 
