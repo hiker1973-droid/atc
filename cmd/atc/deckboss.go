@@ -22,10 +22,42 @@ import (
 // catNumRe captures the cat number from "cat 1" / "CAT 2" / "cat3".
 var catNumRe = regexp.MustCompile(`\bcat\s*(\d)\b`)
 
+// assignCatForCaller picks a catapult for a §1 check-in.
+//
+// With deckPositionCheck off this is byte-for-byte the historical behaviour:
+// first free cat, lowest number first. With it on, Deckboss consults Tacview
+// for where the caller is actually parked and prefers the pair of cats nearest
+// that spot — bow cats 1/2 for aircraft forward of the island, waist cats 3/4
+// for aircraft aft — so the assignment matches the deck the pilot is looking at
+// instead of always starting at cat one.
+//
+// Fails open by design. If Tacview has no carrier, no contact for the callsign,
+// or shows them off the boat, we log why and fall back to the plain first-free
+// assignment rather than leaving a pilot without a cat mid-mission.
+func assignCatForCaller(callsign string, deckPositionCheck bool,
+	atcCtrl *controller.ATCController, deck *state.DeckbossState) int {
+
+	if !deckPositionCheck {
+		return deck.AssignCat(callsign)
+	}
+	foreAft, rangeNm, onDeck := atcCtrl.DeckSpotNm(callsign)
+	if !onDeck {
+		log.Warn().Str("callsign", callsign).Float64("rangeNm", rangeNm).
+			Msg("Deckboss: deck position check — no on-deck Tacview contact, falling back to first free cat")
+		return deck.AssignCat(callsign)
+	}
+	preferBow := foreAft >= 0
+	catNum := deck.AssignCatPreferred(callsign, preferBow)
+	log.Info().Str("callsign", callsign).Float64("foreAftNm", foreAft).
+		Bool("preferBow", preferBow).Int("cat", catNum).
+		Msg("Deckboss: cat assigned from Tacview deck position")
+	return catNum
+}
+
 // deckbossLoop handles carrier deck operations (default 128.600 MHz —
 // DCS carrier UHF control).
 func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword, voice string,
-	txCooldown *int64, atcCtrl *controller.ATCController, deck *state.DeckbossState) {
+	txCooldown *int64, atcCtrl *controller.ATCController, deck *state.DeckbossState, deckPositionCheck bool) {
 
 	const deckCallsign = "Deckboss"
 	deckVoice := voice
@@ -111,7 +143,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				return
 			}
 			// §1 check-in: assign cat or queue in conga
-			catNum := deck.AssignCat(callsign)
+			catNum := assignCatForCaller(callsign, deckPositionCheck, atcCtrl, deck)
 			if catNum > 0 {
 				transmit(comp.DeckbossCatAssignment(callsign, catNum))
 			} else {

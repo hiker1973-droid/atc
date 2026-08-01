@@ -23,6 +23,12 @@ Deckboss handles **on-deck** aircraft only — cat assignment, conga-line sequen
 
 This is the pilot's call when they're up and ready for cat. Deckboss assigns a free cat or queues them in the conga. `Green Jet` is the legacy DCS phrase (yellow-shirt → green-shirt handoff on the deck) and stays accepted for backward compatibility.
 
+**Which cat gets assigned.** By default Deckboss hands out the lowest free cat (1 → 2 → 3 → 4), blind to where the aircraft actually is. With `--deck-position-check` on, it instead reads the caller's position from Tacview, projects it onto the carrier's BRC axis, and prefers the pair of cats nearest that spot — **bow cats 1/2** for aircraft forward of the carrier point, **waist cats 3/4** for aircraft aft. If the preferred pair is full it falls through to the other pair rather than pushing the pilot into the conga.
+
+The check **fails open**: no carrier on Tacview, no contact for the callsign, a stale (>30s) contact, or an aircraft that reads airborne or off the boat all fall back to plain first-free assignment and log a `warn`. A pilot never loses a cat to a telemetry gap. On-deck means within `DeckRadiusNm` (0.20 nm) of the carrier contact and below `DeckAltFt` (200 ft MSL) — both in `pkg/controller/controller.go`.
+
+The Tacview path is also idempotent per callsign: a pilot who re-checks in gets their existing cat back instead of a second slot. (The default first-free path still has this gap — see Notes.)
+
 ### 1a. Cat assigned (free cat available) — `DeckbossCatAssignment`
 1. `{CALLSIGN}, Deckboss, cleared to cat {CAT}.`
 2. `{CALLSIGN}, Deckboss, cat {CAT} is yours, taxi forward.`
@@ -164,7 +170,8 @@ Address-led guard applies — pilot must lead with `Deckboss, ...` to avoid self
 ## Notes
 
 - **No Marshal/Recovery responses here.** Deckboss only does deck operations (launch). Recovery is Marshal's role on 306.3.
-- The cat number range is 1–4 (super carrier standard).
+- The cat number range is 1–4 (super carrier standard). Bow = 1/2, waist = 3/4.
+- **Latent bug in the default path:** `state.AssignCat` does not check whether the callsign already holds a cat, so a repeated §1 check-in assigns a *second* slot and leaks the first. `AssignCatPreferred` (the `--deck-position-check` path) guards against this. Fix `AssignCat` the same way when the flag is promoted to default.
 - Conga line capacity is set in `pkg/state/state.go` — currently a fixed limit. If you want to expose it as a flag, that's v1.1.0.
 - Suggestions for **new intents** worth adding (just say which):
   - `bingo` / `state` — fuel report (currently no Deckboss handler)

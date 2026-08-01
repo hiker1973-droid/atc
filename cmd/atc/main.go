@@ -111,6 +111,7 @@ var (
 	flagRunwayRotation      bool
 	flagRunwaySlot          time.Duration
 	flagPositionCheck       bool
+	flagDeckPositionCheck   bool
 )
 
 func main() {
@@ -246,6 +247,8 @@ func main() {
 		"Length of one runway-rotation slot. Default 4h matches production cadence; shorten (e.g. 60s) for live verification of slot rolls.")
 	f.BoolVar(&flagPositionCheck, "position-check", false,
 		"Validate via Tacview that a pilot calling 'holding short' is actually within HoldShortValidationNm of the runway threshold. Off by default — enable for a session to observe before relying on it.")
+	f.BoolVar(&flagDeckPositionCheck, "deck-position-check", false,
+		"Deckboss assigns catapults from the caller's actual Tacview position on deck — bow cats 1/2 forward, waist cats 3/4 aft — instead of always taking the lowest free cat. Fails open to first-free when Tacview can't place the caller. Off by default.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -823,9 +826,9 @@ func run(cmd *cobra.Command, args []string) error {
 		go func() {
 			defer wg.Done()
 			deckbossLoop(ctx, flagSRSAddr, deckFreqMHz, apiKey, flagEAMPassword,
-				flagDeckbossVoice, &deckbossCooldown, atcCtrl, deckState)
+				flagDeckbossVoice, &deckbossCooldown, atcCtrl, deckState, flagDeckPositionCheck)
 		}()
-		log.Info().Float64("freq", deckFreqMHz).Msg("Deckboss online")
+		log.Info().Float64("freq", deckFreqMHz).Bool("deckPositionCheck", flagDeckPositionCheck).Msg("Deckboss online")
 	}
 
 	// Start marshal loop if freq configured (OMDM only)

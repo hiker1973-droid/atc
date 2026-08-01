@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1953,6 +1954,83 @@ func (c *ATCController) IsDeckClear() bool {
 		}
 	}
 	return true
+}
+
+// Deck geometry. A Nimitz/Ford hull is ~333m long, so anything Tacview reports
+// within DeckRadiusNm of the carrier's own contact point and below DeckAltFt is
+// sitting on (or immediately alongside) the boat. Generous on both axes — the
+// carrier contact is a single point, deck spots are spread over the full hull,
+// and DCS reports MSL so a deck spot reads ~60ft.
+const (
+	DeckRadiusNm = 0.20
+	DeckAltFt    = 200
+)
+
+// DeckContact is one aircraft Tacview shows parked on the carrier deck.
+type DeckContact struct {
+	Callsign  string  `json:"callsign"`
+	ForeAftNm float64 `json:"foreAftNm"` // + forward of carrier point, - aft
+	RangeNm   float64 `json:"rangeNm"`
+	AltFt     float64 `json:"altFt"`
+}
+
+// deckSpotLocked computes where a contact sits relative to the carrier: distance
+// along the BRC axis (positive = forward toward the bow, negative = aft toward
+// the round-down) plus total range, both nm. Caller must hold allPositionsMu.
+func deckSpotLocked(contact *TacviewContact, carrierPt orb.Point, brc float64) (foreAftNm, rangeNm float64) {
+	acPt := orb.Point{contact.Lon, contact.Lat}
+	rangeNm = haversineNm(acPt, carrierPt)
+	rel := (bearingDegFromTo(carrierPt, acPt) - brc) * math.Pi / 180
+	return rangeNm * math.Cos(rel), rangeNm
+}
+
+// DeckSpotNm reports where an aircraft is sitting relative to the carrier.
+// onDeck is true only when Tacview has a fresh contact that is within
+// DeckRadiusNm of the boat and below DeckAltFt. Returns onDeck=false whenever
+// the carrier or the caller can't be resolved — callers are expected to treat
+// that as "unknown" and fall back, not as "not on deck".
+func (c *ATCController) DeckSpotNm(callsign string) (foreAftNm, rangeNm float64, onDeck bool) {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	_, carrier, ok := c.findCarrierContact()
+	if !ok {
+		return 0, 0, false
+	}
+	contact := c.lookupContact(callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
+		return 0, 0, false
+	}
+	carrierPt := orb.Point{carrier.Lon, carrier.Lat}
+	foreAftNm, rangeNm = deckSpotLocked(contact, carrierPt, carrier.HeadingDeg)
+	return foreAftNm, rangeNm, rangeNm <= DeckRadiusNm && contact.AltFt < DeckAltFt
+}
+
+// GetDeckContacts lists every aircraft Tacview currently shows on the carrier
+// deck, nearest the bow first. Excludes the carrier itself.
+func (c *ATCController) GetDeckContacts() []DeckContact {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	carrierCS, carrier, ok := c.findCarrierContact()
+	if !ok {
+		return nil
+	}
+	carrierPt := orb.Point{carrier.Lon, carrier.Lat}
+	var out []DeckContact
+	for cs, contact := range c.allPositions {
+		if cs == carrierCS || time.Since(contact.UpdatedAt) > 30*time.Second {
+			continue
+		}
+		if contact.AltFt >= DeckAltFt {
+			continue
+		}
+		foreAft, rng := deckSpotLocked(contact, carrierPt, carrier.HeadingDeg)
+		if rng > DeckRadiusNm {
+			continue
+		}
+		out = append(out, DeckContact{Callsign: cs, ForeAftNm: foreAft, RangeNm: rng, AltFt: contact.AltFt})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ForeAftNm > out[j].ForeAftNm })
+	return out
 }
 
 // GetAirfieldState returns a snapshot of the airfield state for ATIS use.

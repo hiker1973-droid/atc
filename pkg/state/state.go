@@ -343,6 +343,41 @@ func (ds *DeckbossState) AssignCat(callsign string) int {
 	return 0
 }
 
+// AssignCatPreferred assigns a cat, preferring the bow pair (1, 2) when
+// preferBow is true and the waist pair (3, 4) otherwise. Falls through to the
+// other pair when the preferred one is full, so a busy deck still gets a cat
+// rather than being pushed into the conga. Returns 0 if all four are occupied.
+//
+// Unlike AssignCat this is idempotent: a callsign that already holds a cat gets
+// the same number back instead of a second slot, so a repeated check-in call
+// can't corrupt deck state.
+func (ds *DeckbossState) AssignCatPreferred(callsign string, preferBow bool) int {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	for _, cat := range ds.Cats {
+		if cat.Callsign == callsign {
+			return cat.Number
+		}
+	}
+	bow, waist := [2]int{1, 2}, [2]int{3, 4}
+	order := [2][2]int{bow, waist}
+	if !preferBow {
+		order = [2][2]int{waist, bow}
+	}
+	for _, group := range order {
+		for _, n := range group {
+			cat := ds.Cats[n-1]
+			if cat.Status == CatFree {
+				cat.Status = CatTaxying
+				cat.Callsign = callsign
+				cat.UpdatedAt = time.Now()
+				return cat.Number
+			}
+		}
+	}
+	return 0
+}
+
 // SetCatStatus updates the status of a cat by number.
 func (ds *DeckbossState) SetCatStatus(catNum int, status CatStatus) {
 	ds.mu.Lock()
