@@ -178,7 +178,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 							continue
 						}
 						atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration("command test")).UnixNano())
-						mp3, err := synthesizeSpeech(ctx, apiKey, "command test", voice, flagTTSSpeed)
+						mp3, err := synthesizeSpeech(ctx, apiKey, "command test", commandVoice(voice))
 						if err != nil {
 							log.Error().Err(err).Msg("Command test TTS failed")
 							continue
@@ -287,7 +287,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 							}
 							log.Info().Str("text", text).Str("callsign", cs).Str("channel", channelName).Msg("Command transcribed")
 							broadcastLog("tx", fmt.Sprintf("CMD TX → %q", resp))
-							mp3, err := synthesizeSpeech(ctx, apiKey, resp, voice, flagTTSSpeed)
+							mp3, err := synthesizeSpeech(ctx, apiKey, resp, commandVoice(voice))
 							if err != nil {
 								log.Error().Err(err).Msg("Command TTS failed")
 								return

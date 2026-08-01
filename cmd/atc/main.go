@@ -68,6 +68,12 @@ var (
 	flagHandoffCommandPreset string
 	flagHandoffMarshalFreq   float64
 	flagHandoffMarshalName   string
+	// Per-role TTS delivery instructions — see the --voice-style-* flag block.
+	flagVoiceStyleTower    string
+	flagVoiceStyleMarshal  string
+	flagVoiceStyleDeckboss string
+	flagVoiceStyleCommand  string
+	flagVoiceStyleATIS     string
 	flagDashboardPort   int
 	flagCommandOnly     bool
 	flagATISOnly        bool
@@ -180,6 +186,20 @@ func main() {
 		"Frequency MHz that Command sends carrier-inbound pilots to (0=disable Marshal handoff)")
 	f.StringVar(&flagHandoffMarshalName, "handoff-marshal-name", "Marshal",
 		"Controller name spoken in the carrier-recovery handoff")
+
+	// Delivery style per role — the gpt-4o-mini-tts `instructions` field.
+	// This is what makes a role sound like that role rather than like an
+	// audiobook; empty disables it for that role.
+	f.StringVar(&flagVoiceStyleTower, "voice-style-tower", styleTower,
+		"TTS delivery instructions for tower (empty=none)")
+	f.StringVar(&flagVoiceStyleMarshal, "voice-style-marshal", styleMarshal,
+		"TTS delivery instructions for Marshal (empty=none)")
+	f.StringVar(&flagVoiceStyleDeckboss, "voice-style-deckboss", styleDeckboss,
+		"TTS delivery instructions for Deckboss (empty=none)")
+	f.StringVar(&flagVoiceStyleCommand, "voice-style-command", styleCommand,
+		"TTS delivery instructions for Command (empty=none)")
+	f.StringVar(&flagVoiceStyleATIS, "voice-style-atis", styleATIS,
+		"TTS delivery instructions for ATIS (empty=none)")
 	f.StringVar(&flagTTSVoice, "tts-voice", "nova",
 		"OpenAI TTS voice (female slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
 	f.StringVar(&flagTTSVoiceMale, "tts-voice-male", "onyx",
@@ -566,7 +586,7 @@ func run(cmd *cobra.Command, args []string) error {
 			go runMiniTacview(ctx, flagTacviewAddr, store)
 			srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 			handoffTX := func(text, _ string) {
-				mp3, err := synthesizeSpeech(ctx, apiKey, text, flagCommandVoice, flagTTSSpeed)
+				mp3, err := synthesizeSpeech(ctx, apiKey, text, commandVoice(flagCommandVoice))
 				if err != nil {
 					log.Error().Err(err).Msg("Command handoff TTS failed")
 					return
@@ -611,7 +631,7 @@ func run(cmd *cobra.Command, args []string) error {
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voice, flagTTSSpeed)
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voiceProfile{voice, flagTTSSpeed, flagVoiceStyleTower})
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -1479,19 +1499,26 @@ type ttsCache struct {
 
 var globalTTSCache = &ttsCache{items: make(map[string][]byte)}
 
-func (c *ttsCache) get(voice string, speed float64, text string) ([]byte, bool) {
-	key := fmt.Sprintf("%s:%.2f:%s", voice, speed, text)
+// ttsKey includes the delivery instructions: two roles can share a voice and
+// speed but sound different, so leaving instructions out of the key would let
+// one role serve the other a cached MP3 in the wrong style.
+func ttsKey(v voiceProfile, text string) string {
+	return fmt.Sprintf("%s:%.2f:%s:%s", v.voice, v.speed, v.instructions, text)
+}
+
+func (c *ttsCache) get(v voiceProfile, text string) ([]byte, bool) {
+	key := ttsKey(v, text)
 	c.mu.RLock()
-	v, ok := c.items[key]
+	got, ok := c.items[key]
 	c.mu.RUnlock()
 	if ok {
 		atomic.AddInt64(&c.hits, 1)
 	}
-	return v, ok
+	return got, ok
 }
 
-func (c *ttsCache) set(voice string, speed float64, text string, mp3 []byte) {
-	key := fmt.Sprintf("%s:%.2f:%s", voice, speed, text)
+func (c *ttsCache) set(v voiceProfile, text string, mp3 []byte) {
+	key := ttsKey(v, text)
 	c.mu.Lock()
 	// Evict random entries if cache exceeds 200 items (~5MB)
 	if len(c.items) >= 200 {
@@ -1558,18 +1585,21 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 	// the bot ever transmits them without the prefix (it doesn't). To make
 	// prewarm actually help, the composer needs to stitch a cached body MP3
 	// with a per-callsign+tower prefix MP3 — flagged for follow-up.
+	// Must match the profile the tower hot path uses, or every prewarmed
+	// entry lands under a different cache key and never gets hit.
+	prof := voiceProfile{voice, flagTTSSpeed, flagVoiceStyleTower}
 	log.Info().Int("phrases", len(phrases)).Msg("pre-warming TTS cache")
 	warmed := 0
 	for _, phrase := range phrases {
-		if _, ok := globalTTSCache.get(voice, flagTTSSpeed, phrase); ok {
+		if _, ok := globalTTSCache.get(prof, phrase); ok {
 			continue
 		}
-		mp3, err := synthesizeSpeechAPI(ctx, apiKey, phrase, voice, flagTTSSpeed)
+		mp3, err := synthesizeSpeechAPI(ctx, apiKey, phrase, prof)
 		if err != nil {
 			log.Warn().Err(err).Str("phrase", phrase).Msg("TTS prewarm failed")
 			continue
 		}
-		globalTTSCache.set(voice, flagTTSSpeed, phrase, mp3)
+		globalTTSCache.set(prof, phrase, mp3)
 		warmed++
 		// Small delay to avoid rate limiting
 		time.Sleep(200 * time.Millisecond)
@@ -1584,6 +1614,17 @@ func prewarmTTSCache(ctx context.Context, apiKey, voice, runway string) {
 // produce a cold-cache TX latency spike.
 func currentTowerVoice() string {
 	if flagVoiceRotateHrs <= 0 {
+		// Rotation off — pin the voice to the airfield instead of always
+		// using the female slot. Each field then has a stable controller
+		// identity across the whole session, which reads as several distinct
+		// people rather than one whose voice keeps changing. Rotation on a
+		// wall-clock bucket can also flip mid-pattern: a pilot hears one
+		// controller on downwind and another on final.
+		if flagTTSVoiceMale != "" && flagTTSVoiceMale != flagTTSVoice {
+			if icaoVoiceBucket(flagAirfield)%2 == 1 {
+				return flagTTSVoiceMale
+			}
+		}
 		return flagTTSVoice
 	}
 	bucket := time.Now().Unix() / int64(flagVoiceRotateHrs*3600)
@@ -1591,6 +1632,16 @@ func currentTowerVoice() string {
 		return flagTTSVoice
 	}
 	return flagTTSVoiceMale
+}
+
+// icaoVoiceBucket hashes an ICAO to a stable small integer so a given field
+// always lands on the same voice slot, run after run.
+func icaoVoiceBucket(icao string) int {
+	sum := 0
+	for _, r := range strings.ToUpper(icao) {
+		sum += int(r)
+	}
+	return sum
 }
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
@@ -1611,19 +1662,85 @@ func estimateTTSDuration(text string) time.Duration {
 	return d
 }
 
-// synthesizeSpeech checks cache first, falls back to API on miss. speed is the
-// TTS playback rate (0.97 for ATIS to keep clarity, ~1.05 for tower/marshal/
-// command/deckboss for snappier ATC cadence).
-func synthesizeSpeech(ctx context.Context, apiKey, text, voice string, speed float64) ([]byte, error) {
-	if mp3, ok := globalTTSCache.get(voice, speed, text); ok {
+// voiceProfile is everything that decides how a role sounds: which OpenAI voice
+// speaks, how fast, and — the part that actually separates one controller from
+// another — how they deliver it.
+//
+// gpt-4o-mini-tts accepts an `instructions` string that steers tone, cadence,
+// and affect. It is the whole reason to use that model over tts-1, which
+// ignores the field. Without it every role reads in the same neutral
+// audiobook register regardless of which voice is assigned.
+type voiceProfile struct {
+	voice        string
+	speed        float64
+	instructions string
+}
+
+// Delivery briefs per role. A tower controller, a marshal controller, and a
+// flight-deck boss do not sound alike, and the difference is cadence and affect
+// far more than it is timbre.
+const (
+	styleTower = "Speak as a US military air traffic control tower controller. " +
+		"Clipped, matter-of-fact, brisk. Flat affect, no warmth, no rising intonation. " +
+		"Run grouped numbers together as a single phrase rather than reading them one by one."
+
+	styleMarshal = "Speak as a US Navy carrier Marshal controller. " +
+		"Calm, measured, deliberate pacing. Unhurried and steady even in bad weather. " +
+		"Authoritative but never rushed."
+
+	styleDeckboss = "Speak as a US Navy carrier flight deck boss on the deck-edge handset, " +
+		"raising your voice over jet noise. Loud, urgent, punchy, commanding. Very short clauses."
+
+	styleCommand = "Speak as a military strike command controller on a tactical net. " +
+		"Steady, businesslike, confident. Slight urgency, no emotion."
+
+	styleATIS = "Read as a recorded automated terminal information broadcast. " +
+		"Even, neutral, unhurried, identical inflection on every phrase. No emphasis anywhere."
+)
+
+// Per-role speeds. Tower and Deckboss run fast the way real ones do; Marshal is
+// deliberately slower because a Case III approach is read to a pilot who is
+// writing it down; ATIS is slowest for clarity on a loop.
+const (
+	speedMarshal  = 1.00
+	speedDeckboss = 1.10
+	speedATIS     = 0.97
+)
+
+// towerVoice / marshalVoice / deckbossVoice / commandVoice / atisVoice build the
+// profile for each role from the flags. Kept as functions rather than vars so
+// they pick up the rotating tower voice at call time.
+func towerVoice() voiceProfile {
+	return voiceProfile{currentTowerVoice(), flagTTSSpeed, flagVoiceStyleTower}
+}
+
+func marshalVoice(v string) voiceProfile {
+	return voiceProfile{v, speedMarshal, flagVoiceStyleMarshal}
+}
+
+func deckbossVoice(v string) voiceProfile {
+	return voiceProfile{v, speedDeckboss, flagVoiceStyleDeckboss}
+}
+
+func commandVoice(v string) voiceProfile {
+	return voiceProfile{v, flagTTSSpeed, flagVoiceStyleCommand}
+}
+
+func atisVoice(v string) voiceProfile {
+	return voiceProfile{v, speedATIS, flagVoiceStyleATIS}
+}
+
+// synthesizeSpeech checks cache first, falls back to API on miss.
+func synthesizeSpeech(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
+	if mp3, ok := globalTTSCache.get(v, text); ok {
 		log.Debug().Str("text", text).Msg("TTS cache hit")
 		return mp3, nil
 	}
-	mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, voice, speed)
+	mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, v)
 	if err != nil {
 		return nil, err
 	}
-	globalTTSCache.set(voice, speed, text, mp3)
+	globalTTSCache.set(v, text, mp3)
 	return mp3, nil
 }
 
@@ -1680,15 +1797,20 @@ func translateATIS(ctx context.Context, apiKey, text, language string) (string, 
 	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 
-func synthesizeSpeechAPI(ctx context.Context, apiKey, text, voice string, speed float64) ([]byte, error) {
+func synthesizeSpeechAPI(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
+	speed := v.speed
 	if speed <= 0 {
 		speed = 0.97
 	}
 	body := map[string]interface{}{
 		"model": "gpt-4o-mini-tts",
 		"input": text,
-		"voice": voice,
+		"voice": v.voice,
 		"speed": speed,
+	}
+	// Only gpt-4o-mini-tts honours instructions; tts-1/tts-1-hd reject it.
+	if v.instructions != "" {
+		body["instructions"] = v.instructions
 	}
 	data, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST",
@@ -1960,12 +2082,18 @@ func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
 	tmpOut := tmpIn.Name() + ".out.mp3"
 	defer os.Remove(tmpOut)
 
+	// alimiter after the mix: volume=1.15 on top of an 8:1 compressor and then
+	// summing pink noise can push past full scale, and digital clipping sounds
+	// like crackle rather than like a driven radio. The limiter catches those
+	// peaks and gives the hard-driven UHF character the compressor alone
+	// doesn't.
 	filter := fmt.Sprintf(
 		"[0:a]highpass=f=%d,lowpass=f=%d,"+
 			"acompressor=threshold=-24dB:ratio=8:attack=5:release=60,"+
 			"volume=1.15[voice];"+
 			"anoisesrc=color=pink:amplitude=%.3f:duration=0[noise];"+
-			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0[out]",
+			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0,"+
+			"alimiter=limit=0.95:attack=1:release=40[out]",
 		hpf, lpf, noiseAmp,
 	)
 

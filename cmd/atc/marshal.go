@@ -73,7 +73,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 	transmit := func(text string) {
 		log.Info().Str("text", text).Msg("Marshal TX")
 		atomic.StoreInt64(txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, voice, flagTTSSpeed)
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, marshalVoice(voice))
 		if err != nil {
 			log.Error().Err(err).Msg("Marshal TTS failed")
 			return

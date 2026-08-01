@@ -37,7 +37,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 	transmit := func(text string) {
 		log.Info().Str("text", text).Msg("Deckboss TX")
 		atomic.StoreInt64(txCooldown, time.Now().Add(estimateTTSDuration(text)).UnixNano())
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, deckVoice, flagTTSSpeed)
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, deckbossVoice(deckVoice))
 		if err != nil {
 			log.Error().Err(err).Msg("Deckboss TTS failed")
 			return

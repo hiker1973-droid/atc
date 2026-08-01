@@ -25,4 +25,7 @@ set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice fable --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+:: Voice: ash, not fable. Fable is soft and storyteller-ish; the deck boss is
+:: shouting over jet noise on a handset. Delivery style and rate come from
+:: --voice-style-deckboss and speedDeckboss in main.go.
+start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice ash --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
