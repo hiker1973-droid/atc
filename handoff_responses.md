@@ -28,7 +28,7 @@ still reads cleanly. Pilot-side courtesy acks use `ATCComposer.HandoffAck`.
 | Command | Tower | Tacview: pilot closes through 30 NM of a land field | ✅ §1 below |
 | Command | Marshal | Tacview: pilot closes through 30 NM and the **carrier** is nearer than any field | ✅ §1 below |
 | Command | — | Pilot-initiated `RTB` / `request recovery` | ✅ §2 below |
-| Deckboss | Command | Pilot's `airborne` / `clear traffic` call after the shot | ✅ §3 below |
+| Deckboss | Command | Pilot's `airborne` / `clear traffic` call after the shot | ❌ removed 2026-08-06 — see §3 |
 | Deckboss | Command | Pilot-initiated `pushing command` | ✅ §4 below |
 | Deckboss | LSO | `remain in bolter pattern` | ✅ `deckboss_responses.md` §8 |
 | Marshal | Paddles | 3 NM `initial` call | ✅ `marshal_responses.md` §6 |
@@ -47,9 +47,9 @@ vSFG-7 rig, so the handoffs work with no changes to the existing `.bat` files.
 
 | Flag | Default | Used by |
 |---|---|---|
-| `--handoff-command-freq` | `282.0` | Deckboss departure handoff (`0` disables) |
-| `--handoff-command-name` | `vSFG-7-Command` | Deckboss departure handoff |
-| `--handoff-command-preset` | `channel four` | Deckboss departure handoff (empty omits) |
+| `--handoff-command-freq` | `282.0` | Marshal departure handoff (`0` disables). No longer read by Deckboss — see §3 |
+| `--handoff-command-name` | `vSFG-7-Command` | Marshal departure handoff; also Deckboss's `pushing command` ack (§4) |
+| `--handoff-command-preset` | `channel four` | Marshal departure handoff (empty omits). No longer read by Deckboss |
 | `--handoff-marshal-freq` | `306.3` | Command carrier-recovery handoff (`0` disables) |
 | `--handoff-marshal-name` | `Marshal` | Command carrier-recovery handoff |
 
@@ -98,20 +98,23 @@ will do rather than guessing a field.
 
 ---
 
-## 3. Deckboss → Command (on the airborne call)
+## 3. Deckboss → Command (on the airborne call) — **REMOVED 2026-08-06**
 
-Replaces the bare `copy, good hunting` ack on `deckboss_responses.md` §4.
-Deckboss owns the deck, not the departing aircraft — once they're off the bow
-they belong to the strike controller, so this is where the real flow gets them
-off the deck frequency.
+Deckboss no longer hands departing aircraft to Command on the airborne call.
+The `deckboss_responses.md` §4 ack is now a bare `{CALLSIGN}, Deckboss, copy
+airborne.` and pilots switch to Command on their own. Cat/conga slot management
+on that call is unchanged.
+
+The removed variants, for reference if this is ever put back:
 
 1. `{CALLSIGN}, Deckboss, contact {HANDOFF}, {FREQ}, {PRESET}. Good hunting.`
 2. `{CALLSIGN}, Deckboss, switch to {HANDOFF}, {FREQ}, {PRESET}. Good hunting.`
 3. `{CALLSIGN}, Deckboss, frequency change approved, contact {HANDOFF}, {FREQ}, {PRESET}. Good hunting.`
 
-Falls back to the old `{CALLSIGN}, Deckboss, copy, good hunting.` when
-`--handoff-command-freq` is `0`. Cat/conga slot management on this call is
-unchanged.
+`--handoff-command-freq` / `--handoff-command-preset` now have no effect on
+Deckboss; `--handoff-command-name` is still read by §4 below (the
+pilot-initiated `pushing command` ack). Both flags still drive the Tower and
+Marshal handoffs above.
 
 ---
 

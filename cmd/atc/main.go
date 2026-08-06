@@ -177,8 +177,12 @@ func main() {
 	// (see start_*.bat), so the destinations it hands off TO are configured
 	// separately. Defaults match the vSFG-7 rig, so the handoffs work with no
 	// extra flags on the existing .bat files.
+	// -freq and -preset no longer reach Deckboss: its airborne ack was cut back
+	// to a bare "copy airborne" on 2026-08-06 and it no longer hands departing
+	// aircraft off the deck freq. -name is still spoken in Deckboss's
+	// pilot-initiated "pushing command" ack. All three stay live for Marshal.
 	f.Float64Var(&flagHandoffCommandFreq, "handoff-command-freq", 282.0,
-		"Frequency MHz that Deckboss/Marshal send departing pilots to (0=disable that handoff)")
+		"Frequency MHz that Marshal sends departing pilots to (0=disable that handoff)")
 	f.StringVar(&flagHandoffCommandName, "handoff-command-name", "vSFG-7-Command",
 		"Controller name spoken in the departure handoff")
 	f.StringVar(&flagHandoffCommandPreset, "handoff-command-preset", "channel four",

@@ -267,7 +267,7 @@ Post-landing:
 - `Deckboss, [callsign], radio check`
 - `Deckboss, [callsign], request taxi` · `green jet` (ready for cat assignment)
 - `Deckboss, [callsign], ready cat [N]` · `tension cat [N]` · `shoot` (under tension)
-- `[callsign], airborne` (post-launch ack — slot is already cleared after shoot, so this is optional)
+- `[callsign], airborne` (post-launch — Deckboss replies "copy airborne"; the slot is already cleared 10 s after the under-tension ack, so this is optional)
 - `Deckboss, [callsign], remain in bolter [pattern]` (trap practice — Deckboss acks and hands off to LSO)
 - `Deckboss, [callsign], say BRC` · `request BRC` (mother's heading)
 

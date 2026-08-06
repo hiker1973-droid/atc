@@ -741,24 +741,15 @@ func (c *ATCComposer) CommandFuelState(callsign string, fuelState float64) strin
 // ── Deckboss Composer Methods ─────────────────────────────────────────────────
 
 // DeckbossCatAssign — assigns a cat to an incoming green jet.
-// DeckbossUnderTension — aircraft on cat, under tension.
+// DeckbossUnderTension — aircraft on cat, under tension. Deckboss does not
+// call the shot: the launch is the shooter's, so the ack tells the pilot to
+// run the engines up and wait for the shooter's signal rather than issuing a
+// "clear to launch" from the radio.
 func (c *ATCComposer) DeckbossUnderTension(callsign string, catNum int) string {
 	cat := numberWord(catNum)
 	return pick([]string{
-		fmt.Sprintf("%s, Deckboss, under tension, cat %s, clear to launch.", callsign, cat),
-		fmt.Sprintf("%s, Deckboss, tension cat %s, hold.", callsign, cat),
-		fmt.Sprintf("%s, Deckboss, cat %s under tension, stand by.", callsign, cat),
-	})
-}
-
-// DeckbossShoot — shooter's launch signal, fires ~5s after UnderTension.
-// Not callsigned; addresses the cat itself, deck-wide.
-func (c *ATCComposer) DeckbossShoot(catNum int) string {
-	cat := numberWord(catNum)
-	return pick([]string{
-		fmt.Sprintf("Cat %s, fly.", cat),
-		fmt.Sprintf("Cat %s, shoot, shoot, shoot.", cat),
-		fmt.Sprintf("Cat %s, cleared to launch.", cat),
+		fmt.Sprintf("%s, Deckboss, under tension cat %s, spin it up, shooter's discretion.", callsign, cat),
+		fmt.Sprintf("%s, Deckboss, copy under tension, go gates, shooter's discretion.", callsign),
 	})
 }
 

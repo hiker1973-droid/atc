@@ -164,9 +164,15 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			}
 			// §2 under tension / shoot shortcut: pilot says either
 			// "under tension cat X" / "ready cat X" OR the shortcut "shoot"
-			// (with the address). Fires the under-tension ack + the 5s auto-
-			// shoot. Cat number is sourced from state (§1 assignment), then
-			// from text regex, then a generic ack as last resort.
+			// (with the address). Fires the under-tension ack and starts the
+			// 10s cat-clear timer below. Cat number is sourced from state
+			// (§1 assignment), then from text regex, then a generic ack as
+			// last resort.
+			//
+			// Note the address guard above is load-bearing for a second
+			// reason now: the ack ends in "shooter's discretion", which
+			// contains the bare "shoot" trigger. The echo comes back
+			// callsign-led, so it is dropped before it can re-fire §2.
 			catNum := deck.GetCatByCallsign(callsign)
 			if catNum == 0 {
 				// Pilot called §2 without prior §1 — parse cat number directly
@@ -181,41 +187,31 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			}
 			if catNum > 0 {
 				transmit(comp.DeckbossUnderTension(callsign, catNum))
-				// §2a auto-shoot + slot management: shooter's launch signal
-				// 5s after under-tension. After the shoot fires, free the
-				// cat and pull next conga aircraft onto it. Was previously
-				// deferred to §4 (pilot's airborne call) — moved here so
-				// next-up gets their slot announcement as soon as the
-				// launching pilot is fired off, not whenever they remember
-				// to call airborne. §4 still handles the fallback for the
-				// generic-ack edge case below.
-				go func(cs string, cn int) {
+				// §2a slot management. Deckboss no longer calls the shot —
+				// the under-tension ack ends with "shooter's discretion" and
+				// the shooter fires the jet off the deck, so there is no
+				// "Cat X, shoot, shoot, shoot" TX (removed 2026-08-06). The
+				// timer still runs the slot handoff: 10 seconds after the
+				// under-tension ack the aircraft is off the cat, so free it
+				// and pull the next conga aircraft onto it. Next-up hears
+				// their slot without waiting on the launching pilot's
+				// airborne call; §4 still covers the generic-ack edge case.
+				go func(cs string) {
 					select {
 					case <-ctx.Done():
 						return
-					case <-time.After(5 * time.Second):
-						transmit(comp.DeckbossShoot(cn))
+					case <-time.After(10 * time.Second):
 					}
 					freed := deck.FreeCat(cs)
 					if freed > 0 {
-						log.Info().Str("callsign", cs).Int("cat", freed).Msg("Deckboss: cat cleared (post-shoot)")
+						log.Info().Str("callsign", cs).Int("cat", freed).Msg("Deckboss: cat cleared (post-launch)")
 						next := deck.DequeueConga()
 						if next != "" {
 							deck.AssignCat(next)
-							nx, fn := next, freed
-							// 10s gap after the shoot call before announcing to
-							// next-up — gives the launching aircraft time to
-							// taxi off the cat / clear the deck so the slot is
-							// realistically open when next-up hears it. Lands
-							// at T+15 from the under-tension ack (T+0 tension,
-							// T+5 shoot, T+15 cat clear).
-							go func() {
-								time.Sleep(10 * time.Second)
-								transmit(fmt.Sprintf("%s, %s", nx, comp.DeckbossCatClear(fn)))
-							}()
+							transmit(fmt.Sprintf("%s, %s", next, comp.DeckbossCatClear(freed)))
 						}
 					}
-				}(callsign, catNum)
+				}(callsign)
 			} else {
 				// Couldn't parse a cat number from the call — generic ack
 				transmit(fmt.Sprintf("%s, Deckboss, copy under tension.", callsign))
@@ -237,25 +233,27 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 
 		case containsAny(lower, "airborne", "clear traffic"):
 			// §4: pilot's optional airborne callout. In the standard flow
-			// the cat was already cleared by §2a immediately after shoot,
-			// so this is just an ack. The slot-management block below only
-			// fires as a fallback when §2a was skipped (generic "copy under
-			// tension" in §2 because no cat number was parseable). FreeCat
-			// returns 0 if the slot is already cleared, so the double-fire
-			// guard is free. The ack deliberately omits the word "airborne"
-			// so the SRS echo doesn't re-trigger this same case in a loop.
+			// the cat was already cleared by §2a on the 10s post-launch
+			// timer, so this is just an ack. The slot-management block below
+			// only fires as a fallback when §2a was skipped (generic "copy
+			// under tension" in §2 because no cat number was parseable).
+			// FreeCat returns 0 if the slot is already cleared, so the
+			// double-fire guard is free.
 			//
-			// The ack also carries the departure handoff. Deckboss owns the
-			// deck, not the departing aircraft — once they're off the bow
-			// they belong to the strike controller, so this is the point the
-			// real flow sends them off the deck freq. Falls back to the bare
-			// ack when --handoff-command-freq is 0.
-			if flagHandoffCommandFreq > 0 {
-				transmit(comp.Handoff(callsign, flagHandoffCommandName,
-					flagHandoffCommandFreq, flagHandoffCommandPreset, "Good hunting."))
-			} else {
-				transmit(fmt.Sprintf("%s, Deckboss, copy, good hunting.", callsign))
+			// The ack is now "copy airborne" (2026-08-06) — it repeats the
+			// trigger word, so the old "omit the word" self-echo protection
+			// is gone and the mid-string check below replaces it: our own TX
+			// comes back callsign-led with "Deckboss" in the middle
+			// ("Raider 032, Deckboss, copy airborne."), which no pilot call
+			// looks like. Pilots may or may not lead with "Deckboss" on this
+			// call, so both of their shapes still get through — address-led
+			// ("Deckboss, Raider 032, airborne") and bare ("Raider 032,
+			// airborne").
+			if !addressed && containsAny(lower, addrPrefixes...) {
+				log.Debug().Str("text", text).Msg("Deckboss: §4 dropped — Deckboss mid-string, self-echo of airborne ack")
+				return
 			}
+			transmit(fmt.Sprintf("%s, Deckboss, copy airborne.", callsign))
 			catNum := deck.FreeCat(callsign)
 			if catNum > 0 {
 				log.Info().Str("callsign", callsign).Int("cat", catNum).Msg("Deckboss: cat cleared (airborne fallback)")

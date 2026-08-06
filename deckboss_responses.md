@@ -13,7 +13,7 @@ Triggers from `cmd/atc/deckboss.go` `handleDeckbossCall`. Responses from `pkg/co
 
 Deckboss handles **on-deck** aircraft only — cat assignment, conga-line sequencing, launch detection. Inbound recovery is Marshal's job (306.3).
 
-**Address rule:** §1 (check-in), §2 (under tension), §6 (radio check), §7 (BRC), and §8 (bolter pattern) require the pilot to lead with `Deckboss, ...`. Without the address prefix the call is treated as a self-echo of Deckboss's own TX and dropped. §3 (shooter / tension-only) and §4 (airborne / clear traffic) skip the guard — pilots typically don't address Deckboss on those quick calls and the response shapes can't false-fire §4.
+**Address rule:** §1 (check-in), §2 (under tension), §6 (radio check), §7 (BRC), and §8 (bolter pattern) require the pilot to lead with `Deckboss, ...`. Without the address prefix the call is treated as a self-echo of Deckboss's own TX and dropped. §3 (shooter / tension-only) and §4 (airborne / clear traffic) skip the guard — pilots typically don't address Deckboss on those quick calls. §4 instead uses a mid-string check (see §4) since its ack now repeats the trigger word.
 
 ---
 
@@ -56,34 +56,30 @@ The Tacview path is also idempotent per callsign: a pilot who re-checks in gets 
 
 **Triggers:** (`ready` OR `tension`) AND `cat`  *(must appear together)*  ·  OR `shoot` (shortcut)
 
-Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing). The `shoot` shortcut collapses the under-tension call into one word — pilot just says `Deckboss, Raider XX, shoot` and Deckboss fires §2 ack + §2a auto-shoot. Cat number sourced from §1 assignment if present, otherwise parsed from the transmission, otherwise generic ack.
+Pilot reports they're spotted and ready. Deckboss confirms tension. Accepts both `ready cat X` (standard carrier pre-tension call) and `tension cat X` (shooter-side phrasing). The `shoot` shortcut collapses the under-tension call into one word — pilot just says `Deckboss, Raider XX, shoot` and Deckboss fires the §2 ack, then the §2a cat-clear timer. Cat number sourced from §1 assignment if present, otherwise parsed from the transmission, otherwise generic ack.
 
 **Responses (`DeckbossUnderTension`):**
-1. `{CALLSIGN}, Deckboss, under tension, cat {CAT}, clear to launch.`
-2. `{CALLSIGN}, Deckboss, tension cat {CAT}, hold.`
-3. `{CALLSIGN}, Deckboss, cat {CAT} under tension, stand by.`
+1. `{CALLSIGN}, Deckboss, under tension cat {CAT}, spin it up, shooter's discretion.`
+2. `{CALLSIGN}, Deckboss, copy under tension, go gates, shooter's discretion.`
+
+Deckboss does **not** call the shot (changed 2026-08-06). The launch belongs to the shooter, so the ack tells the pilot to run the engines up and go on the shooter's signal — no "clear to launch" from the radio. Variant 2 carries no cat number, which is fine: the cat was already named in the §1 assignment.
 
 ---
 
-## 2a. Auto-shoot (5s after §2) + cat clear + next-conga pull
+## 2a. Cat clear + next-conga pull (10s after §2)
 
-**Triggers:** automatic — fires 5 seconds after a successful §2 `DeckbossUnderTension` response. Not pilot-initiated.
+**Triggers:** automatic — fires 10 seconds after a successful §2 `DeckbossUnderTension` response. Not pilot-initiated.
 
-Shooter's launch signal. Not callsigned (addresses the cat, deck-wide). **After the shoot call, Deckboss frees the cat slot and pulls the next pilot from the conga onto it** (or, if conga is empty, leaves the slot open for the next §1 `Request Taxi` caller). The cat-clear ack to next-up TXes **10 seconds after the shoot call** (T+15 from the under-tension ack) — gives the launching aircraft time to taxi off the cat / clear the deck so the slot is realistically open when next-up hears it. Next-up gets their slot assignment without waiting for the launching pilot's airborne call.
+There is no longer a Deckboss shoot call (`DeckbossShoot` removed 2026-08-06) — this is now a silent timer that only does slot management. By T+10 the jet is off the cat, so Deckboss frees the slot and pulls the next pilot from the conga onto it (or, if the conga is empty, leaves the slot open for the next §1 `Request Taxi` caller). Next-up gets their slot assignment without waiting for the launching pilot's airborne call.
 
-**Timeline:** T+0 under tension → T+5 shoot → T+15 cat clear to next-up.
+**Timeline:** T+0 under tension → T+10 cat clear to next-up.
 
-**Responses (`DeckbossShoot`):**
-1. `Cat {CAT}, fly.`
-2. `Cat {CAT}, shoot, shoot, shoot.`
-3. `Cat {CAT}, cleared to launch.`
-
-**Cat-clear ack to next-up (`DeckbossCatClear`)** — fires immediately after the shoot call if a conga pilot is waiting. Prefixed with next-up callsign:
+**Cat-clear ack to next-up (`DeckbossCatClear`)** — fires at T+10 if a conga pilot is waiting. Prefixed with next-up callsign:
 1. `{NEXT_CALLSIGN}, Deckboss, cat {CAT} is clear.`
 2. `{NEXT_CALLSIGN}, Deckboss, cat {CAT} clear, deck is moving.`
 3. `{NEXT_CALLSIGN}, Deckboss, cat {CAT} off the deck.`
 
-Only fires when §2 had a real cat number (either from `GetCatByCallsign` or parsed from the pilot's transmission). The generic "copy under tension" fallback skips the auto-shoot **and** the cat-clear — §4 airborne or §5 Tacview fallback handles those edge cases.
+Only fires when §2 had a real cat number (either from `GetCatByCallsign` or parsed from the pilot's transmission). The generic "copy under tension" fallback skips the cat-clear — §4 airborne or §5 Tacview fallback handles those edge cases.
 
 ---
 
@@ -99,23 +95,22 @@ Currently **silent** — no transmission, just a debug log. Pilot is going. If t
 
 **Triggers:** `airborne` OR `clear traffic` (from the just-launched pilot)
 
-Pilot's optional airborne callout. In the standard flow the cat slot was already cleared by §2a immediately after shoot, so this is just an ack — no slot management needed. The ack TXes to the launching pilot only; next-up was already pulled at §2a.
+Pilot's optional airborne callout. In the standard flow the cat slot was already cleared by §2a on the T+10 timer, so this is just an ack — no slot management needed. The ack TXes to the launching pilot only; next-up was already pulled at §2a.
 
-**Ack to launching pilot** (always fires) — now carries the departure handoff to
-Command, since Deckboss owns the deck and not the departing aircraft. See
-`handoff_responses.md` §3.
-- `{CALLSIGN}, Deckboss, contact {HANDOFF}, {FREQ}, {PRESET}. Good hunting.` (+2 variants)
-- Falls back to `{CALLSIGN}, Deckboss, copy, good hunting.` when `--handoff-command-freq` is `0`.
+**Ack to launching pilot** (always fires) — bare ack, single variant:
+- `{CALLSIGN}, Deckboss, copy airborne.`
 
-The ack deliberately omits the word "airborne" so the SRS echo of our own TX doesn't re-trigger §4 in a loop. (§4 skips the address-led guard since pilots don't address Deckboss on quick airborne calls — the self-trigger risk is mitigated by avoiding the trigger word in our response.)
+The departure handoff to Command was **removed from this ack 2026-08-06** — Deckboss no longer pushes departing aircraft off the deck freq, pilots switch on their own. `--handoff-command-freq` no longer affects §4 (the pilot-initiated "switching command" ack below still uses `--handoff-command-name`).
+
+**Self-echo guard.** The ack now repeats the trigger word "airborne", so the old "omit the trigger word" protection is gone. In its place §4 drops any transmission that is *not* address-led but *does* contain a Deckboss token somewhere in the middle — which is exactly the shape of our own TX echoing back (`Raider 032, Deckboss, copy airborne.`) and never the shape of a pilot call. Both pilot phrasings still land: `Deckboss, Raider 032, airborne` (address-led) and a bare `Raider 032 airborne` (no Deckboss token).
 
 **Fallback path:** If §2 fell back to the generic "copy under tension" ack (no real cat number identified), §2a was skipped and the cat slot is still held. In that case §4 takes over: frees the cat, pulls next conga aircraft, and TXes `DeckbossCatClear` to next-up. The cat-clear variants are the same as §2a.
 
 ---
 
-## 5. Auto-detected launch (no shoot, no airborne call)
+## 5. Auto-detected launch (no cat number, no airborne call)
 
-Background Tacview timer. If §2a fired (shoot path), the cat is already clear — this fallback does nothing. Same for §4 (airborne path). This only fires when both §2a and §4 were skipped: e.g. pilot said "under tension" without a cat number AND never called airborne. After 2 minutes on cat the Tacview monitor detects the aircraft off the deck and frees the slot. Same `DeckbossCatClear` response goes to next conga aircraft.
+Background Tacview timer. If §2a fired (T+10 timer), the cat is already clear — this fallback does nothing. Same for §4 (airborne path). This only fires when both §2a and §4 were skipped: e.g. pilot said "under tension" without a cat number AND never called airborne. After 2 minutes on cat the Tacview monitor detects the aircraft off the deck and frees the slot. Same `DeckbossCatClear` response goes to next conga aircraft.
 
 No pilot-side trigger here — it's a background timer.
 

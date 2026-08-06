@@ -86,9 +86,9 @@ Don't call `initial` in Case 3 — call `platform` instead.
 |---|---|
 | `radio check` | loud and clear |
 | `request taxi` / `green jet` | cat assignment OR conga line position |
-| `ready cat [N]` / `tension cat [N]` / `shoot` | under tension, then auto-shoot 5 s later |
-| (auto) cat clear | next conga pilot pulled onto cat at T+15 s |
-| `airborne` (post-launch) | copy, good hunting (optional) |
+| `ready cat [N]` / `tension cat [N]` / `shoot` | under tension, spin it up — shooter's discretion (no shoot call) |
+| (auto) cat clear | next conga pilot pulled onto cat at T+10 s |
+| `airborne` (post-launch) | copy airborne (optional) |
 | `remain in bolter [pattern]` | copy, hand off to LSO |
 | `say BRC` / `request BRC` | mother's BRC |
 
