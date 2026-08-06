@@ -2277,6 +2277,10 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 	// Object registries persist across reconnects — Tacview resends full state on reconnect
 	objects := make(map[string]string)
 	objectTypes := make(map[string]string)
+	// Hull/airframe name (ACMI Name=), kept separately from the objects map:
+	// that one prefers Group=, which the whole strike group shares, so it can't
+	// tell CVN_72 from LHA_Tarawa. findCarrierContact needs the real name.
+	objectNames := make(map[string]string)
 	type objData struct {
 		lon, lat, altFt, speedKts float64
 		headingDeg                float64
@@ -2429,13 +2433,19 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 					positions[id] = &objData{}
 				}
 			}
+			if n := extractACMIProp(props, "Name"); n != "" {
+				objectNames[id] = n
+			}
 			// First-seen diagnostic: dump the full ACMI prop line so we can
 			// confirm which fields DCS is actually exporting (modex vs player).
 			if !wasKnown && objects[id] != "" {
 				// Air-only: ATC only ever does callsign lookups for aircraft.
 				// Without this filter the log is drowned by every ground
 				// vehicle, ship, and static in the mission (200+ entries).
-				if t := extractACMIProp(props, "Type"); strings.HasPrefix(t, "Air") {
+				// Flat-tops are logged too — when Marshal calls a BRC from the
+				// wrong hull, this line is what identifies the right one.
+				if t := extractACMIProp(props, "Type"); strings.HasPrefix(t, "Air") ||
+					strings.Contains(t, "AircraftCarrier") {
 					log.Info().
 						Str("id", id).
 						Str("chosenKey", objects[id]).
@@ -2522,13 +2532,20 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 				positions[id].speedKts = iasMs * 1.94384
 			}
 
-			// Feed into ATC state — air objects only (filter ground/sea/static)
+			// Feed into ATC state — aircraft plus flat-tops; everything else
+			// (escorts, ground units, statics) is filtered out. The carrier has
+			// to be let through for Marshal/Deckboss BRC and range calls.
+			// NOTE: this used to read strings.Contains(objType, "Air"), which
+			// admitted carriers only by accident — "Sea+Watercraft+Aircraft-
+			// Carrier" happens to contain "Air". Spelled out so the carrier
+			// path can't be lost to a well-meaning tightening of the filter.
 			if callsign, ok := objects[id]; ok {
 				objType := objectTypes[id]
-				isAir := objType == "" || strings.Contains(objType, "Air")
-				if isAir {
+				wanted := objType == "" || strings.HasPrefix(objType, "Air") ||
+					strings.Contains(objType, "AircraftCarrier")
+				if wanted {
 					if pos, ok := positions[id]; ok && pos.hasPos {
-						atcCtrl.UpdateAnyPosition(callsign, pos.lon, pos.lat, pos.altFt, pos.speedKts, pos.headingDeg, pos.vertSpeedFpm)
+						atcCtrl.UpdateAnyPosition(callsign, objectNames[id], objType, pos.lon, pos.lat, pos.altFt, pos.speedKts, pos.headingDeg, pos.vertSpeedFpm)
 						atomic.StoreInt64(lastData, time.Now().UnixNano())
 					}
 				}

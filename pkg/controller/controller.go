@@ -116,6 +116,10 @@ type ATCRequest struct {
 // TacviewContact holds full state for any aircraft seen in Tacview.
 type TacviewContact struct {
 	Callsign     string
+	UnitName     string // ACMI Name= (e.g. "CVN_72", "LHA_Tarawa") — Callsign
+	                    // may be the Group= label, which is shared by the whole
+	                    // strike group and does not identify the hull.
+	ObjType      string // ACMI Type= (e.g. "Sea+Watercraft+AircraftCarrier")
 	Lon, Lat     float64
 	AltFt        float64
 	SpeedKts     float64
@@ -1686,13 +1690,22 @@ func (c *ATCController) lookupContact(callsign string) *TacviewContact {
 	return nil
 }
 
-// UpdateAnyPosition records position for ANY Tacview aircraft and updates ATC state.
-func (c *ATCController) UpdateAnyPosition(callsign string, lon, lat, altFt, speedKts, headingDeg, vertSpeedFpm float64) {
+// UpdateAnyPosition records position for ANY Tacview aircraft and updates ATC
+// state. unitName / objType are the raw ACMI Name= and Type= fields; they are
+// what findCarrierContact uses to tell the flat-top from its escorts, since
+// the callsign key is often a shared Group= label.
+func (c *ATCController) UpdateAnyPosition(callsign, unitName, objType string, lon, lat, altFt, speedKts, headingDeg, vertSpeedFpm float64) {
 	c.allPositionsMu.Lock()
 	if c.allPositions[callsign] == nil {
 		c.allPositions[callsign] = &TacviewContact{Callsign: callsign}
 	}
 	contact := c.allPositions[callsign]
+	if unitName != "" {
+		contact.UnitName = unitName
+	}
+	if objType != "" {
+		contact.ObjType = objType
+	}
 	contact.Lon = lon
 	contact.Lat = lat
 	contact.AltFt = altFt
@@ -1779,55 +1792,94 @@ func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 	return false
 }
 
-// findCarrierContact locates the carrier in Tacview using a two-tier match.
-// Different missions name the CVN differently:
-//   - Training missions export the CVN as e.g. "CVN-72 ABE" (matches the
-//     "cvn"/"lincoln" tier).
-//   - Foothold exports the CVN as "Carrier strike group-5" (only matches the
-//     generic "carrier" tier), and the same mission may also export escort /
-//     group-center marker units that ALSO contain "carrier" in their name and
-//     sit dozens of nm away from the actual flat-top.
+// cvnHullNames are the supercarrier hull / class names DCS exports in the ACMI
+// Name= field. Used to prefer the CVN over an LHA when a mission floats both.
+var cvnHullNames = []string{
+	"cvn", "lincoln", "stennis", "roosevelt", "washington", "vinson",
+	"nimitz", "eisenhower", "truman", "forrestal",
+}
+
+// findCarrierContact locates the flat-top in Tacview.
 //
-// To stay correct across both naming conventions, we prefer named-ship matches
-// (tier 1) and fall back to the generic "carrier" tier only when no specific
-// CVN is found. All matching candidates are logged so future mismatches can
-// be debugged from the JSONL trail. Caller must hold c.allPositionsMu (read).
+// Matching on the contact's map key alone is not safe: the key is whatever
+// UpdateAnyPosition was handed, and for ships DCS usually supplies the ACMI
+// Group= label, which the ENTIRE strike group shares. A live Training 1 feed
+// (verified 2026-08-06) exports, among others:
+//
+//	Group "Carrier strike group"     Name CVN_72       Sea+Watercraft+AircraftCarrier  hdg 358
+//	Group "Carrier strike group-1"   Name LHA_Tarawa   Sea+Watercraft+AircraftCarrier  hdg 179
+//	Group "Carrier strike group-2"   Name S-3B Tanker  Air+FixedWing
+//	Group "Carrier strike group-10"  Name SH-60B       Air+Rotorcraft
+//
+// A "does the key contain 'carrier'" match therefore picks a coin-flip among
+// the CVN, an amphib steaming the opposite leg of the box, a tanker, and a
+// helo — and Go's random map iteration order means it can pick a different one
+// on every call. That is what produced BRC readings 180° out: the Tarawa on
+// 179 instead of the Lincoln on 358.
+//
+// So we match on the ACMI Type= (authoritative — only real flat-tops carry
+// "AircraftCarrier") and break ties on the hull Name=, preferring the CVN.
+// Within a tier the lowest key wins, so the answer is stable across calls
+// rather than flip-flopping with map order. Name/group keyword matching
+// survives as a last resort for feeds that don't export Type=, but excludes
+// aircraft so a strike-group-labelled tanker can never stand in for the boat.
+// All candidates are logged so future mismatches are debuggable from the JSONL
+// trail. Caller must hold c.allPositionsMu (read).
 func (c *ATCController) findCarrierContact() (callsign string, contact *TacviewContact, found bool) {
-	var primaryCS, fallbackCS string
-	var primary, fallback *TacviewContact
+	type candidate struct {
+		cs string
+		ct *TacviewContact
+	}
+	// Tiers, best first: CVN hull → any flat-top → CVN-named non-aircraft →
+	// strike-group label on a non-aircraft.
+	var tiers [4][]candidate
+	tierNames := [4]string{"CVN", "flat-top", "named", "group"}
 	var candidates []string
 	for cs, ct := range c.allPositions {
 		if time.Since(ct.UpdatedAt) > 60*time.Second {
 			continue
 		}
-		lower := strings.ToLower(cs)
+		hay := strings.ToLower(cs + " " + ct.UnitName)
+		isFlatTop := strings.Contains(ct.ObjType, "AircraftCarrier")
+		isAircraft := strings.HasPrefix(ct.ObjType, "Air+")
+		hasCVNName := matchesAny(hay, cvnHullNames)
+		tier := -1
 		switch {
-		case strings.Contains(lower, "cvn"),
-			strings.Contains(lower, "lincoln"),
-			strings.Contains(lower, "stennis"),
-			strings.Contains(lower, "roosevelt"),
-			strings.Contains(lower, "washington"),
-			strings.Contains(lower, "vinson"):
-			candidates = append(candidates, cs+" [CVN]")
-			if primary == nil {
-				primaryCS, primary = cs, ct
-			}
-		case strings.Contains(lower, "carrier"):
-			candidates = append(candidates, cs+" [group]")
-			if fallback == nil {
-				fallbackCS, fallback = cs, ct
-			}
+		case isFlatTop && hasCVNName:
+			tier = 0
+		case isFlatTop:
+			tier = 1
+		case !isAircraft && hasCVNName:
+			tier = 2
+		case !isAircraft && strings.Contains(hay, "carrier"):
+			tier = 3
+		default:
+			continue
 		}
+		tiers[tier] = append(tiers[tier], candidate{cs, ct})
+		candidates = append(candidates, cs+"/"+ct.UnitName+" ["+tierNames[tier]+"]")
 	}
-	if primary != nil {
-		c.logCarrierChoice(primaryCS, candidates, "carrier match")
-		return primaryCS, primary, true
-	}
-	if fallback != nil {
-		c.logCarrierChoice(fallbackCS, candidates, "carrier match (group-label fallback)")
-		return fallbackCS, fallback, true
+	sort.Strings(candidates)
+	for tier, group := range tiers {
+		if len(group) == 0 {
+			continue
+		}
+		sort.Slice(group, func(i, j int) bool { return group[i].cs < group[j].cs })
+		best := group[0]
+		c.logCarrierChoice(best.cs, candidates, "carrier match ("+tierNames[tier]+")")
+		return best.cs, best.ct, true
 	}
 	return "", nil, false
+}
+
+// matchesAny reports whether lower (already lowercased) contains any needle.
+func matchesAny(lower string, needles []string) bool {
+	for _, n := range needles {
+		if strings.Contains(lower, n) {
+			return true
+		}
+	}
+	return false
 }
 
 // logCarrierChoice emits an info-level log only when the chosen carrier
@@ -1848,8 +1900,14 @@ func (c *ATCController) logCarrierChoice(chosen string, candidates []string, msg
 }
 
 // GetCarrierBRC returns the carrier's Base Recovery Course (bow direction) from
-// Tacview. Returns -1 if carrier not found. Tacview's HeadingDeg on the CVN
-// points at the bow, so we return it directly.
+// Tacview. Returns -1 if carrier not found.
+//
+// HeadingDeg is returned as-is: Tacview's heading on the CVN points at the BOW.
+// Re-verified against the live Training 1 feed 2026-08-06 — CVN_72's reported
+// heading (358.3) matched its course over ground computed from 90 s of
+// position samples (358.3) to a tenth of a degree. Do NOT reintroduce a +180
+// inversion here; every 180°-out report so far has been findCarrierContact
+// locking onto the wrong hull, not a bad heading.
 func (c *ATCController) GetCarrierBRC() float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
