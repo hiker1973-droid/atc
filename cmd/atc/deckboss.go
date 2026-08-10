@@ -62,7 +62,8 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 	const deckCallsign = "Deckboss"
 	deckVoice := voice
 	if deckVoice == "" {
-		deckVoice = "ash"
+		// Keep in sync with the --deckboss-voice default in main.go.
+		deckVoice = "shimmer"
 	}
 	comp := composer.NewATCComposer(deckCallsign)
 

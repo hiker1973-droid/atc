@@ -46,7 +46,7 @@ exposed as a flag.
 |---|---|---|
 | Tower | `--tts-voice` (`nova`) / `--tts-voice-male` (`onyx`) | See rotation below. |
 | Marshal | `--marshal-voice` (`coral` in `start_marshal.bat`) | Good fit — calm and even. |
-| Deckboss | `--deckboss-voice` (`ash`) | Was `fable` in `start_deckboss.bat`, which is soft and storyteller-ish — wrong for someone shouting over jet noise. |
+| Deckboss | `--deckboss-voice` (`shimmer`) | Female, bright and cutting — suits shouting over jet noise. Was `ash` (male) until 2026-08-06; `fable` before that, rejected as soft and storyteller-ish. Shared with Al Dhafra Tower: the four female voices were all taken, and a land field on 251.1 is the safest one to double up on. |
 | Command | `--command-voice` (`sage` in `start_command.bat`) | Good fit. |
 
 ## Tower voice rotation

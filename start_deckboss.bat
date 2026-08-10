@@ -25,7 +25,17 @@ set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-:: Voice: ash, not fable. Fable is soft and storyteller-ish; the deck boss is
-:: shouting over jet noise on a handset. Delivery style and rate come from
-:: --voice-style-deckboss and speedDeckboss in main.go.
-start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice ash --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+:: Voice: shimmer (female, 2026-08-06 — was ash, which is male). Bright and
+:: cutting, which suits a deck boss shouting over jet noise on a handset;
+:: fable was rejected earlier for being soft and storyteller-ish.
+::
+:: shimmer is shared with Al Dhafra Tower (OMAM, 251.1) — the one duplicate in
+:: the stack. Every other female OpenAI voice is already spoken for: nova is
+:: OMDM Tower (same process as Deckboss, so the worst possible collision),
+:: coral is Marshal (the other carrier voice), sage is Command (everyone
+:: monitors it). Al Dhafra is a land field a carrier pilot on 128.6 will not
+:: have tuned, so it is the safest voice to double up on.
+::
+:: Delivery style and rate come from --voice-style-deckboss and speedDeckboss
+:: in main.go — both gender-neutral, so no change needed there.
+start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
