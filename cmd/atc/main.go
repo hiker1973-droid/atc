@@ -165,8 +165,8 @@ func main() {
 		"HTTP dashboard port (0=disabled). OMDM=6001, OMAM=6002, OMAL=6003")
 	f.StringVar(&flagDeckbossFreq, "deckboss-freq", "0",
 		"Deckboss frequency MHz (OMDM only, e.g. 128.6 — DCS carrier UHF)")
-	f.StringVar(&flagDeckbossVoice, "deckboss-voice", "ash",
-		"OpenAI TTS voice for Deckboss: ash (default, calm authoritative), echo (mid male), ballad, sage, onyx, etc.")
+	f.StringVar(&flagDeckbossVoice, "deckboss-voice", "shimmer",
+		"OpenAI TTS voice for Deckboss: shimmer (default, female, bright and cutting), nova/coral/sage (other female), ash/echo/onyx (male)")
 	f.StringVar(&flagMarshalVoice, "marshal-voice", "ballad",
 		"OpenAI TTS voice for Marshal: ballad (default, naval-controller feel), verse, sage, onyx, etc.")
 	f.StringVar(&flagMarshalFreq, "marshal-freq", "0",

@@ -1792,6 +1792,21 @@ func (c *ATCController) IsAircraftAirborne(callsign string) bool {
 	return false
 }
 
+// HasRecentContact reports whether Tacview currently shows the callsign with a
+// contact updated within maxAge. Unlike IsAircraftAirborne it says nothing
+// about what the aircraft is doing — only whether it is still there — so
+// Deckboss can tell "sitting on the cat" apart from "disconnected, respawned,
+// or destroyed on deck", none of which produce a launch transition.
+//
+// Only meaningful while Tacview is actually feeding: with the feed down every
+// callsign reads as absent, so callers must gate on IsTacviewActive.
+func (c *ATCController) HasRecentContact(callsign string, maxAge time.Duration) bool {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	contact := c.lookupContact(callsign)
+	return contact != nil && time.Since(contact.UpdatedAt) <= maxAge
+}
+
 // cvnHullNames are the supercarrier hull / class names DCS exports in the ACMI
 // Name= field. Used to prefer the CVN over an LHA when a mission floats both.
 var cvnHullNames = []string{

@@ -62,7 +62,8 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 	const deckCallsign = "Deckboss"
 	deckVoice := voice
 	if deckVoice == "" {
-		deckVoice = "ash"
+		// Keep in sync with the --deckboss-voice default in main.go.
+		deckVoice = "shimmer"
 	}
 	comp := composer.NewATCComposer(deckCallsign)
 
@@ -78,8 +79,56 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		transmitExternalAudioFile(ctx, mp3, freqMHz, "OMDM-DKB", srsHost, srsPort, flagExternalAudio)
 	}
 
-	// Tacview monitor — free cat if aircraft launches without airborne call
+	// releaseCat frees every slot held by cs and, when someone is waiting,
+	// pulls the head of the conga onto a cat and tells them which one.
+	//
+	// The cat-clear names the cat next-up was actually assigned rather than the
+	// one that just freed. On a partially spotted deck those differ — free cat
+	// 1 with cat 3 just released and next-up is assigned 1 but was being sent
+	// to 3, a cat another aircraft is sitting on.
+	//
+	// txDelay staggers the transmission so the cat-clear doesn't step on the
+	// ack that triggered the release. Returns the freed cat number, 0 if cs
+	// held no slot (so a double-fire from §2a and §4 is a no-op).
+	releaseCat := func(cs string, txDelay time.Duration) int {
+		freed, next, nextCat := deck.ReleaseAndPullNext(cs)
+		if next != "" {
+			go func() {
+				if txDelay > 0 {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(txDelay):
+					}
+				}
+				transmit(fmt.Sprintf("%s, %s", next, comp.DeckbossCatClear(nextCat)))
+			}()
+		}
+		return freed
+	}
+
+	// Tacview monitor — reclaims cat slots the radio flow never released.
 	go func() {
+		const (
+			// minTimeOnCat is how long a slot must be held before the monitor
+			// considers it at all: a pilot who just got the cat is still
+			// taxiing to it and has not launched.
+			minTimeOnCat = 2 * time.Minute
+			// staleSlotTimeout is how long a slot may be held by an aircraft
+			// Tacview no longer sees before Deckboss reclaims it. Covers the
+			// pilot who disconnects, respawns, or dies on the deck — none of
+			// which produce the climb-out IsAircraftAirborne looks for, so
+			// without this the slot was held for the life of the process and
+			// the deck slowly read full with nothing on it.
+			staleSlotTimeout = 5 * time.Minute
+			// congaStaleTimeout is the same idea for the conga line. A queued
+			// pilot who leaves keeps their place and gets handed a cat they
+			// will never taxi to, which re-fills the deck with a ghost.
+			congaStaleTimeout = 5 * time.Minute
+			// contactMaxAge is how fresh a Tacview contact must be to count as
+			// "still on the server".
+			contactMaxAge = 60 * time.Second
+		)
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -87,25 +136,42 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for _, cat := range deck.Cats {
-					if cat.Callsign == "" {
+				// Every reclaim below needs a live feed to distinguish "gone"
+				// from "not being tracked". With Tacview down every callsign
+				// reads as absent, which would clear the whole deck.
+				tacviewUp := atcCtrl.IsTacviewActive()
+
+				for n := 1; n <= 4; n++ {
+					cat := deck.GetCat(n)
+					if cat.Callsign == "" || time.Since(cat.UpdatedAt) < minTimeOnCat {
 						continue
 					}
-					// If on cat > 2 min and Tacview shows airborne — free the cat
-					if time.Since(cat.UpdatedAt) < 2*time.Minute {
+					switch {
+					case atcCtrl.IsAircraftAirborne(cat.Callsign):
+						log.Info().Str("callsign", cat.Callsign).Int("cat", cat.Number).
+							Msg("Deckboss: Tacview detected launch")
+						releaseCat(cat.Callsign, 3*time.Second)
+					case tacviewUp && time.Since(cat.UpdatedAt) > staleSlotTimeout &&
+						!atcCtrl.HasRecentContact(cat.Callsign, contactMaxAge):
+						log.Warn().Str("callsign", cat.Callsign).Int("cat", cat.Number).
+							Dur("heldFor", time.Since(cat.UpdatedAt)).
+							Msg("Deckboss: reclaiming stale cat — no Tacview contact, aircraft gone")
+						releaseCat(cat.Callsign, 3*time.Second)
+					}
+				}
+
+				if !tacviewUp {
+					continue
+				}
+				// Candidates are collected first so the deck lock is never
+				// held across a controller call.
+				for _, cs := range deck.CongaWaitingSince(congaStaleTimeout) {
+					if atcCtrl.HasRecentContact(cs, contactMaxAge) {
 						continue
 					}
-					if atcCtrl.IsAircraftAirborne(cat.Callsign) {
-						log.Info().Str("callsign", cat.Callsign).Msg("Deckboss: Tacview detected launch")
-						catNum := deck.FreeCat(cat.Callsign)
-						next := deck.DequeueConga()
-						if next != "" {
-							deck.AssignCat(next)
-							go func(cs string, cn int) {
-								time.Sleep(3 * time.Second)
-								transmit(fmt.Sprintf("%s, %s", cs, comp.DeckbossCatClear(cn)))
-							}(next, catNum)
-						}
+					if deck.RemoveFromConga(cs) {
+						log.Warn().Str("callsign", cs).
+							Msg("Deckboss: dropped stale conga entry — no Tacview contact, aircraft gone")
 					}
 				}
 			}
@@ -147,12 +213,16 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			if catNum > 0 {
 				transmit(comp.DeckbossCatAssignment(callsign, catNum))
 			} else {
-				pos := deck.EnqueueConga(callsign)
-				if pos == -1 {
+				// §1b/§1c/§1d. The result codes decide which response the
+				// caller gets: a pilot re-checking in from the line hears
+				// their position (§1c), not another "join the conga" (§1b).
+				pos, res := deck.EnqueueConga(callsign)
+				switch res {
+				case state.CongaFull:
 					transmit(comp.DeckbossDeckFull(callsign))
-				} else if pos == -2 {
+				case state.CongaAlready:
 					transmit(comp.DeckbossStandby(callsign, pos))
-				} else {
+				default:
 					transmit(comp.DeckbossCongaLine(callsign))
 				}
 			}
@@ -202,14 +272,8 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 						return
 					case <-time.After(10 * time.Second):
 					}
-					freed := deck.FreeCat(cs)
-					if freed > 0 {
+					if freed := releaseCat(cs, 0); freed > 0 {
 						log.Info().Str("callsign", cs).Int("cat", freed).Msg("Deckboss: cat cleared (post-launch)")
-						next := deck.DequeueConga()
-						if next != "" {
-							deck.AssignCat(next)
-							transmit(fmt.Sprintf("%s, %s", next, comp.DeckbossCatClear(freed)))
-						}
 					}
 				}(callsign)
 			} else {
@@ -254,18 +318,11 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				return
 			}
 			transmit(fmt.Sprintf("%s, Deckboss, copy airborne.", callsign))
-			catNum := deck.FreeCat(callsign)
-			if catNum > 0 {
+			// Also drops them from the conga if they somehow launched while
+			// still queued — otherwise the line hands them a cat later.
+			deck.RemoveFromConga(callsign)
+			if catNum := releaseCat(callsign, 3*time.Second); catNum > 0 {
 				log.Info().Str("callsign", callsign).Int("cat", catNum).Msg("Deckboss: cat cleared (airborne fallback)")
-				next := deck.DequeueConga()
-				if next != "" {
-					deck.AssignCat(next)
-					cn, nx := catNum, next
-					go func() {
-						time.Sleep(3 * time.Second)
-						transmit(fmt.Sprintf("%s, %s", nx, comp.DeckbossCatClear(cn)))
-					}()
-				}
 			}
 
 		case containsAny(lower, "pushing command", "switching command", "push command", "switch command",

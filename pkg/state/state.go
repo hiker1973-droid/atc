@@ -313,14 +313,15 @@ type CatState struct {
 
 // DeckbossState manages the carrier deck — cats and conga line.
 type DeckbossState struct {
-	mu        sync.Mutex
-	Cats      [4]*CatState // cats 1-4
-	CongaLine []string     // callsigns waiting in order
+	mu            sync.Mutex
+	Cats          [4]*CatState         // cats 1-4
+	CongaLine     []string             // callsigns waiting in order
+	congaJoinedAt map[string]time.Time // when each queued callsign joined
 }
 
 // NewDeckbossState creates a fresh deckboss state with all cats free.
 func NewDeckbossState() *DeckbossState {
-	ds := &DeckbossState{}
+	ds := &DeckbossState{congaJoinedAt: map[string]time.Time{}}
 	for i := 0; i < 4; i++ {
 		ds.Cats[i] = &CatState{Number: i + 1, Status: CatFree}
 	}
@@ -329,9 +330,27 @@ func NewDeckbossState() *DeckbossState {
 
 // AssignCat finds the first free cat and assigns the callsign.
 // Returns cat number (1-4) or 0 if all cats are busy.
+//
+// Idempotent per callsign, like AssignCatPreferred: a pilot who re-checks in
+// gets their existing cat back rather than a second slot. Repeat §1 calls are
+// routine — the pilot doesn't hear the reply, or STT delivers the same TX
+// twice — and before this guard each repeat burned another slot and orphaned
+// the previous one, so a few repeats left the deck reporting "all cats
+// engaged" with nothing actually sitting on a cat.
 func (ds *DeckbossState) AssignCat(callsign string) int {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
+	return ds.assignCatLocked(callsign)
+}
+
+// assignCatLocked is AssignCat without the lock, for composing multi-step deck
+// updates that must land atomically. Caller holds ds.mu.
+func (ds *DeckbossState) assignCatLocked(callsign string) int {
+	for _, cat := range ds.Cats {
+		if cat.Callsign == callsign {
+			return cat.Number
+		}
+	}
 	for _, cat := range ds.Cats {
 		if cat.Status == CatFree {
 			cat.Status = CatTaxying
@@ -348,9 +367,9 @@ func (ds *DeckbossState) AssignCat(callsign string) int {
 // other pair when the preferred one is full, so a busy deck still gets a cat
 // rather than being pushed into the conga. Returns 0 if all four are occupied.
 //
-// Unlike AssignCat this is idempotent: a callsign that already holds a cat gets
-// the same number back instead of a second slot, so a repeated check-in call
-// can't corrupt deck state.
+// Idempotent per callsign, same as AssignCat: a callsign that already holds a
+// cat gets the same number back instead of a second slot, so a repeated
+// check-in call can't corrupt deck state.
 func (ds *DeckbossState) AssignCatPreferred(callsign string, preferBow bool) int {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
@@ -389,20 +408,63 @@ func (ds *DeckbossState) SetCatStatus(catNum int, status CatStatus) {
 	ds.Cats[catNum-1].UpdatedAt = time.Now()
 }
 
-// FreeCat marks a cat as free and clears the callsign. Returns the freed callsign.
+// FreeCat frees every cat held by the callsign and clears it. Returns the
+// lowest freed cat number, or 0 if the callsign held none.
+//
+// Releases all matches rather than the first: a single callsign should never
+// hold two slots now that both assign paths are idempotent, but a release that
+// only cleared one slot is what made the old double-assign permanent, and this
+// is the cheap belt-and-braces against any future path that assigns without
+// the guard.
 func (ds *DeckbossState) FreeCat(callsign string) int {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
+	return ds.freeCatLocked(callsign)
+}
+
+// freeCatLocked is FreeCat without the lock. Caller holds ds.mu.
+func (ds *DeckbossState) freeCatLocked(callsign string) int {
+	first := 0
 	for _, cat := range ds.Cats {
 		if cat.Callsign == callsign {
-			num := cat.Number
+			if first == 0 {
+				first = cat.Number
+			}
 			cat.Status = CatFree
 			cat.Callsign = ""
 			cat.UpdatedAt = time.Now()
-			return num
 		}
 	}
-	return 0
+	return first
+}
+
+// ReleaseAndPullNext frees every slot held by callsign and, when the conga
+// line has someone waiting, moves the head of the line straight onto a cat.
+//
+// Both halves happen under one lock. Done as separate FreeCat + DequeueConga +
+// AssignCat calls, a §1 check-in landing in the gap can take the slot that was
+// just freed, leaving the pulled aircraft off both the cats and the line.
+//
+// Returns the freed cat number (0 if the callsign held no slot), the callsign
+// pulled off the conga ("" if nobody was waiting or no cat came free), and the
+// cat that aircraft was actually given — which is not necessarily the freed
+// one on a partially spotted deck.
+func (ds *DeckbossState) ReleaseAndPullNext(callsign string) (freed int, next string, nextCat int) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	freed = ds.freeCatLocked(callsign)
+	if freed == 0 || len(ds.CongaLine) == 0 {
+		return freed, "", 0
+	}
+	candidate := ds.CongaLine[0]
+	nextCat = ds.assignCatLocked(candidate)
+	if nextCat == 0 {
+		// No cat came free after all — leave them at the head of the line.
+		return freed, "", 0
+	}
+	ds.CongaLine = ds.CongaLine[1:]
+	delete(ds.congaJoinedAt, candidate)
+	return freed, candidate, nextCat
 }
 
 // GetCatByCallsign returns the cat number for a callsign, or 0 if not found.
@@ -429,17 +491,37 @@ func (ds *DeckbossState) AllCatsBusy() bool {
 	return true
 }
 
-// EnqueueConga adds a callsign to the conga line. Returns position (1-based).
-func (ds *DeckbossState) EnqueueConga(callsign string) int {
+// CongaCapacity caps the conga line. Past this Deckboss tells the caller the
+// deck is full and to hold clear of the bow (§1d) instead of growing a queue
+// it will never work through.
+const CongaCapacity = 6
+
+// CongaResult reports the outcome of an EnqueueConga call.
+type CongaResult int
+
+const (
+	CongaQueued  CongaResult = iota // newly added to the line
+	CongaAlready                    // callsign was already waiting
+	CongaFull                       // line is at CongaCapacity
+)
+
+// EnqueueConga adds a callsign to the conga line. Returns the caller's 1-based
+// position along with whether they were newly queued, already in line, or
+// refused because the line is full (position 0).
+func (ds *DeckbossState) EnqueueConga(callsign string) (int, CongaResult) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	for i, cs := range ds.CongaLine {
 		if cs == callsign {
-			return i + 1
+			return i + 1, CongaAlready
 		}
 	}
+	if len(ds.CongaLine) >= CongaCapacity {
+		return 0, CongaFull
+	}
 	ds.CongaLine = append(ds.CongaLine, callsign)
-	return len(ds.CongaLine)
+	ds.congaJoinedAt[callsign] = time.Now()
+	return len(ds.CongaLine), CongaQueued
 }
 
 // DequeueConga removes and returns the next callsign from the conga line.
@@ -451,7 +533,39 @@ func (ds *DeckbossState) DequeueConga() string {
 	}
 	next := ds.CongaLine[0]
 	ds.CongaLine = ds.CongaLine[1:]
+	delete(ds.congaJoinedAt, next)
 	return next
+}
+
+// CongaWaitingSince returns the callsigns that have been queued for at least
+// minAge. Deckboss uses it to pick candidates for a liveness check without
+// holding the deck lock across a controller call.
+func (ds *DeckbossState) CongaWaitingSince(minAge time.Duration) []string {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	var out []string
+	for _, cs := range ds.CongaLine {
+		if joined, ok := ds.congaJoinedAt[cs]; ok && time.Since(joined) >= minAge {
+			out = append(out, cs)
+		}
+	}
+	return out
+}
+
+// RemoveFromConga drops a callsign from the conga line. Reports whether it was
+// there. Used to evict pilots who left the server while queued — otherwise
+// they keep their place and get handed a cat they will never taxi to.
+func (ds *DeckbossState) RemoveFromConga(callsign string) bool {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	for i, cs := range ds.CongaLine {
+		if cs == callsign {
+			ds.CongaLine = append(ds.CongaLine[:i], ds.CongaLine[i+1:]...)
+			delete(ds.congaJoinedAt, callsign)
+			return true
+		}
+	}
+	return false
 }
 
 // CongaLen returns the number of aircraft waiting in the conga line.

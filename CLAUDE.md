@@ -37,7 +37,7 @@ Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
 |---|---|---|---|
 | `atc-omal.log` | OMAL / Al Ain | 250.7 | — |
 | `atc-omam.log` | OMAM / Al Dhafra | 251.1 | — |
-| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | **Deckboss** (128.6, "Deckboss", `ash`) — interleaved |
+| `atc-omdm.log` | OMDM / Al Minhad | 250.1 | **Deckboss** (128.6, "Deckboss", `shimmer`) — interleaved |
 | `atc-marshal.log` | — | — | Marshal only (306.3, "Union Marshal", `onyx`) |
 | `atc-command.log` | — | — | Command only (282.0, "vSFG-7-Command", `sage`) |
 | `atc-atis.log` | — | — | All 5 ATIS stations |
@@ -67,7 +67,9 @@ Stop: close the console window, `stop_marshal.bat` to kill only Marshal, or use 
 ### Training 1 active roles (2026-05-19)
 **Tower**, **ATIS**, **Marshal** (306.3), **Command** (282.0), and **Deckboss** (128.6 — DCS carrier UHF) all run live on Training 1. Bat files at repo root: `start_atis.bat`, `start_towers.bat`, `start_marshal.bat`, `start_command.bat`, `start_deckboss.bat`, `start_launcher.bat`. Post-reboot one-shot: **`start_all.bat`** fires ATIS → towers → marshal → command → deckboss → launcher in order.
 
-Voices are differentiated per role for audible separation on cockpit comms — all female / female-leaning, all six unique. Set via `--tts-voice` in `start_towers.bat` (per-tower override) and per-role voice flags elsewhere: OMDM Tower `nova`, OMAM Tower `shimmer`, OMAL Tower `alloy`, Marshal `coral` (`start_marshal.bat` `--marshal-voice`), Command `sage` (`start_command.bat` `--command-voice`), Deckboss `fable` (`start_deckboss.bat` `--deckboss-voice`). Reassigned 2026-05-29 from prior all-nova-towers / ash-Deckboss. Switchable in the bat files without rebuilds.
+Voices are differentiated per role for audible separation on cockpit comms — all female / female-leaning. Set via `--tts-voice` in `start_towers.bat` (per-tower override) and per-role voice flags elsewhere: OMDM Tower `nova`, OMAM Tower `shimmer`, OMAL Tower `alloy`, Marshal `coral` (`start_marshal.bat` `--marshal-voice`), Command `sage` (`start_command.bat` `--command-voice`), Deckboss `shimmer` (`start_deckboss.bat` `--deckboss-voice`). Reassigned 2026-05-29 from prior all-nova-towers.
+
+**The all-unique rule no longer holds** — Deckboss went `ash` → `shimmer` on 2026-08-06 (the operator wanted it female; `ash` is male, and this line previously claimed `fable`, which the bat file had never used). OpenAI has only four clearly female voices — `nova`, `shimmer`, `coral`, `sage` — and all four were already taken, so Deckboss had to double up. `shimmer` was the safest share: its other holder is a land field on 251.1 that a carrier pilot on 128.6 won't have tuned. `nova` was ruled out because OMDM Tower runs in the *same process* as Deckboss, `coral` because Marshal is the other carrier voice, `sage` because everyone monitors Command. If a fifth female voice ever ships, give it to Deckboss and restore the rule. Switchable in the bat files without rebuilds; the code defaults in `cmd/atc/main.go` and `cmd/atc/deckboss.go` were moved to `shimmer` to match.
 
 Still parked under `dev_only/` (do not launch on Training 1):
 - `dev_only/run_scudwatch.bat` — Scudwatch threat broadcaster 264.0
@@ -89,6 +91,13 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - Tests roles one at a time and asks Claude to tail the relevant log(s) for the session. They want filtered, site-prefixed events, not raw JSONL.
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
+
+## Recent context (2026-08-06)
+- **Deckboss phraseology reworked, `92a428c`** (pushed to `main`, **not yet deployed to Training 1**). Three operator-requested changes: (1) §2 under tension now ends with "shooter's discretion" — two variants, `under tension cat {CAT}, spin it up, shooter's discretion` / `copy under tension, go gates, shooter's discretion`; (2) §4 airborne is a bare `copy airborne`, and the Command departure handoff that rode on that ack is **removed** — pilots switch on their own; (3) the auto `Cat {CAT}, shoot, shoot, shoot` TX is **gone entirely** (`DeckbossShoot` deleted) because Deckboss no longer calls the shot. Its timer survives, cut 5s → 10s, and now only does slot management. **Timeline changed: was T+0 tension / T+5 shoot / T+15 cat clear, now T+0 / T+10 clear.**
+- **Both new responses repeat their own trigger words — the self-echo guards had to change.** "shooter's **discretion**" contains the bare `shoot` trigger for §2; the existing address-led guard already drops the callsign-led echo, but it is now load-bearing for a second reason (noted in code — don't remove it). §4 has no address guard and its old protection was literally *avoiding the word "airborne"*, which the new ack breaks. Replaced with a mid-string check: drop any non-address-led call that carries a Deckboss token, which is exactly our own echo shape (`Raider 032, Deckboss, copy airborne.`) and never a pilot call. Both pilot phrasings still land — address-led and bare.
+- **`--handoff-command-freq` / `--handoff-command-preset` no longer reach Deckboss** (consequence of dropping the §4 handoff). `--handoff-command-name` still feeds Deckboss's pilot-initiated `pushing command` ack. All three remain live for Marshal. `handoff_responses.md` §3 is marked removed with the old variants kept for reference.
+- **Deckboss voice `ash` → `shimmer`** (female, operator request). Note the prior CLAUDE.md voice line claimed `fable`, which `start_deckboss.bat` had **never** used — it had been `ash` since the 128.6 bring-up. Second time this voice line has drifted from the bat files (see 2026-05-29 below); **read the bat file, don't trust the doc.** Changed in `start_deckboss.bat` plus the code defaults in `main.go` and `deckboss.go` so a bare launch is female too. See the voice section above for why the all-unique rule is now broken.
+- **TTS cache keys on the voice profile**, so the voice change silently invalidates every cached Deckboss line — expect re-synthesis latency on the first few calls after restart, then it settles.
 
 ## Recent context (2026-08-01)
 - **Deployed `c9781f0` to Training 1** — pulled 3 commits (Iraq theatre `3f108a0`, phraseology + inter-role handoffs `b57ddc6`, per-role TTS delivery style `c9781f0`), rebuilt both binaries, full restart of the PG set. Prior binaries kept as `atc.rollback.exe` / `launcher.rollback.exe`. Wind-driven runways came up **OMDM=09 / OMAM=13R / OMAL=19** (13R not the usual 31L — wind was 160°, not a regression).

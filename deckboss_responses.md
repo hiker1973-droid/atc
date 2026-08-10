@@ -40,12 +40,14 @@ The Tacview path is also idempotent per callsign: a pilot who re-checks in gets 
 3. `{CALLSIGN}, Deckboss, no cats available, conga line, standby.`
 
 ### 1c. Already in conga (re-checking in) — `DeckbossStandby`
+*(Live since 2026-08-10. Previously unreachable — a re-check-in from the line got §1b again.)*
 1. `{CALLSIGN}, Deckboss, you are number {POS} in the conga, standby.`
 2. `{CALLSIGN}, Deckboss, hold position, number {POS} in line.`
 
 (Note: `DeckbossStandby` only has 2 variants in source — could add a 3rd to match the convention.)
 
 ### 1d. Conga full — `DeckbossDeckFull`
+*(Live since 2026-08-10 at `CongaCapacity` = 6. Previously unreachable — the line had no cap.)*
 1. `{CALLSIGN}, Deckboss, deck is full, hold clear of the bow.`
 2. `{CALLSIGN}, Deckboss, no room on deck, hold your position.`
 3. `{CALLSIGN}, Deckboss, deck is saturated, hold clear, standby.`
@@ -108,11 +110,17 @@ The departure handoff to Command was **removed from this ack 2026-08-06** — De
 
 ---
 
-## 5. Auto-detected launch (no cat number, no airborne call)
+## 5. Auto-detected launch + stale-slot reclaim
 
-Background Tacview timer. If §2a fired (T+10 timer), the cat is already clear — this fallback does nothing. Same for §4 (airborne path). This only fires when both §2a and §4 were skipped: e.g. pilot said "under tension" without a cat number AND never called airborne. After 2 minutes on cat the Tacview monitor detects the aircraft off the deck and frees the slot. Same `DeckbossCatClear` response goes to next conga aircraft.
+Background Tacview monitor, 15s tick. No pilot-side trigger. Two independent reclaim paths, both gated on a slot having been held at least **2 minutes** (a pilot who just got the cat is still taxiing to it):
 
-No pilot-side trigger here — it's a background timer.
+**5a. Launch detected.** If §2a fired (T+10 timer) the cat is already clear and this does nothing; same for §4. It only fires when both were skipped — e.g. the pilot said "under tension" without a cat number AND never called airborne. `IsAircraftAirborne` sees the climb-out and the slot is freed, `DeckbossCatClear` to next-up.
+
+**5b. Stale slot reclaim (added 2026-08-10).** A pilot who disconnects, respawns, or dies on the deck never produces the climb-out 5a looks for, so their slot used to be held for the life of the process — a second route to "all cats engaged" with an empty deck. Now: slot held **> 5 minutes** with **no Tacview contact for the callsign in the last 60s** → reclaim, `warn` log, pull next-up. The same rule evicts pilots who left while queued in the conga (they otherwise keep their place and get handed a cat they'll never taxi to).
+
+Both stale checks are gated on `IsTacviewActive()`. With the feed down every callsign reads as absent, which would otherwise clear the whole deck at once. No feed = no reclaim, slots stay held.
+
+Tuning constants are at the top of the monitor goroutine in `cmd/atc/deckboss.go`.
 
 ---
 
@@ -166,8 +174,8 @@ Address-led guard applies — pilot must lead with `Deckboss, ...` to avoid self
 
 - **No Marshal/Recovery responses here.** Deckboss only does deck operations (launch). Recovery is Marshal's role on 306.3.
 - The cat number range is 1–4 (super carrier standard). Bow = 1/2, waist = 3/4.
-- **Latent bug in the default path:** `state.AssignCat` does not check whether the callsign already holds a cat, so a repeated §1 check-in assigns a *second* slot and leaks the first. `AssignCatPreferred` (the `--deck-position-check` path) guards against this. Fix `AssignCat` the same way when the flag is promoted to default.
-- Conga line capacity is set in `pkg/state/state.go` — currently a fixed limit. If you want to expose it as a flag, that's v1.1.0.
+- **Fixed 2026-08-10 — "cats full with nothing on deck".** `state.AssignCat` (the default path) did not check whether the callsign already held a cat, so every repeated §1 check-in took a *second* slot and orphaned the first — and `FreeCat` only ever released one, which made the leak permanent. Four repeats from one aircraft filled the deck. `AssignCat` is now idempotent per callsign like `AssignCatPreferred`, and `FreeCat` releases every slot a callsign holds.
+- Conga line capacity is `state.CongaCapacity` in `pkg/state/state.go` — currently **6**. Before 2026-08-10 no limit was enforced at all: the handler tested `EnqueueConga` for result codes it never returned, so §1c and §1d were unreachable and an over-full line just kept growing. If you want the cap exposed as a flag, that's v1.1.0.
 - Suggestions for **new intents** worth adding (just say which):
   - `bingo` / `state` — fuel report (currently no Deckboss handler)
   - `wave off` — Deckboss-side equivalent (rare; usually LSO not Deckboss)

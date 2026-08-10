@@ -12,7 +12,7 @@ One-page command reference. Every call leads with the role name (`Tower, …` / 
 | Al Dhafra Tower | 251.10 | shimmer |
 | vSFG-7 Command | 282.00 | sage |
 | Marshal | 306.30 | coral |
-| Deckboss | 128.60 | fable |
+| Deckboss | 128.60 | shimmer (shared with Al Dhafra Tower) |
 
 ---
 
