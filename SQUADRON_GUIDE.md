@@ -22,14 +22,15 @@ Six roles, all live on Training 1:
 | Al Ain Tower (OMAL) | 250.70 | alloy | Ground + tower |
 | Al Dhafra Tower (OMAM) | 251.10 | shimmer | Ground + tower |
 | Marshal | 306.30 | coral | Carrier inbound stack |
-| Deckboss | 128.60 | fable | Carrier deck ops (cat assignments, launch) |
+| Deckboss | 128.60 | shimmer | Carrier deck ops (cat assignments, launch) |
 | Command | 282.00 | sage | Squadron command / mission handoff |
 
-As of v1.4.0 every live role has a distinct voice (all female-leaning) — even
-if you miss the callsign you can tell which role is talking, and which tower
-when you've got two fields up in parallel. ATIS shares its voice with Minhad
-Tower (nova) but you hear them on different freqs so it doesn't collide
-in practice.
+Every live role is female-leaning, and almost every one has its own voice — if
+you miss the callsign you can usually tell which role is talking, and which
+tower when you've got two fields up in parallel. Two pairs share a voice, both
+on freqs you won't have up at the same time: ATIS with Minhad Tower (nova), and
+Deckboss with Al Dhafra Tower (shimmer, as of 2026-08-06). If you're on the
+boat you won't have a land field tuned, so neither collides in practice.
 
 ---
 
@@ -97,8 +98,10 @@ still works.
 
 ### Distinct voice per role
 Each live role gets its own voice (see table above). Two birds in parallel
-on different tower freqs are now audibly distinguishable. Deckboss moved
-off `ash` (male) to `fable` to match the rest of the female-leaning roster.
+on different tower freqs are now audibly distinguishable. Deckboss moved off
+`ash` (male) to `shimmer` on 2026-08-06 to match the rest of the female-leaning
+roster — the one voice shared with a tower, since the four female voices were
+already spoken for.
 
 ### Departure queue visible on the operator dashboard
 The launcher dashboard (operator screen at `http://localhost:7000/`) now has a
@@ -282,10 +285,10 @@ runway, and altimeter.
 
 ## Voice cues
 - **nova** → ATIS broadcasts AND Al Minhad Tower (different freqs, no collision)
-- **shimmer** → Al Dhafra Tower
+- **shimmer** → Al Dhafra Tower AND Deckboss (land field vs. the boat — you
+  won't have both up)
 - **alloy** → Al Ain Tower
 - **coral** → Marshal
-- **fable** → Deckboss
 - **sage** → Command
 
 If two Tower voices sound the same to you, you're not on what you think

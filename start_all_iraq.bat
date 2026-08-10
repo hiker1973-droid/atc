@@ -1,6 +1,6 @@
 @echo off
 :: vSFG-7 — single-shot launcher for the Iraq theatre.
-:: Order: ATIS -> Towers (9 recovery bases) -> Command -> Dashboard
+:: Order: ATIS -> Towers (4 ATIS recovery bases) -> Command -> Dashboard
 :: Set SKYEYE_MIZ to the Iraq mission .miz before running.
 :: NOTE: land-based theatre — NO carrier (Marshal/Deckboss). Towers broadcast
 :: on UHF (COMM1 preset / DCS default), ATIS on VHF-band 230.x in English +

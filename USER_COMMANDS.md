@@ -12,8 +12,8 @@ What to say on each channel to get a useful response from the AI ATC. Speak natu
 | Al Dhafra Tower (OMAM) | 251.1 | Two-way |
 | Al Ain Tower (OMAL) | 250.7 | Two-way |
 | Command (vSFG-7-Command) | 282.0 | Two-way |
-| (NOT IN USE YET) Deckboss (carrier) | 306.2 | Two-way |
-| (NOT in USE YET)Marshal (carrier stack) | 306.3 | Two-way |
+| Deckboss (carrier deck) | 128.6 | Two-way |
+| Marshal (carrier stack) | 306.3 | Two-way |
 | ATIS Dhafra | 248.20 | Listen only |
 | ATIS Minhad | 248.30 | Listen only |
 | ATIS Khasab | 248.50 | Listen only |
@@ -101,28 +101,40 @@ If your transmission doesn't hit one of these, Command stays silent (logged as "
 
 ---
 
-## Deckboss (306.2) — carrier launch director
+## Deckboss (128.6) — carrier launch director
 
-Triggered by what you say, not by where you are on the boat.
+Triggered by what you say, not by where you are on the boat. Lead with
+`Deckboss, ...` on every call except the airborne one — without the address
+most intents are treated as a radio echo and dropped.
 
 | Intent | Say | What happens |
 |---|---|---|
-| Check in for launch | `"...green jet"` | Assigned a cat (1–4) or queued in the conga line |
-| Tensioned, ready | `"...ready cat 3"`, `"ready on the cat"` | Deckboss calls "under tension" |
+| Check in for launch | `"...request taxi"`, `"green jet"` | Assigned a cat (1–4) or queued in the conga line |
+| Tensioned, ready | `"...under tension cat 3"`, `"ready cat 3"`, `"shoot"` | Under-tension ack — spin it up, the shooter fires you |
 | Tension confirmed | `"...tension"` | Silent — you launch |
-| Airborne | `"...airborne"`, `"clear of traffic"` | Frees your cat; next pilot in conga gets it |
-| Radio check | `"...radio check"`, `"5x5"`, `"five by five"` | Standard reply |
+| Airborne | `"...airborne"`, `"clear of traffic"` | `"copy airborne"` — optional, your cat was already freed |
+| Bolter pattern | `"...remain in bolter pattern"` | Ack + handoff to LSO |
+| BRC | `"...say BRC"`, `"request BRC"` | Mother's current bow heading |
+| Radio check | `"...radio check"`, `"five by five"` | Standard reply |
 
 The deck has 4 cats. If all are taken, you're queued. If the conga line is also full you'll be told the deck is full — try again later.
 
+**Deckboss does not call the shot.** The under-tension ack ends with "shooter's
+discretion" — the shooter on the deck fires you, so don't wait for a "shoot"
+call on the radio; there isn't one. Ten seconds after that ack your cat is
+freed and the next pilot in the conga is called up, so your airborne call is a
+courtesy, not something the queue is waiting on.
+
 ### Sample exchange
 
-> Pilot: *"Deckboss, Raider 1-1, green jet."*
-> Deckboss: *"Raider 1-1, Deckboss, taxi to cat 2, hold for tension."*
-> Pilot: *"Raider 1-1, ready cat 2."*
-> Deckboss: *"Raider 1-1, under tension, stand by."*
-> Pilot: *"Raider 1-1, tension."*  (Deckboss silent)
-> Pilot: *"Raider 1-1, airborne."*  (cat 2 freed)
+> Pilot: *"Deckboss, Raider 1-1, request taxi."*
+> Deckboss: *"Raider 1-1, Deckboss, cleared to cat two."*
+> Pilot: *"Deckboss, Raider 1-1, under tension cat two."*
+> Deckboss: *"Raider 1-1, Deckboss, under tension cat two, spin it up, shooter's discretion."*
+> (shooter fires you — no radio call)
+> Deckboss: *"Raider 1-2, Deckboss, cat two is clear."*  (10s later, to the next pilot up)
+> Pilot: *"Deckboss, Raider 1-1, airborne."*
+> Deckboss: *"Raider 1-1, Deckboss, copy airborne."*
 
 ---
 
