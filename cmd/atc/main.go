@@ -227,8 +227,8 @@ func main() {
 		"Radio effect intensity for tower TX: light, medium, heavy, extreme")
 	f.StringVar(&flagATISRadioIntensity, "atis-radio-intensity", "light",
 		"Radio effect intensity for ATIS TX (kept clean since it's a recorded loop): light, medium, heavy, extreme")
-	f.Float64Var(&flagTTSSpeed, "tts-speed", 1.05,
-		"TTS playback speed for tower/marshal/command/deckboss (ATIS stays at 0.97 for clarity)")
+	f.Float64Var(&flagTTSSpeed, "tts-speed", speedDeckboss,
+		"TTS playback speed for tower/command — defaults to the Deckboss rate (Marshal 1.00 and ATIS 0.97 have their own)")
 	f.BoolVar(&flagScudwatchOnly, "scudwatch-only", false,
 		"Run as Scud / launch-warning monitor only — no tower, ATIS, deckboss, or marshal")
 	f.StringVar(&flagScudwatchFreq, "scudwatch-freq", "282.00",
@@ -1642,6 +1642,11 @@ const (
 // Per-role speeds. Tower and Deckboss run fast the way real ones do; Marshal is
 // deliberately slower because a Case III approach is read to a pilot who is
 // writing it down; ATIS is slowest for clarity on a loop.
+//
+// Tower/Command speed is the --tts-speed flag, whose default is speedDeckboss
+// (2026-08-13, operator preference): the deck boss's clip was the one that
+// sounded right, so every live controller channel now runs at that rate.
+// Overriding --tts-speed on one process still works if a field needs to differ.
 const (
 	speedMarshal  = 1.00
 	speedDeckboss = 1.10
