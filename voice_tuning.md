@@ -27,18 +27,20 @@ prose — rewrite them freely and rebuild; there is no schema.
 
 ## Speech rate
 
-`--tts-speed` (default `1.05`) covers Tower and Command. Marshal and Deckboss
-and ATIS have their own rates, because the roles genuinely differ:
+Every role runs at **1.10** as of 2026-08-16 (operator preference). The rates
+used to differ per role; Marshal (`1.00`) and ATIS (`0.97`) were raised to match
+the Deckboss rate that sounded right.
 
-| Role | Rate | Why |
+| Role | Rate | Knob |
 |---|---|---|
-| Tower / Command | `1.05` (`--tts-speed`) | Real tower controllers run fast and clipped. |
-| Deckboss | `1.10` (`speedDeckboss`) | Deck calls are urgent and short. |
-| Marshal | `1.00` (`speedMarshal`) | A Case III approach is read to a pilot who is writing it down. |
-| ATIS | `0.97` (`speedATIS`) | Clarity on a loop beats pace. |
+| Tower / Command | `1.10` | `--tts-speed` (default is `speedDeckboss`) |
+| Deckboss | `1.10` | `speedDeckboss` |
+| Marshal | `1.10` | `speedMarshal` |
+| ATIS | `1.10` | `speedATIS` |
 
-The per-role constants are in `cmd/atc/main.go`; only the Tower/Command rate is
-exposed as a flag.
+The per-role constants are in `cmd/atc/main.go` and are kept as three separate
+names even though they're now equal, so one role can be pulled back off 1.10
+without disturbing the others. Only the Tower/Command rate is exposed as a flag.
 
 ## Voice casting
 
@@ -72,6 +74,21 @@ character compression alone doesn't give.
 
 Intensity is per role: `--radio-effect-intensity` (default `medium`),
 `--tower-radio-intensity` (`heavy`), `--atis-radio-intensity` (`light`).
+
+The pink-noise amplitude behind each tier was raised ~60% on 2026-08-16 for a
+more audible carrier hiss. The tiers keep their old spacing:
+
+| Tier | Noise amplitude | Was |
+|---|---|---|
+| light (ATIS) | `0.032` | `0.020` |
+| medium (Marshal, Deckboss, Command) | `0.064` | `0.040` |
+| heavy (Tower) | `0.128` | `0.080` |
+| extreme | `0.208` | `0.130` |
+
+The bandpass corners were left alone — hiss level is the knob for "more static";
+narrowing the passband changes the voice's character instead. If it now reads as
+too hot, step the tier down (`--tower-radio-intensity=medium`) before editing the
+constants, since the flags need no rebuild.
 
 PTT key-up click and squelch tail are already applied by `addMicClicks`, which
 runs after the radio effect on every TX.

@@ -753,6 +753,58 @@ func (c *ATCComposer) DeckbossUnderTension(callsign string, catNum int) string {
 	})
 }
 
+// DeckbossCopyAirborne — acks the just-launched pilot's airborne call and
+// pushes them to Marshal, who owns the departure until they are clear of the
+// zone. Deckboss issued no handoff at all between 2026-08-06 and 2026-08-16
+// (the ack was a bare "copy airborne"); the handoff is back, but aimed at
+// Marshal rather than straight at Command, so departures now leave the deck
+// freq on a defined chain: Deckboss → Marshal → Command.
+//
+// toName/freqMHz come from --handoff-marshal-name / --handoff-marshal-freq.
+// With the frequency at 0 (handoff disabled) this degrades to the bare ack,
+// so turning the flag off restores the old behaviour exactly. 3 variations.
+func (c *ATCComposer) DeckbossCopyAirborne(callsign, toName string, freqMHz float64) string {
+	if toName == "" || freqMHz <= 0 {
+		return fmt.Sprintf("%s, Deckboss, copy airborne.", callsign)
+	}
+	dest := fmt.Sprintf("%s, %s", toName, spellFrequency(freqMHz))
+	return pick([]string{
+		fmt.Sprintf("%s, Deckboss, copy airborne, push %s.", callsign, dest),
+		fmt.Sprintf("%s, Deckboss, copy airborne, switch %s.", callsign, dest),
+		fmt.Sprintf("%s, Deckboss, copy airborne, contact %s.", callsign, dest),
+	})
+}
+
+// MarshalDepartureClear answers the departing pilot's "clear seven miles"
+// check-in on the Marshal freq: Marshal releases them from the carrier's
+// control zone and pushes them to Command for tasking. This is the outbound
+// counterpart to MarshalAckDME, which acks the same distance shape for
+// aircraft recovering *to* the boat — see isDepartureClearCall in marshal.go
+// for how the two are told apart.
+//
+// zone is the control-zone name ("Union"), toName/freqMHz/preset come from
+// the --handoff-command-* flags. Frequency and preset are each omitted when
+// empty, so a rig that wants the short "push command for tasking" call can get
+// it with --handoff-command-freq=0 --handoff-command-preset="". 3 variations.
+func (c *ATCComposer) MarshalDepartureClear(callsign, zone, toName string, freqMHz float64, preset string) string {
+	dest := toName
+	if freqMHz > 0 {
+		dest = fmt.Sprintf("%s, %s", dest, spellFrequency(freqMHz))
+	}
+	if preset != "" {
+		dest = fmt.Sprintf("%s, %s", dest, preset)
+	}
+	clear := "clear of the control zone"
+	if zone != "" {
+		clear = fmt.Sprintf("clear of %s control zone", zone)
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, %s, push %s, for tasking.", callsign, c.towerCallsign, clear, dest),
+		fmt.Sprintf("%s, %s, roger, %s, switch %s, for tasking.", callsign, c.towerCallsign, clear, dest),
+		fmt.Sprintf("%s, %s, %s, contact %s, for tasking, good hunting.", callsign, c.towerCallsign, clear, dest),
+	})
+}
+
 // DeckbossCatClear — cat has cleared after launch, advance conga. Handler
 // prepends the next-up pilot callsign so the full TX comes out as
 // "Raider 04, Deckboss, cat one is clear." — role identifier inside the

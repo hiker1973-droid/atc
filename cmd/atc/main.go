@@ -177,18 +177,19 @@ func main() {
 	// (see start_*.bat), so the destinations it hands off TO are configured
 	// separately. Defaults match the vSFG-7 rig, so the handoffs work with no
 	// extra flags on the existing .bat files.
-	// -freq and -preset no longer reach Deckboss: its airborne ack was cut back
-	// to a bare "copy airborne" on 2026-08-06 and it no longer hands departing
-	// aircraft off the deck freq. -name is still spoken in Deckboss's
-	// pilot-initiated "pushing command" ack. All three stay live for Marshal.
+	// Departing aircraft follow a three-leg chain (2026-08-16): Deckboss acks
+	// airborne and pushes to Marshal on -marshal-freq; Marshal releases them
+	// from the control zone and pushes to Command on -command-freq. Deckboss
+	// went via Command directly until 2026-08-06, then handed off to nobody at
+	// all until the Marshal leg was added.
 	f.Float64Var(&flagHandoffCommandFreq, "handoff-command-freq", 282.0,
-		"Frequency MHz that Marshal sends departing pilots to (0=disable that handoff)")
+		"Frequency MHz that Marshal sends departing pilots to (0=omit the frequency from that call)")
 	f.StringVar(&flagHandoffCommandName, "handoff-command-name", "vSFG-7-Command",
 		"Controller name spoken in the departure handoff")
 	f.StringVar(&flagHandoffCommandPreset, "handoff-command-preset", "channel four",
 		"Spoken preset for the departure handoff (empty to omit)")
 	f.Float64Var(&flagHandoffMarshalFreq, "handoff-marshal-freq", 306.3,
-		"Frequency MHz that Command sends carrier-inbound pilots to (0=disable Marshal handoff)")
+		"Frequency MHz for Marshal — Command sends carrier-inbound pilots here, and Deckboss sends departing pilots here (0=disable both Marshal handoffs)")
 	f.StringVar(&flagHandoffMarshalName, "handoff-marshal-name", "Marshal",
 		"Controller name spoken in the carrier-recovery handoff")
 
@@ -228,7 +229,7 @@ func main() {
 	f.StringVar(&flagATISRadioIntensity, "atis-radio-intensity", "light",
 		"Radio effect intensity for ATIS TX (kept clean since it's a recorded loop): light, medium, heavy, extreme")
 	f.Float64Var(&flagTTSSpeed, "tts-speed", speedDeckboss,
-		"TTS playback speed for tower/command — defaults to the Deckboss rate (Marshal 1.00 and ATIS 0.97 have their own)")
+		"TTS playback speed for tower/command — defaults to the Deckboss rate, which every other role also runs at")
 	f.BoolVar(&flagScudwatchOnly, "scudwatch-only", false,
 		"Run as Scud / launch-warning monitor only — no tower, ATIS, deckboss, or marshal")
 	f.StringVar(&flagScudwatchFreq, "scudwatch-freq", "282.00",
@@ -1587,9 +1588,11 @@ func icaoVoiceBucket(icao string) int {
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
-// 14 chars/sec rate is empirical at our previous 0.88 speed; at 0.97 actual
-// playback is ~15.5 chars/sec, so 14 keeps the estimate conservative (slightly
-// over-cools rather than under-cools). The 5s margin covers ExternalAudio.exe
+// 14 chars/sec rate is empirical at our old 0.88 speed; every role now runs at
+// 1.10, where actual playback is faster still, so 14 keeps the estimate
+// conservative (over-cools rather than under-cools) — deliberately left alone
+// when the rates went up, since under-cooling is the failure that bites.
+// The 5s margin covers ExternalAudio.exe
 // startup, the playback tail, the mic-click splice, and — critically — the
 // Whisper flush gap that arrives AFTER audio stops playing. Without enough
 // margin here the bot transcribes its own TX loopback and re-fires the same
@@ -1639,18 +1642,20 @@ const (
 		"Even, neutral, unhurried, identical inflection on every phrase. No emphasis anywhere."
 )
 
-// Per-role speeds. Tower and Deckboss run fast the way real ones do; Marshal is
-// deliberately slower because a Case III approach is read to a pilot who is
-// writing it down; ATIS is slowest for clarity on a loop.
+// Per-role speeds. All roles run at the Deckboss rate (2026-08-16, operator
+// preference): the deck boss's clip was the one that sounded right, so every
+// channel — live controller and recorded loop alike — now reads at that pace.
+// Marshal was 1.00 (a Case III approach is read to a pilot who is writing it
+// down) and ATIS was 0.97 (clarity on a loop); both were raised to match.
 //
-// Tower/Command speed is the --tts-speed flag, whose default is speedDeckboss
-// (2026-08-13, operator preference): the deck boss's clip was the one that
-// sounded right, so every live controller channel now runs at that rate.
-// Overriding --tts-speed on one process still works if a field needs to differ.
+// Tower/Command speed is the --tts-speed flag, whose default is speedDeckboss.
+// The constants stay separate so a single role can be pulled back off 1.10
+// without disturbing the others, and overriding --tts-speed on one process
+// still works if a field needs to differ.
 const (
-	speedMarshal  = 1.00
+	speedMarshal  = 1.10
 	speedDeckboss = 1.10
-	speedATIS     = 0.97
+	speedATIS     = 1.10
 )
 
 // towerVoice / marshalVoice / deckbossVoice / commandVoice / atisVoice build the
@@ -1746,7 +1751,7 @@ func translateATIS(ctx context.Context, apiKey, text, language string) (string, 
 func synthesizeSpeechAPI(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
 	speed := v.speed
 	if speed <= 0 {
-		speed = 0.97
+		speed = speedDeckboss
 	}
 	body := map[string]interface{}{
 		"model": "gpt-4o-mini-tts",
@@ -2001,17 +2006,20 @@ func whisperTranscribe(ctx context.Context, apiKey string, audio []byte, filenam
 // carrier hiss is audible under the speech. Returns the original bytes on any
 // ffmpeg failure so broadcasts never drop to silence.
 func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
+	// Noise amplitudes were raised ~60% on 2026-08-16 (operator preference:
+	// more carrier hiss for the radio feel). Ratios between the tiers are
+	// unchanged, so "heavy" still sits the same distance above "medium".
 	var noiseAmp float64
 	var hpf, lpf int
 	switch strings.ToLower(intensity) {
 	case "light":
-		noiseAmp, hpf, lpf = 0.020, 350, 3200
+		noiseAmp, hpf, lpf = 0.032, 350, 3200
 	case "heavy":
-		noiseAmp, hpf, lpf = 0.080, 500, 2700
+		noiseAmp, hpf, lpf = 0.128, 500, 2700
 	case "extreme":
-		noiseAmp, hpf, lpf = 0.130, 600, 2400
+		noiseAmp, hpf, lpf = 0.208, 600, 2400
 	default: // medium
-		noiseAmp, hpf, lpf = 0.040, 400, 3000
+		noiseAmp, hpf, lpf = 0.064, 400, 3000
 	}
 
 	tmpIn, err := os.CreateTemp("", "atc-radio-in-*.mp3")

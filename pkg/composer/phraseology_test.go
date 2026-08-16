@@ -207,3 +207,78 @@ func TestHandoffNamesFacilityBeforeFrequency(t *testing.T) {
 		t.Errorf("bare handoff has dangling punctuation: %q", bare)
 	}
 }
+
+// The Deckboss → Marshal → Command departure chain. Both phrases below are
+// spoken on every launch, so they are worth pinning: the frequency has to be
+// spelled digit-by-digit (a numeral reaches TTS as "three hundred six"), and
+// the handoff has to degrade to the pre-2026-08-16 bare ack when disabled.
+func TestDeckbossCopyAirborneCarriesMarshalHandoff(t *testing.T) {
+	c := NewATCComposer("Deckboss")
+	for i := 0; i < 40; i++ {
+		got := c.DeckbossCopyAirborne("Raider 032", "Marshal", 306.3)
+		if !strings.Contains(got, "copy airborne") {
+			t.Fatalf("ack lost the airborne readback: %q", got)
+		}
+		if !strings.Contains(got, "three zero six point three") {
+			t.Fatalf("frequency not spelled as digits: %q", got)
+		}
+		marshal := strings.Index(got, "Marshal")
+		freq := strings.Index(got, "three zero six")
+		if marshal < 0 || freq < 0 || marshal > freq {
+			t.Fatalf("facility must precede frequency: %q", got)
+		}
+	}
+	// Handoff disabled (--handoff-marshal-freq=0) restores the bare ack.
+	bare := c.DeckbossCopyAirborne("Raider 032", "Marshal", 0)
+	if bare != "Raider 032, Deckboss, copy airborne." {
+		t.Errorf("disabled handoff should give the bare ack, got %q", bare)
+	}
+}
+
+func TestMarshalDepartureClearReleasesZoneAndPushesCommand(t *testing.T) {
+	c := NewATCComposer("Union Marshal")
+	for i := 0; i < 40; i++ {
+		got := c.MarshalDepartureClear("Raider 032", "Union", "vSFG-7-Command", 282.0, "channel four")
+		if !strings.Contains(got, "clear of Union control zone") {
+			t.Fatalf("missing zone release: %q", got)
+		}
+		if !strings.Contains(got, "for tasking") {
+			t.Fatalf("missing tasking push: %q", got)
+		}
+		if !strings.Contains(got, "two eight two point zero") {
+			t.Fatalf("frequency not spelled as digits: %q", got)
+		}
+		zone := strings.Index(got, "control zone")
+		dest := strings.Index(got, "vSFG-7-Command")
+		if zone > dest {
+			t.Fatalf("zone release must precede the push: %q", got)
+		}
+	}
+	// The short form a rig gets with --handoff-command-freq=0 and no preset.
+	bare := c.MarshalDepartureClear("Raider 032", "Union", "command", 0, "")
+	if !strings.Contains(bare, "push command, for tasking.") &&
+		!strings.Contains(bare, "switch command, for tasking.") &&
+		!strings.Contains(bare, "contact command, for tasking") {
+		t.Errorf("bare form reads wrong: %q", bare)
+	}
+	if strings.Contains(bare, ", ,") || strings.Contains(bare, "  ") {
+		t.Errorf("bare form has dangling punctuation: %q", bare)
+	}
+}
+
+func TestDepartureChainEmitsNoNumerals(t *testing.T) {
+	d := NewATCComposer("Deckboss")
+	m := NewATCComposer("Union Marshal")
+	// Callsigns legitimately contain digits, so check only the text after the
+	// callsign — that is the part the composer itself generates.
+	for i := 0; i < 40; i++ {
+		for _, got := range []string{
+			d.DeckbossCopyAirborne("Raider", "Marshal", 306.3),
+			m.MarshalDepartureClear("Raider", "Union", "Command", 282.0, "channel four"),
+		} {
+			if strings.ContainsAny(got, "0123456789") {
+				t.Errorf("numeral would be voiced as a cardinal number: %q", got)
+			}
+		}
+	}
+}

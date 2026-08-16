@@ -20,7 +20,7 @@ OpenAI endpoints.
                   │                                            │
                   │  OpenAI API                                │
                   │     • Whisper (gpt-4o-mini-transcribe)     │
-                  │     • TTS  (onyx, speed 0.97)              │
+                  │     • TTS  (per-role voice, speed 1.10)    │
                   │     • Chat (Arabic translate for ATIS)     │
                   └────────────────────┬───────────────────────┘
                                        │

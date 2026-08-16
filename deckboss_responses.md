@@ -99,10 +99,20 @@ Currently **silent** — no transmission, just a debug log. Pilot is going. If t
 
 Pilot's optional airborne callout. In the standard flow the cat slot was already cleared by §2a on the T+10 timer, so this is just an ack — no slot management needed. The ack TXes to the launching pilot only; next-up was already pulled at §2a.
 
-**Ack to launching pilot** (always fires) — bare ack, single variant:
-- `{CALLSIGN}, Deckboss, copy airborne.`
+**Ack to launching pilot** (always fires) — 3 variants, all carrying the Marshal handoff:
+- `{CALLSIGN}, Deckboss, copy airborne, push Marshal, three zero six point three.`
+- `{CALLSIGN}, Deckboss, copy airborne, switch Marshal, {FREQ}.`
+- `{CALLSIGN}, Deckboss, copy airborne, contact Marshal, {FREQ}.`
 
-The departure handoff to Command was **removed from this ack 2026-08-06** — Deckboss no longer pushes departing aircraft off the deck freq, pilots switch on their own. `--handoff-command-freq` no longer affects §4 (the pilot-initiated "switching command" ack below still uses `--handoff-command-name`).
+**Departure chain (restored 2026-08-16).** Deckboss handed departing aircraft to Command directly until 2026-08-06, then to nobody at all — the ack was a bare `copy airborne` and pilots switched on their own. The handoff is back, but aimed at **Marshal** rather than Command, so a departure now leaves the boat on a defined three-leg chain:
+
+| Leg | Who | Call |
+|---|---|---|
+| 1 | Deckboss → pilot | `copy airborne, push Marshal, three zero six point three` |
+| 2 | pilot → Marshal | `Union Marshal, {CALLSIGN}, clear seven miles` |
+| 3 | Marshal → pilot | `clear of Union control zone, push {COMMAND}, {FREQ}, for tasking` |
+
+Name and frequency come from `--handoff-marshal-name` / `--handoff-marshal-freq` (default `Marshal` / `306.3`). Setting `--handoff-marshal-freq=0` disables the handoff and restores the exact pre-2026-08-16 bare ack, which is pinned by a test. Leg 3 is documented in `marshal_responses.md`.
 
 **Self-echo guard.** The ack now repeats the trigger word "airborne", so the old "omit the trigger word" protection is gone. In its place §4 drops any transmission that is *not* address-led but *does* contain a Deckboss token somewhere in the middle — which is exactly the shape of our own TX echoing back (`Raider 032, Deckboss, copy airborne.`) and never the shape of a pilot call. Both pilot phrasings still land: `Deckboss, Raider 032, airborne` (address-led) and a bare `Raider 032 airborne` (no Deckboss token).
 

@@ -88,6 +88,31 @@ The reported distance `{DIST}` is parsed from the pilot's transmission and echoe
 
 Pilot must still lead the transmission with the address word ("Marshal, …") — the self-echo guard in `handleMarshalCall` drops anything that doesn't, so `Raider 39, 7 DME, switching channel 4` alone gets filtered. With the prefix (`Marshal, Raider 39, 7 DME`) the trigger fires.
 
+> **This case is tested *after* §1c below.** A departing aircraft reports the same distance shape, and answering it with "continue inbound" would be exactly backwards.
+
+---
+
+## 1c. Departure clear of zone → Command handoff (added 2026-08-16)
+
+**Triggers:** `clear` **plus** one of `mile` · `dme` · `clear of` · `outbound` — e.g. `Union Marshal, Raider 32, clear seven miles`
+
+The outbound counterpart to §1b, and the middle leg of the departure chain that starts with Deckboss's airborne ack (see `deckboss_responses.md` §4). A pilot who has just launched checks in on the Marshal freq, Marshal releases them from the carrier's control zone and pushes them to Command for tasking.
+
+**Responses (`MarshalDepartureClear`):**
+1. `{CALLSIGN}, Union Marshal, clear of Union control zone, push {COMMAND}, {FREQ}, {PRESET}, for tasking.`
+2. `{CALLSIGN}, Union Marshal, roger, clear of Union control zone, switch {COMMAND}, {FREQ}, {PRESET}, for tasking.`
+3. `{CALLSIGN}, Union Marshal, clear of Union control zone, contact {COMMAND}, {FREQ}, {PRESET}, for tasking, good hunting.`
+
+`{COMMAND}` / `{FREQ}` / `{PRESET}` come from `--handoff-command-name` / `--handoff-command-freq` / `--handoff-command-preset` (defaults `vSFG-7-Command` / `282.0` / `channel four`). These three flags were defined but referenced nowhere between 2026-08-06 and 2026-08-16; this case is what re-activated them. Frequency and preset are each dropped when empty, so `--handoff-command-freq=0 --handoff-command-preset=""` yields the short form: `{CALLSIGN}, Union Marshal, clear of Union control zone, push command, for tasking.`
+
+The zone name is derived from `marshalCallsign` ("Union Marshal" → "Union"), so the zone and the controller can't drift apart.
+
+**No stack interaction.** A departure is leaving, so it is deliberately *not* enqueued — putting one in the recovery stack would skew the angels assignment for aircraft actually coming back.
+
+**Telling a departure from a recovery.** `isDepartureClearCall` (in `cmd/atc/marshal.go`) keys on the word "clear": recovery aircraft report a bare distance (`Marshal, Raider 39, seven DME`), departures report being clear of the zone. Because "clear" is a common word, any inbound-phase keyword — `marking mom`, `commencing`, `platform`, `initial`, `established`, `see you at`, `paddles`, `bolter`, `state` — **vetoes** the match and falls through to the inbound handling. That veto list is the load-bearing part and is covered by a table test in `cmd/atc/departure_handoff_test.go`.
+
+**Courtesy ack.** The pilot's follow-up (`Union Marshal, Raider 32, pushing command`) gets a short `HandoffAck`; the frequency was already issued so it isn't repeated.
+
 ---
 
 ## 2. See me at 10 / radar contact
