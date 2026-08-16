@@ -177,18 +177,19 @@ func main() {
 	// (see start_*.bat), so the destinations it hands off TO are configured
 	// separately. Defaults match the vSFG-7 rig, so the handoffs work with no
 	// extra flags on the existing .bat files.
-	// -freq and -preset no longer reach Deckboss: its airborne ack was cut back
-	// to a bare "copy airborne" on 2026-08-06 and it no longer hands departing
-	// aircraft off the deck freq. -name is still spoken in Deckboss's
-	// pilot-initiated "pushing command" ack. All three stay live for Marshal.
+	// Departing aircraft follow a three-leg chain (2026-08-16): Deckboss acks
+	// airborne and pushes to Marshal on -marshal-freq; Marshal releases them
+	// from the control zone and pushes to Command on -command-freq. Deckboss
+	// went via Command directly until 2026-08-06, then handed off to nobody at
+	// all until the Marshal leg was added.
 	f.Float64Var(&flagHandoffCommandFreq, "handoff-command-freq", 282.0,
-		"Frequency MHz that Marshal sends departing pilots to (0=disable that handoff)")
+		"Frequency MHz that Marshal sends departing pilots to (0=omit the frequency from that call)")
 	f.StringVar(&flagHandoffCommandName, "handoff-command-name", "vSFG-7-Command",
 		"Controller name spoken in the departure handoff")
 	f.StringVar(&flagHandoffCommandPreset, "handoff-command-preset", "channel four",
 		"Spoken preset for the departure handoff (empty to omit)")
 	f.Float64Var(&flagHandoffMarshalFreq, "handoff-marshal-freq", 306.3,
-		"Frequency MHz that Command sends carrier-inbound pilots to (0=disable Marshal handoff)")
+		"Frequency MHz for Marshal — Command sends carrier-inbound pilots here, and Deckboss sends departing pilots here (0=disable both Marshal handoffs)")
 	f.StringVar(&flagHandoffMarshalName, "handoff-marshal-name", "Marshal",
 		"Controller name spoken in the carrier-recovery handoff")
 

@@ -317,13 +317,33 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				log.Debug().Str("text", text).Msg("Deckboss: §4 dropped — Deckboss mid-string, self-echo of airborne ack")
 				return
 			}
-			transmit(fmt.Sprintf("%s, Deckboss, copy airborne.", callsign))
+			// The ack now carries the Marshal handoff (2026-08-16), so the
+			// departing pilot leaves the deck freq with a frequency in hand
+			// instead of having to know the chain. Self-echo protection is
+			// unaffected: our TX is still callsign-led with "Deckboss"
+			// mid-string, which is what the guard above keys on.
+			transmit(comp.DeckbossCopyAirborne(callsign, flagHandoffMarshalName, flagHandoffMarshalFreq))
 			// Also drops them from the conga if they somehow launched while
 			// still queued — otherwise the line hands them a cat later.
 			deck.RemoveFromConga(callsign)
 			if catNum := releaseCat(callsign, 3*time.Second); catNum > 0 {
 				log.Info().Str("callsign", callsign).Int("cat", catNum).Msg("Deckboss: cat cleared (airborne fallback)")
 			}
+
+		case containsAny(lower, "pushing marshal", "switching marshal", "push marshal", "switch marshal",
+			"pushing marshall", "switching marshall", "push marshall", "switch marshall"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: marshal handoff ack dropped — not address-led, likely self-echo")
+				return
+			}
+			// Pilot's courtesy call on the Marshal handoff issued with the
+			// airborne ack. Address-led is load-bearing here: our own airborne
+			// ack now ends in "push Marshal, three zero six point three", which
+			// contains this trigger verbatim. The echo comes back callsign-led
+			// and is dropped before it can re-fire. "Marshall" spellings are
+			// Whisper variants, same as the marshal role's own guard list.
+			log.Info().Str("callsign", callsign).Msg("Deckboss: pilot-initiated marshal handoff ack")
+			transmit(comp.HandoffAck(callsign, flagHandoffMarshalName))
 
 		case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
 			"pushing strike", "switching strike", "pushing departure", "switching departure"):

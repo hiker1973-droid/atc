@@ -46,6 +46,43 @@ func extractDMEDistance(lower string) int {
 	return 0
 }
 
+// isDepartureClearCall recognises the check-in a *departing* aircraft makes on
+// the Marshal freq after Deckboss pushes them over — "Union Marshal, Raider 32,
+// clear seven miles".
+//
+// This has to be tested ahead of the inbound " dme"/" mile" case, which matches
+// the same distance shape and would otherwise answer a jet on its way out with
+// "radar contact, seven DME, continue inbound".
+//
+// The discriminator is the word "clear": aircraft recovering to the boat report
+// a bare distance ("Marshal, Raider 39, seven DME"), while a departure reports
+// being clear of the zone. Any inbound-phase keyword vetoes the match, so a
+// recovery call that happens to contain "clear" can't be read as a departure —
+// the veto is what keeps this safe, since "clear" on its own is a common word.
+func isDepartureClearCall(lower string) bool {
+	if !strings.Contains(lower, "clear") {
+		return false
+	}
+	if containsAny(lower, "marking mom", "marking moms", "commencing", "platform",
+		"initial", "established", "see you at", "paddles", "bolter", "state") {
+		return false
+	}
+	// Either a distance ("clear seven miles") or an explicit clear-of phrasing
+	// ("clear of mother") with no number at all.
+	return containsAny(lower, " mile", " dme", "clear of", "outbound")
+}
+
+// marshalZoneName derives the control-zone name spoken in the departure release
+// from the role callsign: "Union Marshal" → "Union". Keeps the zone and the
+// controller named consistently off one constant instead of a second literal
+// that could drift out of sync with it.
+func marshalZoneName() string {
+	if i := strings.Index(marshalCallsign, " "); i > 0 {
+		return marshalCallsign[:i]
+	}
+	return ""
+}
+
 const (
 	marshalCallsign = "Union Marshal"
 	// Stack altitude band — Marshal assigns the lowest unoccupied angel in
@@ -392,6 +429,21 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	case containsAny(lower, "see you at 10", "see you at ten"):
 		transmit(comp.MarshalRadarContact(callsign, 10))
 
+	case isDepartureClearCall(lower):
+		// Departing aircraft, handed over by Deckboss with the airborne ack.
+		// Marshal releases them from the carrier's control zone and pushes them
+		// to Command for tasking. Deliberately no stack interaction: a departure
+		// is leaving, so enqueuing it would put a phantom in the recovery stack
+		// and skew the angels assignment for aircraft actually coming back.
+		//
+		// Must stay above the " dme"/" mile" case below — see isDepartureClearCall.
+		dist := extractDMEDistance(lower)
+		log.Info().Str("callsign", callsign).Int("distNm", dist).
+			Str("to", flagHandoffCommandName).Float64("freq", flagHandoffCommandFreq).
+			Msg("Marshal: departure clear of zone, pushing to command")
+		transmit(comp.MarshalDepartureClear(callsign, marshalZoneName(),
+			flagHandoffCommandName, flagHandoffCommandFreq, flagHandoffCommandPreset))
+
 	case containsAny(lower, " dme", " mile"):
 		dist := extractDMEDistance(lower)
 		if dist <= 0 {
@@ -472,6 +524,16 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		stack.SetPhase(callsign, "platform")
 		log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
 		transmit(comp.MarshalAtPlatform(callsign, finalBearing))
+
+	case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
+		"pushing strike", "switching strike"):
+		// Pilot's courtesy call on the departure push issued above. Short ack
+		// only. Sits after the DME case for the same reason as the paddles ack
+		// below, and our own departure TX ends in "push <command> for tasking",
+		// which contains this trigger — the address-led guard at the top of the
+		// handler drops that echo before it reaches here.
+		log.Info().Str("callsign", callsign).Msg("Marshal: pilot-initiated command handoff ack")
+		transmit(comp.HandoffAck(callsign, flagHandoffCommandName))
 
 	case containsAny(lower, "pushing paddles", "switching paddles", "push paddles", "switch paddles",
 		"pushing lso", "switching lso", "pushing button", "pushing channel"):
