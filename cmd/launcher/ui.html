@@ -413,6 +413,22 @@ const THEATRES = {
     // Land-based theatre — no carrier roles; target the nine towers only.
     wxPorts: [6031, 6032, 6033, 6034, 6035, 6036, 6037, 6038, 6039],
   },
+  syria: {
+    label: 'Syria', primaryLabel: 'Incirlik (LTAG)', atisRole: 'vSFG-7 ATIS (Syria)',
+    towers: [
+      { icao: 'LTAG', label: 'Incirlik',     freq: '360.100', port: 6041, role: 'Incirlik Tower' },
+      { icao: 'LLRD', label: 'Ramat David',  freq: '251.300', port: 6042, role: 'Ramat David Tower' },
+      { icao: 'OJMF', label: 'King Hussein', freq: '250.450', port: 6043, role: 'King Hussein Tower' },
+      { icao: 'LTDA', label: 'Hatay',        freq: '250.300', port: 6044, role: 'Hatay Tower' },
+      { icao: 'LTAJ', label: 'Gaziantep',    freq: '250.100', port: 6045, role: 'Gaziantep Tower' },
+      { icao: 'LCRA', label: 'Akrotiri',     freq: '252.000', port: 6046, role: 'Akrotiri Tower' },
+      { icao: 'LCPH', label: 'Paphos',       freq: '249.100', port: 6047, role: 'Paphos Tower' },
+      { icao: 'OJHR', label: 'H4',           freq: '252.250', port: 6048, role: 'H4 Tower' },
+    ],
+    // Carrier ops ARE run on Syria: CVN-72 ABE, with Marshal (6004) and
+    // Deckboss (6005) on the shared carrier ports, same as PG.
+    wxPorts: [6041, 6042, 6043, 6044, 6045, 6046, 6047, 6048, 6004, 6005],
+  },
 };
 let currentTheatre = 'pg';
 let TOWERS = THEATRES[currentTheatre].towers;

@@ -1,0 +1,20 @@
+# vsfg7-atc - H4 Tower (OJHR) - Syria / Eastern Med
+# Foothold VM: 192.168.1.222
+#
+# Tower frequency is the ratified vSFG-7 "Hornet Radio Presets - Eastern Med" card.
+# The card calls this H3; there is no H3 on the Syria map. This is OJHR 'H-4 AB'.
+# NO ILS/TACAN/VOR/NDB anywhere on the field -- its ATIS reports no approach aids.
+# DCS terrain tower is 250.10; the card says 252.250.
+
+airfield: OJHR
+callsign: "H4 Tower"
+freq_mhz: 252.250
+
+# NOTE: 5002, not the 5008 the Training rig and the PG configs use.
+srs_addr: "localhost:5002"
+grpc_addr: "localhost:50051"
+
+log_level: info
+weather_interval_sec: 30
+stale_threshold_min: 10
+pattern_alt_ft: 1500

@@ -209,6 +209,8 @@ func regionForBat(bat string) string {
 		return "germany"
 	case strings.Contains(l, "iraq"):
 		return "iraq"
+	case strings.Contains(l, "syria"):
+		return "syria"
 	default:
 		return "pg"
 	}
@@ -831,6 +833,7 @@ var regionBats = map[string]string{
 	"caucasus": "start_region_caucasus.bat",
 	"germany":  "start_region_germany.bat",
 	"iraq":     "start_region_iraq.bat",
+	"syria":    "start_region_syria.bat",
 }
 
 // startRegion runs a theatre's region bat, spawning all of its role windows in

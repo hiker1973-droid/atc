@@ -52,6 +52,17 @@ var towerDashboardPortByICAO = map[string]int{
 	"ORER": 6037,
 	"ORKK": 6038,
 	"ORSU": 6039,
+	// Syria / Eastern Med towers (8 recovery bases, own range 6041-6048).
+	// All eight carry an ATIS: five from the squadron card, three assigned
+	// (Hatay/Gaziantep/Akrotiri, which the card gives tower-only).
+	"LTAG": 6041,
+	"LLRD": 6042,
+	"OJMF": 6043,
+	"LTDA": 6044,
+	"LTAJ": 6045,
+	"LCRA": 6046,
+	"LCPH": 6047,
+	"OJHR": 6048,
 }
 
 // fetchTowerRunway returns the active runway reported by the tower /status
@@ -508,6 +519,10 @@ func atisSecondLangForMap(m string) (string, bool) {
 		return "German", true
 	case "iraq", "iq", "or":
 		return "Arabic", true
+	case "syria", "sy", "easternmed", "eastern-med", "eastern med", "emed":
+		// The eight fields span Turkey, Israel, Jordan and Cyprus, so there is no
+		// single local language. Arabic is the widest fit across the Levant ones.
+		return "Arabic", true
 	default: // Persian Gulf
 		return "Arabic", true
 	}
@@ -562,6 +577,31 @@ func atisStationsForMap(m string) []*atisStation {
 				Advisory: advisory},
 			{Name: "Balad ATIS", FreqMHz: 230.700, Voice: "echo", ICAO: "ORBD",
 				TACAN: "VORTAC 114.60.", ILS: "ILS 109.90 runway 15. ILS 109.95 runway 33.", Advisory: advisory},
+		}
+	case "syria", "sy", "easternmed", "eastern-med", "eastern med", "emed":
+		// Frequencies are the ratified vSFG-7 "Hornet Radio Presets - Eastern Med"
+		// card. Hatay/Gaziantep/Akrotiri ATIS are ASSIGNED (249.3/249.4/249.5) -- the
+		// card gives those three tower-only. Navaids are read from the DCS Syria
+		// beacons.lua and CombatWombat's surveyed airfield summary.
+		return []*atisStation{
+			{Name: "Incirlik ATIS", FreqMHz: 360.200, Voice: "nova", ICAO: "LTAG",
+				TACAN: "TACAN 21X.", ILS: "ILS 109.30 runway 05. ILS 111.70 runway 23.", Advisory: advisory},
+			{Name: "Ramat David ATIS", FreqMHz: 256.150, Voice: "shimmer", ICAO: "LLRD",
+				ILS: "ILS 111.10 runway 15.", Advisory: advisory},
+			{Name: "King Hussein ATIS", FreqMHz: 255.550, Voice: "alloy", ICAO: "OJMF",
+				TACAN: "VORTAC 115.90, channel 106.", ILS: "ILS 111.70 runway 13.", Advisory: advisory},
+			{Name: "Hatay ATIS", FreqMHz: 249.300, Voice: "echo", ICAO: "LTDA",
+				TACAN: "VOR DME 112.05.", ILS: "ILS 108.90 runway 04. ILS 108.15 runway 22.", Advisory: advisory},
+			{Name: "Gaziantep ATIS", FreqMHz: 249.400, Voice: "fable", ICAO: "LTAJ",
+				TACAN: "VOR DME 116.70.", ILS: "ILS 109.10 runway 28.", Advisory: advisory},
+			{Name: "Akrotiri ATIS", FreqMHz: 249.500, Voice: "onyx", ICAO: "LCRA",
+				TACAN: "TACAN 107X.", ILS: "ILS 109.70 runway 28.", Advisory: advisory},
+			{Name: "Paphos ATIS", FreqMHz: 249.000, Voice: "nova", ICAO: "LCPH",
+				TACAN: "TACAN 79X.", ILS: "ILS 108.90 runway 29.", Advisory: advisory},
+			// H4 has NO ILS, TACAN, VOR or NDB anywhere on the field -- both strings
+			// are deliberately empty so the ATIS does not claim an aid that is not there.
+			{Name: "H4 ATIS", FreqMHz: 240.850, Voice: "shimmer", ICAO: "OJHR",
+				Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{

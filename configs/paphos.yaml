@@ -1,0 +1,20 @@
+# vsfg7-atc - Paphos Tower (LCPH) - Syria / Eastern Med
+# Foothold VM: 192.168.1.222
+#
+# Tower frequency is the ratified vSFG-7 "Hornet Radio Presets - Eastern Med" card.
+# vSFG-7 MOVE: the card prints 252.100, which collides with TEXACO 1. The tanker
+# keeps 252.100 (squadron standard); Paphos moved beside its own ATIS on 249.000.
+# DCS terrain tower is 251.80.
+
+airfield: LCPH
+callsign: "Paphos Tower"
+freq_mhz: 249.100
+
+# NOTE: 5002, not the 5008 the Training rig and the PG configs use.
+srs_addr: "localhost:5002"
+grpc_addr: "localhost:50051"
+
+log_level: info
+weather_interval_sec: 30
+stale_threshold_min: 10
+pattern_alt_ft: 1500
