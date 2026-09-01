@@ -32,9 +32,40 @@
   a:hover { text-decoration: underline; }
 
   /* Header */
-  header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange); display: flex; align-items: center; gap: 1rem; }
-  .brand { display: flex; align-items: baseline; gap: 0.8rem; }
-  .logo { font-size: 1.5rem; font-weight: 700; color: var(--orange); letter-spacing: 0.05em; }
+  /* One row that wraps instead of squashing. The header carries a lot now —
+     brand, rig picker, five theatre buttons, region controls, nav, clock — and
+     on a narrow window flex was shrinking the wordmark into odd sizes. */
+  header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange);
+           display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; row-gap: 0.6rem; }
+  .brand { display: flex; align-items: center; gap: 0.7rem; flex: none; }
+  .patch { width: 38px; height: 38px; border-radius: 50%; flex: none;
+           box-shadow: 0 0 0 1px var(--border), 0 0 10px rgba(88,166,255,0.25); }
+  /* Fixed cap, gentle floor: never shrinks below legible, never outgrows the
+     patch beside it. */
+  .logo { font-size: clamp(1.15rem, 0.9vw + 0.85rem, 1.5rem); font-weight: 700; color: var(--orange);
+          letter-spacing: 0.05em; line-height: 1; white-space: nowrap; }
+  .title { white-space: nowrap; }
+  @media (max-width: 900px) { .title { display: none; } }
+
+  /* Rig picker — which launcher this page is driving. Everything but /api/me
+     is fetched through the selected rig's proxy prefix. */
+  .rig-pick { display: flex; align-items: center; gap: 0.4rem; margin-left: 0.4rem; }
+  .rig-pick label { color: var(--muted); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .rig-sel { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+             border-radius: 5px; padding: 0.25rem 0.5rem; font-size: 0.82rem; font-family: inherit; }
+  .rig-sel.remote { border-color: var(--orange); color: var(--orange); }
+
+  /* Viewer mode — anyone past the Access gate who is not listed in --admins.
+     The server refuses these actions anyway (controlAllowed); hiding them just
+     stops a viewer clicking buttons that can only fail. */
+  .view-chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--label);
+               font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; padding: 0.15rem 0.4rem; border-radius: 3px; }
+  body.viewer .region-btn,
+  body.viewer .wx-set-btn,
+  body.viewer .btn.start,
+  body.viewer .btn.stop,
+  body.viewer .btn.warn { display: none !important; }
+  body.viewer .rwy-sel { pointer-events: none; opacity: 0.6; }
   .title { color: var(--label); font-size: 0.9rem; }
   .beta { background: var(--orange); color: #000; font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px; letter-spacing: 0.1em; }
   .server { margin-left: auto; text-align: right; }
@@ -56,8 +87,12 @@
   /* Layout */
   main { padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.9rem; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.9rem; }
-  .panel h3 { margin: 0 0 0.6rem 0; font-size: 0.7rem; color: var(--label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
-  .panel h3 .sub { float: right; color: var(--muted); font-weight: 400; letter-spacing: 0.02em; text-transform: none; font-size: 0.72rem; }
+  /* Flex rather than floats: these headings mix a title with a pill and a
+     button at different font sizes, and floating them left each on its own
+     baseline. Right-hand items are pushed over with margin-left:auto. */
+  .panel h3 { margin: 0 0 0.6rem 0; font-size: 0.7rem; color: var(--label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+              display: flex; align-items: center; gap: 0.4rem; min-height: 1.5rem; }
+  .panel h3 .sub { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0.02em; text-transform: none; font-size: 0.72rem; }
 
   /* Role card row */
   .role-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.7rem; }
@@ -80,7 +115,15 @@
   .weather-grid .cell { }
   .weather-grid .cell .lbl { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
   .weather-grid .cell .val { color: var(--cyan); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
-  .case-pill { float: right; background: var(--panel-2); border: 1px solid var(--orange); color: var(--orange); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; letter-spacing: 0.08em; }
+  /* Air picture: AI unit names can run to 60+ characters, so the callsign
+     column truncates with the full value on hover. */
+  .ab-cs { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; vertical-align: bottom; }
+  .side { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem;
+          background: var(--muted); vertical-align: middle; }
+  .side.blue { background: var(--blue); }
+  .side.red  { background: var(--red); }
+  .case-pill { margin-left: auto; white-space: nowrap; background: var(--panel-2); border: 1px solid var(--orange); color: var(--orange); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; letter-spacing: 0.08em; }
 
   /* Tables (stack, pattern, freqs, cats) */
   table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
@@ -147,7 +190,7 @@
   .log .row.t-msh .msg { color: #6dabff; }
   .log .row.t-dkb .msg { color: var(--gold); }
   .log .row.t-err .msg { color: var(--red); }
-  .log-legend { float: right; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
+  .log-legend { margin-left: auto; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
   .log-legend .pip { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.25rem; vertical-align: middle; }
 
   .empty { color: var(--muted); padding: 1rem 0.3rem; font-style: italic; text-align: center; font-size: 0.78rem; }
@@ -168,7 +211,7 @@
   #wxInner .actions { margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
   #wxNote { color: var(--muted); font-size: 0.85em; margin-top: 0.6rem; }
   #wxStatus { color: var(--muted); font-size: 0.85em; margin-top: 0.4rem; min-height: 1.1em; }
-  .wx-set-btn { float: right; padding: 0.15rem 0.6rem; font-size: 0.82em; }
+  .wx-set-btn { padding: 0.15rem 0.6rem; font-size: 0.82em; line-height: 1.5; white-space: nowrap; flex: none; }
   #logInner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
   #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   #logTitle { font-weight: 500; }
@@ -222,9 +265,15 @@
 <body>
 <header>
   <div class="brand">
+    <img class="patch" src="/logo.png" alt="vSFG-7 squadron patch">
     <span class="logo">vSFG-7</span>
     <span class="title">AI Tower ATC Control Portal</span>
     <span class="beta">BETA</span>
+    <span class="view-chip" id="viewChip" style="display:none;">VIEW ONLY</span>
+  </div>
+  <div class="rig-pick">
+    <label for="rigSel">Rig</label>
+    <select class="rig-sel" id="rigSel" onchange="switchRig(this.value)"></select>
   </div>
   <div class="theatre-switch" id="theatreSwitch">
     <span class="theatre-label">Theatre</span>
@@ -282,6 +331,14 @@
     <div class="panel">
       <h3>Airfield Traffic — Takeoff &amp; Landing Lines <span class="sub" id="trafficSub"></span></h3>
       <div id="trafficTbl"><div class="empty">No airfield traffic.</div></div>
+    </div>
+  </section>
+
+  <!-- Air picture from Tacview: everyone airborne, ranged off blue bullseye -->
+  <section class="row-departures">
+    <div class="panel">
+      <h3>Airborne <span class="sub" id="airborneSub">—</span></h3>
+      <div id="airborneTbl"><div class="empty">No air picture.</div></div>
     </div>
   </section>
 
@@ -359,6 +416,110 @@
 </div>
 
 <script>
+// ──────────────────────────────────────────────────────────────────────────
+// Which rig this page is driving
+// ──────────────────────────────────────────────────────────────────────────
+// The page is always served by the launcher you connected to, but it can drive
+// any rig in the fleet: an empty RIG means "this box", anything else prefixes
+// every call with /rig/<name>, which the local launcher proxies onward. That
+// matters through the tunnel, where only one launcher is reachable from outside
+// but the missions run on another rig.
+//
+// /api/me is the one exception — identity is always the local launcher's call,
+// never the remote rig's.
+let RIG = localStorage.getItem('rig') || '';
+const api = (path) => RIG ? '/rig/' + RIG + path : path;
+
+async function loadRigs() {
+  const sel = $('rigSel');
+  let rigs = [];
+  try {
+    rigs = await fetch('/api/fleet').then(r => r.json());
+  } catch (e) { /* fleet unreachable — fall back to this box only */ }
+  if (!Array.isArray(rigs) || !rigs.length) rigs = [{ name: 'this box', self: true }];
+
+  // The rig the launcher is running on is addressed as '' (no proxy hop):
+  // proxying to ourselves would arrive from loopback with no Access token.
+  //
+  // Each option carries its running-role count. Without it there is no way to
+  // tell from the picker which rig is actually flying a mission, and the
+  // default (this box) is often the idle one.
+  sel.innerHTML = rigs.map(r => {
+    const val = r.self ? '' : r.name;
+    const down = r.launcherUp === false;
+    const n = (r.running || []).length;
+    const state = down ? 'down' : (n ? n + ' running' : 'idle');
+    return `<option value="${val}"${down && !r.self ? ' disabled' : ''}>` +
+           `${r.name}${r.self ? ' (this box)' : ''} — ${state}</option>`;
+  }).join('');
+
+  // First visit with no saved choice: land on whichever rig is actually flying.
+  // The exposed box is the aggregator, not where missions run, so defaulting to
+  // it shows a dead dashboard to anyone opening the public URL.
+  if (localStorage.getItem('rig') === null) {
+    const busiest = rigs.filter(r => r.launcherUp !== false)
+                        .sort((a, b) => (b.running || []).length - (a.running || []).length)[0];
+    if (busiest && (busiest.running || []).length) RIG = busiest.self ? '' : busiest.name;
+  }
+
+  // A remembered rig that has dropped out of --fleet falls back to local.
+  if (RIG && !rigs.some(r => r.name === RIG && !r.self)) RIG = '';
+  sel.value = RIG;
+  sel.classList.toggle('remote', !!RIG);
+}
+
+async function switchRig(name) {
+  RIG = name || '';
+  localStorage.setItem('rig', RIG);
+  $('rigSel').classList.toggle('remote', !!RIG);
+  closeLogStreams();   // the open SSE streams point at the old rig
+  await followRunningTheatre();
+  refreshAll();
+  openLogStreams();
+}
+
+// Rig and theatre are separate choices, and each rig runs whatever theatre its
+// operator started — Training 1 flies Caucasus, foothold flies Syria, dev
+// depends on the test. Landing on a rig with the wrong theatre selected shows a
+// wall of dead panels, which looks exactly like a broken connection.
+//
+// So follow the theatre the rig is actually flying: the one with the most
+// running roles. Counting is what matters rather than "does the current
+// theatre have anything up" — Training 1 runs Deckboss and Marshal, which are
+// pg-region roles, alongside a Caucasus mission, so a mere presence test would
+// pin the page to an idle Persian Gulf.
+//
+// Only ever called on a rig change or at boot, so a deliberate theatre click
+// stands until you move rigs.
+async function followRunningTheatre() {
+  try {
+    const roles = await fetch(api('/api/roles')).then(r => r.json());
+    const running = {};
+    for (const r of roles) {
+      if (r.status === 'running' && THEATRES[r.region]) {
+        running[r.region] = (running[r.region] || 0) + 1;
+      }
+    }
+    const ranked = Object.keys(running).sort((a, b) => running[b] - running[a]);
+    const best = ranked[0];
+    // Ties keep the current theatre rather than flapping between equals.
+    if (best && best !== currentTheatre && running[best] > (running[currentTheatre] || 0)) {
+      switchTheatre(best);
+    }
+  } catch (e) { /* leave the theatre alone */ }
+}
+
+// Viewer vs operator. Enforcement is server-side (controlAllowed); this only
+// decides whether to render controls that a viewer could never use.
+async function loadIdentity() {
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    document.body.classList.toggle('viewer', !me.admin);
+    $('viewChip').style.display = me.admin ? 'none' : 'inline-block';
+    if (!me.admin) $('viewChip').title = me.name + ' — read-only access';
+  } catch (e) { /* leave the page as-is; the server still refuses actions */ }
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Config — role → tower port + window-title mapping
 // ──────────────────────────────────────────────────────────────────────────
@@ -504,7 +665,7 @@ const CARRIER = [
 
 async function refreshRoles() {
   try {
-    const r = await fetch('/api/roles');
+    const r = await fetch(api('/api/roles'));
     const list = await r.json();
     roleStatus = {};
     for (const x of (list||[])) roleStatus[x.name] = x.status;
@@ -514,7 +675,7 @@ async function refreshRoles() {
 async function refreshTowers() {
   await Promise.all(TOWERS.map(async t => {
     try {
-      const r = await fetch(`/tower/${t.port}/status`, { cache: 'no-store' });
+      const r = await fetch(api(`/tower/${t.port}/status`), { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       towerStatus[t.icao] = await r.json();
     } catch { towerStatus[t.icao] = null; }
@@ -524,7 +685,7 @@ async function refreshTowers() {
 async function refreshCarrier() {
   await Promise.all(CARRIER.map(async c => {
     try {
-      const r = await fetch(`/tower/${c.port}/status`, { cache: 'no-store' });
+      const r = await fetch(api(`/tower/${c.port}/status`), { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       carrierStatus[c.key] = await r.json();
     } catch { carrierStatus[c.key] = null; }
@@ -589,6 +750,63 @@ function renderCards() {
       </div>`);
   }
   $('roleCards').innerHTML = parts.join('');
+}
+
+// Air picture — everyone airborne on the selected rig, ranged and bearinged off
+// the blue bullseye. Bearings are true, not magnetic: the Tacview feed carries
+// no declination, so calling them magnetic would be a quiet lie.
+async function refreshAirborne() {
+  const sub = $('airborneSub');
+  const tbl = $('airborneTbl');
+  let p;
+  try {
+    // Deliberately NOT through api(): this launcher reads every rig's Tacview
+    // feed itself, so the air picture never depends on which build the remote
+    // rig's launcher happens to be running.
+    const r = await fetch('/api/airborne' + (RIG ? '?rig=' + encodeURIComponent(RIG) : ''));
+    if (r.status === 404) {
+      sub.textContent = '';
+      tbl.innerHTML = '<div class="empty">No Tacview feed configured for this rig.</div>';
+      return;
+    }
+    if (!r.ok) throw new Error(r.status);
+    p = await r.json();
+  } catch (e) {
+    sub.textContent = '';
+    tbl.innerHTML = '<div class="empty">Air picture unavailable.</div>';
+    return;
+  }
+
+  if (!p.connected) {
+    sub.textContent = '';
+    tbl.innerHTML = `<div class="empty">Tacview not connected${p.err ? ' — ' + esc(p.err) : ''}.</div>`;
+    return;
+  }
+
+  const n = (p.contacts || []).length;
+  sub.textContent = `${n} airborne` +
+    (p.onGround ? ` · ${p.onGround} on the ground` : '') +
+    (p.bullseye ? '' : ' · no blue bullseye in the feed');
+
+  if (!n) {
+    tbl.innerHTML = '<div class="empty">Nobody airborne.</div>';
+    return;
+  }
+
+  const rows = p.contacts.map(c => `
+      <tr>
+        <td><span class="side ${c.color === 'Blue' ? 'blue' : (c.color === 'Red' ? 'red' : '')}"></span><span class="ab-cs" title="${esc(c.callsign)}">${esc(c.callsign)}</span></td>
+        <td style="color:var(--muted)">${esc(c.aircraft)}</td>
+        <td>${c.altFt.toLocaleString()} ft</td>
+        <td>${String(c.heading).padStart(3, '0')}°</td>
+        <td>${p.bullseye ? `<span style="color:var(--gold)">${String(c.bullBrg).padStart(3, '0')}° / ${c.bullNm} nm</span>` : '—'}</td>
+      </tr>`).join('');
+
+  tbl.innerHTML = `
+    <table>
+      <thead><tr><th>Callsign</th><th>Aircraft</th><th>Alt</th><th>Hdg</th><th>Bullseye (true)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderMissionClock() {
@@ -793,9 +1011,9 @@ function renderPattern() {
 // ──────────────────────────────────────────────────────────────────────────
 // Role control actions
 // ──────────────────────────────────────────────────────────────────────────
-async function startRole(name)   { await fetch('/api/start?name='   + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
-async function stopRole(name)    { await fetch('/api/stop?name='    + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
-async function restartRole(name) { await fetch('/api/restart?name=' + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
+async function startRole(name)   { await fetch(api('/api/start?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function stopRole(name)    { await fetch(api('/api/stop?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function restartRole(name) { await fetch(api('/api/restart?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
 // Flip the dashboard between theatres. Backend role start/stop is unaffected
 // (it auto-discovers all bats); this only re-points the tower-status, weather,
 // departures and pattern panels at the selected theatre's towers.
@@ -811,7 +1029,7 @@ function switchTheatre(name) {
     b.classList.toggle('active', b.dataset.theatre === name));
   $('wxPrimary').textContent = cfg.primaryLabel;
   updateRegionButtons();
-  TOWERS.forEach(connectLog);             // no-op for already-connected towers
+  openLogStreams();                       // the stream is per-theatre
   refreshAll();
 }
 
@@ -833,7 +1051,7 @@ async function startAtis() {
   const btn = $('startAtisBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/start?name=' + encodeURIComponent(cfg.atisRole), { method: 'POST' });
+    const r = await fetch(api('/api/start?name=') + encodeURIComponent(cfg.atisRole), { method: 'POST' });
     if (!r.ok) alert(`Start ${cfg.label} ATIS failed: ${await r.text()}`);
   } catch (e) { alert('Start ATIS failed: ' + e.message); }
   setTimeout(() => { btn.disabled = false; refreshAll(); }, 1200);
@@ -843,7 +1061,7 @@ async function startRegion() {
   const btn = $('startRegionBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/start-region?region=' + encodeURIComponent(currentTheatre), { method: 'POST' });
+    const r = await fetch(api('/api/start-region?region=') + encodeURIComponent(currentTheatre), { method: 'POST' });
     if (!r.ok) alert(`Start ${cfg.label} failed: ${await r.text()}`);
   } catch (e) { alert('Start region failed: ' + e.message); }
   setTimeout(() => { btn.disabled = false; refreshAll(); }, 1500);
@@ -854,7 +1072,7 @@ async function stopRegion() {
   const btn = $('stopRegionBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/stop-region?region=' + encodeURIComponent(currentTheatre), { method: 'POST' });
+    const r = await fetch(api('/api/stop-region?region=') + encodeURIComponent(currentTheatre), { method: 'POST' });
     if (r.ok) {
       const j = await r.json();
       if (j.killed === 0) alert(`No running ${cfg.label} roles to stop.`);
@@ -867,7 +1085,7 @@ async function stopRegion() {
 
 async function setRunway(port, runway) {
   try {
-    const r = await fetch(`/tower/${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
+    const r = await fetch(api(`/tower/${port}/runway?to=${encodeURIComponent(runway)}`), { method: 'POST' });
     if (!r.ok) alert(`Runway change failed: ${await r.text()}`);
   } catch (e) { alert('Runway change failed: ' + e.message); }
   setTimeout(refreshAll, 500);
@@ -878,7 +1096,7 @@ async function setRunway(port, runway) {
 let WX_TARGET_PORTS = THEATRES[currentTheatre].wxPorts;
 async function openWeatherModal() {
   try {
-    const r = await fetch(`/tower/${TOWERS[0].port}/status`);
+    const r = await fetch(api(`/tower/${TOWERS[0].port}/status`));
     if (r.ok) {
       const s = await r.json();
       const t = s.tower || {};
@@ -896,8 +1114,19 @@ function closeWeatherModal() { $('wxModal').classList.remove('open'); }
 async function readMizWeather() {
   $('wxStatus').textContent = 'Reading .miz…';
   try {
-    const r = await fetch('/api/miz-weather');
-    if (!r.ok) { $('wxStatus').textContent = 'Failed: ' + (await r.text()).trim(); return; }
+    const r = await fetch(api('/api/miz-weather'));
+    if (!r.ok) {
+      // The mission file lives on the selected rig and is read by THAT rig's
+      // launcher, so name it — otherwise a rig still on an old build reports a
+      // path from a machine you are not looking at, which reads like nonsense.
+      const msg = (await r.text()).trim();
+      const where = RIG || 'this box';
+      const stale = /Administrator..Saved:/.test(msg)
+        ? " — that rig's launcher predates the .miz path fix; redeploy its launcher."
+        : '';
+      $('wxStatus').textContent = `Failed on ${where}: ${msg}${stale}`;
+      return;
+    }
     const w = await r.json();
     $('wxInDir').value  = Math.round(w.windDir);
     $('wxInKts').value  = Math.round(w.windKts);
@@ -905,7 +1134,7 @@ async function readMizWeather() {
     $('wxInVis').value  = (Math.round(w.visNm * 10) / 10);
     $('wxInAlt').value  = w.altInHg.toFixed(2);
     $('wxStatus').textContent = `Loaded from ${w.mizName} (wind is true; click Apply to propagate).`;
-  } catch (e) { $('wxStatus').textContent = 'Failed: ' + e.message; }
+  } catch (e) { $('wxStatus').textContent = `Failed on ${RIG || 'this box'}: ${e.message}`; }
 }
 async function applyWeather() {
   const q = new URLSearchParams({
@@ -918,7 +1147,7 @@ async function applyWeather() {
   $('wxStatus').textContent = 'Applying…';
   const results = await Promise.all(WX_TARGET_PORTS.map(async (port) => {
     try {
-      const r = await fetch(`/tower/${port}/weather?${q.toString()}`, { method: 'POST' });
+      const r = await fetch(api(`/tower/${port}/weather?${q.toString()}`), { method: 'POST' });
       return { port, ok: r.ok, msg: r.ok ? '' : await r.text() };
     } catch (e) { return { port, ok: false, msg: e.message }; }
   }));
@@ -930,8 +1159,8 @@ async function applyWeather() {
     $('wxStatus').textContent = `Failed on ports: ${failed.map(f => f.port + ' (' + f.msg.trim() + ')').join(', ')}`;
   }
 }
-async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch('/api/start?name=' + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
-async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch('/api/stop?name=' + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
+async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch(api('/api/start?name=') + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
+async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch(api('/api/stop?name=') + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
 
 // ──────────────────────────────────────────────────────────────────────────
 // Live log — open one SSE per tower, merge into one feed
@@ -940,25 +1169,41 @@ const MAX_LOG = 250;
 const logEvents = [];
 const sources = {};
 
-function connectLog(t) {
-  if (sources[t.icao]) return;
+// One stream for the whole theatre. The browser allows only about six
+// concurrent connections per origin, and an EventSource holds one for the life
+// of the page — a tower each was fine for Persian Gulf's three and silently
+// starved every other fetch on Syria's eight. The launcher does the fan-in now
+// and tags each event with its tower port.
+function openLogStreams() {
+  closeLogStreams();
+  const ports = [...TOWERS.map(t => t.port), ...CARRIER.map(c => c.port)];
+  const byPort = {};
+  for (const t of TOWERS) byPort[t.port] = t.icao;
+  for (const c of CARRIER) byPort[c.port] = c.key.toUpperCase();
+
+  const qs = 'ports=' + ports.join(',') + (RIG ? '&rig=' + encodeURIComponent(RIG) : '');
   try {
-    const es = new EventSource(`/tower/${t.port}/ws/log`);
-    sources[t.icao] = es;
+    const es = new EventSource('/api/log-stream?' + qs);
+    sources.merged = es;
     es.onmessage = ev => {
       try {
-        const e = JSON.parse(ev.data);
-        e._src = t.icao;
+        const m = JSON.parse(ev.data);
+        const e = m.data;
+        e._src = byPort[m.src] || m.src;
         logEvents.push(e);
         if (logEvents.length > MAX_LOG) logEvents.shift();
         appendLogRow(e);
       } catch {}
     };
-    es.onerror = () => {
-      // Will auto-retry, but if the tower is offline this fires constantly.
-      // EventSource handles backoff itself.
-    };
+    es.onerror = () => { /* EventSource handles its own backoff */ };
   } catch (e) { /* ignore */ }
+}
+
+function closeLogStreams() {
+  for (const k of Object.keys(sources)) {
+    try { sources[k].close(); } catch {}
+    delete sources[k];
+  }
 }
 
 function appendLogRow(e) {
@@ -978,7 +1223,7 @@ function appendLogRow(e) {
 // ──────────────────────────────────────────────────────────────────────────
 async function refreshHealth() {
   try {
-    const h = await fetch('/api/health').then(r => r.json());
+    const h = await fetch(api('/api/health')).then(r => r.json());
     const ok = h && (h.srs || h.tacview || h.openai);
     $('serverLine').className = 'server-line' + (ok ? '' : ' down');
     $('tv64Badge').className = 'tv64-badge' + (h && h.tacview64 === false ? ' show' : '');
@@ -1010,7 +1255,7 @@ async function loadModalLog() {
   const role = map[file] || 'Al Minhad Tower';
   $('logTitle').textContent = `Tail — ${file}`;
   try {
-    const r = await fetch('/api/log?name=' + encodeURIComponent(role));
+    const r = await fetch(api('/api/log?name=') + encodeURIComponent(role));
     $('logBody').textContent = r.ok ? await r.text() : 'Log not available.';
     $('logBody').scrollTop = $('logBody').scrollHeight;
   } catch (e) { $('logBody').textContent = 'Error: ' + e.message; }
@@ -1020,7 +1265,7 @@ async function loadModalLog() {
 // Refresh loop
 // ──────────────────────────────────────────────────────────────────────────
 async function refreshAll() {
-  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth()]);
+  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth(), refreshAirborne()]);
   renderCards();
   renderMissionClock();
   renderWeather();
@@ -1032,10 +1277,11 @@ async function refreshAll() {
 
 // Boot
 updateRegionButtons();
+loadIdentity();
+loadRigs().then(followRunningTheatre);   // loadRigs may reset a stale saved rig
 refreshAll();
 setInterval(refreshAll, 3000);
-TOWERS.forEach(connectLog);
-CARRIER.forEach(c => connectLog({ icao: c.key.toUpperCase(), port: c.port }));
+openLogStreams();
 </script>
 </body>
 </html>

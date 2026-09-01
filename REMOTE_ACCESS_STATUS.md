@@ -1,48 +1,57 @@
-# Remote access — setup status / resume here (2026-07-09)
+# Remote access — setup status / resume here (2026-09-01)
 
 Goal: expose the launcher dashboard publicly, gated by **Discord login**
-(restricted to the vSFG-7 guild) via **Cloudflare Tunnel + Cloudflare Access**.
+(restricted to the vSFG-7 guild) via **Cloudflare Tunnel + Cloudflare Access**,
+with squadron members read-only and a named operator list keeping control.
 Full runbook: `REMOTE_ACCESS.md`.
 
-## DONE
-- **Launcher reverse-proxy** — `/tower/<port>/…` (allowlisted 6001-6005 / 6011-6014).
-  UI fetches tower data through it, so only `:7000` needs exposing. Committed +
-  pushed (`4f7fbd7`). Verified: `/tower/6013/status` OK, `/tower/9999` → 403.
-- **cloudflared** downloaded to `C:\SkyeyeATC\cloudflared.exe` (v2026.7.x,
-  standalone — no install needed).
+Decisions taken 2026-09-01: **split roles** (viewer / operator), exposed rig is
+**host `.231`**, ingress is **Cloudflare Tunnel + Discord OIDC**.
 
-## BLOCKED / IN PROGRESS — the tunnel
-- Tried `cloudflared tunnel login` (cert method). It **failed**: cloudflared on
-  the rig couldn't fetch the cert (`error="Failed to fetch resource"`), the
-  browser-download fallback produced an **empty cert.pem**. Cert method abandoned.
-- **Pivoted to the dashboard-managed (token) tunnel** — cleaner, no cert.pem / no
-  config.yml, and installs cloudflared as a **service** (also fixes the process
-  getting reaped between sessions).
+## DONE
+- **Launcher reverse-proxy** — `/tower/<port>/…` (allowlisted 6001-6048). Older
+  work, pushed as `4f7fbd7`.
+- **Launcher auth** (`cmd/launcher/auth.go`, new) — Cloudflare Access JWT
+  verification against the team JWKS (signature, `aud`, `iss`, expiry), viewer /
+  operator split, `--access-team` / `--access-aud` / `--admins` /
+  `--trusted-cidr`. Off unless `--access-aud` is set, so the other rigs are
+  untouched. `/api/me` reports the caller's tier.
+- **Control actions hardened** — start / stop / restart / start-region /
+  stop-region / rescan and the proxied tower `runway` + `weather` POSTs are now
+  operator-only, POST-only, same-origin-only. They previously accepted GET from
+  anyone who could reach the port.
+- **Rig picker** — `/rig/<name>/…` proxy plus a header dropdown, so the one
+  exposed launcher can drive any rig in `--fleet` (the missions run on
+  Training 1, not on the exposed box). Access credentials are stripped before
+  the hop.
+- **Viewer UI** — non-operators get a VIEW ONLY chip and no control buttons.
+- **Squadron patch** in the header (`/logo.png`, embedded in the binary).
+- **Tests** — `cmd/launcher/auth_test.go`, `proxy_test.go`. Cover token forgery,
+  expiry, wrong-audience, wrong-issuer, `alg:none`, claim tampering, the
+  loopback-is-not-trusted rule, the control gate, and the proxy gate.
+- **Verified on the LAN** against a real launcher — the curl matrix in
+  `REMOTE_ACCESS.md` Part E, plus a live `/rig/training1/api/roles` hop.
 
 ## RESUME HERE  ← next action
-1. Cloudflare **Zero Trust → Networks → Tunnels → Create a tunnel** → connector
-   **Cloudflared** → name `vsfg7-atc` → Save.
-2. On the install step, **Windows** tab: copy the **token** (the long `eyJ…`
-   string in the `cloudflared service install <TOKEN>` command). Skip the
-   download — cloudflared is already on the rig.
-3. Install the connector on the rig (Claude can run this given the token):
-   `C:\SkyeyeATC\cloudflared.exe service install <TOKEN>`
-4. In the tunnel's **Public Hostnames** → Add: `atc.<yourdomain>` → HTTP →
-   `localhost:7000`.
-5. Then the **auth gate** (Part C+D of `REMOTE_ACCESS.md`): deploy the
-   `Erisa/discord-oidc-worker` shim, add it as an OIDC login method in Access,
-   and create an Access application for `atc.<yourdomain>` restricted to the
-   vSFG-7 Discord guild.
+Everything left is in the Cloudflare and Discord consoles (needs your accounts):
 
-## Rig process state (may need a bounce next session)
-- **Launcher** (`:7000`) keeps getting reaped between sessions — restart with
-  `start_launcher.bat` (or the dashboard-managed cloudflared service makes this a
-  non-issue once auth is on). Check: is `:7000` listening?
-- **Caucasus** towers up (Batumi 260 / Senaki 261 / Kobuleti 262 / Kutaisi 263),
-  EN+Russian ATIS. **Persian Gulf left DOWN** (mission is Caucasus).
-- Remember: launch multi-tower sets with staggering (SRS drops a simultaneous
-  registration — see the SRS gotcha memory).
+1. **Tunnel** — `REMOTE_ACCESS.md` Part B. cloudflared is **not** on `.231`
+   (the July download was on another rig and is gone). Install it, create the
+   `vsfg7-atc` tunnel, install the connector with the token, and point the
+   public hostname at **`http://127.0.0.1:7000`**.
+2. **Discord OIDC worker** — Part C.
+3. **Access application + policy**, then copy its **AUD tag** — Part D.
+4. **Restart the launcher with the auth flags** (Part A) and re-run the Part E
+   matrix through the tunnel.
+5. **Install the launcher as a Windows service** so the public URL does not go
+   dark when it does its silent-death trick.
 
-## Git
-- All code pushed through `4f7fbd7`. This status file + any doc tweaks are the
-  only local-only changes.
+## Rig state (2026-09-01)
+- Launchers up on training1 `.220`, dev `.221`, foothold `.222`. **Host `.231`
+  has no launcher running** — start it before exposing anything.
+- Host is on `main`; the auth work above is uncommitted local change.
+
+## Follow-up, not blocking
+- Tower dashboards bind `0.0.0.0` with `Access-Control-Allow-Origin: *`
+  (`cmd/atc/dashboard.go`). Pre-existing LAN exposure; bind to `127.0.0.1`,
+  the launcher proxy is the only consumer.
