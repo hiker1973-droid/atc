@@ -411,11 +411,27 @@ async function loadRigs() {
 
   // The rig the launcher is running on is addressed as '' (no proxy hop):
   // proxying to ourselves would arrive from loopback with no Access token.
+  //
+  // Each option carries its running-role count. Without it there is no way to
+  // tell from the picker which rig is actually flying a mission, and the
+  // default (this box) is often the idle one.
   sel.innerHTML = rigs.map(r => {
     const val = r.self ? '' : r.name;
-    const down = r.launcherUp === false && !r.self ? ' — down' : '';
-    return `<option value="${val}"${r.launcherUp === false && !r.self ? ' disabled' : ''}>${r.name}${r.self ? ' (this box)' : ''}${down}</option>`;
+    const down = r.launcherUp === false;
+    const n = (r.running || []).length;
+    const state = down ? 'down' : (n ? n + ' running' : 'idle');
+    return `<option value="${val}"${down && !r.self ? ' disabled' : ''}>` +
+           `${r.name}${r.self ? ' (this box)' : ''} — ${state}</option>`;
   }).join('');
+
+  // First visit with no saved choice: land on whichever rig is actually flying.
+  // The exposed box is the aggregator, not where missions run, so defaulting to
+  // it shows a dead dashboard to anyone opening the public URL.
+  if (localStorage.getItem('rig') === null) {
+    const busiest = rigs.filter(r => r.launcherUp !== false)
+                        .sort((a, b) => (b.running || []).length - (a.running || []).length)[0];
+    if (busiest && (busiest.running || []).length) RIG = busiest.self ? '' : busiest.name;
+  }
 
   // A remembered rig that has dropped out of --fleet falls back to local.
   if (RIG && !rigs.some(r => r.name === RIG && !r.self)) RIG = '';
@@ -423,13 +439,45 @@ async function loadRigs() {
   sel.classList.toggle('remote', !!RIG);
 }
 
-function switchRig(name) {
+async function switchRig(name) {
   RIG = name || '';
   localStorage.setItem('rig', RIG);
   $('rigSel').classList.toggle('remote', !!RIG);
   closeLogStreams();   // the open SSE streams point at the old rig
+  await followRunningTheatre();
   refreshAll();
   openLogStreams();
+}
+
+// Rig and theatre are separate choices, and each rig runs whatever theatre its
+// operator started — Training 1 flies Caucasus, foothold flies Syria, dev
+// depends on the test. Landing on a rig with the wrong theatre selected shows a
+// wall of dead panels, which looks exactly like a broken connection.
+//
+// So follow the theatre the rig is actually flying: the one with the most
+// running roles. Counting is what matters rather than "does the current
+// theatre have anything up" — Training 1 runs Deckboss and Marshal, which are
+// pg-region roles, alongside a Caucasus mission, so a mere presence test would
+// pin the page to an idle Persian Gulf.
+//
+// Only ever called on a rig change or at boot, so a deliberate theatre click
+// stands until you move rigs.
+async function followRunningTheatre() {
+  try {
+    const roles = await fetch(api('/api/roles')).then(r => r.json());
+    const running = {};
+    for (const r of roles) {
+      if (r.status === 'running' && THEATRES[r.region]) {
+        running[r.region] = (running[r.region] || 0) + 1;
+      }
+    }
+    const ranked = Object.keys(running).sort((a, b) => running[b] - running[a]);
+    const best = ranked[0];
+    // Ties keep the current theatre rather than flapping between equals.
+    if (best && best !== currentTheatre && running[best] > (running[currentTheatre] || 0)) {
+      switchTheatre(best);
+    }
+  } catch (e) { /* leave the theatre alone */ }
 }
 
 // Viewer vs operator. Enforcement is server-side (controlAllowed); this only
@@ -1101,7 +1149,7 @@ function closeLogStreams() {
 // Boot
 updateRegionButtons();
 loadIdentity();
-loadRigs();
+loadRigs().then(followRunningTheatre);   // loadRigs may reset a stale saved rig
 refreshAll();
 setInterval(refreshAll, 3000);
 openLogStreams();
