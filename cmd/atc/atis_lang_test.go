@@ -71,3 +71,45 @@ func TestSyriaATISLanguages(t *testing.T) {
 		}
 	}
 }
+
+// A bilingual station reads the report twice, which measured ~63s against the
+// 45s single-language tick. Because broadcast() is called synchronously and
+// time.Ticker buffers one tick, an over-running broadcast is followed
+// immediately by the pending one — the station transmits back-to-back with no
+// idle gap. The interval has to follow the same resolver that decides the
+// second language, or Akrotiri (English only) gets slowed down with the rest
+// of Syria for no reason.
+func TestATISBroadcastInterval(t *testing.T) {
+	cases := []struct {
+		name    string
+		station atisStation
+		mapName string
+		want    int
+	}{
+		{"bilingual station gets the slow cadence", atisStation{Lang: "Turkish"}, "syria", atisIntervalBilingualSec},
+		{"English-only keeps the fast cadence", atisStation{Lang: "English"}, "syria", atisIntervalSec},
+		{"theatre default is bilingual too", atisStation{}, "pg", atisIntervalBilingualSec},
+		{"Syria fallback stays bilingual", atisStation{}, "syria", atisIntervalBilingualSec},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := atisBroadcastIntervalSec(&tc.station, tc.mapName); got != tc.want {
+				t.Errorf("atisBroadcastIntervalSec(%+v, %q) = %d, want %d",
+					tc.station, tc.mapName, got, tc.want)
+			}
+		})
+	}
+}
+
+// The slow cadence must actually clear the audio it was sized for. Measured
+// with ffprobe over every cached station file on 2026-09-01, the longest
+// bilingual read is Al Dhafra at 71.5s (Minhad 67.7s, Hatay 65.2s) -- note the
+// worst case is a PG field, not a Syria one. A future edit that trims the
+// interval below that puts the station back into continuous back-to-back TX.
+func TestBilingualIntervalClearsObservedAudio(t *testing.T) {
+	const longestObservedBilingualSec = 72
+	if atisIntervalBilingualSec <= longestObservedBilingualSec {
+		t.Errorf("atisIntervalBilingualSec = %d, must exceed the %ds longest observed bilingual broadcast",
+			atisIntervalBilingualSec, longestObservedBilingualSec)
+	}
+}

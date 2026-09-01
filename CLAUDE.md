@@ -49,11 +49,17 @@ Role names in logs: `Tower`, `Deckboss`, `Marshal` (single L). User's verbal "Ma
 Common fault signatures: `level=warn` + `SRS disconnected` · `level=error` + `ExternalAudio file error` · `TTS synthesis failed` · `Whisper returned empty transcription` · `SRS TCP failed`.
 
 ## ATIS broadcast cadence
-**45 seconds per station** (was 120s, changed 2026-04-25). Set at two call sites — keep them in sync if it ever moves:
-- `cmd/atc/atis.go:336` — `atisOnlyLoop` (used by `--atis-only` / `start_atis.bat`)
-- `cmd/atc/main.go:537` — tower-bundled path (used when `--atis-broadcast` is on)
+**Per station, keyed off whether it broadcasts a second language** (2026-09-01):
+- **45s** — English-only stations (`atisIntervalSec`)
+- **90s** — bilingual stations (`atisIntervalBilingualSec`), which read the whole report twice
 
-5 ATIS stations: Dhafra (248.2), Minhad (248.3), Liwa (248.55), Al Ain (248.85), Khasab (248.5). Startup staggered `15 + i*37` seconds to desync TTS calls. Per-station `broadcasting` mutex (`TryLock`) drops the next tick if previous broadcast is still in progress — if you see `ATIS broadcast already in progress — skipping` in logs repeatedly, audio is exceeding 45s and the interval should creep back toward 60–90s. TTS only regenerates when weather/runway changes; otherwise it rebroadcasts `atis_cache/atis_<ICAO>.mp3`.
+One source of truth: `atisBroadcastIntervalSec(station, map)` in `cmd/atc/atis.go`, which asks the same `atisSecondLang` resolver that decides the second language. Both loops call it — `atisOnlyLoop` (`--atis-only` / `start_atis.bat`) and the tower-bundled path (`--atis-broadcast`) — so **the old "two call sites, keep them in sync" hazard is gone**; don't reintroduce a literal. A new bilingual field picks up 90s automatically, and a station whose `Lang` is `"English"` (Akrotiri) keeps 45s even on a bilingual map.
+
+Why: bilingual audio measured with ffprobe over the cache (2026-09-01) runs **Al Dhafra 71.5s, Minhad 67.7s, Hatay 65.2s against the 45s tick** — note the worst offenders are **PG** fields, so PG has been over the tick since bilingual ATIS landed; Syria just made it visible. When the audio outruns the tick the station stops idling entirely. `broadcast()` is called synchronously from the ticker loop and `time.Ticker`'s channel is buffered depth 1, so a tick firing mid-broadcast waits in that buffer and fires the instant the transmission returns — **back-to-back TX, ~100% duty cycle**, not the 45s the number implied. `TestBilingualIntervalClearsObservedAudio` pins 90s above that 63s measurement.
+
+**Do not diagnose this from the `broadcasting` `TryLock` warning.** That mutex guards concurrent *entry*, which a single synchronous caller per station cannot cause — `ATIS broadcast already in progress — skipping` has **never** appeared in this deployment. An over-running ATIS is silent in the logs; measure the gap between transmissions instead.
+
+Startup staggered `15 + i*37` seconds to desync TTS calls. TTS only regenerates when weather/runway changes; otherwise it rebroadcasts from cache. **Every station caches as `atis_cache/atis_<ICAO>_bilingual.mp3`** — the `_bilingual` suffix is unconditional (`atis.go` `cachePath`), so an English-only station like Akrotiri still uses it. Don't read the filename as evidence a station is bilingual; check its duration or its `Lang` field (LCRA's file is 23.6s, i.e. one English pass). PG's 5 stations: Dhafra (248.2), Minhad (248.3), Liwa (248.55), Al Ain (248.85), Kish (248.5).
 
 ## Operator workflow
 Start scripts in `C:\SkyeyeATC\`. Recommended order:

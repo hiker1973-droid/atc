@@ -530,6 +530,46 @@ func atisSecondLang(station *atisStation, m string) (string, bool) {
 	return atisSecondLangForMap(m)
 }
 
+// ATIS broadcast cadence, per station.
+//
+// A bilingual station reads the whole report twice — English, then the local
+// language — so its audio runs roughly double. ffprobe over every cached
+// station file (2026-09-01): Al Dhafra 71.5s, Minhad 67.7s, Hatay 65.2s,
+// against a 45s tick. The worst case is a PG field, not a Syria one — PG has
+// been over the tick since bilingual ATIS landed, Syria just made it visible.
+//
+// When the audio outruns the tick the station stops idling altogether. The loop
+// below calls broadcast() synchronously, and time.Ticker's channel is buffered
+// depth 1: a tick that fires mid-broadcast sits in that buffer, so the moment
+// an over-running transmission returns, the loop selects the already-pending
+// tick and
+// transmits again with no gap. The result is a ~100% duty cycle — continuous
+// TX on the station's frequency and a permanently resident ExternalAudio
+// process — not the 45s cadence the number claims.
+//
+// Note this is NOT the `broadcasting` TryLock path: that mutex guards against
+// concurrent entry, which one synchronous caller per station can never cause.
+// It has never fired in this deployment — zero "already in progress" lines in
+// the whole log history — so don't reach for that warning as the symptom.
+//
+// 90s clears the 71.5s worst case with ~18s of genuine idle.
+// English-only stations keep 45s.
+const (
+	atisIntervalSec          = 45
+	atisIntervalBilingualSec = 90
+)
+
+// atisBroadcastIntervalSec returns the tick interval for one station, keyed off
+// the same resolver that decides whether it gets a second language at all — so
+// a station that drops its second pass (Akrotiri) keeps the fast cadence, and a
+// new bilingual field picks up the slow one without touching this code.
+func atisBroadcastIntervalSec(station *atisStation, m string) int {
+	if _, wantSecond := atisSecondLang(station, m); wantSecond {
+		return atisIntervalBilingualSec
+	}
+	return atisIntervalSec
+}
+
 // atisSecondLangForMap returns the non-English language the ATIS also
 // broadcasts for a given theatre, plus whether a second pass is wanted at all.
 // Persian Gulf → Arabic (local language of the UAE fields); Caucasus → Russian
@@ -692,7 +732,7 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 				return
 			case <-time.After(time.Duration(d) * time.Second):
 			}
-			atisLoop(ctx, st, apiKey, eamPassword, srsAddr, atcCtrl, 45)
+			atisLoop(ctx, st, apiKey, eamPassword, srsAddr, atcCtrl, atisBroadcastIntervalSec(st, flagMap))
 		}(s, delay)
 	}
 	log.Info().Int("stations", len(stations)).Str("srs", srsAddr).Msg("ATIS-only broadcaster started")

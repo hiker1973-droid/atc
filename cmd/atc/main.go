@@ -816,7 +816,7 @@ func run(cmd *cobra.Command, args []string) error {
 					case <-time.After(time.Duration(delay) * time.Second):
 					}
 				}
-				atisLoop(ctx, st, apiKey, flagEAMPassword, flagSRSAddr, atcCtrl, 45)
+				atisLoop(ctx, st, apiKey, flagEAMPassword, flagSRSAddr, atcCtrl, atisBroadcastIntervalSec(st, flagMap))
 			}(s, staggerSec)
 		}
 		log.Info().Int("stations", len(atisStations)).Msg("ATIS broadcaster started")
