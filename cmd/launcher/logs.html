@@ -13,6 +13,8 @@
     font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
   header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
     border-bottom: 1px solid var(--border); background: var(--panel); }
+  .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
+           box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
   header .logo { font-weight: 800; color: var(--blue); }
   header .title { font-weight: 600; margin-right: 0.5rem; }
   header label { color: var(--muted); font-size: 0.8rem; }
@@ -40,6 +42,7 @@
 </head>
 <body>
 <header>
+  <img class="patch" src="/logo.png" alt="vSFG-7 squadron patch">
   <span class="logo">vSFG-7</span><span class="title">Live Logs</span>
   <label>Rig</label><select id="rig"></select>
   <label>Role</label><select id="role"></select>

@@ -34,7 +34,29 @@
   /* Header */
   header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange); display: flex; align-items: center; gap: 1rem; }
   .brand { display: flex; align-items: baseline; gap: 0.8rem; }
+  .patch { width: 42px; height: 42px; border-radius: 50%; align-self: center; flex: none;
+           box-shadow: 0 0 0 1px var(--border), 0 0 10px rgba(88,166,255,0.25); }
   .logo { font-size: 1.5rem; font-weight: 700; color: var(--orange); letter-spacing: 0.05em; }
+
+  /* Rig picker — which launcher this page is driving. Everything but /api/me
+     is fetched through the selected rig's proxy prefix. */
+  .rig-pick { display: flex; align-items: center; gap: 0.4rem; margin-left: 0.4rem; }
+  .rig-pick label { color: var(--muted); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .rig-sel { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+             border-radius: 5px; padding: 0.25rem 0.5rem; font-size: 0.82rem; font-family: inherit; }
+  .rig-sel.remote { border-color: var(--orange); color: var(--orange); }
+
+  /* Viewer mode — anyone past the Access gate who is not listed in --admins.
+     The server refuses these actions anyway (controlAllowed); hiding them just
+     stops a viewer clicking buttons that can only fail. */
+  .view-chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--label);
+               font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; padding: 0.15rem 0.4rem; border-radius: 3px; }
+  body.viewer .region-btn,
+  body.viewer .wx-set-btn,
+  body.viewer .btn.start,
+  body.viewer .btn.stop,
+  body.viewer .btn.warn { display: none !important; }
+  body.viewer .rwy-sel { pointer-events: none; opacity: 0.6; }
   .title { color: var(--label); font-size: 0.9rem; }
   .beta { background: var(--orange); color: #000; font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px; letter-spacing: 0.1em; }
   .server { margin-left: auto; text-align: right; }
@@ -222,9 +244,15 @@
 <body>
 <header>
   <div class="brand">
+    <img class="patch" src="/logo.png" alt="vSFG-7 squadron patch">
     <span class="logo">vSFG-7</span>
     <span class="title">AI Tower ATC Control Portal</span>
     <span class="beta">BETA</span>
+    <span class="view-chip" id="viewChip" style="display:none;">VIEW ONLY</span>
+  </div>
+  <div class="rig-pick">
+    <label for="rigSel">Rig</label>
+    <select class="rig-sel" id="rigSel" onchange="switchRig(this.value)"></select>
   </div>
   <div class="theatre-switch" id="theatreSwitch">
     <span class="theatre-label">Theatre</span>
@@ -360,6 +388,62 @@
 
 <script>
 // ──────────────────────────────────────────────────────────────────────────
+// Which rig this page is driving
+// ──────────────────────────────────────────────────────────────────────────
+// The page is always served by the launcher you connected to, but it can drive
+// any rig in the fleet: an empty RIG means "this box", anything else prefixes
+// every call with /rig/<name>, which the local launcher proxies onward. That
+// matters through the tunnel, where only one launcher is reachable from outside
+// but the missions run on another rig.
+//
+// /api/me is the one exception — identity is always the local launcher's call,
+// never the remote rig's.
+let RIG = localStorage.getItem('rig') || '';
+const api = (path) => RIG ? '/rig/' + RIG + path : path;
+
+async function loadRigs() {
+  const sel = $('rigSel');
+  let rigs = [];
+  try {
+    rigs = await fetch('/api/fleet').then(r => r.json());
+  } catch (e) { /* fleet unreachable — fall back to this box only */ }
+  if (!Array.isArray(rigs) || !rigs.length) rigs = [{ name: 'this box', self: true }];
+
+  // The rig the launcher is running on is addressed as '' (no proxy hop):
+  // proxying to ourselves would arrive from loopback with no Access token.
+  sel.innerHTML = rigs.map(r => {
+    const val = r.self ? '' : r.name;
+    const down = r.launcherUp === false && !r.self ? ' — down' : '';
+    return `<option value="${val}"${r.launcherUp === false && !r.self ? ' disabled' : ''}>${r.name}${r.self ? ' (this box)' : ''}${down}</option>`;
+  }).join('');
+
+  // A remembered rig that has dropped out of --fleet falls back to local.
+  if (RIG && !rigs.some(r => r.name === RIG && !r.self)) RIG = '';
+  sel.value = RIG;
+  sel.classList.toggle('remote', !!RIG);
+}
+
+function switchRig(name) {
+  RIG = name || '';
+  localStorage.setItem('rig', RIG);
+  $('rigSel').classList.toggle('remote', !!RIG);
+  closeLogStreams();   // the open SSE streams point at the old rig
+  refreshAll();
+  openLogStreams();
+}
+
+// Viewer vs operator. Enforcement is server-side (controlAllowed); this only
+// decides whether to render controls that a viewer could never use.
+async function loadIdentity() {
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    document.body.classList.toggle('viewer', !me.admin);
+    $('viewChip').style.display = me.admin ? 'none' : 'inline-block';
+    if (!me.admin) $('viewChip').title = me.name + ' — read-only access';
+  } catch (e) { /* leave the page as-is; the server still refuses actions */ }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Config — role → tower port + window-title mapping
 // ──────────────────────────────────────────────────────────────────────────
 // Two theatres. The launcher backend auto-discovers start/stop roles from every
@@ -476,7 +560,7 @@ const CARRIER = [
 
 async function refreshRoles() {
   try {
-    const r = await fetch('/api/roles');
+    const r = await fetch(api('/api/roles'));
     const list = await r.json();
     roleStatus = {};
     for (const x of (list||[])) roleStatus[x.name] = x.status;
@@ -486,7 +570,7 @@ async function refreshRoles() {
 async function refreshTowers() {
   await Promise.all(TOWERS.map(async t => {
     try {
-      const r = await fetch(`/tower/${t.port}/status`, { cache: 'no-store' });
+      const r = await fetch(api(`/tower/${t.port}/status`), { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       towerStatus[t.icao] = await r.json();
     } catch { towerStatus[t.icao] = null; }
@@ -496,7 +580,7 @@ async function refreshTowers() {
 async function refreshCarrier() {
   await Promise.all(CARRIER.map(async c => {
     try {
-      const r = await fetch(`/tower/${c.port}/status`, { cache: 'no-store' });
+      const r = await fetch(api(`/tower/${c.port}/status`), { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       carrierStatus[c.key] = await r.json();
     } catch { carrierStatus[c.key] = null; }
@@ -765,9 +849,9 @@ function renderPattern() {
 // ──────────────────────────────────────────────────────────────────────────
 // Role control actions
 // ──────────────────────────────────────────────────────────────────────────
-async function startRole(name)   { await fetch('/api/start?name='   + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
-async function stopRole(name)    { await fetch('/api/stop?name='    + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
-async function restartRole(name) { await fetch('/api/restart?name=' + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
+async function startRole(name)   { await fetch(api('/api/start?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function stopRole(name)    { await fetch(api('/api/stop?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function restartRole(name) { await fetch(api('/api/restart?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
 // Flip the dashboard between theatres. Backend role start/stop is unaffected
 // (it auto-discovers all bats); this only re-points the tower-status, weather,
 // departures and pattern panels at the selected theatre's towers.
@@ -804,7 +888,7 @@ async function startAtis() {
   const btn = $('startAtisBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/start?name=' + encodeURIComponent(cfg.atisRole), { method: 'POST' });
+    const r = await fetch(api('/api/start?name=') + encodeURIComponent(cfg.atisRole), { method: 'POST' });
     if (!r.ok) alert(`Start ${cfg.label} ATIS failed: ${await r.text()}`);
   } catch (e) { alert('Start ATIS failed: ' + e.message); }
   setTimeout(() => { btn.disabled = false; refreshAll(); }, 1200);
@@ -814,7 +898,7 @@ async function startRegion() {
   const btn = $('startRegionBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/start-region?region=' + encodeURIComponent(currentTheatre), { method: 'POST' });
+    const r = await fetch(api('/api/start-region?region=') + encodeURIComponent(currentTheatre), { method: 'POST' });
     if (!r.ok) alert(`Start ${cfg.label} failed: ${await r.text()}`);
   } catch (e) { alert('Start region failed: ' + e.message); }
   setTimeout(() => { btn.disabled = false; refreshAll(); }, 1500);
@@ -825,7 +909,7 @@ async function stopRegion() {
   const btn = $('stopRegionBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/stop-region?region=' + encodeURIComponent(currentTheatre), { method: 'POST' });
+    const r = await fetch(api('/api/stop-region?region=') + encodeURIComponent(currentTheatre), { method: 'POST' });
     if (r.ok) {
       const j = await r.json();
       if (j.killed === 0) alert(`No running ${cfg.label} roles to stop.`);
@@ -838,7 +922,7 @@ async function stopRegion() {
 
 async function setRunway(port, runway) {
   try {
-    const r = await fetch(`/tower/${port}/runway?to=${encodeURIComponent(runway)}`, { method: 'POST' });
+    const r = await fetch(api(`/tower/${port}/runway?to=${encodeURIComponent(runway)}`), { method: 'POST' });
     if (!r.ok) alert(`Runway change failed: ${await r.text()}`);
   } catch (e) { alert('Runway change failed: ' + e.message); }
   setTimeout(refreshAll, 500);
@@ -849,7 +933,7 @@ async function setRunway(port, runway) {
 let WX_TARGET_PORTS = THEATRES[currentTheatre].wxPorts;
 async function openWeatherModal() {
   try {
-    const r = await fetch(`/tower/${TOWERS[0].port}/status`);
+    const r = await fetch(api(`/tower/${TOWERS[0].port}/status`));
     if (r.ok) {
       const s = await r.json();
       const t = s.tower || {};
@@ -867,7 +951,7 @@ function closeWeatherModal() { $('wxModal').classList.remove('open'); }
 async function readMizWeather() {
   $('wxStatus').textContent = 'Reading .miz…';
   try {
-    const r = await fetch('/api/miz-weather');
+    const r = await fetch(api('/api/miz-weather'));
     if (!r.ok) { $('wxStatus').textContent = 'Failed: ' + (await r.text()).trim(); return; }
     const w = await r.json();
     $('wxInDir').value  = Math.round(w.windDir);
@@ -889,7 +973,7 @@ async function applyWeather() {
   $('wxStatus').textContent = 'Applying…';
   const results = await Promise.all(WX_TARGET_PORTS.map(async (port) => {
     try {
-      const r = await fetch(`/tower/${port}/weather?${q.toString()}`, { method: 'POST' });
+      const r = await fetch(api(`/tower/${port}/weather?${q.toString()}`), { method: 'POST' });
       return { port, ok: r.ok, msg: r.ok ? '' : await r.text() };
     } catch (e) { return { port, ok: false, msg: e.message }; }
   }));
@@ -901,8 +985,8 @@ async function applyWeather() {
     $('wxStatus').textContent = `Failed on ports: ${failed.map(f => f.port + ' (' + f.msg.trim() + ')').join(', ')}`;
   }
 }
-async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch('/api/start?name=' + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
-async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch('/api/stop?name=' + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
+async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch(api('/api/start?name=') + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
+async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch(api('/api/stop?name=') + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
 
 // ──────────────────────────────────────────────────────────────────────────
 // Live log — open one SSE per tower, merge into one feed
@@ -914,7 +998,7 @@ const sources = {};
 function connectLog(t) {
   if (sources[t.icao]) return;
   try {
-    const es = new EventSource(`/tower/${t.port}/ws/log`);
+    const es = new EventSource(api(`/tower/${t.port}/ws/log`));
     sources[t.icao] = es;
     es.onmessage = ev => {
       try {
@@ -949,7 +1033,7 @@ function appendLogRow(e) {
 // ──────────────────────────────────────────────────────────────────────────
 async function refreshHealth() {
   try {
-    const h = await fetch('/api/health').then(r => r.json());
+    const h = await fetch(api('/api/health')).then(r => r.json());
     const ok = h && (h.srs || h.tacview || h.openai);
     $('serverLine').className = 'server-line' + (ok ? '' : ' down');
     $('tv64Badge').className = 'tv64-badge' + (h && h.tacview64 === false ? ' show' : '');
@@ -981,7 +1065,7 @@ async function loadModalLog() {
   const role = map[file] || 'Al Minhad Tower';
   $('logTitle').textContent = `Tail — ${file}`;
   try {
-    const r = await fetch('/api/log?name=' + encodeURIComponent(role));
+    const r = await fetch(api('/api/log?name=') + encodeURIComponent(role));
     $('logBody').textContent = r.ok ? await r.text() : 'Log not available.';
     $('logBody').scrollTop = $('logBody').scrollHeight;
   } catch (e) { $('logBody').textContent = 'Error: ' + e.message; }
@@ -1001,12 +1085,26 @@ async function refreshAll() {
   renderCats();
 }
 
+// Open / tear down every tower SSE stream. Torn down and reopened when the rig
+// picker changes, so the feed follows the selected launcher.
+function openLogStreams() {
+  TOWERS.forEach(connectLog);
+  CARRIER.forEach(c => connectLog({ icao: c.key.toUpperCase(), port: c.port }));
+}
+function closeLogStreams() {
+  for (const k of Object.keys(sources)) {
+    try { sources[k].close(); } catch {}
+    delete sources[k];
+  }
+}
+
 // Boot
 updateRegionButtons();
+loadIdentity();
+loadRigs();
 refreshAll();
 setInterval(refreshAll, 3000);
-TOWERS.forEach(connectLog);
-CARRIER.forEach(c => connectLog({ icao: c.key.toUpperCase(), port: c.port }));
+openLogStreams();
 </script>
 </body>
 </html>

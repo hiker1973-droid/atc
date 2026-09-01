@@ -33,7 +33,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html logs.html
+//go:embed ui.html fleet.html logs.html logo.png
 var uiFS embed.FS
 
 var (
@@ -88,8 +88,14 @@ func main() {
 	} else {
 		rootDir, _ = os.Getwd()
 	}
+	if err := initAuth(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
 	fmt.Printf("vSFG-7 Launcher — root=%s listen=%s\n", rootDir, *flagListen)
 	fmt.Printf("Open http://localhost%s/ in a browser.\n", *flagListen)
+	fmt.Println(authSummary())
 
 	discoverRoles()
 	fleetRigs = parseFleet(*flagFleet)
@@ -98,26 +104,35 @@ func main() {
 	go alertLoop()
 
 	mux := http.NewServeMux()
+	// Read-only — any authenticated caller.
 	mux.HandleFunc("/", serveUI)
 	mux.HandleFunc("/fleet", serveFleetUI)
 	mux.HandleFunc("/logs", serveLogsUI)
+	mux.HandleFunc("/logo.png", serveLogo)
+	mux.HandleFunc("/api/me", handleMe)
 	mux.HandleFunc("/api/fleet", handleFleet)
 	mux.HandleFunc("/api/version", handleVersion)
 	mux.HandleFunc("/api/alerts", handleAlerts)
 	mux.HandleFunc("/api/rig-log", handleRigLog)
 	mux.HandleFunc("/api/roles", handleRoles)
 	mux.HandleFunc("/api/health", handleHealth)
-	mux.HandleFunc("/api/start", handleStart)
-	mux.HandleFunc("/api/stop", handleStop)
-	mux.HandleFunc("/api/start-region", handleStartRegion)
-	mux.HandleFunc("/api/stop-region", handleStopRegion)
-	mux.HandleFunc("/api/restart", handleRestart)
 	mux.HandleFunc("/api/log", handleLog)
-	mux.HandleFunc("/api/rescan", handleRescan)
 	mux.HandleFunc("/api/miz-weather", handleMizWeather)
-	mux.HandleFunc("/tower/", handleTowerProxy)
 
-	if err := http.ListenAndServe(*flagListen, mux); err != nil {
+	// State-changing — operators only, POST + same-origin (see controlAllowed).
+	mux.HandleFunc("/api/start", requireControl(handleStart))
+	mux.HandleFunc("/api/stop", requireControl(handleStop))
+	mux.HandleFunc("/api/start-region", requireControl(handleStartRegion))
+	mux.HandleFunc("/api/stop-region", requireControl(handleStopRegion))
+	mux.HandleFunc("/api/restart", requireControl(handleRestart))
+	mux.HandleFunc("/api/rescan", requireControl(handleRescan))
+
+	// Mixed — the proxy gates per-method itself: GET /status is a viewer read,
+	// POST /runway and /weather are control actions.
+	mux.HandleFunc("/tower/", handleTowerProxy)
+	mux.HandleFunc("/rig/", handleRigProxy)
+
+	if err := http.ListenAndServe(*flagListen, withAuth(mux)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -650,6 +665,7 @@ type RigStatus struct {
 	Name       string    `json:"name"`
 	Host       string    `json:"host"`
 	Port       int       `json:"port"`
+	Self       bool      `json:"self"`
 	HostUp     bool      `json:"hostUp"`
 	LauncherUp bool      `json:"launcherUp"`
 	Health     *Health      `json:"health,omitempty"`
@@ -679,7 +695,7 @@ func fleetGetJSON(url string, v any) error {
 // unreachable it falls back to a TCP probe of SMB 445 so we can still tell
 // "host up, launcher down" from "host offline".
 func pollRig(rig Rig) RigStatus {
-	rs := RigStatus{Name: rig.Name, Host: rig.Host, Port: rig.Port, At: time.Now()}
+	rs := RigStatus{Name: rig.Name, Host: rig.Host, Port: rig.Port, Self: isSelf(rig), At: time.Now()}
 	base := fmt.Sprintf("http://%s:%d", rig.Host, rig.Port)
 
 	var h Health
@@ -734,6 +750,19 @@ func handleFleet(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, pollFleet(fleetRigs))
 }
 
+// serveLogo serves the squadron patch shown in every page header. Embedded so
+// the launcher stays a single portable binary.
+func serveLogo(w http.ResponseWriter, _ *http.Request) {
+	data, err := uiFS.ReadFile("logo.png")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
+}
+
 func serveFleetUI(w http.ResponseWriter, _ *http.Request) {
 	data, err := uiFS.ReadFile("fleet.html")
 	if err != nil {
@@ -761,6 +790,90 @@ func rigByName(name string) (Rig, bool) {
 		}
 	}
 	return Rig{}, false
+}
+
+var (
+	localAddrsOnce sync.Once
+	localAddrs     map[string]bool
+)
+
+// localAddrSet is every name this box answers to, used to spot which --fleet
+// entry is the launcher itself.
+func localAddrSet() map[string]bool {
+	localAddrsOnce.Do(func() {
+		localAddrs = map[string]bool{"localhost": true, "127.0.0.1": true, "::1": true}
+		if addrs, err := net.InterfaceAddrs(); err == nil {
+			for _, a := range addrs {
+				if ipn, ok := a.(*net.IPNet); ok {
+					localAddrs[ipn.IP.String()] = true
+				}
+			}
+		}
+		if h, err := os.Hostname(); err == nil {
+			localAddrs[strings.ToLower(h)] = true
+		}
+	})
+	return localAddrs
+}
+
+func listenPort() int {
+	_, p, err := net.SplitHostPort(*flagListen)
+	if err != nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(p)
+	return n
+}
+
+// isSelf reports whether a fleet entry points back at this launcher. The UI
+// uses it to address the local rig as "" — no proxy hop.
+func isSelf(rig Rig) bool {
+	return rig.Port == listenPort() && localAddrSet()[strings.ToLower(rig.Host)]
+}
+
+// handleRigProxy forwards /rig/<name>/<path> to another rig's launcher, so one
+// exposed launcher can drive the whole fleet. This is what makes the dashboard's
+// rig picker work from outside, where only this box is reachable.
+//
+// Note the trust it implies: the remote rigs run auth-off on the LAN and see
+// this proxy as a trusted local caller, so an operator here is an operator
+// everywhere in --fleet. Keep --admins tight (REMOTE_ACCESS.md).
+func handleRigProxy(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/rig/")
+	slash := strings.IndexByte(rest, '/')
+	if slash <= 0 {
+		http.Error(w, "bad rig path — want /rig/<name>/<path>", http.StatusBadRequest)
+		return
+	}
+	rig, ok := rigByName(rest[:slash])
+	if !ok {
+		http.Error(w, "unknown rig", http.StatusNotFound)
+		return
+	}
+	if isSelf(rig) {
+		// A hop back to ourselves would arrive from loopback carrying no Access
+		// token and be refused by withAuth. The UI addresses this rig as "".
+		http.Error(w, "that rig is this launcher — request the path directly", http.StatusBadRequest)
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		if code, err := controlAllowed(r); err != nil {
+			http.Error(w, err.Error(), code)
+			return
+		}
+	}
+
+	target := &url.URL{Scheme: "http", Host: net.JoinHostPort(rig.Host, strconv.Itoa(rig.Port))}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.FlushInterval = -1 // stream SSE (/tower/<port>/ws/log) immediately
+	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, _ error) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	r.URL.Path = "/" + rest[slash+1:]
+	// Never hand this session's Access credentials to another host.
+	r.Header.Del(accessJWTHeader)
+	r.Header.Del("Cookie")
+	proxy.ServeHTTP(w, r)
 }
 
 // handleRigLog proxies a role's recent log (last 32KB) from any fleet rig so the
@@ -930,6 +1043,16 @@ func handleTowerProxy(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !proxyPorts[port] {
 		http.Error(w, "tower port not allowed", http.StatusForbidden)
 		return
+	}
+	// The towers have no auth of their own, so the proxy is where their control
+	// surface gets gated. Reads (/status, /health, /ws/log) are open to any
+	// authenticated viewer; anything that writes — POST /runway, /weather —
+	// goes through the same operator check as the launcher's own actions.
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		if code, err := controlAllowed(r); err != nil {
+			http.Error(w, err.Error(), code)
+			return
+		}
 	}
 	target := &url.URL{Scheme: "http", Host: fmt.Sprintf("127.0.0.1:%d", port)}
 	proxy := httputil.NewSingleHostReverseProxy(target)
