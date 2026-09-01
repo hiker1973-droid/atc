@@ -1115,7 +1115,18 @@ async function readMizWeather() {
   $('wxStatus').textContent = 'Reading .miz…';
   try {
     const r = await fetch(api('/api/miz-weather'));
-    if (!r.ok) { $('wxStatus').textContent = 'Failed: ' + (await r.text()).trim(); return; }
+    if (!r.ok) {
+      // The mission file lives on the selected rig and is read by THAT rig's
+      // launcher, so name it — otherwise a rig still on an old build reports a
+      // path from a machine you are not looking at, which reads like nonsense.
+      const msg = (await r.text()).trim();
+      const where = RIG || 'this box';
+      const stale = /Administrator..Saved:/.test(msg)
+        ? " — that rig's launcher predates the .miz path fix; redeploy its launcher."
+        : '';
+      $('wxStatus').textContent = `Failed on ${where}: ${msg}${stale}`;
+      return;
+    }
     const w = await r.json();
     $('wxInDir').value  = Math.round(w.windDir);
     $('wxInKts').value  = Math.round(w.windKts);
@@ -1123,7 +1134,7 @@ async function readMizWeather() {
     $('wxInVis').value  = (Math.round(w.visNm * 10) / 10);
     $('wxInAlt').value  = w.altInHg.toFixed(2);
     $('wxStatus').textContent = `Loaded from ${w.mizName} (wind is true; click Apply to propagate).`;
-  } catch (e) { $('wxStatus').textContent = 'Failed: ' + e.message; }
+  } catch (e) { $('wxStatus').textContent = `Failed on ${RIG || 'this box'}: ${e.message}`; }
 }
 async function applyWeather() {
   const q = new URLSearchParams({
