@@ -500,7 +500,7 @@ async function loadIdentity() {
 // (its /status feeds the weather panel + Set-Weather prefill).
 const THEATRES = {
   pg: {
-    label: 'Persian Gulf', primaryLabel: 'OMDM', atisRole: 'vSFG-7 ATIS',
+    label: 'Persian Gulf', primaryLabel: 'OMDM', atisRole: 'vSFG-7 ATIS', commandRole: 'vSFG-7 Command',
     towers: [
       { icao: 'OMDM', label: 'Al Minhad', freq: '250.100', port: 6001, role: 'Al Minhad Tower' },
       { icao: 'OMAM', label: 'Al Dhafra', freq: '251.100', port: 6002, role: 'Al Dhafra Tower' },
@@ -510,7 +510,7 @@ const THEATRES = {
     wxPorts: [6001, 6002, 6003, 6004, 6005],
   },
   caucasus: {
-    label: 'Caucasus', primaryLabel: 'Batumi (UGSB)', atisRole: 'vSFG-7 ATIS (Caucasus)',
+    label: 'Caucasus', primaryLabel: 'Batumi (UGSB)', atisRole: 'vSFG-7 ATIS (Caucasus)', commandRole: 'vSFG-7 Command (Caucasus)',
     towers: [
       { icao: 'UGSB', label: 'Batumi',   freq: '260.000', port: 6011, role: 'Batumi Tower' },
       { icao: 'UG5X', label: 'Kobuleti', freq: '262.000', port: 6012, role: 'Kobuleti Tower' },
@@ -521,7 +521,7 @@ const THEATRES = {
     wxPorts: [6011, 6012, 6013, 6014],
   },
   germany: {
-    label: 'Germany', primaryLabel: 'Ramstein (ETAR)', atisRole: 'vSFG-7 ATIS (Germany)',
+    label: 'Germany', primaryLabel: 'Ramstein (ETAR)', atisRole: 'vSFG-7 ATIS (Germany)', commandRole: 'vSFG-7 Command (Germany)',
     towers: [
       { icao: 'ETAR', label: 'Ramstein',    freq: '133.200', port: 6021, role: 'Ramstein Tower' },
       { icao: 'ETAD', label: 'Spangdahlem', freq: '122.200', port: 6022, role: 'Spangdahlem Tower' },
@@ -536,7 +536,7 @@ const THEATRES = {
     wxPorts: [6021, 6022, 6023, 6024, 6025, 6026, 6027, 6028],
   },
   iraq: {
-    label: 'Iraq', primaryLabel: 'Al Asad (ORAA)', atisRole: 'vSFG-7 ATIS (Iraq)',
+    label: 'Iraq', primaryLabel: 'Al Asad (ORAA)', atisRole: 'vSFG-7 ATIS (Iraq)', commandRole: 'vSFG-7 Command (Iraq)',
     towers: [
       { icao: 'ORAA', label: 'Al Asad',      freq: '363.700', port: 6031, role: 'Al Asad Tower' },
       { icao: 'ORSH', label: 'Al Sahra',     freq: '250.150', port: 6032, role: 'Al Sahra Tower' },
@@ -552,7 +552,7 @@ const THEATRES = {
     wxPorts: [6031, 6032, 6033, 6034, 6035, 6036, 6037, 6038, 6039],
   },
   syria: {
-    label: 'Syria', primaryLabel: 'Incirlik (LTAG)', atisRole: 'vSFG-7 ATIS (Syria)',
+    label: 'Syria', primaryLabel: 'Incirlik (LTAG)', atisRole: 'vSFG-7 ATIS (Syria)', commandRole: 'vSFG-7 Command (Syria)',
     towers: [
       { icao: 'LTAG', label: 'Incirlik',     freq: '360.100', port: 6041, role: 'Incirlik Tower' },
       { icao: 'LLRD', label: 'Ramat David',  freq: '251.300', port: 6042, role: 'Ramat David Tower' },
@@ -572,10 +572,39 @@ let currentTheatre = 'pg';
 let TOWERS = THEATRES[currentTheatre].towers;
 // Non-tower roles each get their own card.
 const COMBO_CARDS = [
-  { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · BRC 275°', roles: ['Marshal'],        stopLabel: 'Stop Marshal' },
-  { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command',    roles: ['vSFG-7 Command'], stopLabel: 'Stop Command' },
-  { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'OMDM carrier UHF',  roles: ['Deckboss'],       stopLabel: 'Stop Deckboss' },
+  { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · BRC 275°', base: 'Marshal',        stopLabel: 'Stop Marshal' },
+  { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command',    base: 'vSFG-7 Command', stopLabel: 'Stop Command' },
+  { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'carrier UHF',       base: 'Deckboss',       stopLabel: 'Stop Deckboss' },
 ];
+
+// Resolve a combo card to the role the selected rig actually has.
+//
+// These cards hard-coded the Persian Gulf names, which is wrong on every other
+// theatre: foothold flies Syria as 'Deckboss (Syria)' / 'Marshal (Syria)' /
+// 'vSFG-7 Command (Syria)', so all three read OFFLINE while all three were up.
+// Training 1 is the opposite case — it runs the un-suffixed carrier roles
+// alongside a Caucasus mission — so a fixed name per theatre would still be
+// wrong on one rig or the other.
+//
+// Prefer the theatre's own name; else take whatever '<base> (…)' variant is
+// actually running; else fall back to a name that exists on the rig, so the
+// Start button still starts the right role.
+function resolveRole(base, preferred) {
+  if (preferred && roleStatus[preferred] === 'running') return preferred;
+  const variants = Object.keys(roleStatus).filter(n => n === base || n.startsWith(base + ' ('));
+  const up = variants.find(n => roleStatus[n] === 'running');
+  if (up) return up;
+  if (preferred && roleStatus[preferred] !== undefined) return preferred;
+  return variants[0] || base;
+}
+
+function comboCards() {
+  const cfg = THEATRES[currentTheatre] || {};
+  return COMBO_CARDS.map(c => ({
+    ...c,
+    roles: [resolveRole(c.base, c.id === 'command' ? cfg.commandRole : null)],
+  }));
+}
 
 // ──────────────────────────────────────────────────────────────────────────
 // Tiny helpers
@@ -672,7 +701,7 @@ function renderCards() {
       </div>`);
   }
 
-  for (const c of COMBO_CARDS) {
+  for (const c of comboCards()) {
     const runAny = c.roles.some(r => roleStatus[r] === 'running');
     const runAll = c.roles.every(r => roleStatus[r] === 'running');
     const dotCls = runAll ? 'up' : (runAny ? 'down' : 'down');
