@@ -32,11 +32,20 @@
   a:hover { text-decoration: underline; }
 
   /* Header */
-  header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange); display: flex; align-items: center; gap: 1rem; }
-  .brand { display: flex; align-items: baseline; gap: 0.8rem; }
-  .patch { width: 42px; height: 42px; border-radius: 50%; align-self: center; flex: none;
+  /* One row that wraps instead of squashing. The header carries a lot now —
+     brand, rig picker, five theatre buttons, region controls, nav, clock — and
+     on a narrow window flex was shrinking the wordmark into odd sizes. */
+  header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange);
+           display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; row-gap: 0.6rem; }
+  .brand { display: flex; align-items: center; gap: 0.7rem; flex: none; }
+  .patch { width: 38px; height: 38px; border-radius: 50%; flex: none;
            box-shadow: 0 0 0 1px var(--border), 0 0 10px rgba(88,166,255,0.25); }
-  .logo { font-size: 1.5rem; font-weight: 700; color: var(--orange); letter-spacing: 0.05em; }
+  /* Fixed cap, gentle floor: never shrinks below legible, never outgrows the
+     patch beside it. */
+  .logo { font-size: clamp(1.15rem, 0.9vw + 0.85rem, 1.5rem); font-weight: 700; color: var(--orange);
+          letter-spacing: 0.05em; line-height: 1; white-space: nowrap; }
+  .title { white-space: nowrap; }
+  @media (max-width: 900px) { .title { display: none; } }
 
   /* Rig picker — which launcher this page is driving. Everything but /api/me
      is fetched through the selected rig's proxy prefix. */
@@ -310,6 +319,14 @@
     <div class="panel">
       <h3>Airfield Traffic — Takeoff &amp; Landing Lines <span class="sub" id="trafficSub"></span></h3>
       <div id="trafficTbl"><div class="empty">No airfield traffic.</div></div>
+    </div>
+  </section>
+
+  <!-- Air picture from Tacview: everyone airborne, ranged off blue bullseye -->
+  <section class="row-departures">
+    <div class="panel">
+      <h3>Airborne <span class="sub" id="airborneSub">—</span></h3>
+      <div id="airborneTbl"><div class="empty">No air picture.</div></div>
     </div>
   </section>
 
@@ -722,6 +739,62 @@ function renderCards() {
       </div>`);
   }
   $('roleCards').innerHTML = parts.join('');
+}
+
+// Air picture — everyone airborne on the selected rig, ranged and bearinged off
+// the blue bullseye. Bearings are true, not magnetic: the Tacview feed carries
+// no declination, so calling them magnetic would be a quiet lie.
+async function refreshAirborne() {
+  const sub = $('airborneSub');
+  const tbl = $('airborneTbl');
+  let p;
+  try {
+    const r = await fetch(api('/api/airborne'));
+    // A rig still running an older launcher has no such endpoint. Same idiom as
+    // the fleet monitor's "no version" — it means that box needs a redeploy.
+    if (r.status === 404) {
+      sub.textContent = '';
+      tbl.innerHTML = '<div class="empty">This rig\'s launcher predates the air picture — redeploy it.</div>';
+      return;
+    }
+    if (!r.ok) throw new Error(r.status);
+    p = await r.json();
+  } catch (e) {
+    sub.textContent = '';
+    tbl.innerHTML = '<div class="empty">Air picture unavailable.</div>';
+    return;
+  }
+
+  if (!p.connected) {
+    sub.textContent = '';
+    tbl.innerHTML = `<div class="empty">Tacview not connected${p.err ? ' — ' + esc(p.err) : ''}.</div>`;
+    return;
+  }
+
+  const n = (p.contacts || []).length;
+  sub.textContent = `${n} airborne` +
+    (p.onGround ? ` · ${p.onGround} on the ground` : '') +
+    (p.bullseye ? '' : ' · no blue bullseye in the feed');
+
+  if (!n) {
+    tbl.innerHTML = '<div class="empty">Nobody airborne.</div>';
+    return;
+  }
+
+  const rows = p.contacts.map(c => `
+      <tr>
+        <td>${esc(c.callsign)}</td>
+        <td style="color:var(--muted)">${esc(c.aircraft)}</td>
+        <td>${c.altFt.toLocaleString()} ft</td>
+        <td>${String(c.heading).padStart(3, '0')}°</td>
+        <td>${p.bullseye ? `<span style="color:var(--gold)">${String(c.bullBrg).padStart(3, '0')}° / ${c.bullNm} nm</span>` : '—'}</td>
+      </tr>`).join('');
+
+  tbl.innerHTML = `
+    <table>
+      <thead><tr><th>Callsign</th><th>Aircraft</th><th>Alt</th><th>Hdg</th><th>Bullseye (true)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderMissionClock() {
@@ -1152,7 +1225,7 @@ async function loadModalLog() {
 // Refresh loop
 // ──────────────────────────────────────────────────────────────────────────
 async function refreshAll() {
-  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth()]);
+  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth(), refreshAirborne()]);
   renderCards();
   renderMissionClock();
   renderWeather();

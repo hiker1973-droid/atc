@@ -102,6 +102,7 @@ func main() {
 	cachedVersion = computeVersion()
 	go healthLoop()
 	go alertLoop()
+	go airborneLoop()
 
 	mux := http.NewServeMux()
 	// Read-only — any authenticated caller.
@@ -118,6 +119,7 @@ func main() {
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/log", handleLog)
 	mux.HandleFunc("/api/miz-weather", handleMizWeather)
+	mux.HandleFunc("/api/airborne", handleAirborne)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(handleStart))
