@@ -376,6 +376,11 @@ const THEATRES = {
     ],
     // 3 towers + Marshal (6004) + Deckboss (6005)
     wxPorts: [6001, 6002, 6003, 6004, 6005],
+    combos: [
+      { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · BRC 275°', roles: ['Marshal'],        stopLabel: 'Stop Marshal' },
+      { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command',    roles: ['vSFG-7 Command'], stopLabel: 'Stop Command' },
+      { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'OMDM carrier UHF',  roles: ['Deckboss'],       stopLabel: 'Stop Deckboss' },
+    ],
   },
   caucasus: {
     label: 'Caucasus', primaryLabel: 'Batumi (UGSB)', atisRole: 'vSFG-7 ATIS (Caucasus)',
@@ -387,6 +392,10 @@ const THEATRES = {
     ],
     // CA carrier roles not wired yet — target the four towers only.
     wxPorts: [6011, 6012, 6013, 6014],
+    // No Marshal/Deckboss bat for this theatre yet — Command only.
+    combos: [
+      { id: 'command', label: 'Command', freq: '282.000', extras: 'vSFG-7 Command (Caucasus)', roles: ['vSFG-7 Command (Caucasus)'], stopLabel: 'Stop Command' },
+    ],
   },
   germany: {
     label: 'Germany', primaryLabel: 'Ramstein (ETAR)', atisRole: 'vSFG-7 ATIS (Germany)',
@@ -402,6 +411,10 @@ const THEATRES = {
     ],
     // Land-based theatre — no carrier roles; target the eight towers only.
     wxPorts: [6021, 6022, 6023, 6024, 6025, 6026, 6027, 6028],
+    // Land-based — no carrier roles at all. Command only.
+    combos: [
+      { id: 'command', label: 'Command', freq: '282.000', extras: 'vSFG-7 Command (Germany)', roles: ['vSFG-7 Command (Germany)'], stopLabel: 'Stop Command' },
+    ],
   },
   iraq: {
     label: 'Iraq', primaryLabel: 'Al Asad (ORAA)', atisRole: 'vSFG-7 ATIS (Iraq)',
@@ -418,6 +431,10 @@ const THEATRES = {
     ],
     // Land-based theatre — no carrier roles; target the nine towers only.
     wxPorts: [6031, 6032, 6033, 6034, 6035, 6036, 6037, 6038, 6039],
+    // Land-based — no carrier roles at all. Command only.
+    combos: [
+      { id: 'command', label: 'Command', freq: '282.000', extras: 'vSFG-7 Command (Iraq)', roles: ['vSFG-7 Command (Iraq)'], stopLabel: 'Stop Command' },
+    ],
   },
   syria: {
     label: 'Syria', primaryLabel: 'Incirlik (LTAG)', atisRole: 'vSFG-7 ATIS (Syria)',
@@ -434,16 +451,27 @@ const THEATRES = {
     // Carrier ops ARE run on Syria: CVN-72 ABE, with Marshal (6004) and
     // Deckboss (6005) on the shared carrier ports, same as PG.
     wxPorts: [6041, 6042, 6043, 6044, 6045, 6046, 6047, 6048, 6004, 6005],
+    // Carrier ops are flown here (CVN-72 ABE). Syria's carrier freqs differ
+    // from PG — Marshal 306.100 (not 306.300) and Deckboss 306.200 (not
+    // 128.600, which is the mission's own AI carrier ATC) — so these MUST
+    // target the _syria bats. Pointing them at the PG roles is the bug that
+    // put Marshal on 306.300 and Deckboss on top of the AI controller.
+    // LSO 128.100 has no atc.exe role, so it gets no card.
+    combos: [
+      { id: 'marshal',  label: 'Marshal',  freq: '306.100', extras: 'CVN-72 ABE · TACAN 72X',   roles: ['Marshal (Syria)'],          stopLabel: 'Stop Marshal' },
+      { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Syria)',   roles: ['vSFG-7 Command (Syria)'],   stopLabel: 'Stop Command' },
+      { id: 'deckboss', label: 'Deckboss', freq: '306.200', extras: 'Eastern Med carrier UHF',  roles: ['Deckboss (Syria)'],         stopLabel: 'Stop Deckboss' },
+    ],
   },
 };
 let currentTheatre = 'pg';
 let TOWERS = THEATRES[currentTheatre].towers;
-// Non-tower roles each get their own card.
-const COMBO_CARDS = [
-  { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · BRC 275°', roles: ['Marshal'],        stopLabel: 'Stop Marshal' },
-  { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command',    roles: ['vSFG-7 Command'], stopLabel: 'Stop Command' },
-  { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'OMDM carrier UHF',  roles: ['Deckboss'],       stopLabel: 'Stop Deckboss' },
-];
+// Non-tower roles each get their own card. These are PER-THEATRE: the role
+// name must match the bat's `start "<title>"` exactly or the card reads
+// OFFLINE while the role is live, and Start spawns the wrong theatre's role.
+// Command runs on 282.0 in every theatre but its window title is suffixed
+// (`vSFG-7 Command (Syria)`), so a single hardcoded list cannot serve them all.
+let COMBO_CARDS = THEATRES[currentTheatre].combos;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Tiny helpers
@@ -777,6 +805,7 @@ function switchTheatre(name) {
   const cfg = THEATRES[name];
   TOWERS = cfg.towers;
   WX_TARGET_PORTS = cfg.wxPorts;
+  COMBO_CARDS = cfg.combos;               // else the cards keep PG's role names
   towerStatus = {};                       // drop stale other-theatre status
   document.querySelectorAll('.theatre-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.theatre === name));
