@@ -144,6 +144,12 @@ type atisStation struct {
 	Advisory  string  // static advisory text
 	ILS       string  // e.g. "ILS 110.70 RWY 09. ILS 110.75 RWY 27."
 	TACAN     string  // e.g. "TACAN 99X."
+	// Lang overrides the theatre's second broadcast language for this one
+	// field. Empty means "use the theatre default" (atisSecondLangForMap), which
+	// is right for a single-country map. "English" means English only — no
+	// second pass at all. Set per-field where one theatre spans several
+	// countries; Syria is the case that forced it.
+	Lang      string
 }
 
 type atisState struct {
@@ -321,10 +327,14 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		// Regenerate TTS if weather changed or no cache yet
 		if weatherChanged || state.cachedMP3 == nil {
 			enText := buildATISText(station, state)
-			secondLang, wantSecond := atisSecondLangForMap(flagMap)
+			secondLang, wantSecond := atisSecondLang(station, flagMap)
+			langField := secondLang
+			if !wantSecond {
+				langField = "none (English only)"
+			}
 			log.Info().Str("station", station.Name).Str("ident", identWord(state.ident)).
-				Str("secondLang", secondLang).
-				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio (EN + local)")
+				Str("secondLang", langField).
+				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio")
 
 			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, atisVoice(station.Voice))
 			if err != nil {
@@ -506,6 +516,20 @@ func isNightTime(t time.Time) bool {
 // Handles: check-in, on-station, off-station, radio check.
 
 
+// atisSecondLang resolves the second broadcast language for one station: the
+// station's own Lang if it sets one, otherwise the theatre default. A station
+// whose Lang is "English" broadcasts English only — a second English pass would
+// just be the same words twice.
+func atisSecondLang(station *atisStation, m string) (string, bool) {
+	if station.Lang != "" {
+		if strings.EqualFold(station.Lang, "English") {
+			return "", false
+		}
+		return station.Lang, true
+	}
+	return atisSecondLangForMap(m)
+}
+
 // atisSecondLangForMap returns the non-English language the ATIS also
 // broadcasts for a given theatre, plus whether a second pass is wanted at all.
 // Persian Gulf → Arabic (local language of the UAE fields); Caucasus → Russian
@@ -520,8 +544,9 @@ func atisSecondLangForMap(m string) (string, bool) {
 	case "iraq", "iq", "or":
 		return "Arabic", true
 	case "syria", "sy", "easternmed", "eastern-med", "eastern med", "emed":
-		// The eight fields span Turkey, Israel, Jordan and Cyprus, so there is no
-		// single local language. Arabic is the widest fit across the Levant ones.
+		// FALLBACK ONLY. The eight fields span Turkey, Israel, Jordan and Cyprus,
+		// so there is no single local language and every Syria station sets its
+		// own Lang. Arabic here only covers a station added without one.
 		return "Arabic", true
 	default: // Persian Gulf
 		return "Arabic", true
@@ -583,24 +608,37 @@ func atisStationsForMap(m string) []*atisStation {
 		// card. Hatay/Gaziantep/Akrotiri ATIS are ASSIGNED (249.3/249.4/249.5) -- the
 		// card gives those three tower-only. Navaids are read from the DCS Syria
 		// beacons.lua and CombatWombat's surveyed airfield summary.
+		//
+		// SECOND LANGUAGE IS PER FIELD HERE, not per theatre: the eight span four
+		// countries. Turkish at Incirlik/Hatay/Gaziantep, Hebrew at Ramat David,
+		// Greek at Paphos, Arabic at the two Jordanian fields, and English only at
+		// Akrotiri -- it is a UK Sovereign Base Area and operates in English.
 		return []*atisStation{
 			{Name: "Incirlik ATIS", FreqMHz: 360.200, Voice: "nova", ICAO: "LTAG",
+				Lang: "Turkish", // Turkey
 				TACAN: "TACAN 21X.", ILS: "ILS 109.30 runway 05. ILS 111.70 runway 23.", Advisory: advisory},
 			{Name: "Ramat David ATIS", FreqMHz: 256.150, Voice: "shimmer", ICAO: "LLRD",
+				Lang: "Hebrew", // Israel
 				ILS: "ILS 111.10 runway 15.", Advisory: advisory},
 			{Name: "King Hussein ATIS", FreqMHz: 255.550, Voice: "alloy", ICAO: "OJMF",
+				Lang: "Arabic", // Jordan
 				TACAN: "VORTAC 115.90, channel 106.", ILS: "ILS 111.70 runway 13.", Advisory: advisory},
 			{Name: "Hatay ATIS", FreqMHz: 249.300, Voice: "echo", ICAO: "LTDA",
+				Lang: "Turkish", // Turkey
 				TACAN: "VOR DME 112.05.", ILS: "ILS 108.90 runway 04. ILS 108.15 runway 22.", Advisory: advisory},
 			{Name: "Gaziantep ATIS", FreqMHz: 249.400, Voice: "fable", ICAO: "LTAJ",
+				Lang: "Turkish", // Turkey
 				TACAN: "VOR DME 116.70.", ILS: "ILS 109.10 runway 28.", Advisory: advisory},
 			{Name: "Akrotiri ATIS", FreqMHz: 249.500, Voice: "onyx", ICAO: "LCRA",
+				Lang: "English", // UK Sovereign Base Area -- English only
 				TACAN: "TACAN 107X.", ILS: "ILS 109.70 runway 28.", Advisory: advisory},
 			{Name: "Paphos ATIS", FreqMHz: 249.000, Voice: "nova", ICAO: "LCPH",
+				Lang: "Greek", // Cyprus
 				TACAN: "TACAN 79X.", ILS: "ILS 108.90 runway 29.", Advisory: advisory},
 			// H4 has NO ILS, TACAN, VOR or NDB anywhere on the field -- both strings
 			// are deliberately empty so the ATIS does not claim an aid that is not there.
 			{Name: "H4 ATIS", FreqMHz: 240.850, Voice: "shimmer", ICAO: "OJHR",
+				Lang: "Arabic", // Jordan
 				Advisory: advisory},
 		}
 	default: // Persian Gulf

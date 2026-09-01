@@ -45,6 +45,25 @@ Incirlik 55°/235°, Ramat David 146°, Mafraq 132°, Hatay 224°, Gaziantep 106
 Akrotiri 111°, Paphos 114°. Syria magvar is ≈ **+5.5°E**, so subtract ~5° for the
 magnetic designator.
 
+### ATIS second language — set PER FIELD, not per theatre
+
+Every other theatre broadcasts English plus one language for the whole map. The
+eight Eastern Med fields sit in four countries, so Arabic — the theatre default
+that Syria would otherwise inherit from the PG/Iraq pattern — is genuinely local
+at only two of them. Each station therefore carries its own `Lang`:
+
+| Field | Second language | Why |
+|---|---|---|
+| Incirlik, Hatay, Gaziantep | **Turkish** | Turkey |
+| Ramat David | **Hebrew** | Israel |
+| Paphos | **Greek** | Cyprus |
+| King Hussein / Mafraq, H4 | **Arabic** | Jordan |
+| RAF Akrotiri | **English only** | UK Sovereign Base Area — operates in English |
+
+English is always broadcast first at every field, unchanged. `Lang: "English"`
+is how a station says "no second pass"; an empty `Lang` still falls back to
+`atisSecondLangForMap`, so the other four theatres are untouched.
+
 ---
 
 ## 2. Three things to resolve before coding
