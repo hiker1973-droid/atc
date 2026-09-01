@@ -122,6 +122,7 @@ func main() {
 	mux.HandleFunc("/api/log", handleLog)
 	mux.HandleFunc("/api/miz-weather", handleMizWeather)
 	mux.HandleFunc("/api/airborne", handleAirborne)
+	mux.HandleFunc("/api/log-stream", handleLogStream)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(handleStart))

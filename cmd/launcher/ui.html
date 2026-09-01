@@ -1029,7 +1029,7 @@ function switchTheatre(name) {
     b.classList.toggle('active', b.dataset.theatre === name));
   $('wxPrimary').textContent = cfg.primaryLabel;
   updateRegionButtons();
-  TOWERS.forEach(connectLog);             // no-op for already-connected towers
+  openLogStreams();                       // the stream is per-theatre
   refreshAll();
 }
 
@@ -1158,25 +1158,41 @@ const MAX_LOG = 250;
 const logEvents = [];
 const sources = {};
 
-function connectLog(t) {
-  if (sources[t.icao]) return;
+// One stream for the whole theatre. The browser allows only about six
+// concurrent connections per origin, and an EventSource holds one for the life
+// of the page — a tower each was fine for Persian Gulf's three and silently
+// starved every other fetch on Syria's eight. The launcher does the fan-in now
+// and tags each event with its tower port.
+function openLogStreams() {
+  closeLogStreams();
+  const ports = [...TOWERS.map(t => t.port), ...CARRIER.map(c => c.port)];
+  const byPort = {};
+  for (const t of TOWERS) byPort[t.port] = t.icao;
+  for (const c of CARRIER) byPort[c.port] = c.key.toUpperCase();
+
+  const qs = 'ports=' + ports.join(',') + (RIG ? '&rig=' + encodeURIComponent(RIG) : '');
   try {
-    const es = new EventSource(api(`/tower/${t.port}/ws/log`));
-    sources[t.icao] = es;
+    const es = new EventSource('/api/log-stream?' + qs);
+    sources.merged = es;
     es.onmessage = ev => {
       try {
-        const e = JSON.parse(ev.data);
-        e._src = t.icao;
+        const m = JSON.parse(ev.data);
+        const e = m.data;
+        e._src = byPort[m.src] || m.src;
         logEvents.push(e);
         if (logEvents.length > MAX_LOG) logEvents.shift();
         appendLogRow(e);
       } catch {}
     };
-    es.onerror = () => {
-      // Will auto-retry, but if the tower is offline this fires constantly.
-      // EventSource handles backoff itself.
-    };
+    es.onerror = () => { /* EventSource handles its own backoff */ };
   } catch (e) { /* ignore */ }
+}
+
+function closeLogStreams() {
+  for (const k of Object.keys(sources)) {
+    try { sources[k].close(); } catch {}
+    delete sources[k];
+  }
 }
 
 function appendLogRow(e) {
@@ -1246,19 +1262,6 @@ async function refreshAll() {
   renderPattern();
   renderMarshalStack();
   renderCats();
-}
-
-// Open / tear down every tower SSE stream. Torn down and reopened when the rig
-// picker changes, so the feed follows the selected launcher.
-function openLogStreams() {
-  TOWERS.forEach(connectLog);
-  CARRIER.forEach(c => connectLog({ icao: c.key.toUpperCase(), port: c.port }));
-}
-function closeLogStreams() {
-  for (const k of Object.keys(sources)) {
-    try { sources[k].close(); } catch {}
-    delete sources[k];
-  }
 }
 
 // Boot
