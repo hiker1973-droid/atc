@@ -29,35 +29,35 @@ echo [vSFG-7] Starting Syria ATC system (8 recovery bases)...
 :: NOTE: the Foothold VM runs SRS on :5002, NOT the :5008 the Training rig uses.
 :: SKYEYE_SRS must say localhost:5002 on that host.
 
-echo   Incirlik Tower (LTAG) -> dashboard 6041
+echo   Incirlik Tower (LTAG) -^> dashboard 6041
 start "Incirlik Tower" cmd /c "%~dp0atc.exe --airfield LTAG --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6041 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   Ramat David Tower (LLRD) -> dashboard 6042
+echo   Ramat David Tower (LLRD) -^> dashboard 6042
 start "Ramat David Tower" cmd /c "%~dp0atc.exe --airfield LLRD --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6042 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   King Hussein Tower (OJMF) -> dashboard 6043
+echo   King Hussein Tower (OJMF) -^> dashboard 6043
 start "King Hussein Tower" cmd /c "%~dp0atc.exe --airfield OJMF --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --dashboard-port 6043 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   Hatay Tower (LTDA) -> dashboard 6044
+echo   Hatay Tower (LTDA) -^> dashboard 6044
 start "Hatay Tower" cmd /c "%~dp0atc.exe --airfield LTDA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice echo --dashboard-port 6044 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   Gaziantep Tower (LTAJ) -> dashboard 6045
+echo   Gaziantep Tower (LTAJ) -^> dashboard 6045
 start "Gaziantep Tower" cmd /c "%~dp0atc.exe --airfield LTAJ --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice fable --dashboard-port 6045 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   Akrotiri Tower (LCRA) -> dashboard 6046
+echo   Akrotiri Tower (LCRA) -^> dashboard 6046
 start "Akrotiri Tower" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice onyx --dashboard-port 6046 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   Paphos Tower (LCPH) -> dashboard 6047
+echo   Paphos Tower (LCPH) -^> dashboard 6047
 start "Paphos Tower" cmd /c "%~dp0atc.exe --airfield LCPH --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6047 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
-echo   H4 Tower (OJHR) -> dashboard 6048
+echo   H4 Tower (OJHR) -^> dashboard 6048
 start "H4 Tower" cmd /c "%~dp0atc.exe --airfield OJHR --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6048 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
