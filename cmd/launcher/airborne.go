@@ -60,32 +60,83 @@ type LatLon struct {
 	Lon float64 `json:"lon"`
 }
 
-var (
-	airMu      sync.Mutex
-	airPicture = AirPicture{Contacts: []Contact{}}
-)
-
-func handleAirborne(w http.ResponseWriter, _ *http.Request) {
-	airMu.Lock()
-	p := airPicture
-	airMu.Unlock()
-	writeJSON(w, p)
+// airSource is one Tacview feed: this box, or a rig on the LAN.
+//
+// The launcher watches every rig's feed itself rather than asking each rig's
+// launcher for its own picture. Tacview is reachable across the LAN, so this
+// way only the exposed launcher needs the air-picture code — the other rigs
+// keep whatever launcher build they are on, and the picker still shows a live
+// picture for all of them.
+type airSource struct {
+	addr string
+	mu   sync.Mutex
+	pic  AirPicture
 }
 
-func setAirErr(err error) {
-	airMu.Lock()
-	airPicture = AirPicture{Connected: false, Err: err.Error(), At: time.Now(), Contacts: []Contact{}}
-	airMu.Unlock()
+func (s *airSource) get() AirPicture {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pic
 }
 
-// airborneLoop keeps a Tacview session up, reconnecting on drop.
-func airborneLoop() {
+func (s *airSource) set(p AirPicture) {
+	s.mu.Lock()
+	s.pic = p
+	s.mu.Unlock()
+}
+
+func (s *airSource) setErr(err error) {
+	s.set(AirPicture{Connected: false, Err: err.Error(), At: time.Now(), Contacts: []Contact{}})
+}
+
+// run keeps the session up, reconnecting on drop.
+func (s *airSource) run() {
 	for {
-		if err := airborneSession(*flagTacviewAddr); err != nil {
-			setAirErr(err)
+		if err := airborneSession(s.addr, s); err != nil {
+			s.setErr(err)
 		}
 		time.Sleep(10 * time.Second)
 	}
+}
+
+var (
+	airMu      sync.Mutex
+	airSources = map[string]*airSource{}
+)
+
+// startAirborneSources opens one feed for this box and one per remote rig.
+// Call after fleetRigs is parsed.
+func startAirborneSources() {
+	add := func(key, addr string) {
+		if addr == "" {
+			return
+		}
+		s := &airSource{addr: addr, pic: AirPicture{Contacts: []Contact{}}}
+		airMu.Lock()
+		airSources[key] = s
+		airMu.Unlock()
+		go s.run()
+	}
+	add("", *flagTacviewAddr) // "" is this box, matching the UI rig value
+	for _, r := range fleetRigs {
+		if isSelf(r) {
+			continue
+		}
+		add(r.Name, net.JoinHostPort(r.Host, strconv.Itoa(*flagTacviewPort)))
+	}
+}
+
+// handleAirborne serves ?rig=<name>, or this box when the parameter is absent.
+func handleAirborne(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("rig")
+	airMu.Lock()
+	s, ok := airSources[key]
+	airMu.Unlock()
+	if !ok {
+		http.Error(w, "no air picture configured for that rig", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, s.get())
 }
 
 // tvObject is the accumulated state of one object in the stream. Updates are
@@ -105,7 +156,7 @@ type tvObject struct {
 	HasHeading bool
 }
 
-func airborneSession(addr string) error {
+func airborneSession(addr string, src *airSource) error {
 	if addr == "" {
 		return fmt.Errorf("no --tacview-addr configured")
 	}
@@ -194,7 +245,7 @@ func airborneSession(addr string) error {
 		// Republish at most every 2s — the stream is far chattier than anyone
 		// needs to watch.
 		if time.Since(lastPublish) >= 2*time.Second {
-			publishAirPicture(objects, refLat, refLon)
+			publishAirPicture(src, objects, refLat, refLon)
 			lastPublish = time.Now()
 		}
 	}
@@ -257,7 +308,7 @@ func splitACMI(line string) []string {
 	return out
 }
 
-func publishAirPicture(objects map[string]*tvObject, refLat, refLon float64) {
+func publishAirPicture(src *airSource, objects map[string]*tvObject, refLat, refLon float64) {
 	var bull *LatLon
 	for _, o := range objects {
 		if strings.Contains(o.Type, "Bullseye") && strings.EqualFold(o.Color, "Blue") && o.HasPos {
@@ -310,15 +361,13 @@ func publishAirPicture(objects map[string]*tvObject, refLat, refLon float64) {
 		return contacts[i].Callsign < contacts[j].Callsign
 	})
 
-	airMu.Lock()
-	airPicture = AirPicture{
+	src.set(AirPicture{
 		Connected: true,
 		At:        time.Now(),
 		Bullseye:  bull,
 		Contacts:  contacts,
 		OnGround:  onGround,
-	}
-	airMu.Unlock()
+	})
 }
 
 func firstNonEmpty(vals ...string) string {

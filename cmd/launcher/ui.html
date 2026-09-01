@@ -87,8 +87,12 @@
   /* Layout */
   main { padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.9rem; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.9rem; }
-  .panel h3 { margin: 0 0 0.6rem 0; font-size: 0.7rem; color: var(--label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
-  .panel h3 .sub { float: right; color: var(--muted); font-weight: 400; letter-spacing: 0.02em; text-transform: none; font-size: 0.72rem; }
+  /* Flex rather than floats: these headings mix a title with a pill and a
+     button at different font sizes, and floating them left each on its own
+     baseline. Right-hand items are pushed over with margin-left:auto. */
+  .panel h3 { margin: 0 0 0.6rem 0; font-size: 0.7rem; color: var(--label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+              display: flex; align-items: center; gap: 0.4rem; min-height: 1.5rem; }
+  .panel h3 .sub { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0.02em; text-transform: none; font-size: 0.72rem; }
 
   /* Role card row */
   .role-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.7rem; }
@@ -111,7 +115,15 @@
   .weather-grid .cell { }
   .weather-grid .cell .lbl { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
   .weather-grid .cell .val { color: var(--cyan); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
-  .case-pill { float: right; background: var(--panel-2); border: 1px solid var(--orange); color: var(--orange); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; letter-spacing: 0.08em; }
+  /* Air picture: AI unit names can run to 60+ characters, so the callsign
+     column truncates with the full value on hover. */
+  .ab-cs { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; vertical-align: bottom; }
+  .side { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem;
+          background: var(--muted); vertical-align: middle; }
+  .side.blue { background: var(--blue); }
+  .side.red  { background: var(--red); }
+  .case-pill { margin-left: auto; white-space: nowrap; background: var(--panel-2); border: 1px solid var(--orange); color: var(--orange); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; letter-spacing: 0.08em; }
 
   /* Tables (stack, pattern, freqs, cats) */
   table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
@@ -178,7 +190,7 @@
   .log .row.t-msh .msg { color: #6dabff; }
   .log .row.t-dkb .msg { color: var(--gold); }
   .log .row.t-err .msg { color: var(--red); }
-  .log-legend { float: right; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
+  .log-legend { margin-left: auto; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
   .log-legend .pip { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.25rem; vertical-align: middle; }
 
   .empty { color: var(--muted); padding: 1rem 0.3rem; font-style: italic; text-align: center; font-size: 0.78rem; }
@@ -199,7 +211,7 @@
   #wxInner .actions { margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
   #wxNote { color: var(--muted); font-size: 0.85em; margin-top: 0.6rem; }
   #wxStatus { color: var(--muted); font-size: 0.85em; margin-top: 0.4rem; min-height: 1.1em; }
-  .wx-set-btn { float: right; padding: 0.15rem 0.6rem; font-size: 0.82em; }
+  .wx-set-btn { padding: 0.15rem 0.6rem; font-size: 0.82em; line-height: 1.5; white-space: nowrap; flex: none; }
   #logInner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
   #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   #logTitle { font-weight: 500; }
@@ -749,12 +761,13 @@ async function refreshAirborne() {
   const tbl = $('airborneTbl');
   let p;
   try {
-    const r = await fetch(api('/api/airborne'));
-    // A rig still running an older launcher has no such endpoint. Same idiom as
-    // the fleet monitor's "no version" — it means that box needs a redeploy.
+    // Deliberately NOT through api(): this launcher reads every rig's Tacview
+    // feed itself, so the air picture never depends on which build the remote
+    // rig's launcher happens to be running.
+    const r = await fetch('/api/airborne' + (RIG ? '?rig=' + encodeURIComponent(RIG) : ''));
     if (r.status === 404) {
       sub.textContent = '';
-      tbl.innerHTML = '<div class="empty">This rig\'s launcher predates the air picture — redeploy it.</div>';
+      tbl.innerHTML = '<div class="empty">No Tacview feed configured for this rig.</div>';
       return;
     }
     if (!r.ok) throw new Error(r.status);
@@ -783,7 +796,7 @@ async function refreshAirborne() {
 
   const rows = p.contacts.map(c => `
       <tr>
-        <td>${esc(c.callsign)}</td>
+        <td><span class="side ${c.color === 'Blue' ? 'blue' : (c.color === 'Red' ? 'red' : '')}"></span><span class="ab-cs" title="${esc(c.callsign)}">${esc(c.callsign)}</span></td>
         <td style="color:var(--muted)">${esc(c.aircraft)}</td>
         <td>${c.altFt.toLocaleString()} ft</td>
         <td>${String(c.heading).padStart(3, '0')}°</td>

@@ -43,7 +43,9 @@ var (
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
 	flagMizDir      = flag.String("miz-dir", `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for newest .miz when --miz-path is empty")
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
-	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,dev@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
+	flagTacviewPort = flag.Int("tacview-port", 42676,
+		"Tacview real-time telemetry port used when reading a remote rig's air picture")
+	flagFleet = flag.String("fleet", "host@192.168.1.231:7000,dev@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
 )
 
 var fleetRigs []Rig
@@ -102,7 +104,7 @@ func main() {
 	cachedVersion = computeVersion()
 	go healthLoop()
 	go alertLoop()
-	go airborneLoop()
+	startAirborneSources()
 
 	mux := http.NewServeMux()
 	// Read-only — any authenticated caller.
@@ -664,12 +666,12 @@ func parseFleet(s string) []Rig {
 
 // RigStatus is a point-in-time health snapshot of one rig for the fleet view.
 type RigStatus struct {
-	Name       string    `json:"name"`
-	Host       string    `json:"host"`
-	Port       int       `json:"port"`
-	Self       bool      `json:"self"`
-	HostUp     bool      `json:"hostUp"`
-	LauncherUp bool      `json:"launcherUp"`
+	Name       string       `json:"name"`
+	Host       string       `json:"host"`
+	Port       int          `json:"port"`
+	Self       bool         `json:"self"`
+	HostUp     bool         `json:"hostUp"`
+	LauncherUp bool         `json:"launcherUp"`
 	Health     *Health      `json:"health,omitempty"`
 	Version    *VersionInfo `json:"version,omitempty"`
 	RolesTotal int          `json:"rolesTotal"`
