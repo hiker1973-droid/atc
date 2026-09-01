@@ -41,7 +41,7 @@ var (
 	flagRoot        = flag.String("root", "", "SkyeyeATC root dir (default: directory of this binary)")
 	flagSRSAddr     = flag.String("srs-addr", "192.168.1.221:5004", "SRS address for health probe")
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
-	flagMizDir      = flag.String("miz-dir", `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for newest .miz when --miz-path is empty")
+	flagMizDir      = flag.String("miz-dir", "", "Dir scanned for newest .miz when --miz-path is empty (default: this user's DCS Saved Games)")
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
 	flagTacviewPort = flag.Int("tacview-port", 42676,
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
@@ -1181,25 +1181,35 @@ func handleRescan(w http.ResponseWriter, _ *http.Request) {
 // expects. windDir is true degrees — the dashboard /weather endpoint already
 // treats its incoming windDir as true.
 func handleMizWeather(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	// Priority mirrors atc.exe's boot seed (cmd/atc/main.go): an explicit
-	// --miz-path (fed SKYEYE_MIZ by start_launcher.bat) wins, so the dashboard
-	// weather widget reflects the same mission the roles actually loaded rather
-	// than whatever .miz was saved most recently on disk.
-	path := *flagMizPath
-	if path == "" {
-		p, err := miz.FindNewestMiz(*flagMizDir)
+	// --miz-path (fed SKYEYE_MIZ by start_launcher.bat) wins, so the widget
+	// reflects the mission the roles actually loaded rather than whatever .miz
+	// happens to be newest on disk.
+	if path := *flagMizPath; path != "" {
+		wx, err := miz.ReadMizWeather(path)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		path = p
-	}
-	wx, err := miz.ReadMizWeather(path)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeMizWeather(w, path, wx)
 		return
 	}
+
+	dir, tried := resolveMizDir()
+	if dir == "" {
+		http.Error(w, "no DCS Missions dir found; pass --miz-dir or set SKYEYE_MIZ. Tried: "+
+			strings.Join(tried, " ; "), http.StatusNotFound)
+		return
+	}
+	path, wx, err := newestParsableMiz(dir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeMizWeather(w, path, wx)
+}
+
+func writeMizWeather(w http.ResponseWriter, path string, wx miz.Weather) {
 	writeJSON(w, map[string]interface{}{
 		"mizName": filepath.Base(path),
 		"windDir": wx.WindDirTrue,
