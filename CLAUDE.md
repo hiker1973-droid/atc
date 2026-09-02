@@ -104,6 +104,38 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
 
+## Git workflow
+
+Remote is `github.com/hiker1973-droid/atc`, default branch `main`.
+
+- **The operator works directly on `main`.** Asked to commit, land it on `main` and
+  push unless they say otherwise. Working on a side branch and stopping there just
+  costs a round trip — on 2026-09-02 a `fix/...` branch had to be merged and pushed
+  in a follow-up because that was the intent all along. Branch only for genuinely
+  speculative work, and say so.
+- **`main` should match what is running on the rig.** Deploys build from the working
+  tree (`go build -o atc.exe ./cmd/atc`), so uncommitted edits mean the live binary
+  has no commit behind it. After a deploy, commit — do not leave the rig running
+  code that is not in git.
+- **Use `git commit -F <file>`, not `-m` with a here-string.** Multi-line messages
+  through PowerShell trip `'/' is outside repository`. Write the message to the
+  scratchpad and pass `-F`.
+- **`LF will be replaced by CRLF` warnings are noise.** The repo is CRLF; tooling
+  writes LF and git normalizes. It does not mean the file is mangled — check
+  `git diff --stat` and you will see only the real lines changed. Related: `gofmt -l`
+  lists most of `cmd/atc/` for the same reason, so a file appearing there is not
+  evidence your edit is unformatted. Check `gofmt -d <file>` for your own hunks.
+- **Ignored, so never commit them:** `atc.exe`, `launcher.exe`, `atis_cache/`.
+  Rollback copies (`atc.rollback.exe`, `launcher.rollback.exe`) and scratch backups
+  (`*.bat.bak`, `atis_cache_old_44k/`) are untracked on purpose — leave them alone
+  rather than adding or deleting on your own initiative.
+- **Split commits by concern.** A portable bug fix and theatre-specific operator
+  config belong in separate commits so the config can be reverted without losing the
+  fix — e.g. `d231884` (GUID fix, every theatre) vs `a8a0986` (Syria frequencies).
+- Commit messages here carry the reasoning, not just the change: what the symptom
+  looked like, what was ruled out, and what is still open. Several of this repo's
+  hardest bugs were invisible in the diff and only findable from the message.
+
 ## Syria (Eastern Med) — live theatre as of 2026-09-02
 
 Foothold Syria runs on this rig now, **not PG**. One map at a time, so the PG scripts are the wrong ones here: `start_all.bat` would put Marshal on 306.300 and Deckboss on PG's 128.600. Use `start_region_syria.bat` (ATIS → towers → Command → Marshal → Deckboss); it does **not** start the launcher.
