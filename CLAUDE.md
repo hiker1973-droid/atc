@@ -3,7 +3,7 @@
 AI-powered Tower ATC for DCS World, owned by **vSFG-7**. Layered on SkyEye infrastructure: SRS for radio bridging, OpenAI Whisper for STT, OpenAI TTS for voice, Tacview real-time telemetry for aircraft positions. Three airfields plus carrier ops and a few special channels.
 
 ## Where you are
-This is **Training 1** — the production rig where big missions run. SkyeyeATC was developed on a separate dev box (Windows Server 2022, vsfg7-atc) and ported here on **2026-04-25**. Treat this as prod: be cautious with destructive operations during live training, no exploratory refactors mid-session.
+This is **Training 1** — the production rig where big missions run. **Foothold Syria is the live theatre as of 2026-09-02**, not PG. SkyeyeATC was developed on a separate dev box (Windows Server 2022, vsfg7-atc) and ported here on **2026-04-25**. Treat this as prod: be cautious with destructive operations during live training, no exploratory refactors mid-session.
 
 ## Network (env vars, v1.1.0+)
 All `.bat` scripts read four env vars and fail fast if any is missing. Same scripts work on dev rig and Training 1 — only the values differ.
@@ -12,7 +12,7 @@ All `.bat` scripts read four env vars and fail fast if any is missing. Same scri
 |---|---|---|---|
 | `OPENAI_API_KEY` | sk-proj-... | sk-proj-... | `atc.exe` directly (Whisper STT + TTS) |
 | `SRS_EAM` | (rotate before mission) | (same) | All `start_*.bat`, passed as `--eam-password` |
-| `SKYEYE_SRS` | `localhost:5008` | `localhost:5008` | All `start_*.bat`, passed as `--srs-addr` |
+| `SKYEYE_SRS` | `localhost:5002` | `localhost:5002` | All `start_*.bat`, passed as `--srs-addr`. **This said 5008 until 2026-09-02 and was wrong** — the live `SRS-Server.exe` listens on **:5002** (verified by `netstat`, and every role authenticates against it). Do not change the env var to match an older doc. |
 | `SKYEYE_TACVIEW` | `localhost:42676` | `localhost:42676` | Tower / Marshal / Scudwatch / Launcher, passed as `--tacview-addr` |
 | `SKYEYE_MIZ` | (set per mission) | (same) | All `start_*.bat`, passed as `--miz-path` for the boot weather seed. **Optional** — unset = fall back to newest `.miz` in `--miz-dir`. |
 
@@ -31,6 +31,8 @@ DCS-gRPC is not externalized — `:50051` is stable across boxes.
 - `configs/{alain,dhafra,minhad}.yaml` — per-airfield configs (hardcode `localhost:5008`, which matches the live SRS server — verified 2026-06-26: `SRS-Server.exe` listens on `:5008` and `SKYEYE_SRS=localhost:5008`. These YAMLs are not currently read by `atc.exe` anyway.)
 
 ## Sites and roles
+**This section describes the PG (Persian Gulf) set.** Syria is the live theatre as of 2026-09-02 with eight fields on its own frequencies and log slugs (`atc-ltag.log`, `atc-llrd.log`, `atc-ojmf.log`, `atc-ltda.log`, `atc-ltaj.log`, `atc-lcra.log`, `atc-lcph.log`, `atc-ojhr.log`) — see **Syria (Eastern Med)** below. One map runs at a time.
+
 Three SRS-bridged tower instances, each writing JSONL to `C:/SkyeyeATC/logs/`:
 
 | Log file | Site | Tower freq | Extra roles in this log |
@@ -101,6 +103,80 @@ The role *code* for all parked roles stays on `main`; only the launch scripts ar
 - Tests roles one at a time and asks Claude to tail the relevant log(s) for the session. They want filtered, site-prefixed events, not raw JSONL.
 - Production rig — prefer stable behavior and minimum-blast-radius changes over experimental refactors.
 - `/ultrareview` is user-triggered for branch / PR reviews; Claude doesn't launch it.
+
+## Syria (Eastern Med) — live theatre as of 2026-09-02
+
+Foothold Syria runs on this rig now, **not PG**. One map at a time, so the PG scripts are the wrong ones here: `start_all.bat` would put Marshal on 306.300 and Deckboss on PG's 128.600. Use `start_region_syria.bat` (ATIS → towers → Command → Marshal → Deckboss); it does **not** start the launcher.
+
+**The squadron card is the authority on frequencies** — `00_2_vSFG7_Hornet_Presets_SY_Foothold.jpg` at the repo root (untracked; supplied by the operator 2026-09-02). Every frequency in the code was checked against it and matched. Do not "fix" a frequency without checking the card.
+
+| Role | Freq | Card ref |
+|---|---|---|
+| Incirlik LTAG tower / ATIS | 360.100 / 360.200 | COMM 1 CH 8 / 9 |
+| Ramat David LLRD tower / ATIS | 251.300 / 256.150 | CH 10 / 11 |
+| King Hussein OJMF tower / ATIS | 250.450 / 255.550 | CH 12 / 13 |
+| Hatay LTDA tower | 250.300 | CH 14 |
+| Gaziantep LTAJ tower | 250.100 | CH 15 |
+| H4 OJHR tower / ATIS | 252.250 / 240.850 | CH 16 / 17 |
+| Akrotiri LCRA tower | 252.000 | CH 18 |
+| Paphos LCPH tower / ATIS | 249.100 / 249.000 | CH 19 / 20 |
+| Marshal | 306.100 | COMM 1 CH 2 |
+| Command | 282.000 | COMM 1 CH 4 |
+| **Deckboss** | **128.600** | **deviates — card says COMM 2 CH 1 = 306.200** |
+
+Dashboards 6041–6048 for the towers, 6004 Marshal, 6005 Deckboss.
+
+**Deckboss deviation.** The card puts Deckboss on 306.200, and 128.600 on COMM 1 CH 1 = CVN-72 **AI**, the mission's own carrier controller. Operator ruled 128.600 anyway on 2026-09-02, so we transmit on top of the DCS AI and a pilot using COMM 2 CH 1 as briefed will not hear us. Called out in `start_deckboss_syria.bat`. **If Deckboss is ever reported silent, start here.** Cautionary tale: pilots seen tuned to `128.600 + 306.200` are on COMM 1 CH 1 + COMM 2 CH 1 — i.e. correctly tuned to Deckboss on **306.200**. That was misread once as evidence they wanted Deckboss moved.
+
+Hatay / Gaziantep / Akrotiri ATIS (249.300 / 249.400 / 249.500) are **assigned by us**, not on the card — the card gives those three tower-only, so pilots have no preset for them.
+
+LSO 128.100 is on the card but `atc.exe` has no LSO role; handoff is verbal.
+
+## ExternalAudio crashes mid-transmission — read before debugging "SRS not transmitting"
+
+All TX goes out through `DCS-SR-ExternalAudio.exe`. **It has a .NET bug that kills it partway through a transmission:**
+
+```
+Playing audio - sent 4000ms - 8%
+Process terminated.
+A callback was made on a garbage collected delegate of type MMTimerProc::Invoke
+exit status 0x80131623
+```
+
+The station keys up, sends a few seconds, and dies. Registration, frequency and client list all look perfect — **the only evidence is `level=error` + `ExternalAudio file error` in `atc-*.log`.** On 2026-09-02 there were 827 of these, 798 of them ATIS, dying between 3% and 79% through the file. To the operator it presents as "SRS is connected but nothing ever transmits", on every field at once, and it is easily misdiagnosed as a frequency or SRS-config fault. It cost most of a day.
+
+**It is load-dependent, which is why PG looked fine and Syria did not.** Crashes by date: 6–31/day through August on PG (5 ATIS, 2 long bilingual), then **118 on 2026-09-01** when Syria's 8 stations / 7 bilingual / 44–58s reports went live. Same latent bug, roughly ten times the exposure.
+
+**Mitigation (`6f4afb2`): everything handed to ExternalAudio is now 16kHz mono.** ExternalAudio always converts input to mono 16-bit PCM @ 16kHz before Opus-encoding, so 44100 bought nothing and cost a resample on our longest files. `srsAudioRateHz` in `cmd/atc/main.go` pins **all three** ffmpeg stages — `concatMP3WithSilence`, `applyRadioEffect`, `addMicClicks`. The last matters most: it runs last, so whatever it emits is what ExternalAudio actually reads. Crash split was 1586 log lines at 44100Hz against 4 at 24000Hz. Zero crashes since. **This is a mitigation, not a cure — the bug is upstream.** If it returns, look at transmission length first.
+
+Akrotiri ATIS stays 24kHz — English-only, never hits the concat, 4 of 827 failures.
+
+## Debugging SRS: what is and is not trustworthy
+
+- **`clients-list.json` is NOT a reliable census.** (`Saved Games\...\Config\`, written because `CLIENT_EXPORT_ENABLED=True`.) Entries appear and vanish between reads, and it has consistently shown only **6 of 8** towers even when all eight log `SRS registered — listening` and hold ESTABLISHED TCP + UDP to `:5002`. Useful for spotting *identity* corruption; never conclude "not registered" from absence.
+- **`TRANSMISSION_LOG_ENABLED=true`** was set in `SRS.cfg` on 2026-09-02 for diagnostics (backup `SRS.cfg.bak-2026-09-02`); it writes `<SRS>\Server\<date>-transmissionlog.csv`. It stayed **empty** with no pilots connected — an empty log does **not** prove nothing transmitted.
+- **`<SRS>\Server\serverlog.txt`** is the server's own log (~80MB). Constant connect/disconnect churn there is normal — that is ExternalAudio's transient client, one per transmission.
+- **Caucasus has never run on this rig.** No log contains `UGSB`/`UGKO`/`UGKS`/`UG5X`. It was merged (`d805e5c`) but never deployed, so "it works on Caucasus" has no baseline here. The only prior working theatre is PG.
+- SRS listens on **:5002** (`SKYEYE_SRS`), not the 5008 written elsewhere in this file.
+
+## OPEN: King Hussein (OJMF) + H4 (OJHR) missing from the SRS client list
+
+Reproducible across three restart patterns including a clean full restart with 4s spacing. Both towers log `SRS registered — listening` on 250.450 / 252.250 and hold ESTABLISHED TCP **and** UDP to `:5002`, but never appear in `clients-list.json`. Ruled out with evidence — do not re-chase these:
+
+- **Not a GUID collision** — PIDs distinct mod 1e6 since `d231884`
+- **Not a client cap** — killing Marshal + Command to free slots did not admit them
+- **Not a unitId collision** — FNV-32a computed for all 19 role callsigns, all unique
+- **Not launch timing or order** — same result with 2s, 3s and 4s staggers
+
+**Untested: whether pilots can actually hear these two fields.** Given the export is unreliable (above), this may be cosmetic. The next step is a listening test on 250.450 / 252.250 against a known-good field like Gaziantep 250.100 — not more local analysis.
+
+## Recent context (2026-09-02)
+- **`SKYEYE_MIZ` went stale mid-session.** The Missions folder was refreshed at 08:59 — `v1.1` deleted, replaced by **29 `v1.3` weather variants** — so the pinned path silently fell back to `--static-*` defaults on every role. Repinned to the loaded mission, found via `Logs\dcs.log`: grep the `[LOTATC]  ->  ...miz` line, which names what DCS actually loaded. **The server rotates missions, so this pin goes stale on its own — re-check whenever weather looks wrong.**
+- **SRS client GUID fix (`d231884`).** Every role derived its GUID from `time.Now().UnixNano()` alone, which is not unique on Windows — the clock is far coarser than a nanosecond. Eight towers launching within ~81ms drew colliding GUIDs; SRS merged them into shared slots and the losers went silent while still looking connected. Symptom was mangled entries: `Akrotiri Tower` carrying Hatay's 250.300, `H4 Tower` carrying Ramat David's 251.300. Now PID-based via `srsClientGUID`. **The `timeout` staggers in `start_towers_syria.bat` are skipped when the bat is driven non-interactively** (`Input redirection is not supported`) — that is what bunched the launches, so give towers real spacing when scripting them.
+- **16kHz audio fix (`6f4afb2`)** — see the ExternalAudio section above.
+- **Card reconciliation (`ee2f38e`)** — King Hussein + H4 towers restored after being removed earlier the same day while chasing the GUID bug; Deckboss kept on 128.600 by ruling. Every other frequency already matched the card.
+- **Leftovers on disk, all untracked:** `atis_cache_old_44k/` (17 superseded 44.1kHz ATIS mp3s, safe to delete), `start_towers_syria.bat.bak`, and the presets JPG.
+- **The ffmpeg format-string trap.** A bad verb in the ATIS concat filter does not fail loudly: `concatMP3WithSilence` errors, the caller falls back to English-only, and bilingual ATIS quietly disappears behind a single `warn` line. `%[1].3f` is wrong — Go wants the argument index *after* the precision — and renders `%!f(BADINDEX)`. `atisConcatFilter()` is split out and tested for exactly this.
 
 ## Recent context (2026-08-06)
 - **Deckboss phraseology reworked, `92a428c`** (pushed to `main`, **not yet deployed to Training 1**). Three operator-requested changes: (1) §2 under tension now ends with "shooter's discretion" — two variants, `under tension cat {CAT}, spin it up, shooter's discretion` / `copy under tension, go gates, shooter's discretion`; (2) §4 airborne is a bare `copy airborne`, and the Command departure handoff that rode on that ack is **removed** — pilots switch on their own; (3) the auto `Cat {CAT}, shoot, shoot, shoot` TX is **gone entirely** (`DeckbossShoot` deleted) because Deckboss no longer calls the shot. Its timer survives, cut 5s → 10s, and now only does slot management. **Timeline changed: was T+0 tension / T+5 shoot / T+15 cat clear, now T+0 / T+10 clear.**
