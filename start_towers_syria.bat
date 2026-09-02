@@ -25,9 +25,7 @@ set GOMEMLIMIT=512MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-:: Mafraq (OJMF) and H4 (OJHR) removed 2026-09-02 at operator request while
-:: chasing SRS client-GUID collisions -- see cmd/atc/main.go:1113.
-echo [vSFG-7] Starting Syria ATC system (6 recovery bases)...
+echo [vSFG-7] Starting Syria ATC system (8 recovery bases)...
 :: NOTE: the Foothold VM runs SRS on :5002, NOT the :5008 the Training rig uses.
 :: SKYEYE_SRS must say localhost:5002 on that host.
 
@@ -37,6 +35,10 @@ timeout /t 2 /nobreak >nul
 
 echo   Ramat David Tower (LLRD) -^> dashboard 6042
 start "Ramat David Tower" cmd /c "%~dp0atc.exe --airfield LLRD --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6042 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+timeout /t 2 /nobreak >nul
+
+echo   King Hussein Tower (OJMF) -^> dashboard 6043
+start "King Hussein Tower" cmd /c "%~dp0atc.exe --airfield OJMF --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --dashboard-port 6043 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
 echo   Hatay Tower (LTDA) -^> dashboard 6044
@@ -53,6 +55,10 @@ timeout /t 2 /nobreak >nul
 
 echo   Paphos Tower (LCPH) -^> dashboard 6047
 start "Paphos Tower" cmd /c "%~dp0atc.exe --airfield LCPH --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6047 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+timeout /t 2 /nobreak >nul
+
+echo   H4 Tower (OJHR) -^> dashboard 6048
+start "H4 Tower" cmd /c "%~dp0atc.exe --airfield OJHR --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6048 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 2 /nobreak >nul
 
 echo [vSFG-7] Syria towers launched.

@@ -25,14 +25,17 @@ set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-:: Syria / Eastern Med Deckboss -- 128.600, matching the squadron kneeboard
-:: (user ruling 2026-09-02). This SUPERSEDES the 306.200 in SYRIA_PLAN.md
-:: section 3, which is now stale for this role.
+:: Syria / Eastern Med Deckboss -- 128.600 by operator ruling (2026-09-02),
+:: which DEVIATES from the squadron card.
 ::
-:: Known and accepted: 128.600 is SHARED with the mission's own CVN-72 AI ATC
-:: (moved off Foothold's stock 272.000), so we transmit alongside the DCS AI
-:: controller rather than on a clear channel. The kneeboard is the authority --
-:: pilots were tuned to 128.600 and heard nothing while we sat on 306.200.
+:: The card ("vSFG-7 Foothold Syria (Extended) 4.8.0 -- HORNET PRESETS") puts
+:: CVN-72 DECKBOSS on COMM 2 CH 1 = 306.200, and 128.600 on COMM 1 CH 1 =
+:: CVN-72 AI, the mission's own carrier controller. So on 128.600 we transmit
+:: on top of the DCS AI ATC, and a pilot using COMM 2 CH 1 as briefed will not
+:: hear us. The operator chose this deliberately after seeing the card.
+::
+:: If Deckboss is ever reported silent, check this first -- it is the one role
+:: that does not match the printed presets.
 ::
 :: LSO 128.100 is on the squadron card but atc.exe has no LSO role -- Deckboss
 :: and Marshal only ever hand off to it verbally. Nothing to launch for it.
