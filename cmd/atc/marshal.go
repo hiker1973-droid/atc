@@ -183,7 +183,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		}
 
 		guidLen := 22
-		guid := "vsfg7msh" + fmt.Sprintf("%014d", time.Now().UnixNano()%100000000000000)
+		guid := srsClientGUID("vsfg7msh", 14)
 		if len(guid) > guidLen { guid = guid[:guidLen] }
 		for len(guid) < guidLen { guid += "0" }
 		// UDP setup — mirror Tower's ResolveUDPAddr + DialUDP path exactly. The

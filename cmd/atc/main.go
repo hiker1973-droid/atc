@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"hash/fnv"
 	"runtime/debug"
 	"path/filepath"
@@ -1108,9 +1109,36 @@ func dialSRSKeepAlive(ctx context.Context, addr string) (net.Conn, error) {
 	return d.DialContext(ctx, "tcp", addr)
 }
 
+// srsClientGUID builds the SRS client GUID for a role.
+//
+// This MUST be unique per process. SRS keys its client table on this string, so
+// two roles that generate the same GUID collapse into a single slot: the later
+// registration overwrites the earlier one's radio, and the loser goes silent in
+// both directions while still looking connected.
+//
+// That is not hypothetical. The previous scheme was time.Now().UnixNano() alone,
+// which is NOT unique on Windows -- the clock there is far coarser than a
+// nanosecond, so processes launched in the same tick got identical values. On
+// 2026-09-02 eight Syria towers launched within ~81ms of each other; only six
+// reached SRS, and two of those carried another tower's callsign and frequency.
+// PG (3 towers) and Caucasus (4) had been lucky, not correct.
+//
+// PID is unique among live processes, so it alone settles the simultaneous-launch
+// case; the random tail covers PID reuse and the %1e6 wrap. digits is the total
+// width of the numeric tail, kept per-role so GUID length does not change.
+func srsClientGUID(prefix string, digits int) string {
+	const pidDigits = 6
+	randDigits := digits - pidDigits
+	bound := 1
+	for i := 0; i < randDigits; i++ {
+		bound *= 10
+	}
+	return fmt.Sprintf("%s%0*d%0*d", prefix, pidDigits, os.Getpid()%1000000, randDigits, rand.Intn(bound))
+}
+
 func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey, eamPassword string, txCooldown *int64, atcCtrl *controller.ATCController) {
 	freqHz := freqMHz * 1e6
-	guid := "vsfg7atc" + fmt.Sprintf("%014d", time.Now().UnixNano()%100000000000000)
+	guid := srsClientGUID("vsfg7atc", 14)
 	if len(guid) > guidLen {
 		guid = guid[:guidLen]
 	}

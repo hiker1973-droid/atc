@@ -413,7 +413,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		}
 
 		guidLen := 22
-		guid := "vsfg7dkb" + fmt.Sprintf("%014d", time.Now().UnixNano()%100000000000000)
+		guid := srsClientGUID("vsfg7dkb", 14)
 		if len(guid) > guidLen {
 			guid = guid[:guidLen]
 		}

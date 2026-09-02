@@ -126,7 +126,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 			continue
 		}
 
-		guid := fmt.Sprintf("vsfg7cmd%015d", time.Now().UnixNano()%1000000000000000)
+		guid := srsClientGUID("vsfg7cmd", 15)
 		guid = guid[:guidLen]
 		freqHz := freqMHz * 1e6
 
