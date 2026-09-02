@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"hash/fnv"
 	"runtime/debug"
 	"path/filepath"
@@ -2085,7 +2086,8 @@ func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
 		"-filter_complex", filter,
 		"-map", "[out]",
 		"-c:a", "libmp3lame",
-		"-q:a", "4",
+		"-ar", strconv.Itoa(srsAudioRateHz),
+		"-b:a", "64k",
 		tmpOut,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -2137,7 +2139,8 @@ func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
 		"-filter_complex", filter,
 		"-map", "[out]",
 		"-c:a", "libmp3lame",
-		"-q:a", "4",
+		"-ar", strconv.Itoa(srsAudioRateHz),
+		"-b:a", "64k",
 		tmpOut,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -2155,6 +2158,46 @@ func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
 // `silenceSec` seconds of silence between them. Used by ATIS to merge EN+AR
 // into one clean stream — byte-level MP3 concat is fragile and can cause some
 // decoders (DCS-SR-ExternalAudio) to play the two halves simultaneously.
+// srsAudioRateHz is the sample rate we hand to DCS-SR-ExternalAudio.
+//
+// ExternalAudio always converts its input to mono 16-bit PCM at 16kHz before
+// Opus-encoding it, so anything else buys nothing and costs a resample. This
+// used to be 44100, which made every bilingual ATIS the most expensive file we
+// produce: ~70s of audio resampled 44100 -> 16000 on the fly.
+//
+// That mattered because ExternalAudio 2.4.0.0 crashes partway through long
+// transmissions -- "A callback was made on a garbage collected delegate of type
+// MMTimerProc::Invoke", exit 0x80131623 -- killing the process mid-broadcast.
+// On 2026-09-02 the logs held 827 such failures, 798 of them ATIS, dying
+// anywhere from 3% to 79% through the file. Pilots heard a few seconds of a
+// station and then nothing, on every field, which read as "SRS not
+// transmitting". Crashes broke down 1586 log lines at 44100Hz source against 4
+// at 24000Hz -- the long resampled files, not the short ones.
+//
+// Matching ExternalAudio's own target rate removes the resample entirely and
+// shrinks the file, which shortens the window the crash has to land in. It is a
+// mitigation, not a cure: the bug is in ExternalAudio, not here.
+const srsAudioRateHz = 16000
+
+// atisConcatFilter builds the ffmpeg filter_complex that joins the English and
+// local-language ATIS passes with a gap between them.
+//
+// Split out so it can be tested. A malformed filter here does NOT surface as an
+// outage: concatMP3WithSilence just returns an error and the caller falls back
+// to broadcasting English only, so bilingual ATIS quietly disappears with a
+// single warn line. That happened on 2026-09-02 with "%[1].3f" -- Go wants the
+// argument index AFTER the precision ("%.3[1]f"), so it rendered
+// "%!f(BADINDEX)" and ffmpeg rejected the atrim duration. Positional args now.
+func atisConcatFilter(silenceSec float64) string {
+	return fmt.Sprintf(
+		"[0:a]aresample=%d,aformat=channel_layouts=mono[en];"+
+			"[1:a]aresample=%d,aformat=channel_layouts=mono[ar];"+
+			"anullsrc=r=%d:cl=mono,atrim=duration=%.3f[sil];"+
+			"[en][sil][ar]concat=n=3:v=0:a=1[out]",
+		srsAudioRateHz, srsAudioRateHz, srsAudioRateHz, silenceSec,
+	)
+}
+
 func concatMP3WithSilence(en, ar []byte, ffmpegPath string, silenceSec float64) ([]byte, error) {
 	tmpEn, err := os.CreateTemp("", "atc-atis-en-*.mp3")
 	if err != nil {
@@ -2181,13 +2224,7 @@ func concatMP3WithSilence(en, ar []byte, ffmpegPath string, silenceSec float64) 
 	tmpOut := tmpEn.Name() + ".out.mp3"
 	defer os.Remove(tmpOut)
 
-	filter := fmt.Sprintf(
-		"[0:a]aresample=44100,aformat=channel_layouts=mono[en];"+
-			"[1:a]aresample=44100,aformat=channel_layouts=mono[ar];"+
-			"anullsrc=r=44100:cl=mono,atrim=duration=%.3f[sil];"+
-			"[en][sil][ar]concat=n=3:v=0:a=1[out]",
-		silenceSec,
-	)
+	filter := atisConcatFilter(silenceSec)
 
 	cmd := exec.Command(ffmpegPath,
 		"-y",
@@ -2196,7 +2233,8 @@ func concatMP3WithSilence(en, ar []byte, ffmpegPath string, silenceSec float64) 
 		"-filter_complex", filter,
 		"-map", "[out]",
 		"-c:a", "libmp3lame",
-		"-q:a", "4",
+		"-ar", strconv.Itoa(srsAudioRateHz),
+		"-b:a", "64k",
 		tmpOut,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
