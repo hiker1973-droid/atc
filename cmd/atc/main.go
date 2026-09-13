@@ -1481,6 +1481,9 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 	log.Info().Str("text", text).Msg("recognized")
 	req := controller.ParseIntent(text, callsign)
 	if req == nil {
+		// Logged so a call to another field on this frequency, or a field name
+		// Whisper mangled past matching, shows up instead of silence.
+		log.Info().Str("text", text).Str("tower", callsign).Msg("not addressed to this tower — ignored")
 		return
 	}
 	log.Info().Str("callsign", req.Callsign).Int("type", int(req.Type)).Msg("ATC request")

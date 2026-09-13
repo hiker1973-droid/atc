@@ -30,6 +30,7 @@ The tower will only respond when it's addressed. Any of these forms work:
 - `"Dhafra Traffic, Venom 2-3, ..."`
 - `"Tower, Raider 1-1, ..."` (bare)
 - `"Traffic, Raider 1-1, ..."` (CTAF style)
+- `"Akrotiri, Raider 1-1, ..."` (field name only — "Tower" is optional when the field name opens the call)
 
 The system is fuzzy-matched on the field name (`minhad`, `dhafra`, `al ain`) so common Whisper mishears are forgiven. Squadron callsigns the bot auto-corrects: **Raider** (mishears: reader/radar/rater), **Venom** (mishears: vino/venue/demon).
 

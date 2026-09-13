@@ -1187,6 +1187,8 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	// Also build common Whisper misrecognitions
 	aliases := towerKeywordAliases(towerCallsign)
 	
+	aliases = append(aliases, extraFieldAliases(towerCallsign)...)
+
 	isCTAF := false
 	isDirect := false
 	for _, kw := range append([]string{primaryKey}, aliases...) {
@@ -1204,7 +1206,8 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	// Also accept bare "tower" or "traffic" address without field name
 	if !isDirect && !isCTAF {
 		if strings.HasPrefix(lower, "tower,") || strings.HasPrefix(lower, "tower ") ||
-			strings.HasPrefix(lower, "traffic,") || strings.HasPrefix(lower, "traffic ") {
+			strings.HasPrefix(lower, "traffic,") || strings.HasPrefix(lower, "traffic ") ||
+			addressedByFieldName(lower, primaryKey, aliases) {
 			isDirect = true
 		}
 	}
@@ -1342,7 +1345,12 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestAltitude
 
 
-	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comcheck", "comp check", "how copy"):
+	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comcheck", "comp check", "how copy",
+		"checking in", "check in"):
+		// A bare "checking in" is a first call with no request yet — answer it
+		// like a radio check ("loud and clear, go ahead") rather than "say
+		// again". Late in the switch, so a check-in carrying a position or
+		// request still gets that handling. Live miss, Akrotiri 2026-09-13.
 		req.Type = RequestRadioCheck
 	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative",
 		"taxiing", "taxying"):
