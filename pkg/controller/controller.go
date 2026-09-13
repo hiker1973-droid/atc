@@ -197,6 +197,14 @@ type ATCController struct {
 	// false; set via SetPositionCheck (wired to --position-check CLI flag).
 	// When off, isPilotAtHoldShort is not called and behavior is unchanged.
 	positionCheck bool
+
+	// Tacview-driven proactive calls (proactive.go), both off by default.
+	// players is guarded by allPositionsMu; the other fields by mu.
+	unknownTrafficCalls bool
+	runwayVacateChase   bool
+	players             map[string]bool
+	unknownPrevDistNm   map[string]float64
+	unknownWarnedAt     map[string]time.Time
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -675,6 +683,12 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 // Calls oweWheelsCheck exactly once — it marks the check as issued.
 func (c *ATCController) landingClearance(req *ATCRequest, ac *state.AircraftState) string {
 	s := c.airfieldState
+	if ac != nil {
+		// Arms the runway-vacate chase afresh for this landing (proactive.go).
+		ac.LandingClearedAt = time.Now()
+		ac.GroundSlowSince = time.Time{}
+		ac.RunwayChased = false
+	}
 	wheels := c.oweWheelsCheck(ac, req.Raw)
 	if req.Option != composer.OptionNone {
 		return c.composer.OptionClearance(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, req.Option, wheels)
@@ -1059,6 +1073,14 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 				}
 			}
 		}
+	}
+
+	// ── Proactive Tacview calls (proactive.go, off by default) ──────────────────
+	if c.unknownTrafficCalls {
+		c.checkUnknownTraffic(ctx)
+	}
+	if c.runwayVacateChase {
+		c.checkRunwayVacate(ctx)
 	}
 }
 

@@ -112,6 +112,8 @@ var (
 	flagRunwaySlot          time.Duration
 	flagPositionCheck       bool
 	flagDeckPositionCheck   bool
+	flagUnknownTraffic      bool
+	flagRunwayVacateChase   bool
 )
 
 func main() {
@@ -254,6 +256,10 @@ func main() {
 		"Validate via Tacview that a pilot calling 'holding short' is actually within HoldShortValidationNm of the runway threshold. Off by default — enable for a session to observe before relying on it.")
 	f.BoolVar(&flagDeckPositionCheck, "deck-position-check", false,
 		"Deckboss assigns catapults from the caller's actual Tacview position on deck — bow cats 1/2 forward, waist cats 3/4 aft — instead of always taking the lowest free cat. Fails open to first-free when Tacview can't place the caller. Off by default.")
+	f.BoolVar(&flagUnknownTraffic, "unknown-traffic-calls", false,
+		"Tower calls a human-flown aircraft that closes inside 8 nm / 5,000 ft above the field without having talked to it: \"say intentions\". Once per aircraft per 10 min, one call per 10 s monitor tick. Off by default — trial on the dev rig first.")
+	f.BoolVar(&flagRunwayVacateChase, "runway-vacate-chase", false,
+		"Tower asks a landed aircraft to \"report clear of the runway\" when it has sat on the field below 40 kt for 90 s after its landing clearance without calling vacated. Once per landing. Off by default.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -397,6 +403,14 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagPositionCheck {
 		atcCtrl.SetPositionCheck(true)
 		log.Info().Msg("Tacview hold-short position check enabled (--position-check)")
+	}
+	if flagUnknownTraffic {
+		atcCtrl.SetUnknownTrafficCalls(true)
+		log.Info().Msg("unknown-traffic \"say intentions\" calls enabled (--unknown-traffic-calls)")
+	}
+	if flagRunwayVacateChase {
+		atcCtrl.SetRunwayVacateChase(true)
+		log.Info().Msg("runway-vacate chase enabled (--runway-vacate-chase)")
 	}
 	// Seed weather. Priority: explicit --miz-path > newest .miz in --miz-dir >
 	// --static-* flags. .miz wind is true degrees (controller applies MagVar
@@ -588,9 +602,10 @@ func run(cmd *cobra.Command, args []string) error {
 		// spawn a mini Tacview consumer and a watcher that TXs a tower handoff
 		// when a tracked pilot crosses 30 NM inbound to any of OMDM/OMAM/OMAL.
 		var tracker *pilotTracker
+		var store *tacviewPositions
 		if flagTacviewAddr != "" {
 			tracker = newPilotTracker()
-			store := newTacviewPositions()
+			store = newTacviewPositions()
 			go runMiniTacview(ctx, flagTacviewAddr, store)
 			srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 			handoffTX := func(text, _ string) {
@@ -605,7 +620,7 @@ func run(cmd *cobra.Command, args []string) error {
 			log.Info().Str("tacview", flagTacviewAddr).Msg("Command: tower-handoff watcher armed")
 		}
 
-		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio, tracker)
+		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio, tracker, store)
 		return nil
 	}
 
@@ -2433,8 +2448,11 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 				// Strip on the bare "|" — DCS uses inconsistent spacing
 				// around it ("Venom 020 | BARNEY" vs "Raider 032 |Jedi").
 				// Take everything before the first pipe and trim whitespace.
+				// The pipe is also the only human-vs-AI signal Tacview gives,
+				// which the unknown-traffic call relies on.
 				if i := strings.Index(p, "|"); i >= 0 {
 					p = strings.TrimSpace(p[:i])
+					atcCtrl.MarkPlayer(p)
 				}
 				objects[id] = p
 				if positions[id] == nil {

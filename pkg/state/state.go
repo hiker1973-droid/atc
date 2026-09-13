@@ -121,6 +121,15 @@ type AircraftState struct {
 	// path is eligible to fire ClearedForTakeoff for this aircraft. Set by
 	// handleHoldingShortRequest on the no-traffic path; zero = not awaiting.
 	AutoReleaseAt time.Time
+	// LandingClearedAt is when this aircraft was last given a landing or
+	// option clearance; zero = never. Arms the runway-vacate chase.
+	LandingClearedAt time.Time
+	// GroundSlowSince is when Tacview first showed the aircraft on the field
+	// at taxi speed after that clearance; zero while airborne or rolling fast.
+	GroundSlowSince time.Time
+	// RunwayChased is set once "report clear of the runway" has gone out for
+	// the current landing clearance, so it is asked once per landing.
+	RunwayChased bool
 }
 
 // HasPosition returns true if this aircraft has a fresh telemetry position

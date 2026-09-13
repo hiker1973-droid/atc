@@ -118,7 +118,7 @@ func commandResponse(text, callsign, channelName string) string {
 // commandLoop connects to SRS on the command frequency and handles pilot calls.
 // tracker may be nil; when set, every successfully-transcribed pilot callsign
 // is recorded so the Tacview-driven handoff watcher knows who to monitor.
-func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath string, tracker *pilotTracker) {
+func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath string, tracker *pilotTracker, store *tacviewPositions) {
 	guidLen := 22
 	var txCooldown int64
 	for {
@@ -294,7 +294,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 							if tracker != nil {
 								tracker.Note(cs)
 							}
-							resp := commandResponse(text, cs, channelName)
+							resp := commandReply(text, cs, channelName, store)
 							if resp == "" {
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command intent miss")
 								return
