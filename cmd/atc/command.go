@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/vsfg7/atc/pkg/composer"
 )
 
 // commandPick selects one of three strings at random.
@@ -82,6 +83,9 @@ func commandResponse(text, callsign, channelName string) string {
 	// Fence out — leaving combat/training area (check before fence in/check
 	// so "fence out" isn't swallowed by a looser "fence" match).
 	if containsAny(lower, "fence out", "fence-out", "fenceout") {
+		if fuel := extractFuelStateMarshal(lower); fuel > 0 {
+			return composer.NewATCComposer(channelName).CommandFenceOut(callsign, fuel)
+		}
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, copy fence out, safe passage.", callsign, channelName),
 			fmt.Sprintf("%s, %s, roger fence out, squawk standard, proceed home plate.", callsign, channelName),
@@ -91,11 +95,21 @@ func commandResponse(text, callsign, channelName string) string {
 
 	// Fence in / fence check — entering combat/training area, systems hot
 	if containsAny(lower, "fence in", "fence-in", "fencein", "fence check", "fence-check") {
+		if fuel := extractFuelStateMarshal(lower); fuel > 0 {
+			return composer.NewATCComposer(channelName).CommandFenceIn(callsign, fuel)
+		}
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, copy fence in, you are cleared hot.", callsign, channelName),
 			fmt.Sprintf("%s, %s, roger fence in, master arm on, cleared hot, good hunting.", callsign, channelName),
 			fmt.Sprintf("%s, %s, copy fence check, systems hot, you are cleared into the area.", callsign, channelName),
 		})
+	}
+
+	// Bare fuel state report ("Command, Raider 11, state 1.8"). Last so a state
+	// given alongside any call above gets that call's reply; below 2.0 the
+	// composer answers bingo.
+	if fuel := extractFuelStateMarshal(lower); fuel > 0 {
+		return composer.NewATCComposer(channelName).CommandFuelState(callsign, fuel)
 	}
 
 	return ""

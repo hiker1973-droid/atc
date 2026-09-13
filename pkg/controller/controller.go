@@ -96,6 +96,7 @@ const (
 	RequestRadarCheck               // "radar check" — read back Tacview-derived angels/range/bearing
 	RequestStartup                  // "request startup" / "ready for startup" — engine-start approval (Ground)
 	RequestPushingCommand           // "pushing command" — pilot-initiated freq change to Command, courtesy ack
+	RequestRolling                  // "rolling runway XX" — CTAF self-announced takeoff roll
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -609,6 +610,23 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	case RequestPushingCommand:
 		s.Remove(req.Callsign)
 		response = c.composer.PushingCommandAck(req.Callsign)
+
+	case RequestRolling:
+		// Self-announced takeoff roll — the jet is already on the runway, so a
+		// takeoff clearance or hold-short would be moot. Unlike "departing" it
+		// stays tracked (the go-around monitor still needs to see a rolling
+		// departure) and it stamps the departure time, so the spacing gate
+		// holds the next jet behind it. The 7 DME call removes it as usual.
+		ac.TakeoffCleared = true // stop a pending LUAW auto-release clearing a rolling jet
+		if s.ClearForTakeoff(req.Callsign) == nil {
+			s.EnqueueDeparture(ac)
+			s.ClearForTakeoff(req.Callsign)
+		}
+		response = c.composer.DepartureRelease(
+			req.Callsign,
+			s.Airfield.DepartureDistNm,
+			s.Airfield.DepartureAngels,
+		)
 
 	case RequestReadback:
 		return // Silent acknowledge
@@ -1158,10 +1176,22 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		Callsign: extractCallsign(text, towerCallsign),
 		Airframe: extractAirframe(lower),
 	}
+	// "request for taxi" / "requesting for takeoff" — the extra "for" broke
+	// every "request X" trigger below (live miss, Senaki 2026-09).
+	lower = strings.NewReplacer("requesting for ", "requesting ", "request for ", "request ").Replace(lower)
 	switch {
+	case containsAny(lower, "mayday", "pan pan", "pan-pan", "emergency"):
+		// Checked first: a mayday nearly always carries a position ("10 miles
+		// south", "turning base", "just airborne"), and any later case would
+		// otherwise answer it as a routine pattern call.
+		req.Type = RequestEmergency
 	case containsAny(lower, "clear traffic", "clear of traffic", "airborne", "departing"):
 		// Departure release — pilot is clear of the pattern (works on tower or CTAF)
 		req.Type = RequestClearTraffic
+	case containsWord(lower, "rolling", "on the roll"):
+		// CTAF self-announced takeoff roll: "Senaki traffic, Raider 302, rolling
+		// runway 09". Whole-word so "patrolling" doesn't match.
+		req.Type = RequestRolling
 	case containsAny(lower, "seven dme", "7 dme", "seven miles", "7 miles", "cleared airspace", "five miles", "5 miles") ||
 		(containsAny(lower, "dme", "d.m.e", "d m e") && !containsAny(lower, "initial", "inbound")):
 		// Post-departure distance check-in. Whisper often transcribes "7 DME"
@@ -1181,14 +1211,16 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestOverhead
 	case containsAny(lower, "downwind"):
 		req.Type = RequestDownwind
-	case containsAny(lower, "base", "turning base", "right base", "left base", "base final"):
+	case containsWord(lower, "base") && !containsWord(lower, "to base", "home base", "rtb"):
+		// Whole-word, and not "returning to base" / "home base" — those are
+		// inbound calls, handled by the bare-inbound case below.
 		req.Type = RequestBase
-	case containsAny(lower, "traffic in sight", "visual", "tally"):
+	case containsAny(lower, "traffic in sight") ||
+		(containsWord(lower, "visual", "tally") && !containsWord(lower, "visual approach", "request visual")):
+		// "request visual (approach)" is an approach request, not traffic in sight.
 		req.Type = RequestTrafficInSight
 	case containsAny(lower, "negative contact", "no contact", "no joy"):
 		req.Type = RequestNegativeContact
-	case containsAny(lower, "mayday", "pan pan", "emergency", "declaring emergency"):
-		req.Type = RequestEmergency
 	case containsAny(lower,
 		// Standard
 		"runway vacated", "vacated", "clear of runway", "off the runway",
@@ -1206,7 +1238,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// Phonetic mishears
 		"clear active runway", "clear of active"):
 		req.Type = RequestRunwayVacated
-	case containsAny(lower, "straight in", "straight-in", "ils", "instrument approach", "rnav"):
+	case containsAny(lower, "straight in", "straight-in", "instrument approach", "rnav", "visual approach") ||
+		containsWord(lower, "ils", "i l s", "request visual"):
+		// "ils" whole-word only — as a substring it hit "details" / "fails".
 		req.Type = RequestStraightIn
 	case containsAny(lower, "break", "initial"):
 		// Only classify as break if not part of "radio check" etc.
@@ -1214,8 +1248,10 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		if !containsAny(lower, "radio", "check") {
 			req.Type = RequestBreak
 		}
-	case containsAny(lower, "inbound") && !containsAny(lower, "initial", "mile"):
-		// "...inbound" alone — treat as distance initial at unknown distance
+	case (containsAny(lower, "inbound") || containsWord(lower, "rtb", "returning to base", "return to base")) &&
+		!containsAny(lower, "initial", "mile"):
+		// "...inbound" / "returning to base" alone — treat as distance initial
+		// at unknown distance
 		req.Type = RequestDistanceInitial
 	case containsAny(lower, "holding short", "hold short", "short of runway", "at the hold"):
 		req.Type = RequestHoldingShort
@@ -1371,7 +1407,7 @@ func trimTrailingTriggers(cs string) string {
 		"line up", "lining up",
 		// pattern / state calls
 		"holding short", "hold short", "ready for", "ready to",
-		"airborne", "departing", "inbound",
+		"airborne", "departing", "inbound", "rolling", "on the roll", "request for",
 		"on final", " final", "turning final", "short final", "on short",
 		"straight in", "straight-in", "full stop", "touch and go",
 		"3 mile", "three mile", "3-mile", "three-mile",
@@ -1462,6 +1498,24 @@ func extractAirframe(lower string) string {
 func containsAny(s string, subs ...string) bool {
 	for _, sub := range subs {
 		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// nonWordRe splits a lowercased transcript into words for containsWord.
+var nonWordRe = regexp.MustCompile(`[^a-z0-9]+`)
+
+// containsWord is containsAny with whole-word matching, for short triggers
+// that otherwise hit inside other words ("base" in "database", "ils" in
+// "details", "rolling" in "patrolling"). Punctuation and whitespace runs
+// collapse to one space, so multi-word phrases match across "turning, base".
+// s must already be lowercase.
+func containsWord(s string, words ...string) bool {
+	padded := " " + nonWordRe.ReplaceAllString(s, " ") + " "
+	for _, w := range words {
+		if strings.Contains(padded, " "+w+" ") {
 			return true
 		}
 	}

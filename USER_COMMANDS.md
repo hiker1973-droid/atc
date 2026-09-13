@@ -43,7 +43,8 @@ The system is fuzzy-matched on the field name (`minhad`, `dhafra`, `al ain`) so 
 |---|---|---|
 | Request taxi | `"...request taxi"`, `"ready to taxi"`, `"taxi to active"` | |
 | Holding short | `"...holding short runway 27"`, `"at the hold"`, `"short of runway"` | Tower will sequence with inbounds within 15 nm |
-| Ready for takeoff | `"...ready for takeoff"`, `"ready for departure"`, `"request takeoff"`, `"line up"` | |
+| Ready for takeoff | `"...ready for takeoff"`, `"ready for departure"`, `"request takeoff"`, `"line up"` | "request **for** takeoff/taxi" works too |
+| Rolling (CTAF) | `"...rolling runway 09"`, `"on the roll"` | Departure release; spaces the next departure 60 s behind you |
 | Distance check (post-departure) | `"...7 DME"`, `"5 miles"`, `"cleared airspace"` | Releases the runway from your slot |
 | Clear of traffic / pattern | `"...clear of traffic"`, `"airborne"`, `"departing"` | CTAF-style departure call |
 
@@ -91,6 +92,7 @@ Mission-wide ops channel. Six intents, each with three randomised responses.
 | Off station | `"...off station"`, `"departing station"` | Return to assigned pattern |
 | Fence in | `"...fence in"`, `"fence check"` | Cleared hot, master arm on |
 | Fence out | `"...fence out"` | Squawk standard, switch to departure |
+| Fuel state | `"...state 5.2"`, `"state 1 point 8"` | Copies state; below 2.0 you're told you're bingo. Also works tacked onto fence in / fence out |
 
 If your transmission doesn't hit one of these, Command stays silent (logged as "Command intent miss"). The fence-out match is checked **before** fence-in, so "fence out" never gets misclassified.
 

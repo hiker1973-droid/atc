@@ -677,20 +677,24 @@ func (c *ATCComposer) AltitudeClearance(callsign, activeRunway string, altimeter
 // the wind and the wheels-down check anyway.
 
 
+// The Command* methods speak as c.towerCallsign, so Command builds its
+// composer with the channel name (--command-name) to keep the station ID
+// matching the rest of its replies.
+
 // CommandFenceIn — 3 aggressive variations per fuel state scenario.
 func (c *ATCComposer) CommandFenceIn(callsign string, fuelState float64) string {
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, Command, state %s, fence in, go kick some ass.", callsign, s),
-			fmt.Sprintf("%s, Command, copy, state %s, fence in, make it hurt.", callsign, s),
-			fmt.Sprintf("%s, Command, state %s, fence in, go get some.", callsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence in, go kick some ass.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, copy, state %s, fence in, make it hurt.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence in, go get some.", callsign, c.towerCallsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Command, fence in, go kick some ass.", callsign),
-		fmt.Sprintf("%s, Command, copy, fence in, make it hurt.", callsign),
-		fmt.Sprintf("%s, Command, fence in, go get some.", callsign),
+		fmt.Sprintf("%s, %s, fence in, go kick some ass.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy, fence in, make it hurt.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, fence in, go get some.", callsign, c.towerCallsign),
 	})
 }
 
@@ -700,41 +704,41 @@ func (c *ATCComposer) CommandFenceOut(callsign string, fuelState float64) string
 		s := fmt.Sprintf("%.1f", fuelState)
 		if fuelState < 2.0 {
 			return pick([]string{
-				fmt.Sprintf("%s, Command, state %s, fence out, bingo, get your ass back now.", callsign, s),
-				fmt.Sprintf("%s, Command, copy, state %s, you are bingo, expedite recovery.", callsign, s),
-				fmt.Sprintf("%s, Command, state %s, fence out, low state, move it.", callsign, s),
+				fmt.Sprintf("%s, %s, state %s, fence out, bingo, get your ass back now.", callsign, c.towerCallsign, s),
+				fmt.Sprintf("%s, %s, copy, state %s, you are bingo, expedite recovery.", callsign, c.towerCallsign, s),
+				fmt.Sprintf("%s, %s, state %s, fence out, low state, move it.", callsign, c.towerCallsign, s),
 			})
 		}
 		return pick([]string{
-			fmt.Sprintf("%s, Command, state %s, fence out, good work, proceed recovery.", callsign, s),
-			fmt.Sprintf("%s, Command, copy, state %s, fence out, well done, RTB.", callsign, s),
-			fmt.Sprintf("%s, Command, state %s, fence out, nice work, come on home.", callsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence out, good work, proceed recovery.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, copy, state %s, fence out, well done, RTB.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence out, nice work, come on home.", callsign, c.towerCallsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Command, fence out, good work, proceed recovery.", callsign),
-		fmt.Sprintf("%s, Command, copy, fence out, well done, RTB.", callsign),
-		fmt.Sprintf("%s, Command, fence out, nice work, come on home.", callsign),
+		fmt.Sprintf("%s, %s, fence out, good work, proceed recovery.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy, fence out, well done, RTB.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, fence out, nice work, come on home.", callsign, c.towerCallsign),
 	})
 }
 
 // CommandFuelState — 3 variations per fuel state scenario.
 func (c *ATCComposer) CommandFuelState(callsign string, fuelState float64) string {
 	if fuelState <= 0 {
-		return fmt.Sprintf("%s, Command, say state again.", callsign)
+		return fmt.Sprintf("%s, %s, say state again.", callsign, c.towerCallsign)
 	}
 	s := fmt.Sprintf("%.1f", fuelState)
 	if fuelState < 2.0 {
 		return pick([]string{
-			fmt.Sprintf("%s, Command, state %s, you are bingo, get your ass back now.", callsign, s),
-			fmt.Sprintf("%s, Command, copy state %s, bingo, expedite recovery.", callsign, s),
-			fmt.Sprintf("%s, Command, state %s, low state, move it.", callsign, s),
+			fmt.Sprintf("%s, %s, state %s, you are bingo, get your ass back now.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, copy state %s, bingo, expedite recovery.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, state %s, low state, move it.", callsign, c.towerCallsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Command, copy state %s.", callsign, s),
-		fmt.Sprintf("%s, Command, state %s, copy.", callsign, s),
-		fmt.Sprintf("%s, Command, roger, state %s.", callsign, s),
+		fmt.Sprintf("%s, %s, copy state %s.", callsign, c.towerCallsign, s),
+		fmt.Sprintf("%s, %s, state %s, copy.", callsign, c.towerCallsign, s),
+		fmt.Sprintf("%s, %s, roger, state %s.", callsign, c.towerCallsign, s),
 	})
 }
 
