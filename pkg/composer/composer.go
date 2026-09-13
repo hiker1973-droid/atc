@@ -46,6 +46,74 @@ func (c *ATCComposer) RadioCheck(callsign string) string {
 	})
 }
 
+// SayAgainNothingOnFile answers a pilot's "say again" when the tower has no
+// recent transmission to that callsign to repeat — 3 variations.
+func (c *ATCComposer) SayAgainNothingOnFile(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, no recent transmission for you, go ahead.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, negative transmission for you, say request.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, nothing on file for you, go ahead.", callsign, c.towerCallsign),
+	})
+}
+
+// WindCheck answers "wind check" / "say altimeter" — 3 variations.
+func (c *ATCComposer) WindCheck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	alt := formatAltimeter(altimeterInHg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, wind %s, altimeter %s.", callsign, c.towerCallsign, wind, alt),
+		fmt.Sprintf("%s, %s, wind %s, altimeter %s, runway %s in use.", callsign, c.towerCallsign, wind, alt, rwy),
+		fmt.Sprintf("%s, %s, runway %s, wind %s, altimeter %s.", callsign, c.towerCallsign, rwy, wind, alt),
+	})
+}
+
+// Landing options a pilot can ask for instead of a full stop. OptionNone is a
+// normal landing and gets ClearedToLand.
+const (
+	OptionNone        = ""
+	OptionTouchAndGo  = "touch and go"
+	OptionLowApproach = "low approach"
+	OptionTheOption   = "option"
+)
+
+// OptionClearance clears a touch and go, low approach or the option in place
+// of "cleared to land" — 3 variations. wheelsCheck behaves as in ClearedToLand.
+func (c *ATCComposer) OptionClearance(callsign, activeRunway string, windFromMag, windKts float64, option string, wheelsCheck bool) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	gear := ""
+	if wheelsCheck {
+		gear = " check wheels down,"
+	}
+	clearance := "cleared for the option"
+	switch option {
+	case OptionTouchAndGo:
+		clearance = "cleared touch and go"
+	case OptionLowApproach:
+		clearance = "cleared low approach"
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, runway %s, wind %s,%s %s.", callsign, c.towerCallsign, rwy, wind, gear, clearance),
+		fmt.Sprintf("%s, %s, wind %s, runway %s,%s %s.", callsign, c.towerCallsign, wind, rwy, gear, clearance),
+		fmt.Sprintf("%s, runway %s, wind %s,%s %s.", callsign, rwy, wind, gear, clearance),
+	})
+}
+
+// HungOrdnanceAck handles a hung-ordnance recovery: straight in (no overhead
+// break over the field with a live store), then a dearm stop at the end of
+// the runway — 3 variations.
+func (c *ATCComposer) HungOrdnanceAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	alt := formatAltimeter(altimeterInHg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, copy hung ordnance, fly straight in runway %s, avoid overflight of the field, wind %s, altimeter %s, hold at the end of the runway for dearm.", callsign, c.towerCallsign, rwy, wind, alt),
+		fmt.Sprintf("%s, %s, roger hung ordnance, straight in runway %s, no overhead, wind %s, altimeter %s, report five mile final, expect dearm after landing.", callsign, c.towerCallsign, rwy, wind, alt),
+		fmt.Sprintf("%s, %s, copy hung ordnance, straight in approach runway %s, wind %s, altimeter %s, stop at the end of the runway, dearm crew is standing by.", callsign, c.towerCallsign, rwy, wind, alt),
+	})
+}
+
 // TaxiClearance issues taxi instructions — 3 variations.
 func (c *ATCComposer) TaxiClearance(callsign, activeRunway string, altimeterInHg float64) string {
 	alt := formatAltimeter(altimeterInHg)
@@ -677,20 +745,24 @@ func (c *ATCComposer) AltitudeClearance(callsign, activeRunway string, altimeter
 // the wind and the wheels-down check anyway.
 
 
+// The Command* methods speak as c.towerCallsign, so Command builds its
+// composer with the channel name (--command-name) to keep the station ID
+// matching the rest of its replies.
+
 // CommandFenceIn — 3 aggressive variations per fuel state scenario.
 func (c *ATCComposer) CommandFenceIn(callsign string, fuelState float64) string {
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, Command, state %s, fence in, go kick some ass.", callsign, s),
-			fmt.Sprintf("%s, Command, copy, state %s, fence in, make it hurt.", callsign, s),
-			fmt.Sprintf("%s, Command, state %s, fence in, go get some.", callsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence in, go kick some ass.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, copy, state %s, fence in, make it hurt.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence in, go get some.", callsign, c.towerCallsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Command, fence in, go kick some ass.", callsign),
-		fmt.Sprintf("%s, Command, copy, fence in, make it hurt.", callsign),
-		fmt.Sprintf("%s, Command, fence in, go get some.", callsign),
+		fmt.Sprintf("%s, %s, fence in, go kick some ass.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy, fence in, make it hurt.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, fence in, go get some.", callsign, c.towerCallsign),
 	})
 }
 
@@ -700,41 +772,41 @@ func (c *ATCComposer) CommandFenceOut(callsign string, fuelState float64) string
 		s := fmt.Sprintf("%.1f", fuelState)
 		if fuelState < 2.0 {
 			return pick([]string{
-				fmt.Sprintf("%s, Command, state %s, fence out, bingo, get your ass back now.", callsign, s),
-				fmt.Sprintf("%s, Command, copy, state %s, you are bingo, expedite recovery.", callsign, s),
-				fmt.Sprintf("%s, Command, state %s, fence out, low state, move it.", callsign, s),
+				fmt.Sprintf("%s, %s, state %s, fence out, bingo, get your ass back now.", callsign, c.towerCallsign, s),
+				fmt.Sprintf("%s, %s, copy, state %s, you are bingo, expedite recovery.", callsign, c.towerCallsign, s),
+				fmt.Sprintf("%s, %s, state %s, fence out, low state, move it.", callsign, c.towerCallsign, s),
 			})
 		}
 		return pick([]string{
-			fmt.Sprintf("%s, Command, state %s, fence out, good work, proceed recovery.", callsign, s),
-			fmt.Sprintf("%s, Command, copy, state %s, fence out, well done, RTB.", callsign, s),
-			fmt.Sprintf("%s, Command, state %s, fence out, nice work, come on home.", callsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence out, good work, proceed recovery.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, copy, state %s, fence out, well done, RTB.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, state %s, fence out, nice work, come on home.", callsign, c.towerCallsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Command, fence out, good work, proceed recovery.", callsign),
-		fmt.Sprintf("%s, Command, copy, fence out, well done, RTB.", callsign),
-		fmt.Sprintf("%s, Command, fence out, nice work, come on home.", callsign),
+		fmt.Sprintf("%s, %s, fence out, good work, proceed recovery.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy, fence out, well done, RTB.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, fence out, nice work, come on home.", callsign, c.towerCallsign),
 	})
 }
 
 // CommandFuelState — 3 variations per fuel state scenario.
 func (c *ATCComposer) CommandFuelState(callsign string, fuelState float64) string {
 	if fuelState <= 0 {
-		return fmt.Sprintf("%s, Command, say state again.", callsign)
+		return fmt.Sprintf("%s, %s, say state again.", callsign, c.towerCallsign)
 	}
 	s := fmt.Sprintf("%.1f", fuelState)
 	if fuelState < 2.0 {
 		return pick([]string{
-			fmt.Sprintf("%s, Command, state %s, you are bingo, get your ass back now.", callsign, s),
-			fmt.Sprintf("%s, Command, copy state %s, bingo, expedite recovery.", callsign, s),
-			fmt.Sprintf("%s, Command, state %s, low state, move it.", callsign, s),
+			fmt.Sprintf("%s, %s, state %s, you are bingo, get your ass back now.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, copy state %s, bingo, expedite recovery.", callsign, c.towerCallsign, s),
+			fmt.Sprintf("%s, %s, state %s, low state, move it.", callsign, c.towerCallsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, Command, copy state %s.", callsign, s),
-		fmt.Sprintf("%s, Command, state %s, copy.", callsign, s),
-		fmt.Sprintf("%s, Command, roger, state %s.", callsign, s),
+		fmt.Sprintf("%s, %s, copy state %s.", callsign, c.towerCallsign, s),
+		fmt.Sprintf("%s, %s, state %s, copy.", callsign, c.towerCallsign, s),
+		fmt.Sprintf("%s, %s, roger, state %s.", callsign, c.towerCallsign, s),
 	})
 }
 

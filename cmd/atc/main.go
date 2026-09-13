@@ -1056,10 +1056,13 @@ func transcribeFrames(ctx context.Context, apiKey string, frames [][]byte) (stri
 }
 
 // extractFuelStateMarshal parses fuel state from text e.g. "state 5.6".
+// Whisper often writes the spoken decimal as "5 point 6", which Sscanf would
+// read as a bare 5, so "point" is folded back into a decimal point first.
 func extractFuelStateMarshal(lower string) float64 {
 	idx := strings.Index(lower, "state")
 	if idx < 0 { return 0 }
 	after := strings.TrimSpace(lower[idx+5:])
+	after = strings.Replace(after, " point ", ".", 1)
 	var val float64
 	if n, _ := fmt.Sscanf(after, "%f", &val); n == 1 && val > 0 && val < 30 { return val }
 	return 0
@@ -1507,6 +1510,9 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 	log.Info().Str("text", text).Msg("recognized")
 	req := controller.ParseIntent(text, callsign)
 	if req == nil {
+		// Logged so a call to another field on this frequency, or a field name
+		// Whisper mangled past matching, shows up instead of silence.
+		log.Info().Str("text", text).Str("tower", callsign).Msg("not addressed to this tower — ignored")
 		return
 	}
 	log.Info().Str("callsign", req.Callsign).Int("type", int(req.Type)).Msg("ATC request")

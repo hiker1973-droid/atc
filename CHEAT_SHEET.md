@@ -25,6 +25,7 @@ One-page command reference. Every call leads with the role name (`Tower, …` / 
 | `request taxi` | taxi to active runway, hold short |
 | `holding short runway [XX]` | LUAW ack → cleared for takeoff 5 s later (auto) |
 | `request takeoff` / `ready for departure` | manual takeoff clearance (fallback) |
+| `rolling runway [XX]` (CTAF) | departure release, next departure spaced behind you |
 | `airborne` / `clear of traffic` | departure release, climb to angels N |
 | `pushing button 4` / `pushing command` | courtesy ack, switch to Command |
 
@@ -37,11 +38,15 @@ One-page command reference. Every call leads with the role name (`Tower, …` / 
 | `request landing` | landing clearance with wind |
 | `runway vacated` / `clear of active` | welcome back, taxi to parking |
 | `going around` / `missed approach` | sequenced back into pattern |
+| `touch and go` / `low approach` / `request the option` | cleared touch and go / low approach / for the option |
+| `hung ordnance` / `hung store` | straight in, no overhead, dearm at end of runway |
 
 **Any time**
 | You say | What happens |
 |---|---|
 | `radio check` / `comm check` | loud and clear |
+| `say again` | repeats the last thing tower said to you (last 2 min) |
+| `wind check` / `say altimeter` | current wind + altimeter |
 | `mayday` / `declaring emergency` | priority handling |
 | `traffic in sight` / `tally` | acknowledged |
 | `negative contact` / `no joy` | repeat traffic call |
@@ -103,6 +108,7 @@ Don't call `initial` in Case 3 — call `platform` instead.
 | `on station` | good hunting |
 | `off station` | proceed to assigned pattern |
 | `fence out` | safe passage |
+| `state [N.N]` (alone or with fence in/out) | copy state; below 2.0 = bingo, expedite recovery |
 | `radio check` | loud and clear |
 
 ---
