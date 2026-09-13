@@ -38,11 +38,15 @@ One-page command reference. Every call leads with the role name (`Tower, …` / 
 | `request landing` | landing clearance with wind |
 | `runway vacated` / `clear of active` | welcome back, taxi to parking |
 | `going around` / `missed approach` | sequenced back into pattern |
+| `touch and go` / `low approach` / `request the option` | cleared touch and go / low approach / for the option |
+| `hung ordnance` / `hung store` | straight in, no overhead, dearm at end of runway |
 
 **Any time**
 | You say | What happens |
 |---|---|
 | `radio check` / `comm check` | loud and clear |
+| `say again` | repeats the last thing tower said to you (last 2 min) |
+| `wind check` / `say altimeter` | current wind + altimeter |
 | `mayday` / `declaring emergency` | priority handling |
 | `traffic in sight` / `tally` | acknowledged |
 | `negative contact` / `no joy` | repeat traffic call |

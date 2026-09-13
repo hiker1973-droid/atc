@@ -46,6 +46,74 @@ func (c *ATCComposer) RadioCheck(callsign string) string {
 	})
 }
 
+// SayAgainNothingOnFile answers a pilot's "say again" when the tower has no
+// recent transmission to that callsign to repeat — 3 variations.
+func (c *ATCComposer) SayAgainNothingOnFile(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, no recent transmission for you, go ahead.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, negative transmission for you, say request.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, nothing on file for you, go ahead.", callsign, c.towerCallsign),
+	})
+}
+
+// WindCheck answers "wind check" / "say altimeter" — 3 variations.
+func (c *ATCComposer) WindCheck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	alt := formatAltimeter(altimeterInHg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, wind %s, altimeter %s.", callsign, c.towerCallsign, wind, alt),
+		fmt.Sprintf("%s, %s, wind %s, altimeter %s, runway %s in use.", callsign, c.towerCallsign, wind, alt, rwy),
+		fmt.Sprintf("%s, %s, runway %s, wind %s, altimeter %s.", callsign, c.towerCallsign, rwy, wind, alt),
+	})
+}
+
+// Landing options a pilot can ask for instead of a full stop. OptionNone is a
+// normal landing and gets ClearedToLand.
+const (
+	OptionNone        = ""
+	OptionTouchAndGo  = "touch and go"
+	OptionLowApproach = "low approach"
+	OptionTheOption   = "option"
+)
+
+// OptionClearance clears a touch and go, low approach or the option in place
+// of "cleared to land" — 3 variations. wheelsCheck behaves as in ClearedToLand.
+func (c *ATCComposer) OptionClearance(callsign, activeRunway string, windFromMag, windKts float64, option string, wheelsCheck bool) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	gear := ""
+	if wheelsCheck {
+		gear = " check wheels down,"
+	}
+	clearance := "cleared for the option"
+	switch option {
+	case OptionTouchAndGo:
+		clearance = "cleared touch and go"
+	case OptionLowApproach:
+		clearance = "cleared low approach"
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, runway %s, wind %s,%s %s.", callsign, c.towerCallsign, rwy, wind, gear, clearance),
+		fmt.Sprintf("%s, %s, wind %s, runway %s,%s %s.", callsign, c.towerCallsign, wind, rwy, gear, clearance),
+		fmt.Sprintf("%s, runway %s, wind %s,%s %s.", callsign, rwy, wind, gear, clearance),
+	})
+}
+
+// HungOrdnanceAck handles a hung-ordnance recovery: straight in (no overhead
+// break over the field with a live store), then a dearm stop at the end of
+// the runway — 3 variations.
+func (c *ATCComposer) HungOrdnanceAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64) string {
+	rwy := spellRunway(activeRunway)
+	wind := formatWind(windFromMag, windKts)
+	alt := formatAltimeter(altimeterInHg)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, copy hung ordnance, fly straight in runway %s, avoid overflight of the field, wind %s, altimeter %s, hold at the end of the runway for dearm.", callsign, c.towerCallsign, rwy, wind, alt),
+		fmt.Sprintf("%s, %s, roger hung ordnance, straight in runway %s, no overhead, wind %s, altimeter %s, report five mile final, expect dearm after landing.", callsign, c.towerCallsign, rwy, wind, alt),
+		fmt.Sprintf("%s, %s, copy hung ordnance, straight in approach runway %s, wind %s, altimeter %s, stop at the end of the runway, dearm crew is standing by.", callsign, c.towerCallsign, rwy, wind, alt),
+	})
+}
+
 // TaxiClearance issues taxi instructions — 3 variations.
 func (c *ATCComposer) TaxiClearance(callsign, activeRunway string, altimeterInHg float64) string {
 	alt := formatAltimeter(altimeterInHg)

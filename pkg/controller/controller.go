@@ -97,6 +97,9 @@ const (
 	RequestStartup                  // "request startup" / "ready for startup" — engine-start approval (Ground)
 	RequestPushingCommand           // "pushing command" — pilot-initiated freq change to Command, courtesy ack
 	RequestRolling                  // "rolling runway XX" — CTAF self-announced takeoff roll
+	RequestSayAgain                 // "say again" — repeat the tower's last transmission to this callsign
+	RequestWindCheck                // "wind check" / "say altimeter" — current wind and altimeter
+	RequestHungOrdnance             // "hung ordnance" / "hung store" — straight in, dearm after landing
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -106,6 +109,9 @@ type ATCRequest struct {
 	Type      RequestType
 	FuelState float64
 	Raw       string
+	// Option is a touch and go / low approach / the option asked for in this
+	// call (composer.Option* values); OptionNone means a full-stop landing.
+	Option string
 	// DistanceNm is the pilot-stated distance ("X miles inbound") or 0 if
 	// none was given. Used by the inbound flow to choose between a far-out
 	// "continue inbound" reply and a pattern-entry field-info reply.
@@ -175,6 +181,11 @@ type ATCController struct {
 	// goAroundLastTx debounces go-around transmissions per callsign.
 	goAroundMu     sync.Mutex
 	goAroundLastTx map[string]time.Time
+
+	// lastTx is the last transmission addressed to each callsign, for
+	// "say again". See transmitTo in sayagain.go.
+	lastTxMu sync.Mutex
+	lastTx   map[string]lastTransmission
 
 	// lastCarrierChoice remembers the last carrier callsign findCarrierContact
 	// returned so we only log at info on transitions (each pilot call invokes
@@ -431,7 +442,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 
 	case RequestLandingClear:
-		response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, c.oweWheelsCheck(ac, req.Raw))
+		response = c.landingClearance(req, ac)
 
 
 	case RequestStartup:
@@ -498,7 +509,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		if ac := s.Get(req.Callsign); ac != nil && ac.SequenceNumber > 1 {
 			response = c.composer.BaseAck(req.Callsign, s.ActiveRunway, ac.SequenceNumber, c.oweWheelsCheck(ac, req.Raw))
 		} else {
-			response = c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, c.oweWheelsCheck(s.Get(req.Callsign), req.Raw))
+			response = c.landingClearance(req, s.Get(req.Callsign))
 		}
 
 	case RequestTrafficInSight:
@@ -631,14 +642,44 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	case RequestReadback:
 		return // Silent acknowledge
 
+	case RequestSayAgain:
+		// Repeat verbatim and without re-recording, so a second "say again"
+		// still gets the original rather than an ever-older copy of itself.
+		if last, ok := c.lastTransmissionTo(req.Callsign); ok {
+			c.transmit(ctx, last)
+			return
+		}
+		response = c.composer.SayAgainNothingOnFile(req.Callsign)
+
+	case RequestWindCheck:
+		response = c.composer.WindCheck(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg)
+
+	case RequestHungOrdnance:
+		// Sequenced like any arrival, but always straight in: no overhead
+		// break across the field with a live store aboard.
+		s.EnqueueLanding(ac)
+		response = c.composer.HungOrdnanceAck(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg)
+
 	default:
 		c.recordIntentMiss(req.Callsign, req.Raw)
 		response = c.composer.UnableToUnderstand(req.Callsign)
 	}
 
 	if response != "" {
-		c.transmit(ctx, response)
+		c.transmitTo(ctx, req.Callsign, response)
 	}
+}
+
+// landingClearance is the final landing clearance for ac: "cleared to land",
+// or the touch and go / low approach / option the pilot asked for in req.
+// Calls oweWheelsCheck exactly once — it marks the check as issued.
+func (c *ATCController) landingClearance(req *ATCRequest, ac *state.AircraftState) string {
+	s := c.airfieldState
+	wheels := c.oweWheelsCheck(ac, req.Raw)
+	if req.Option != composer.OptionNone {
+		return c.composer.OptionClearance(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, req.Option, wheels)
+	}
+	return c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, wheels)
 }
 
 // handleTakeoffRequest applies conflict detection before issuing a takeoff clearance.
@@ -848,7 +889,7 @@ func (c *ATCController) scheduleAutoRelease(ctx context.Context, callsign string
 		Str("callsign", callsign).
 		Str("runway", s.ActiveRunway).
 		Msg("auto-release after LUAW")
-	c.transmit(ctx, response)
+	c.transmitTo(ctx, callsign, response)
 }
 
 // monitorLoop runs on MonitorInterval and issues proactive calls:
@@ -934,7 +975,7 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 		real.SpeedWarned = true
 		real.SpeedWarnedAt = time.Now()
 		log.Warn().Str("callsign", cs).Msg("speed limit exceeded — issuing warning")
-		c.transmit(ctx, c.composer.SpeedWarning(cs))
+		c.transmitTo(ctx, cs, c.composer.SpeedWarning(cs))
 	}
 
 	// ── Go-around check ───────────────────────────────────────────────────────
@@ -976,7 +1017,7 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 				s.ActiveRunway,
 				departure.Callsign,
 			)
-			c.transmit(ctx, response)
+			c.transmitTo(ctx, ac.Callsign, response)
 		}
 	}
 
@@ -1014,7 +1055,7 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 						Str("callsign", next.Callsign).
 						Str("runway", s.ActiveRunway).
 						Msg("proactive departure clearance — inbound traffic clear")
-					c.transmit(ctx, response)
+					c.transmitTo(ctx, next.Callsign, response)
 				}
 			}
 		}
@@ -1179,12 +1220,23 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	// "request for taxi" / "requesting for takeoff" — the extra "for" broke
 	// every "request X" trigger below (live miss, Senaki 2026-09).
 	lower = strings.NewReplacer("requesting for ", "requesting ", "request for ", "request ").Replace(lower)
+	req.Option = parseOption(lower)
 	switch {
 	case containsAny(lower, "mayday", "pan pan", "pan-pan", "emergency"):
 		// Checked first: a mayday nearly always carries a position ("10 miles
 		// south", "turning base", "just airborne"), and any later case would
 		// otherwise answer it as a routine pattern call.
 		req.Type = RequestEmergency
+	case containsAny(lower, "hung ordnance", "hung ordinance", "hung store", "hung bomb", "hung weapon", "hung munition", "hung missile"):
+		// Ahead of the position cases for the same reason as emergency.
+		// "ordinance" is how Whisper usually spells it.
+		req.Type = RequestHungOrdnance
+	case containsWord(lower, "say again", "say your last", "repeat your last", "say last", "repeat last") &&
+		!containsWord(lower, "i say again"):
+		// "I say again" is the pilot repeating their own call, not asking for ours.
+		req.Type = RequestSayAgain
+	case containsAny(lower, "wind check", "winds check", "say wind", "request wind", "say altimeter", "altimeter check", "request altimeter"):
+		req.Type = RequestWindCheck
 	case containsAny(lower, "clear traffic", "clear of traffic", "airborne", "departing"):
 		// Departure release — pilot is clear of the pattern (works on tower or CTAF)
 		req.Type = RequestClearTraffic
@@ -1277,7 +1329,10 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		"request clearance", "requesting clearance", "requests clearance", "requested clearance",
 		"clearance to the active", "clearance to active", "clearance to taxi", "clearance for taxi"):
 		req.Type = RequestTaxiClear
-	case containsAny(lower, "on final", "final", "request landing", "cleared to land"):
+	case containsAny(lower, "on final", "final", "request landing", "cleared to land", "full stop") ||
+		req.Option != composer.OptionNone:
+		// A bare "request touch and go" / "low approach" / "the option" is a
+		// landing request; landingClearance picks the wording from req.Option.
 		req.Type = RequestLandingClear
 	case containsAny(lower, "going around", "go around", "missed approach"):
 		req.Type = RequestGoAround
@@ -1408,6 +1463,8 @@ func trimTrailingTriggers(cs string) string {
 		// pattern / state calls
 		"holding short", "hold short", "ready for", "ready to",
 		"airborne", "departing", "inbound", "rolling", "on the roll", "request for",
+		"say again", "wind check", "say altimeter", "low approach", "the option",
+		"hung ordnance", "hung ordinance", "hung store",
 		"on final", " final", "turning final", "short final", "on short",
 		"straight in", "straight-in", "full stop", "touch and go",
 		"3 mile", "three mile", "3-mile", "three-mile",

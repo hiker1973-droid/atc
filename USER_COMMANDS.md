@@ -59,6 +59,8 @@ The system is fuzzy-matched on the field name (`minhad`, `dhafra`, `al ain`) so 
 | Base | `"...turning base"`, `"left base"`, `"right base"`, `"base final"` | |
 | Straight-in | `"...straight in"`, `"ILS"`, `"RNAV approach"` | |
 | Final / landing | `"...on final"`, `"request landing"`, `"final, gear down"` | |
+| Touch and go / low approach / option | `"...on final, touch and go"`, `"request low approach"`, `"request the option"` | Replaces "cleared to land" with "cleared touch and go" etc. `"full stop"` = normal landing |
+| Hung ordnance | `"...hung ordnance"`, `"hung store"` | Straight in, no overhead, hold at the end of the runway for dearm |
 | Going around | `"...going around"`, `"go around"`, `"missed approach"` | |
 | Runway vacated | `"...runway vacated"`, `"clear of the active"`, `"off the runway"`, `"exiting runway"` | Releases your slot |
 
