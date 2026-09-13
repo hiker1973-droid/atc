@@ -76,6 +76,15 @@ The system is fuzzy-matched on the field name (`minhad`, `dhafra`, `al ain`) so 
 | Readback | `"...wilco"`, `"roger"`, `"copy"`, `"affirm"` |
 | Emergency | `"mayday mayday mayday"`, `"declaring emergency"`, `"pan pan"` |
 
+### Tower may call you first (optional — off unless the rig enables it)
+
+| When | Tower says | Flag |
+|---|---|---|
+| You close inside 8 nm, below 5,000 ft above the field, without having talked to the tower in the last 10 min | `"...six miles northeast of the field, say intentions."` — once per 10 min, human pilots only | `--unknown-traffic-calls` |
+| You were cleared to land and have sat on the field at taxi speed for 90 s without calling vacated | `"...report clear of the runway."` — once per landing | `--runway-vacate-chase` |
+
+Both calls work with `say again`.
+
 ### Sample exchange
 
 > Pilot: *"Minhad Tower, Raider 1-1, 10 mile initial, request the overhead."*
@@ -96,6 +105,8 @@ Mission-wide ops channel. Six intents, each with three randomised responses.
 | Fence in | `"...fence in"`, `"fence check"` | Cleared hot, master arm on |
 | Fence out | `"...fence out"` | Squawk standard, switch to departure |
 | Fuel state | `"...state 5.2"`, `"state 1 point 8"` | Copies state; below 2.0 you're told you're bingo. Also works tacked onto fence in / fence out |
+| Bullseye | `"...say bullseye"`, `"request bullseye"` | Your position from your coalition's bullseye, magnetic bearing and range. Needs the Tacview feed |
+| Tanker | `"...request tanker"`, `"where's the tanker"`, `"say texaco"` | Magnetic bearing, range and angels to the nearest tanker on your side. Needs the Tacview feed |
 
 If your transmission doesn't hit one of these, Command stays silent (logged as "Command intent miss"). The fence-out match is checked **before** fence-in, so "fence out" never gets misclassified.
 

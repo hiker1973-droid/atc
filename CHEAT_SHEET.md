@@ -51,6 +51,12 @@ One-page command reference. Every call leads with the role name (`Tower, …` / 
 | `traffic in sight` / `tally` | acknowledged |
 | `negative contact` / `no joy` | repeat traffic call |
 
+**Tower may call you** (only if the rig runs the flag)
+| Tower says | Why |
+|---|---|
+| `...say intentions` | you entered the zone (8 nm, < 5,000 ft) without calling — `--unknown-traffic-calls` |
+| `...report clear of the runway` | landed, slowed, no vacated call after 90 s — `--runway-vacate-chase` |
+
 ---
 
 ## Marshal (306.30) — Carrier inbound stack
@@ -109,6 +115,8 @@ Don't call `initial` in Case 3 — call `platform` instead.
 | `off station` | proceed to assigned pattern |
 | `fence out` | safe passage |
 | `state [N.N]` (alone or with fence in/out) | copy state; below 2.0 = bingo, expedite recovery |
+| `say bullseye` | your bullseye bearing/range |
+| `request tanker` / `where's the tanker` | bearing, range, angels to nearest tanker |
 | `radio check` | loud and clear |
 
 ---

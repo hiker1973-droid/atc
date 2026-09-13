@@ -114,6 +114,35 @@ func (c *ATCComposer) HungOrdnanceAck(callsign, activeRunway string, windFromMag
 	})
 }
 
+// CardinalWord returns "north", "northeast", ... for a 0–360 bearing. One word
+// with no hyphen, so TTS doesn't read a pause into it.
+func CardinalWord(deg float64) string {
+	n := int(math.Mod(deg+22.5+360, 360)/45) % 8
+	return []string{"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"}[n]
+}
+
+// UnknownTrafficSayIntentions calls an aircraft that has come into the zone
+// without talking to the tower. fromFieldDeg is the true bearing from the
+// field to the aircraft, so "six miles northeast" is where they are — 3 variations.
+func (c *ATCComposer) UnknownTrafficSayIntentions(callsign string, distNm int, fromFieldDeg float64) string {
+	where := fmt.Sprintf("%s %s", milesToWord(distNm), CardinalWord(fromFieldDeg))
+	return pick([]string{
+		fmt.Sprintf("%s, %s, %s of the field, say intentions.", callsign, c.towerCallsign, where),
+		fmt.Sprintf("%s, %s, radar contact %s, say intentions.", callsign, c.towerCallsign, where),
+		fmt.Sprintf("%s, %s, you are %s and entering my airspace, say intentions.", callsign, c.towerCallsign, where),
+	})
+}
+
+// ReportClearOfRunway chases a landed aircraft that has slowed to taxi speed
+// without calling runway vacated — 3 variations.
+func (c *ATCComposer) ReportClearOfRunway(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, report clear of the runway.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, say position, report runway vacated.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, verify clear of the runway.", callsign, c.towerCallsign),
+	})
+}
+
 // TaxiClearance issues taxi instructions — 3 variations.
 func (c *ATCComposer) TaxiClearance(callsign, activeRunway string, altimeterInHg float64) string {
 	alt := formatAltimeter(altimeterInHg)

@@ -57,13 +57,27 @@ func (t *pilotTracker) Note(callsign string) {
 	}
 }
 
+// tacviewContactInfo is what Command keeps per callsign beyond position:
+// enough to pick out a tanker and to match a pilot to their side's bullseye.
+type tacviewContactInfo struct {
+	AltFt     float64
+	Name      string // ACMI Name= — the aircraft model, e.g. "KC135MPRS"
+	Coalition string // ACMI Coalition=, e.g. "Allies"
+}
+
 type tacviewPositions struct {
-	mu  sync.RWMutex
-	pos map[string]orb.Point
+	mu       sync.RWMutex
+	pos      map[string]orb.Point
+	info     map[string]tacviewContactInfo
+	bullseye map[string]orb.Point // coalition → bullseye (Navaid+Static+Bullseye objects)
 }
 
 func newTacviewPositions() *tacviewPositions {
-	return &tacviewPositions{pos: make(map[string]orb.Point)}
+	return &tacviewPositions{
+		pos:      make(map[string]orb.Point),
+		info:     make(map[string]tacviewContactInfo),
+		bullseye: make(map[string]orb.Point),
+	}
 }
 
 func (t *tacviewPositions) Get(cs string) (orb.Point, bool) {
@@ -89,10 +103,96 @@ func (t *tacviewPositions) Set(cs string, p orb.Point) {
 	t.pos[cs] = p
 }
 
+// SetInfo records altitude, model and coalition for a callsign.
+func (t *tacviewPositions) SetInfo(cs string, info tacviewContactInfo) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.info[cs] = info
+}
+
+// Info returns what is known about a callsign, matched like Get.
+func (t *tacviewPositions) Info(cs string) tacviewContactInfo {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if info, ok := t.info[cs]; ok {
+		return info
+	}
+	for k, v := range t.info {
+		if strings.EqualFold(k, cs) {
+			return v
+		}
+	}
+	return tacviewContactInfo{}
+}
+
 func (t *tacviewPositions) Remove(cs string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.pos, cs)
+	delete(t.info, cs)
+}
+
+// SetBullseye records a coalition's bullseye.
+func (t *tacviewPositions) SetBullseye(coalition string, p orb.Point) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.bullseye[coalition] = p
+}
+
+// Bullseye returns the bullseye for coalition. With no coalition known it
+// answers only when the picture holds exactly one bullseye — never a guess
+// between two sides.
+func (t *tacviewPositions) Bullseye(coalition string) (orb.Point, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if coalition != "" {
+		p, ok := t.bullseye[coalition]
+		return p, ok
+	}
+	if len(t.bullseye) == 1 {
+		for _, p := range t.bullseye {
+			return p, true
+		}
+	}
+	return orb.Point{}, false
+}
+
+type tankerContact struct {
+	callsign string
+	pos      orb.Point
+	info     tacviewContactInfo
+}
+
+// isTanker spots a tanker by DCS model name or by the standard tanker
+// callsigns (AI tankers are usually named Texaco / Arco / Shell).
+func isTanker(callsign, model string) bool {
+	m := strings.ToLower(model)
+	cs := strings.ToLower(callsign)
+	return containsAny(m, "kc-135", "kc135", "kc-130", "kc130", "kc-10", "kc10", "kc-46", "kc46", "s-3b tanker", "il-78") ||
+		containsAny(cs, "texaco", "arco", "shell")
+}
+
+// NearestTanker returns the closest tanker to from. A tanker of another
+// coalition is skipped when both coalitions are known.
+func (t *tacviewPositions) NearestTanker(from orb.Point, coalition string) (tankerContact, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	var best tankerContact
+	bestNm := math.MaxFloat64
+	found := false
+	for cs, p := range t.pos {
+		info := t.info[cs]
+		if !isTanker(cs, info.Name) {
+			continue
+		}
+		if coalition != "" && info.Coalition != "" && info.Coalition != coalition {
+			continue
+		}
+		if d := haversineNm(from, p); d < bestNm {
+			best, bestNm, found = tankerContact{cs, p, info}, d, true
+		}
+	}
+	return best, found
 }
 
 // Carrier returns the carrier's position if one is on scope. Mirrors the
@@ -123,12 +223,141 @@ func (t *tacviewPositions) Carrier() (orb.Point, bool) {
 	return fallback, haveFallback
 }
 
-// runMiniTacview is a stripped-down Tacview consumer for Command. It only
-// maintains a callsign → lat/lon map — no phase detection, conflict logic,
-// or controller wiring. Mirrors the connection/handshake of the main
-// tacviewLoop in main.go but drops everything we don't need.
+// miniObject is one ACMI object's last known state. ACMI real-time telemetry
+// only sends a property when it changes — Pilot/Name/Type/Coalition arrive
+// once, and later T= frames leave unchanged subfields empty — so the state has
+// to persist per object id between lines.
+type miniObject struct {
+	lon, lat, altFt      float64
+	hasLon, hasLat       bool
+	pilot, name, typ, co string
+}
+
+// miniTacviewParser turns ACMI lines into store updates. Split out of
+// runMiniTacview so the parsing can be tested without a socket.
+type miniTacviewParser struct {
+	store          *tacviewPositions
+	keys           map[string]string // object id → store key
+	objs           map[string]*miniObject
+	refLat, refLon float64
+	refSet         bool
+}
+
+func newMiniTacviewParser(store *tacviewPositions) *miniTacviewParser {
+	return &miniTacviewParser{
+		store: store,
+		keys:  make(map[string]string),
+		objs:  make(map[string]*miniObject),
+	}
+}
+
+func (p *miniTacviewParser) handleLine(line string) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+		return
+	}
+	if strings.HasPrefix(line, "-") {
+		// Object destroyed — remove from the store if we keyed it.
+		id := strings.TrimPrefix(line, "-")
+		if key, ok := p.keys[id]; ok {
+			p.store.Remove(key)
+		}
+		delete(p.keys, id)
+		delete(p.objs, id)
+		return
+	}
+	parts := strings.SplitN(line, ",", 2)
+	if len(parts) < 2 {
+		return
+	}
+	id, rest := parts[0], parts[1]
+	// Object "0" carries the global ReferenceLatitude/ReferenceLongitude.
+	if id == "0" {
+		for _, fld := range strings.Split(rest, ",") {
+			k, v, _ := strings.Cut(fld, "=")
+			switch k {
+			case "ReferenceLatitude":
+				p.refLat, _ = strconv.ParseFloat(v, 64)
+				p.refSet = true
+			case "ReferenceLongitude":
+				p.refLon, _ = strconv.ParseFloat(v, 64)
+				p.refSet = true
+			}
+		}
+		return
+	}
+
+	o := p.objs[id]
+	if o == nil {
+		o = &miniObject{}
+		p.objs[id] = o
+	}
+	for _, fld := range strings.Split(rest, ",") {
+		k, v, ok := strings.Cut(fld, "=")
+		if !ok {
+			continue
+		}
+		switch k {
+		case "T":
+			// lon|lat|alt[|...] — an empty subfield is unchanged since the last frame.
+			coords := strings.Split(v, "|")
+			if len(coords) > 0 && coords[0] != "" {
+				if f, err := strconv.ParseFloat(coords[0], 64); err == nil {
+					o.lon, o.hasLon = f, true
+				}
+			}
+			if len(coords) > 1 && coords[1] != "" {
+				if f, err := strconv.ParseFloat(coords[1], 64); err == nil {
+					o.lat, o.hasLat = f, true
+				}
+			}
+			if len(coords) > 2 && coords[2] != "" {
+				if f, err := strconv.ParseFloat(coords[2], 64); err == nil {
+					o.altFt = f * 3.28084
+				}
+			}
+		case "Pilot":
+			o.pilot = v
+		case "Name":
+			o.name = v
+		case "Type":
+			o.typ = v
+		case "Coalition":
+			o.co = v
+		}
+	}
+	if !o.hasLon || !o.hasLat {
+		return
+	}
+	pt := orb.Point{o.lon, o.lat}
+	if p.refSet {
+		pt = orb.Point{o.lon + p.refLon, o.lat + p.refLat}
+	}
+	if strings.Contains(o.typ, "Bullseye") {
+		p.store.SetBullseye(o.co, pt)
+		return
+	}
+	// Pilot field uses "Raider 032 |Jedi" — keep the callsign half only.
+	key := o.pilot
+	if key == "" {
+		key = o.name
+	}
+	if i := strings.Index(key, "|"); i >= 0 {
+		key = strings.TrimSpace(key[:i])
+	}
+	if key == "" {
+		return
+	}
+	p.keys[id] = key
+	p.store.Set(key, pt)
+	p.store.SetInfo(key, tacviewContactInfo{AltFt: o.altFt, Name: o.name, Coalition: o.co})
+}
+
+// runMiniTacview is a stripped-down Tacview consumer for Command. It keeps a
+// callsign → position/altitude/model/coalition map plus each coalition's
+// bullseye — no phase detection, conflict logic, or controller wiring. Mirrors
+// the connection/handshake of the main tacviewLoop in main.go.
 func runMiniTacview(ctx context.Context, addr string, store *tacviewPositions) {
-	objectNames := make(map[string]string)
 	for {
 		select {
 		case <-ctx.Done():
@@ -150,9 +379,7 @@ func runMiniTacview(ctx context.Context, addr string, store *tacviewPositions) {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		conn.Write([]byte("XtraLib.Stream.0\nTacview.RealTimeTelemetry.0\nvSFG7-Command\n0\x00"))
 
-		var refLat, refLon float64
-		var refSet bool
-
+		parser := newMiniTacviewParser(store)
 		scanner := bufio.NewScanner(conn)
 		scanner.Buffer(make([]byte, 65536), 65536)
 		for scanner.Scan() {
@@ -163,80 +390,7 @@ func runMiniTacview(ctx context.Context, addr string, store *tacviewPositions) {
 				return
 			default:
 			}
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
-				continue
-			}
-			if strings.HasPrefix(line, "-") {
-				// Object destroyed — remove from map if we have it by name.
-				id := strings.TrimPrefix(line, "-")
-				if name, ok := objectNames[id]; ok {
-					store.Remove(name)
-					delete(objectNames, id)
-				}
-				continue
-			}
-			parts := strings.SplitN(line, ",", 2)
-			if len(parts) < 2 {
-				continue
-			}
-			id := parts[0]
-			rest := parts[1]
-			// Object "0" carries the global ReferenceLatitude/ReferenceLongitude.
-			if id == "0" {
-				for _, fld := range strings.Split(rest, ",") {
-					if strings.HasPrefix(fld, "ReferenceLatitude=") {
-						refLat, _ = strconv.ParseFloat(strings.TrimPrefix(fld, "ReferenceLatitude="), 64)
-						refSet = true
-					}
-					if strings.HasPrefix(fld, "ReferenceLongitude=") {
-						refLon, _ = strconv.ParseFloat(strings.TrimPrefix(fld, "ReferenceLongitude="), 64)
-						refSet = true
-					}
-				}
-				continue
-			}
-			// Per-object lines: T=lon|lat|alt|... and Pilot=... / Name=...
-			var pilot, name string
-			var lon, lat float64
-			var hasPos bool
-			for _, fld := range strings.Split(rest, ",") {
-				switch {
-				case strings.HasPrefix(fld, "T="):
-					coords := strings.Split(strings.TrimPrefix(fld, "T="), "|")
-					if len(coords) >= 2 {
-						l, errL := strconv.ParseFloat(coords[0], 64)
-						a, errA := strconv.ParseFloat(coords[1], 64)
-						if errL == nil && errA == nil {
-							lon, lat, hasPos = l, a, true
-						}
-					}
-				case strings.HasPrefix(fld, "Pilot="):
-					pilot = strings.TrimPrefix(fld, "Pilot=")
-				case strings.HasPrefix(fld, "Name="):
-					name = strings.TrimPrefix(fld, "Name=")
-				}
-			}
-			if !hasPos {
-				continue
-			}
-			if refSet {
-				lon += refLon
-				lat += refLat
-			}
-			// Pilot field uses "Raider 032 |Jedi" — keep the callsign half only.
-			key := pilot
-			if key == "" {
-				key = name
-			}
-			if i := strings.Index(key, "|"); i >= 0 {
-				key = strings.TrimSpace(key[:i])
-			}
-			if key == "" {
-				continue
-			}
-			objectNames[id] = key
-			store.Set(key, orb.Point{lon, lat})
+			parser.handleLine(scanner.Text())
 		}
 		conn.Close()
 		log.Warn().Msg("Command: Tacview mini-tracker disconnected, reconnecting in 5s")
