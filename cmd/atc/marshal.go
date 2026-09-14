@@ -126,6 +126,10 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		// Prime the state so the first tick doesn't fire a spurious transition
 		// against the zero value.
 		atcCtrl.RefreshRecoveryCase()
+		// Compare against the case this watcher last saw, not RefreshRecoveryCase's
+		// old value: dashboard /status polls and case overrides refresh the case
+		// too, and would otherwise swallow every transition before this tick.
+		last := atcCtrl.GetRecoveryCase()
 		tk := time.NewTicker(30 * time.Second)
 		defer tk.Stop()
 		for {
@@ -133,10 +137,12 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 			case <-ctx.Done():
 				return
 			case <-tk.C:
-				old, current := atcCtrl.RefreshRecoveryCase()
-				if old == current {
+				_, current := atcCtrl.RefreshRecoveryCase()
+				if current == last {
 					continue
 				}
+				old := last
+				last = current
 				log.Info().Int("from", int(old)).Int("to", int(current)).Str("label", composer.CaseLabel(int(current))).Msg("Marshal: recovery case changed")
 				if len(stack.GetAll()) > 0 {
 					transmit(comp.MarshalCaseChange(composer.CaseLabel(int(current))))
