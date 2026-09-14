@@ -45,7 +45,9 @@ var (
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
 	flagTacviewPort = flag.Int("tacview-port", 42676,
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
-	flagFleet = flag.String("fleet", "host@192.168.1.231:7000,dev@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
+	flagSkyEyeImage = flag.String("skyeye-image", "skyeye.exe", "SkyEye GCI process image name the health probe looks for")
+	flagSkyEyeDir   = flag.String("skyeye-dir", "", "SkyEye install dir, used to tell GCI offline from not installed (default: Skyeye beside the SkyeyeATC root)")
+	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,dev@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
 )
 
 var fleetRigs []Rig
@@ -69,6 +71,8 @@ type Health struct {
 	Tacview   bool      `json:"tacview"`
 	Tacview64 bool      `json:"tacview64"`
 	OpenAI    bool      `json:"openai"`
+	GCI       string    `json:"gci"` // SkyEye GCI: online | offline | absent
+	GCIPID    int       `json:"gciPid,omitempty"`
 	At        time.Time `json:"at"`
 }
 
@@ -306,9 +310,46 @@ func updateHealth() {
 		Tacview64: tacview64Probe(),
 		OpenAI:    openaiProbe(3 * time.Second),
 	}
+	h.GCI, h.GCIPID = skyeyeProbe()
 	healthMu.Lock()
 	cachedHealth = h
 	healthMu.Unlock()
+}
+
+// skyeyeProbe reports whether the SkyEye GCI server is running on this rig:
+// "online" with its PID, "offline" when it's installed but not running, or
+// "absent" when there's no SkyEye here to run — not every rig flies GCI, so
+// that case shouldn't read as a fault.
+func skyeyeProbe() (string, int) {
+	image := *flagSkyEyeImage
+	if out, err := exec.Command("tasklist", "/fi", "imagename eq "+image, "/fo", "csv", "/nh").Output(); err == nil {
+		// No match prints an INFO line, which never parses as a row for image.
+		if rec, err := csv.NewReader(strings.NewReader(string(out))).Read(); err == nil &&
+			len(rec) > 1 && strings.EqualFold(rec[0], image) {
+			var pid int
+			fmt.Sscanf(rec[1], "%d", &pid)
+			return "online", pid
+		}
+	}
+	if skyeyeInstalled(image) {
+		return "offline", 0
+	}
+	return "absent", 0
+}
+
+// skyeyeInstalled looks for the SkyEye binary in --skyeye-dir, defaulting to a
+// Skyeye folder beside the SkyeyeATC root (C:\Skyeye next to C:\SkyeyeATC).
+func skyeyeInstalled(image string) bool {
+	dir := *flagSkyEyeDir
+	if dir == "" {
+		dir = filepath.Join(filepath.Dir(rootDir), "Skyeye")
+	}
+	for _, sub := range []string{"", "bin", "dist", "build"} {
+		if fi, err := os.Stat(filepath.Join(dir, sub, image)); err == nil && !fi.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // tacview64Probe checks whether the standalone Tacview64.exe viewer is

@@ -124,6 +124,12 @@
   .side.blue { background: var(--blue); }
   .side.red  { background: var(--red); }
   .case-pill { margin-left: auto; white-space: nowrap; background: var(--panel-2); border: 1px solid var(--orange); color: var(--orange); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; letter-spacing: 0.08em; }
+  select.case-pill { font-family: inherit; cursor: pointer; }
+  select.case-pill.err { border-color: var(--red); color: var(--red); }
+  body.viewer select.case-pill { pointer-events: none; opacity: 0.6; }
+  .gci-chip { display: none; background: var(--panel-2); border: 1px solid var(--border); padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.7rem; letter-spacing: 0.05em; margin-left: 0.6rem; vertical-align: middle; }
+  .gci-chip.online { display: inline-block; color: var(--green); border-color: var(--green-dim); }
+  .gci-chip.offline { display: inline-block; color: var(--red); border-color: var(--red); }
 
   /* Tables (stack, pattern, freqs, cats) */
   table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
@@ -292,7 +298,7 @@
     <a href="/logs" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Logs</a>
   </div>
   <div class="server">
-    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
+    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="gci-chip" id="gciChip"></span><span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
     <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
   </div>
 </header>
@@ -304,7 +310,7 @@
   <!-- Row 2: Weather / Marshal Stack / Catapults -->
   <section class="row-2">
     <div class="panel">
-      <h3>Weather — <span id="wxPrimary">OMDM</span> <span class="case-pill" id="wxCase">CASE 1</span><button class="btn info wx-set-btn" onclick="openWeatherModal()">Set Weather</button></h3>
+      <h3>Weather — <span id="wxPrimary">OMDM</span> <select class="case-pill" id="wxCase" onchange="setCase(this.value)" title="Carrier recovery case — Auto follows ceiling, visibility and night"><option value="0">AUTO</option><option value="1">CASE 1</option><option value="3">CASE 3</option></select><button class="btn info wx-set-btn" onclick="openWeatherModal()">Set Weather</button></h3>
       <div class="weather-grid" id="wxGrid">
         <div class="cell"><div class="lbl">Ceiling</div><div class="val" id="wxCeil">—</div></div>
         <div class="cell"><div class="lbl">Visibility</div><div class="val" id="wxVis">—</div></div>
@@ -729,7 +735,21 @@ function renderCards() {
       </div>`);
   }
 
-  for (const c of COMBO_CARDS) {
+  // A role from another theatre that's running on this rig still gets its card.
+  // Training 1 flies Caucasus with the PG Marshal and Deckboss up, and the page
+  // follows the Caucasus majority — without this they vanished from the page.
+  const shown = new Set(COMBO_CARDS.flatMap(c => c.roles));
+  const strays = [];
+  for (const [key, cfg] of Object.entries(THEATRES)) {
+    if (key === currentTheatre) continue;
+    for (const c of cfg.combos) {
+      if (c.roles.some(r => shown.has(r)) || !c.roles.some(r => roleStatus[r] === 'running')) continue;
+      c.roles.forEach(r => shown.add(r));
+      strays.push({ ...c, extras: `${c.extras} · ${cfg.label}` });
+    }
+  }
+
+  for (const c of [...COMBO_CARDS, ...strays]) {
     const runAny = c.roles.some(r => roleStatus[r] === 'running');
     const runAll = c.roles.every(r => roleStatus[r] === 'running');
     const dotCls = runAll ? 'up' : (runAny ? 'down' : 'down');
@@ -833,11 +853,56 @@ function renderWeather() {
   $('wxWind').textContent  = (t.windKts || t.windDir) ? `${Math.round(t.windDir||0)}° / ${Math.round(t.windKts||0)} kt` : '—';
   $('wxTemp').textContent  = '—'; // not exposed yet
   $('wxNight').textContent = t.isNight ? 'Yes' : 'No';
-  // Crude Case heuristic: ceiling < 3000 or vis < 5 → Case 3, ceil < 1500 → Case 2, else Case 1
-  let cs = 'CASE 1';
-  if (t.ceilingFt && t.ceilingFt < 1500) cs = 'CASE 3';
-  else if (t.ceilingFt && t.ceilingFt < 3000) cs = 'CASE 2';
-  $('wxCase').textContent = cs;
+}
+
+// Recovery case — read from the roles themselves rather than guessed from the
+// weather here. Marshal flies the case, so its answer wins; Deckboss and then
+// the primary tower carry the same computation when Marshal is down.
+function caseSource() {
+  for (const st of [carrierStatus.marshal, carrierStatus.deckboss, towerStatus[TOWERS[0].icao]]) {
+    if (st && st.tower) return st.tower;
+  }
+  return null;
+}
+
+function renderCase() {
+  const sel = $('wxCase');
+  if (document.activeElement === sel) return;   // don't yank it mid-pick
+  const src = caseSource();
+  sel.disabled = !src;
+  if (!src) { sel.options[0].textContent = 'AUTO'; sel.value = '0'; return; }
+  const pinned = src.caseOverride === 1 || src.caseOverride === 3 ? src.caseOverride : 0;
+  sel.options[0].textContent = !pinned && src.recoveryCase ? `AUTO · CASE ${src.recoveryCase}` : 'AUTO';
+  sel.value = String(pinned);
+}
+
+// Every running role in the theatre plus whichever carrier roles are up — each
+// role keeps its own case, so they all have to hear about the change.
+async function setCase(val) {
+  const sel = $('wxCase');
+  const ports = [
+    ...TOWERS.filter(t => towerStatus[t.icao]).map(t => t.port),
+    ...CARRIER.filter(c => carrierStatus[c.key]).map(c => c.port),
+  ];
+  const results = await Promise.all(ports.map(async port => {
+    try {
+      const r = await fetch(api(`/tower/${port}/case?case=${encodeURIComponent(val)}`), { method: 'POST' });
+      return { port, ok: r.ok, status: r.status };
+    } catch (e) { return { port, ok: false, status: 0 }; }
+  }));
+  const failed = results.filter(r => !r.ok);
+  sel.classList.toggle('err', !ports.length || failed.length > 0);
+  if (!ports.length) {
+    sel.title = 'No running roles to set the case on';
+  } else if (failed.length) {
+    sel.title = failed.every(f => f.status === 404)
+      ? 'Case select needs the updated atc.exe on this rig — rebuild and restart the roles'
+      : `Case not set on ports: ${failed.map(f => f.port).join(', ')}`;
+  } else {
+    sel.title = 'Carrier recovery case — Auto follows ceiling, visibility and night';
+  }
+  sel.blur();
+  refreshAll();
 }
 
 function renderMarshalStack() {
@@ -1227,9 +1292,17 @@ async function refreshHealth() {
     const ok = h && (h.srs || h.tacview || h.openai);
     $('serverLine').className = 'server-line' + (ok ? '' : ' down');
     $('tv64Badge').className = 'tv64-badge' + (h && h.tacview64 === false ? ' show' : '');
+    // SkyEye GCI chip: hidden when the rig has no SkyEye, or its launcher
+    // predates the probe.
+    const gci = h && h.gci;
+    const chip = $('gciChip');
+    chip.className = 'gci-chip' + (gci === 'online' || gci === 'offline' ? ' ' + gci : '');
+    chip.textContent = gci === 'online' ? 'GCI ONLINE' : 'GCI OFFLINE';
+    chip.title = gci === 'online' ? `SkyEye GCI running (PID ${h.gciPid})` : 'SkyEye GCI installed but not running';
   } catch {
     $('serverLine').className = 'server-line down';
     $('tv64Badge').className = 'tv64-badge';
+    $('gciChip').className = 'gci-chip';
   }
 }
 
@@ -1269,6 +1342,7 @@ async function refreshAll() {
   renderCards();
   renderMissionClock();
   renderWeather();
+  renderCase();
   renderAirfieldTraffic();
   renderPattern();
   renderMarshalStack();
