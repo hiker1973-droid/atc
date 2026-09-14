@@ -27,13 +27,23 @@ type Weather struct {
 	SourcePath  string
 }
 
+// key matches a Lua table key in either serialization DCS writes: the
+// bracketed `["qnh"] = 760` of the mission editor, or the bare `qnh = 760` of
+// a server re-save. Missions on Training 1 switched to bare keys on
+// 2026-09-13, and every regex silently missed — all roles booted with wind,
+// QNH, visibility and temperature at zero, and ATIS read "altimeter zero".
+func key(name string) string {
+	return `(?:\["` + name + `"\]|\b` + name + `)\s*=\s*`
+}
+
 var (
-	qnhRE        = regexp.MustCompile(`\["qnh"\]\s*=\s*([\d.]+)`)
-	groundWindRE = regexp.MustCompile(`(?s)\["atGround"\]\s*=\s*\{[^{}]*?\["speed"\]\s*=\s*([\d.]+)[^{}]*?\["dir"\]\s*=\s*(\d+)`)
-	visRE        = regexp.MustCompile(`(?s)\["visibility"\]\s*=\s*\{[^{}]*?\["distance"\]\s*=\s*(\d+)`)
-	cloudsBaseRE = regexp.MustCompile(`(?s)\["clouds"\]\s*=\s*\{[^{}]*?\["base"\]\s*=\s*(\d+)`)
-	cloudsDenRE  = regexp.MustCompile(`(?s)\["clouds"\]\s*=\s*\{[^{}]*?\["density"\]\s*=\s*(\d+)`)
-	tempRE       = regexp.MustCompile(`(?s)\["season"\]\s*=\s*\{[^{}]*?\["temperature"\]\s*=\s*([-\d.]+)`)
+	weatherRE    = regexp.MustCompile(key("weather") + `\{`)
+	qnhRE        = regexp.MustCompile(key("qnh") + `([\d.]+)`)
+	groundWindRE = regexp.MustCompile(`(?s)` + key("atGround") + `\{[^{}]*?` + key("speed") + `([\d.]+)[^{}]*?` + key("dir") + `(\d+)`)
+	visRE        = regexp.MustCompile(`(?s)` + key("visibility") + `\{[^{}]*?` + key("distance") + `(\d+)`)
+	cloudsBaseRE = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("base") + `(\d+)`)
+	cloudsDenRE  = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("density") + `(\d+)`)
+	tempRE       = regexp.MustCompile(`(?s)` + key("season") + `\{[^{}]*?` + key("temperature") + `([-\d.]+)`)
 )
 
 // FindNewestMiz returns the most-recently-modified .miz in dir, or an error
@@ -96,6 +106,11 @@ func ReadMizWeather(mizPath string) (Weather, error) {
 		return w, err
 	}
 	s := string(data)
+	// Bare keys are common words, so start at the weather block rather than
+	// risk a `qnh =` or `visibility =` from a trigger script earlier in the file.
+	if loc := weatherRE.FindStringIndex(s); loc != nil {
+		s = s[loc[0]:]
+	}
 
 	if m := qnhRE.FindStringSubmatch(s); len(m) == 2 {
 		qnh, _ := strconv.ParseFloat(m[1], 64)
