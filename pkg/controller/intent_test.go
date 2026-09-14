@@ -53,6 +53,24 @@ func TestParseIntentClassification(t *testing.T) {
 		{"full stop", "Senaki Tower, Raider 11, full stop", RequestLandingClear},
 		{"base with touch and go stays base", "Senaki Tower, Raider 11, turning base, touch and go", RequestBase},
 
+		// Distances. "15 miles" held "5 miles" as a substring and was answered
+		// as the 7 DME departure call; "N mile final" hit the inbound case.
+		{"15 miles inbound", "Senaki Tower, Raider 11, 15 miles inbound", RequestDistanceInitial},
+		{"17 miles inbound", "Senaki Tower, Raider 11, 17 miles inbound", RequestDistanceInitial},
+		{"25 miles inbound", "Senaki Tower, Raider 11, 25 miles inbound", RequestDistanceInitial},
+		{"5 miles inbound", "Senaki Tower, Raider 11, 5 miles inbound", RequestDistanceInitial},
+		{"7 miles inbound", "Senaki Tower, Raider 11, 7 miles inbound", RequestDistanceInitial},
+		{"15 miles answers report fifteen miles", "Senaki Tower, Raider 11, 15 miles", RequestDistanceInitial},
+		{"seven miles is the departure check", "Senaki Tower, Raider 11, seven miles", RequestDistanceCheck},
+		{"7 miles is the departure check", "Senaki Tower, Raider 11, 7 miles", RequestDistanceCheck},
+		{"seven mile dme", "Senaki Tower, Raider 11, seven mile DME", RequestDistanceCheck},
+		{"12 dme inbound", "Senaki Tower, Raider 11, 12 DME inbound", RequestDistanceInitial},
+		{"10 mile final", "Senaki Tower, Raider 11, 10 mile final", RequestLandingClear},
+		{"ten mile final", "Senaki Tower, Raider 11, ten mile final", RequestLandingClear},
+		{"5 mile final", "Senaki Tower, Raider 11, 5 mile final", RequestLandingClear},
+		{"3 mile final is not the overhead", "Senaki Tower, Raider 11, 3 mile final", RequestLandingClear},
+		{"5 mile final touch and go", "Senaki Tower, Raider 11, 5 mile final, touch and go", RequestLandingClear},
+
 		// Existing behaviour that must survive.
 		{"turning base", "Senaki Tower, Raider 11, turning base", RequestBase},
 		{"left base", "Senaki Tower, Raider 11, left base runway 09", RequestBase},

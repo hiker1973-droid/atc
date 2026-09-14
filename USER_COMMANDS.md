@@ -43,10 +43,10 @@ The system is fuzzy-matched on the field name (`minhad`, `dhafra`, `al ain`) so 
 | Intent | Say something like | Notes |
 |---|---|---|
 | Request taxi | `"...request taxi"`, `"ready to taxi"`, `"taxi to active"` | |
-| Holding short | `"...holding short runway 27"`, `"at the hold"`, `"short of runway"` | Tower will sequence with inbounds within 15 nm |
+| Holding short | `"...holding short runway 27"`, `"at the hold"`, `"short of runway"` | Tower will sequence with inbounds within 15 nm. Held for traffic or departure spacing, you are cleared for takeoff once it passes — no second call needed |
 | Ready for takeoff | `"...ready for takeoff"`, `"ready for departure"`, `"request takeoff"`, `"line up"` | "request **for** takeoff/taxi" works too |
 | Rolling (CTAF) | `"...rolling runway 09"`, `"on the roll"` | Departure release; spaces the next departure 60 s behind you |
-| Distance check (post-departure) | `"...7 DME"`, `"5 miles"`, `"cleared airspace"` | Releases the runway from your slot |
+| Distance check (post-departure) | `"...7 DME"`, `"seven miles"`, `"cleared airspace"` | Releases the runway from your slot. Any call with initial / inbound / final / overhead / straight in / RTB in it is an arrival instead, so "15 miles inbound" is not a departure call |
 | Clear of traffic / pattern | `"...clear of traffic"`, `"airborne"`, `"departing"` | CTAF-style departure call |
 
 ### Pattern
@@ -59,7 +59,7 @@ The system is fuzzy-matched on the field name (`minhad`, `dhafra`, `al ain`) so 
 | Downwind | `"...downwind"` | |
 | Base | `"...turning base"`, `"left base"`, `"right base"`, `"base final"` | |
 | Straight-in | `"...straight in"`, `"ILS"`, `"RNAV approach"` | |
-| Final / landing | `"...on final"`, `"request landing"`, `"final, gear down"` | |
+| Final / landing | `"...on final"`, `"request landing"`, `"final, gear down"`, `"10 mile final"` | A distance in the final call is still a landing call |
 | Touch and go / low approach / option | `"...on final, touch and go"`, `"request low approach"`, `"request the option"` | Replaces "cleared to land" with "cleared touch and go" etc. `"full stop"` = normal landing |
 | Hung ordnance | `"...hung ordnance"`, `"hung store"` | Straight in, no overhead, hold at the end of the runway for dearm |
 | Going around | `"...going around"`, `"go around"`, `"missed approach"` | |
