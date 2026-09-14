@@ -160,7 +160,7 @@ function rigCard(r) {
   }
   return `<div class="rig${alertCls}">
     <div class="rig-head">
-      <span class="rig-name">${esc(r.name)}</span>
+      <span class="rig-name" title="rig id: ${esc(r.name)}">${esc(r.label || r.name)}</span>
       <span class="rig-host">${esc(r.host)}:${r.port}</span>
       ${verChip}
       <span class="badge ${cls}">${badge}</span>

@@ -456,7 +456,7 @@ async function loadRigs() {
     const n = (r.running || []).length;
     const state = down ? 'down' : (n ? n + ' running' : 'idle');
     return `<option value="${val}"${down && !r.self ? ' disabled' : ''}>` +
-           `${r.name}${r.self ? ' (this box)' : ''} — ${state}</option>`;
+           `${esc(r.label || r.name)}${r.self ? ' (this box)' : ''} — ${state}</option>`;
   }).join('');
 
   // First visit with no saved choice: land on whichever rig is actually flying.

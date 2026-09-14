@@ -47,7 +47,7 @@ var (
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
 	flagSkyEyeImage = flag.String("skyeye-image", "skyeye.exe", "SkyEye GCI process image name the health probe looks for")
 	flagSkyEyeDir   = flag.String("skyeye-dir", "", "SkyEye install dir, used to tell GCI offline from not installed (default: Skyeye beside the SkyeyeATC root)")
-	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,dev@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
+	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,dev=vSFG-7 Night Training ATC/ATIS@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name[=Display Label]@host:port,...")
 )
 
 var fleetRigs []Rig
@@ -671,14 +671,18 @@ func handleAlerts(w http.ResponseWriter, _ *http.Request) {
 
 // Rig is one box in the vSFG-7 fleet the /fleet monitor polls.
 type Rig struct {
-	Name string `json:"name"`
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Name  string `json:"name"`  // short id: /rig/<name>/ paths, saved picker choice
+	Label string `json:"label"` // what the pages show; defaults to Name
+	Host  string `json:"host"`
+	Port  int    `json:"port"`
 }
 
 // parseFleet parses "name@host:port,name@host:port,..." into a rig list.
 // A bare "host" or "host:port" (no name) uses the host as the name; a missing
-// port defaults to 7000 (the launcher port).
+// port defaults to 7000 (the launcher port). "name=Display Label@host:port"
+// gives the rig a friendlier label while the short name stays the id that
+// URLs and saved choices use — a label like "Night Training ATC/ATIS" has
+// spaces and a slash, so it can't be the id.
 func parseFleet(s string) []Rig {
 	var rigs []Rig
 	for _, part := range strings.Split(s, ",") {
@@ -687,8 +691,12 @@ func parseFleet(s string) []Rig {
 			continue
 		}
 		name, addr := part, part
-		if at := strings.IndexByte(part, '@'); at >= 0 {
+		if at := strings.LastIndexByte(part, '@'); at >= 0 {
 			name, addr = part[:at], part[at+1:]
+		}
+		label := ""
+		if eq := strings.IndexByte(name, '='); eq >= 0 && name != part {
+			name, label = strings.TrimSpace(name[:eq]), strings.TrimSpace(name[eq+1:])
 		}
 		host, portStr, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -701,7 +709,10 @@ func parseFleet(s string) []Rig {
 		if name == part { // "host:port" with no name → name after the port strip
 			name = host
 		}
-		rigs = append(rigs, Rig{Name: name, Host: host, Port: port})
+		if label == "" {
+			label = name
+		}
+		rigs = append(rigs, Rig{Name: name, Label: label, Host: host, Port: port})
 	}
 	return rigs
 }
@@ -709,6 +720,7 @@ func parseFleet(s string) []Rig {
 // RigStatus is a point-in-time health snapshot of one rig for the fleet view.
 type RigStatus struct {
 	Name       string       `json:"name"`
+	Label      string       `json:"label"`
 	Host       string       `json:"host"`
 	Port       int          `json:"port"`
 	Self       bool         `json:"self"`
@@ -741,7 +753,7 @@ func fleetGetJSON(url string, v any) error {
 // unreachable it falls back to a TCP probe of SMB 445 so we can still tell
 // "host up, launcher down" from "host offline".
 func pollRig(rig Rig) RigStatus {
-	rs := RigStatus{Name: rig.Name, Host: rig.Host, Port: rig.Port, Self: isSelf(rig), At: time.Now()}
+	rs := RigStatus{Name: rig.Name, Label: rig.Label, Host: rig.Host, Port: rig.Port, Self: isSelf(rig), At: time.Now()}
 	base := fmt.Sprintf("http://%s:%d", rig.Host, rig.Port)
 
 	var h Health

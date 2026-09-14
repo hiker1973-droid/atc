@@ -74,7 +74,7 @@ async function loadFleet() {
   } catch(e){ fleet = []; }
   const rigSel = $('rig');
   const online = fleet.filter(r => r.launcherUp);
-  rigSel.innerHTML = online.map(r => `<option value="${esc(r.name)}">${esc(r.name)} (${esc(r.host)})</option>`).join('')
+  rigSel.innerHTML = online.map(r => `<option value="${esc(r.name)}">${esc(r.label || r.name)} (${esc(r.host)})</option>`).join('')
     || '<option value="">no rigs online</option>';
   populateRoles();
 }
