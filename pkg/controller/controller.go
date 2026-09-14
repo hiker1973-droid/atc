@@ -2278,6 +2278,21 @@ func (c *ATCController) GetWindKts() float64 {
 	return c.airfieldState.GetWindKts()
 }
 
+// SetRecoveryCaseOverride pins the recovery case (0 hands it back to the
+// weather) and returns the case before and after, re-evaluated against the
+// live night flag.
+func (c *ATCController) SetRecoveryCaseOverride(rc state.RecoveryCase) (old, current state.RecoveryCase) {
+	old = c.airfieldState.GetRecoveryCase()
+	c.airfieldState.SetRecoveryCaseOverride(rc)
+	_, current = c.airfieldState.RefreshRecoveryCase(c.IsNight())
+	return old, current
+}
+
+// GetRecoveryCaseOverride returns the pinned recovery case, or 0 for auto.
+func (c *ATCController) GetRecoveryCaseOverride() state.RecoveryCase {
+	return c.airfieldState.GetRecoveryCaseOverride()
+}
+
 // GetActiveRunway returns the current active runway designator.
 func (c *ATCController) GetActiveRunway() string {
 	return c.airfieldState.ActiveRunway

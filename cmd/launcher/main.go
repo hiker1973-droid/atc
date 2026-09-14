@@ -45,7 +45,9 @@ var (
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
 	flagTacviewPort = flag.Int("tacview-port", 42676,
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
-	flagFleet = flag.String("fleet", "host@192.168.1.231:7000,dev@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name@host:port,...")
+	flagSkyEyeImage = flag.String("skyeye-image", "skyeye.exe", "SkyEye GCI process image name the health probe looks for")
+	flagSkyEyeDir   = flag.String("skyeye-dir", "", "SkyEye install dir, used to tell GCI offline from not installed (default: Skyeye beside the SkyeyeATC root)")
+	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,dev=vSFG-7 Night Training ATC/ATIS@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name[=Display Label]@host:port,...")
 )
 
 var fleetRigs []Rig
@@ -62,6 +64,8 @@ type Role struct {
 	DashboardPort int    `json:"dashboardPort,omitempty"`
 	Status        string `json:"status"`
 	PID           int    `json:"pid,omitempty"`
+
+	cmd string // the bat's atc.exe command line, for process-based detection
 }
 
 type Health struct {
@@ -69,6 +73,8 @@ type Health struct {
 	Tacview   bool      `json:"tacview"`
 	Tacview64 bool      `json:"tacview64"`
 	OpenAI    bool      `json:"openai"`
+	GCI       string    `json:"gci"` // SkyEye GCI: online | offline | absent
+	GCIPID    int       `json:"gciPid,omitempty"`
 	At        time.Time `json:"at"`
 }
 
@@ -193,7 +199,7 @@ func discoverRoles() {
 }
 
 func roleFromCmd(bat, title, cmd string) Role {
-	r := Role{Name: title, Bat: bat, Region: regionForBat(bat), Airfield: "OMDM"} // atc.exe default
+	r := Role{Name: title, Bat: bat, Region: regionForBat(bat), Airfield: "OMDM", cmd: cmd} // atc.exe default
 	if m := reAirfield.FindStringSubmatch(cmd); m != nil {
 		r.Airfield = strings.ToUpper(m[1])
 	}
@@ -306,9 +312,46 @@ func updateHealth() {
 		Tacview64: tacview64Probe(),
 		OpenAI:    openaiProbe(3 * time.Second),
 	}
+	h.GCI, h.GCIPID = skyeyeProbe()
 	healthMu.Lock()
 	cachedHealth = h
 	healthMu.Unlock()
+}
+
+// skyeyeProbe reports whether the SkyEye GCI server is running on this rig:
+// "online" with its PID, "offline" when it's installed but not running, or
+// "absent" when there's no SkyEye here to run — not every rig flies GCI, so
+// that case shouldn't read as a fault.
+func skyeyeProbe() (string, int) {
+	image := *flagSkyEyeImage
+	if out, err := exec.Command("tasklist", "/fi", "imagename eq "+image, "/fo", "csv", "/nh").Output(); err == nil {
+		// No match prints an INFO line, which never parses as a row for image.
+		if rec, err := csv.NewReader(strings.NewReader(string(out))).Read(); err == nil &&
+			len(rec) > 1 && strings.EqualFold(rec[0], image) {
+			var pid int
+			fmt.Sscanf(rec[1], "%d", &pid)
+			return "online", pid
+		}
+	}
+	if skyeyeInstalled(image) {
+		return "offline", 0
+	}
+	return "absent", 0
+}
+
+// skyeyeInstalled looks for the SkyEye binary in --skyeye-dir, defaulting to a
+// Skyeye folder beside the SkyeyeATC root (C:\Skyeye next to C:\SkyeyeATC).
+func skyeyeInstalled(image string) bool {
+	dir := *flagSkyEyeDir
+	if dir == "" {
+		dir = filepath.Join(filepath.Dir(rootDir), "Skyeye")
+	}
+	for _, sub := range []string{"", "bin", "dist", "build"} {
+		if fi, err := os.Stat(filepath.Join(dir, sub, image)); err == nil && !fi.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // tacview64Probe checks whether the standalone Tacview64.exe viewer is
@@ -468,7 +511,8 @@ func updateAlerts() {
 				Message: fmt.Sprintf("duplicate process — %d windows for this role", n), Time: time.Now()})
 		}
 	}
-	if running > 0 {
+	// Window titles miss roles launched without one; any atc.exe counts.
+	if running > 0 || len(atcPIDs()) > 0 {
 		healthMu.Lock()
 		h := cachedHealth
 		healthMu.Unlock()
@@ -630,14 +674,18 @@ func handleAlerts(w http.ResponseWriter, _ *http.Request) {
 
 // Rig is one box in the vSFG-7 fleet the /fleet monitor polls.
 type Rig struct {
-	Name string `json:"name"`
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Name  string `json:"name"`  // short id: /rig/<name>/ paths, saved picker choice
+	Label string `json:"label"` // what the pages show; defaults to Name
+	Host  string `json:"host"`
+	Port  int    `json:"port"`
 }
 
 // parseFleet parses "name@host:port,name@host:port,..." into a rig list.
 // A bare "host" or "host:port" (no name) uses the host as the name; a missing
-// port defaults to 7000 (the launcher port).
+// port defaults to 7000 (the launcher port). "name=Display Label@host:port"
+// gives the rig a friendlier label while the short name stays the id that
+// URLs and saved choices use — a label like "Night Training ATC/ATIS" has
+// spaces and a slash, so it can't be the id.
 func parseFleet(s string) []Rig {
 	var rigs []Rig
 	for _, part := range strings.Split(s, ",") {
@@ -646,8 +694,12 @@ func parseFleet(s string) []Rig {
 			continue
 		}
 		name, addr := part, part
-		if at := strings.IndexByte(part, '@'); at >= 0 {
+		if at := strings.LastIndexByte(part, '@'); at >= 0 {
 			name, addr = part[:at], part[at+1:]
+		}
+		label := ""
+		if eq := strings.IndexByte(name, '='); eq >= 0 && name != part {
+			name, label = strings.TrimSpace(name[:eq]), strings.TrimSpace(name[eq+1:])
 		}
 		host, portStr, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -660,7 +712,10 @@ func parseFleet(s string) []Rig {
 		if name == part { // "host:port" with no name → name after the port strip
 			name = host
 		}
-		rigs = append(rigs, Rig{Name: name, Host: host, Port: port})
+		if label == "" {
+			label = name
+		}
+		rigs = append(rigs, Rig{Name: name, Label: label, Host: host, Port: port})
 	}
 	return rigs
 }
@@ -668,6 +723,7 @@ func parseFleet(s string) []Rig {
 // RigStatus is a point-in-time health snapshot of one rig for the fleet view.
 type RigStatus struct {
 	Name       string       `json:"name"`
+	Label      string       `json:"label"`
 	Host       string       `json:"host"`
 	Port       int          `json:"port"`
 	Self       bool         `json:"self"`
@@ -700,7 +756,7 @@ func fleetGetJSON(url string, v any) error {
 // unreachable it falls back to a TCP probe of SMB 445 so we can still tell
 // "host up, launcher down" from "host offline".
 func pollRig(rig Rig) RigStatus {
-	rs := RigStatus{Name: rig.Name, Host: rig.Host, Port: rig.Port, Self: isSelf(rig), At: time.Now()}
+	rs := RigStatus{Name: rig.Name, Label: rig.Label, Host: rig.Host, Port: rig.Port, Self: isSelf(rig), At: time.Now()}
 	base := fmt.Sprintf("http://%s:%d", rig.Host, rig.Port)
 
 	var h Health
@@ -935,11 +991,18 @@ func startRole(name string) error {
 
 func stopRole(name string) error {
 	wins := enumerateCmdWindows()
-	pid, ok := findWindowPID(wins, name)
-	if !ok {
-		return fmt.Errorf("not running: %s", name)
+	if pid, ok := findWindowPID(wins, name); ok {
+		return killTree(pid)
 	}
-	return killTree(pid)
+	// No window to close — the role may still be running without one.
+	if r := findRole(name); r != nil && r.cmd != "" {
+		for _, p := range listATCProcs() {
+			if roleMatchesProc(r.cmd, p) {
+				return killTree(p.PID)
+			}
+		}
+	}
+	return fmt.Errorf("not running: %s", name)
 }
 
 // regionBats maps a theatre to its single-shot launcher bat (ATIS + towers +
@@ -974,27 +1037,25 @@ func startRegion(region string) error {
 // the number of roles killed so the dashboard can report "nothing was running".
 func stopRegion(region string) (int, error) {
 	rolesMu.Lock()
-	var names []string
-	for i := range roles {
-		if roles[i].Region == region {
-			names = append(names, roles[i].Name)
-		}
-	}
+	rs := append([]Role(nil), roles...)
 	rolesMu.Unlock()
 
-	wins := enumerateCmdWindows()
+	// Detect across every role, not just this region's, so a process is only
+	// ever claimed by the role it actually belongs to.
+	pids := detectRunning(rs)
 	killed := 0
 	var firstErr error
-	for _, n := range names {
-		if pid, ok := findWindowPID(wins, n); ok {
-			if err := killTree(pid); err != nil {
-				if firstErr == nil {
-					firstErr = err
-				}
-				continue
-			}
-			killed++
+	for i := range rs {
+		if rs[i].Region != region || pids[i] == 0 {
+			continue
 		}
+		if err := killTree(pids[i]); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		killed++
 	}
 	return killed, firstErr
 }
@@ -1083,11 +1144,11 @@ func handleRoles(w http.ResponseWriter, _ *http.Request) {
 	copy(out, roles)
 	rolesMu.Unlock()
 
-	wins := enumerateCmdWindows()
+	pids := detectRunning(out)
 	for i := range out {
-		if pid, ok := findWindowPID(wins, out[i].Name); ok {
+		if pids[i] != 0 {
 			out[i].Status = "running"
-			out[i].PID = pid
+			out[i].PID = pids[i]
 		} else {
 			out[i].Status = "stopped"
 		}

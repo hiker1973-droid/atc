@@ -81,9 +81,19 @@ const REGION_LABEL = { pg: 'Persian Gulf', caucasus: 'Caucasus', germany: 'Germa
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-function dot(label, up) {
+function dot(label, up, title) {
   const cls = up === null ? '' : (up ? 'up' : 'down');
-  return `<span class="dot ${cls}"><i></i>${label}</span>`;
+  return `<span class="dot ${cls}"${title ? ` title="${esc(title)}"` : ''}><i></i>${label}</span>`;
+}
+
+// SkyEye GCI has three states: running, installed but stopped, and not on this
+// rig at all (grey — not every rig runs GCI). Launchers that predate the probe
+// send no gci field, which also reads grey.
+function gciDot(h) {
+  if (h.gci === 'online') return dot('GCI', true, `SkyEye GCI running (PID ${h.gciPid})`);
+  if (h.gci === 'offline') return dot('GCI', false, 'SkyEye GCI installed but not running');
+  if (h.gci === 'absent') return dot('GCI', null, 'SkyEye GCI not installed on this rig');
+  return dot('GCI', null, 'unknown — launcher predates the GCI probe, needs redeploy');
 }
 
 function rigCard(r) {
@@ -100,6 +110,7 @@ function rigCard(r) {
       ${dot('Tacview', !!h.tacview)}
       ${dot('Viewer', !!h.tacview64)}
       ${dot('OpenAI', !!h.openai)}
+      ${gciDot(h)}
     </div>`;
   }
 
@@ -149,7 +160,7 @@ function rigCard(r) {
   }
   return `<div class="rig${alertCls}">
     <div class="rig-head">
-      <span class="rig-name">${esc(r.name)}</span>
+      <span class="rig-name" title="rig id: ${esc(r.name)}">${esc(r.label || r.name)}</span>
       <span class="rig-host">${esc(r.host)}:${r.port}</span>
       ${verChip}
       <span class="badge ${cls}">${badge}</span>
