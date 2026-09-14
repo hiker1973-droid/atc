@@ -704,6 +704,11 @@ func (c *ATCController) handleTakeoffRequest(
 	ac *state.AircraftState,
 	s *state.AirfieldState,
 ) string {
+	// A held jet is released by checkConflicts, which only releases aircraft
+	// flagged HoldingShort. Without the flag a departure held for traffic or
+	// spacing waited for a second call that nothing asked the pilot to make.
+	ac.HoldingShort = true
+
 	// Check for inbounds within the hold-short radius.
 	inbounds := s.InboundsWithinNm(HoldShortRadiusNm)
 
@@ -775,6 +780,11 @@ func (c *ATCController) handleHoldingShortRequest(
 		return c.composer.VerifyHoldShortPosition(callsign, s.ActiveRunway)
 	}
 
+	// Flag for checkConflicts' departure release on every path below, as in
+	// handleTakeoffRequest: held for traffic or spacing, the jet is cleared
+	// once that passes.
+	ac.HoldingShort = true
+
 	inbounds := s.InboundsWithinNm(HoldShortRadiusNm)
 
 	if len(inbounds) > 0 {
@@ -830,7 +840,6 @@ func (c *ATCController) handleHoldingShortRequest(
 	// time-gate in checkConflicts prevents that path from firing inside the
 	// 5s LUAW gap.
 	s.EnqueueDeparture(ac)
-	ac.HoldingShort = true
 	ac.AutoReleaseAt = time.Now().Add(AutoReleaseDelay)
 	log.Info().Str("callsign", callsign).Dur("delay", AutoReleaseDelay).Msg("LUAW issued — auto-release armed")
 	go c.scheduleAutoRelease(ctx, callsign)
@@ -1269,13 +1278,20 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// CTAF self-announced takeoff roll: "Senaki traffic, Raider 302, rolling
 		// runway 09". Whole-word so "patrolling" doesn't match.
 		req.Type = RequestRolling
-	case containsAny(lower, "seven dme", "7 dme", "seven miles", "7 miles", "cleared airspace", "five miles", "5 miles") ||
-		(containsAny(lower, "dme", "d.m.e", "d m e") && !containsAny(lower, "initial", "inbound")):
+	case !containsAny(lower, "initial", "inbound", "final", "overhead", "straight", "rtb", "return") &&
+		(containsWord(lower, "seven dme", "7 dme", "seven miles", "7 miles", "five miles", "5 miles") ||
+			containsAny(lower, "cleared airspace", "dme", "d.m.e", "d m e")):
 		// Post-departure distance check-in. Whisper often transcribes "7 DME"
-		// as "seven mile DME" — catch any DME mention that isn't an inbound
-		// pattern entry so it doesn't fall through to RequestDistanceInitial.
+		// as "seven mile DME" — catch any DME mention so it doesn't fall
+		// through to RequestDistanceInitial. Whole-word, and never on a call
+		// with arrival words: as substrings "15 miles inbound" / "17 miles"
+		// matched "5 miles" / "7 miles" and handed arrivals to Command.
 		req.Type = RequestDistanceCheck
-	case containsDistanceMiles(lower) && containsAny(lower, "initial", "mile", "inbound"):
+	case containsDistanceMiles(lower) && containsAny(lower, "initial", "mile", "inbound") &&
+		!containsWord(lower, "final"):
+		// "10 mile final" is a landing call, not an inbound report — it falls
+		// through to RequestLandingClear. The IMC and hung-ordnance replies
+		// ask for exactly that call.
 		// 3 mile initial = overhead break entry; others = inbound position report
 		dist := extractDistanceMilesInt(lower)
 		req.DistanceNm = dist
