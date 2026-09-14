@@ -82,6 +82,7 @@ type TowerStatus struct {
 	AvailableRunways []string `json:"availableRunways"`
 	FlightMode   string   `json:"flightMode"`
 	RecoveryCase int      `json:"recoveryCase"` // 1/2/3 for carrier ops; same value on tower roles
+	CaseOverride int      `json:"caseOverride"` // 0 = auto; otherwise the case pinned via POST /case
 	CeilingFt    float64  `json:"ceilingFt"`
 	VisibNm      float64  `json:"visibNm"`
 	AltimeterInHg float64 `json:"altimeterInHg"`
@@ -191,6 +192,7 @@ func (ds *dashboardServer) run(ctx context.Context) {
 	mux.HandleFunc("/status", cors(ds.handleStatus))
 	mux.HandleFunc("/runway", cors(ds.handleRunway))
 	mux.HandleFunc("/weather", cors(ds.handleWeather))
+	mux.HandleFunc("/case", cors(ds.handleCase))
 	mux.HandleFunc("/ws/log", ds.handleWSLog)
 	mux.HandleFunc("/health", cors(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -263,6 +265,7 @@ func (ds *dashboardServer) handleStatus(w http.ResponseWriter, r *http.Request) 
 		AvailableRunways: available,
 		FlightMode:       modeStr,
 		RecoveryCase:     int(ds.atcCtrl.GetRecoveryCase()),
+		CaseOverride:     int(ds.atcCtrl.GetRecoveryCaseOverride()),
 		CeilingFt:        ceil,
 		VisibNm:          s.VisibilityNm,
 		AltimeterInHg:    altim,
@@ -464,6 +467,30 @@ func (ds *dashboardServer) handleWeather(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	http.Error(w, err.Error(), http.StatusBadRequest)
+}
+
+// handleCase pins the carrier recovery case from the launcher dashboard.
+// POST /case?case=0|1|2|3 — 0 hands the case back to the weather and night
+// flag (the default). Held in memory only: a restarted role comes back on auto.
+func (ds *dashboardServer) handleCase(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	n, err := strconv.Atoi(r.URL.Query().Get("case"))
+	if err != nil || n < 0 || n > 3 {
+		http.Error(w, "'case' must be 0 (auto), 1, 2 or 3", http.StatusBadRequest)
+		return
+	}
+	_, current := ds.atcCtrl.SetRecoveryCaseOverride(state.RecoveryCase(n))
+	label := "auto"
+	if n != 0 {
+		label = fmt.Sprintf("Case %d", n)
+	}
+	log.Info().Int("override", n).Int("case", int(current)).Str("icao", ds.af.ICAO).Msg("Recovery case set via dashboard")
+	broadcastLog("sys", fmt.Sprintf("Recovery case: %s, now Case %d (%s)", label, current, ds.af.ICAO))
+	json.NewEncoder(w).Encode(map[string]int{"caseOverride": n, "recoveryCase": int(current)})
 }
 
 // handleWSLog streams log entries to connected WebSocket clients.

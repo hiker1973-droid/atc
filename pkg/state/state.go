@@ -196,6 +196,7 @@ type AirfieldState struct {
 	WeatherUpdatedAt time.Time
 	FlightMode       FlightMode
 	RecoveryCase     RecoveryCase
+	CaseOverride     RecoveryCase // 0 = auto (weather/night decide); set from the launcher dashboard
 	CeilingFt        float64
 	IsNight          bool
 
@@ -831,7 +832,7 @@ func (s *AirfieldState) UpdateFlightConditions(ceilingFt, visNm float64, isNight
 	default:
 		s.FlightMode = ModeVFR
 	}
-	s.RecoveryCase = ComputeRecoveryCase(ceilingFt, visNm, isNight)
+	s.RecoveryCase = s.effectiveRecoveryCase()
 }
 
 // RefreshRecoveryCase recomputes RecoveryCase using the supplied night flag
@@ -844,8 +845,34 @@ func (s *AirfieldState) RefreshRecoveryCase(isNight bool) (old, current Recovery
 	defer s.mu.Unlock()
 	s.IsNight = isNight
 	old = s.RecoveryCase
-	s.RecoveryCase = ComputeRecoveryCase(s.CeilingFt, s.VisibilityNm, isNight)
+	s.RecoveryCase = s.effectiveRecoveryCase()
 	return old, s.RecoveryCase
+}
+
+// effectiveRecoveryCase is the pinned case when one is set, else the case the
+// weather and night flag call for. Caller holds s.mu.
+func (s *AirfieldState) effectiveRecoveryCase() RecoveryCase {
+	if s.CaseOverride != 0 {
+		return s.CaseOverride
+	}
+	return ComputeRecoveryCase(s.CeilingFt, s.VisibilityNm, s.IsNight)
+}
+
+// SetRecoveryCaseOverride pins RecoveryCase to c whatever the weather, or
+// hands it back to the ceiling/visibility/night computation when c is 0. The
+// pin survives weather updates and the periodic refresh, but not a restart.
+func (s *AirfieldState) SetRecoveryCaseOverride(c RecoveryCase) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.CaseOverride = c
+	s.RecoveryCase = s.effectiveRecoveryCase()
+}
+
+// GetRecoveryCaseOverride returns the pinned recovery case, or 0 for auto.
+func (s *AirfieldState) GetRecoveryCaseOverride() RecoveryCase {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.CaseOverride
 }
 
 // GetFlightMode returns the current flight mode.
