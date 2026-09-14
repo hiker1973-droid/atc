@@ -64,6 +64,8 @@ type Role struct {
 	DashboardPort int    `json:"dashboardPort,omitempty"`
 	Status        string `json:"status"`
 	PID           int    `json:"pid,omitempty"`
+
+	cmd string // the bat's atc.exe command line, for process-based detection
 }
 
 type Health struct {
@@ -197,7 +199,7 @@ func discoverRoles() {
 }
 
 func roleFromCmd(bat, title, cmd string) Role {
-	r := Role{Name: title, Bat: bat, Region: regionForBat(bat), Airfield: "OMDM"} // atc.exe default
+	r := Role{Name: title, Bat: bat, Region: regionForBat(bat), Airfield: "OMDM", cmd: cmd} // atc.exe default
 	if m := reAirfield.FindStringSubmatch(cmd); m != nil {
 		r.Airfield = strings.ToUpper(m[1])
 	}
@@ -509,7 +511,8 @@ func updateAlerts() {
 				Message: fmt.Sprintf("duplicate process — %d windows for this role", n), Time: time.Now()})
 		}
 	}
-	if running > 0 {
+	// Window titles miss roles launched without one; any atc.exe counts.
+	if running > 0 || len(atcPIDs()) > 0 {
 		healthMu.Lock()
 		h := cachedHealth
 		healthMu.Unlock()
@@ -988,11 +991,18 @@ func startRole(name string) error {
 
 func stopRole(name string) error {
 	wins := enumerateCmdWindows()
-	pid, ok := findWindowPID(wins, name)
-	if !ok {
-		return fmt.Errorf("not running: %s", name)
+	if pid, ok := findWindowPID(wins, name); ok {
+		return killTree(pid)
 	}
-	return killTree(pid)
+	// No window to close — the role may still be running without one.
+	if r := findRole(name); r != nil && r.cmd != "" {
+		for _, p := range listATCProcs() {
+			if roleMatchesProc(r.cmd, p) {
+				return killTree(p.PID)
+			}
+		}
+	}
+	return fmt.Errorf("not running: %s", name)
 }
 
 // regionBats maps a theatre to its single-shot launcher bat (ATIS + towers +
@@ -1027,27 +1037,25 @@ func startRegion(region string) error {
 // the number of roles killed so the dashboard can report "nothing was running".
 func stopRegion(region string) (int, error) {
 	rolesMu.Lock()
-	var names []string
-	for i := range roles {
-		if roles[i].Region == region {
-			names = append(names, roles[i].Name)
-		}
-	}
+	rs := append([]Role(nil), roles...)
 	rolesMu.Unlock()
 
-	wins := enumerateCmdWindows()
+	// Detect across every role, not just this region's, so a process is only
+	// ever claimed by the role it actually belongs to.
+	pids := detectRunning(rs)
 	killed := 0
 	var firstErr error
-	for _, n := range names {
-		if pid, ok := findWindowPID(wins, n); ok {
-			if err := killTree(pid); err != nil {
-				if firstErr == nil {
-					firstErr = err
-				}
-				continue
-			}
-			killed++
+	for i := range rs {
+		if rs[i].Region != region || pids[i] == 0 {
+			continue
 		}
+		if err := killTree(pids[i]); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		killed++
 	}
 	return killed, firstErr
 }
@@ -1136,11 +1144,11 @@ func handleRoles(w http.ResponseWriter, _ *http.Request) {
 	copy(out, roles)
 	rolesMu.Unlock()
 
-	wins := enumerateCmdWindows()
+	pids := detectRunning(out)
 	for i := range out {
-		if pid, ok := findWindowPID(wins, out[i].Name); ok {
+		if pids[i] != 0 {
 			out[i].Status = "running"
-			out[i].PID = pid
+			out[i].PID = pids[i]
 		} else {
 			out[i].Status = "stopped"
 		}
