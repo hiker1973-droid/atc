@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"math"
 	"testing"
 
 	"github.com/vsfg7/atc/pkg/airfield"
@@ -90,6 +91,50 @@ func TestFindCarrierIgnoresStrikeGroupAircraft(t *testing.T) {
 	}
 	if brc := c.GetCarrierBRC(); brc != -1 {
 		t.Errorf("BRC = %.1f, want -1 (mother off scope)", brc)
+	}
+}
+
+// Foothold Syria floats CVN-72 and CVN-74 Stennis, both tier 0. Every caller
+// used to get CVN-72 (lowest key). A pilot recovering to Stennis must get
+// Stennis's BRC and range; with no caller the stable lowest-key answer stays.
+func TestCarrierForCallerPicksNearestCVN(t *testing.T) {
+	c := NewATCController("Test", &airfield.Airfield{})
+	c.UpdateAnyPosition("CVN-72", "CVN_72", "Sea+Watercraft+AircraftCarrier", 33.0, 34.0, 60, 20, 249.3, 0)
+	c.UpdateAnyPosition("CVN-74", "Stennis", "Sea+Watercraft+AircraftCarrier", 34.5, 34.0, 60, 20, 90.0, 0)
+	c.UpdateAnyPosition("Raider 331", "FA-18C_hornet", "Air+FixedWing", 34.4, 34.1, 8000, 300, 270, 0)
+	c.UpdateAnyPosition("Raider 312", "FA-18C_hornet", "Air+FixedWing", 33.1, 34.1, 8000, 300, 90, 0)
+
+	if brc := c.GetCarrierBRCFor("Raider 331"); brc != 90.0 {
+		t.Errorf("Raider 331 (near Stennis) BRC = %.1f, want 90.0", brc)
+	}
+	if brc := c.GetCarrierBRCFor("Raider 312"); brc != 249.3 {
+		t.Errorf("Raider 312 (near CVN-72) BRC = %.1f, want 249.3", brc)
+	}
+	if brc := c.GetCarrierBRC(); brc != 249.3 {
+		t.Errorf("no caller BRC = %.1f, want 249.3 (lowest key)", brc)
+	}
+	if _, dist, _, ok := c.LookupCallerRelativeToCarrier("Raider 331"); !ok || dist > 10 {
+		t.Errorf("Raider 331 range to mother = %d (found %v), want Stennis a few nm away", dist, ok)
+	}
+	// A near-Stennis caller must not drag the Kuznetsov-style lower tier in.
+	c.UpdateAnyPosition("Naval-2-4", "KUZNECOW", "Sea+Watercraft+AircraftCarrier", 34.41, 34.1, 60, 20, 10.0, 0)
+	if brc := c.GetCarrierBRCFor("Raider 331"); brc != 90.0 {
+		t.Errorf("with a non-CVN flat-top alongside, BRC = %.1f, want Stennis 90.0", brc)
+	}
+}
+
+// Tacview and the carrier heading are true; pilots fly BRC magnetic.
+func TestToMagnetic(t *testing.T) {
+	c := NewATCController("Test", &airfield.Airfield{MagVar: 5.0})
+	cases := []struct{ in, want float64 }{
+		{249.3, 244.3},
+		{2.0, 357.0},
+		{-1, -1}, // "mother off scope" sentinel passes through
+	}
+	for _, tc := range cases {
+		if got := c.ToMagnetic(tc.in); math.Abs(got-tc.want) > 1e-9 {
+			t.Errorf("ToMagnetic(%.1f) = %.4f, want %.1f", tc.in, got, tc.want)
+		}
 	}
 }
 
