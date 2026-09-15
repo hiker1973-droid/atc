@@ -23,11 +23,20 @@ const (
 	pilotIdleTimeout     = 60 * time.Minute
 )
 
+// carrierLaunchRadiusNm: a pilot Command first sees this close to the boat
+// launched from it (they check in with Command right after Marshal releases
+// them at ~7 DME), so their recovery is Marshal however near a field is.
+const carrierLaunchRadiusNm = 20.0
+
 type trackedPilot struct {
 	callsign   string
 	lastSeen   time.Time
 	lastDistNm float64
 	handedOff  bool
+	// carrierBased is decided once, on the first check with both the pilot
+	// and a carrier on scope.
+	carrierBased   bool
+	carrierChecked bool
 }
 
 type pilotTracker struct {
@@ -430,31 +439,13 @@ func runCommandHandoffWatch(
 			if !ok {
 				continue
 			}
-			var nearestFld *airfield.Airfield
-			nearestDist := 9999.0
-			for _, fld := range fields {
-				d := haversineNm(pos, fld.Center)
-				if d < nearestDist {
-					nearestDist = d
-					nearestFld = fld
-				}
+			carrierPos, haveCarrier := store.Carrier()
+			if haveCarrier && !pilot.carrierChecked {
+				pilot.carrierChecked = true
+				pilot.carrierBased = haversineNm(pos, carrierPos) <= carrierLaunchRadiusNm
 			}
-			// A pilot recovering to the boat is closing on the carrier, not a
-			// field, and belongs to Marshal rather than a tower. Take whichever
-			// recovery point is nearer so the handoff names the right facility.
-			recoveryName, recoveryFreq, recoveryKind := "", 0.0, "tower"
-			if nearestFld != nil {
-				recoveryName = nearestFld.Name + " tower"
-				recoveryFreq = nearestFld.TowerFreqMHz
-			}
-			if carrierPos, ok := store.Carrier(); ok && flagHandoffMarshalFreq > 0 {
-				if d := haversineNm(pos, carrierPos); d < nearestDist {
-					nearestDist = d
-					recoveryName = flagHandoffMarshalName
-					recoveryFreq = flagHandoffMarshalFreq
-					recoveryKind = "marshal"
-				}
-			}
+			rec := chooseRecovery(pos, fields, carrierPos, haveCarrier && flagHandoffMarshalFreq > 0, pilot.carrierBased)
+			recoveryName, recoveryFreq, recoveryKind, nearestDist := rec.name, rec.freqMHz, rec.kind, rec.distNm
 			// Trigger only when closing through the threshold — prevents
 			// firing when pilot starts a sortie already within range, and
 			// prevents repeat fires when they orbit at the edge.
@@ -481,6 +472,36 @@ func runCommandHandoffWatch(
 		}
 		tracker.mu.Unlock()
 	}
+}
+
+// recoveryPoint is where Command sends an RTB pilot.
+type recoveryPoint struct {
+	name    string
+	freqMHz float64
+	kind    string // "tower" | "marshal"
+	distNm  float64
+}
+
+// chooseRecovery picks the facility for the recovery handoff: the nearest
+// field's tower, or Marshal when the boat is nearer. A carrier-based pilot goes
+// to Marshal regardless — on 2026-09-14 Raider 331, off CVN-72, was sent to
+// Akrotiri tower because the field was 29 nm away and the boat 52.
+// marshalAvailable is false when no carrier is on scope or the Marshal handoff
+// is disabled. The returned distance is to the chosen facility, which is what
+// the handoff threshold is tested against.
+func chooseRecovery(pos orb.Point, fields []*airfield.Airfield, carrierPos orb.Point, marshalAvailable, carrierBased bool) recoveryPoint {
+	rp := recoveryPoint{kind: "tower", distNm: 9999}
+	for _, fld := range fields {
+		if d := haversineNm(pos, fld.Center); d < rp.distNm {
+			rp = recoveryPoint{name: fld.Name + " tower", freqMHz: fld.TowerFreqMHz, kind: "tower", distNm: d}
+		}
+	}
+	if marshalAvailable {
+		if d := haversineNm(pos, carrierPos); carrierBased || d < rp.distNm {
+			rp = recoveryPoint{name: flagHandoffMarshalName, freqMHz: flagHandoffMarshalFreq, kind: "marshal", distNm: d}
+		}
+	}
+	return rp
 }
 
 // haversineNm — local copy to avoid pulling the controller package into Command.

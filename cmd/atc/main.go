@@ -909,6 +909,18 @@ func newStaticWeatherController(windDir, windKts, ceilFt, altInHg float64) *cont
 	return c
 }
 
+// carrierWhisperPrompt is the vocabulary prompt whisperTranscribe sends for the
+// Marshal and Deckboss freqs. Whisper sometimes returns it verbatim on noise.
+const carrierWhisperPrompt = "Marshal, Raider, Venom, marking mom, angels, state, established, commencing, pushing, checking in, see you at ten, signal Charlie, BRC, altimeter, radio check, five by five"
+
+// carrierPromptFragments are the distinctive pieces of carrierWhisperPrompt —
+// "marshal", "raider", "angels" and "state" are left out because every real
+// Marshal call carries them.
+var carrierPromptFragments = []string{
+	"venom", "marking mom", "established", "commencing", "pushing", "checking in",
+	"see you at ten", "signal charlie", "brc", "altimeter", "radio check", "five by five",
+}
+
 // isWhisperHallucination returns true if Whisper returned the prompt text
 // or other known hallucination patterns instead of real speech.
 func isWhisperHallucination(text string) bool {
@@ -940,11 +952,26 @@ func isWhisperHallucination(text string) bool {
 		"holding short, runway, cleared",
 		"tower, al ain tower",
 		"raider, venom, radio",
+		"raider, venom, marking mom",
 	}
 	for _, c := range compound {
 		if strings.Contains(lower, c) {
 			return true
 		}
+	}
+	// Carrier prompt echo. The fragments above are the tower prompt, so the
+	// Marshal/Deckboss prompt came straight through: on 2026-09-14 Whisper
+	// returned carrierWhisperPrompt verbatim on the Syria Marshal freq, and
+	// Marshal answered it as a radio check from "Raider". A real call uses a
+	// few of these words; the echo uses all of them.
+	carrierMatches := 0
+	for _, frag := range carrierPromptFragments {
+		if strings.Contains(lower, frag) {
+			carrierMatches++
+		}
+	}
+	if carrierMatches >= 5 {
+		return true
 	}
 	// Too short to be a real call
 	if len(strings.TrimSpace(text)) < 6 {
@@ -2013,7 +2040,7 @@ func whisperTranscribe(ctx context.Context, apiKey string, audio []byte, filenam
 	}
 	w.WriteField("model", "gpt-4o-mini-transcribe")
 	w.WriteField("language", "en")
-	w.WriteField("prompt", "Marshal, Raider, Venom, marking mom, angels, state, established, commencing, pushing, checking in, see you at ten, signal Charlie, BRC, altimeter, radio check, five by five")
+	w.WriteField("prompt", carrierWhisperPrompt)
 	w.Close()
 
 	req, err := http.NewRequestWithContext(ctx, "POST",

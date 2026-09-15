@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"regexp"
 	"strings"
@@ -68,8 +69,143 @@ func isDepartureClearCall(lower string) bool {
 		return false
 	}
 	// Either a distance ("clear seven miles") or an explicit clear-of phrasing
-	// ("clear of mother") with no number at all.
-	return containsAny(lower, " mile", " dme", "clear of", "outbound")
+	// ("clear of mother", or the flown "clear mothers" with no "of").
+	return containsAny(lower, " mile", " dme", "clear of", "outbound",
+		"clear mother", "clear mom", "clear the boat")
+}
+
+// marshalAddressRe matches the address a pilot opens a Marshal call with.
+// Whisper rarely hears "Union" cleanly: one pilot on 2026-09-14 came out as
+// "Unit Marshall", "Here Marshall", "In here, Marshall", "Leader, Marshal" and
+// "You to Marshall". So up to two short filler words may precede
+// "Marshal"/"Marshall". The filler list is closed on purpose — our own TX comes
+// back as "<callsign>, Union Marshal, …" and a callsign is never one of these
+// words, so the echo still fails to match.
+var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|leader|you|to|hey|uh|um|okay|ok|and|so)\W+){0,2}marshall?\b\W*`)
+
+// splitMarshalAddress reports whether text opens with the Marshal address and
+// returns what follows it.
+func splitMarshalAddress(text string) (rest string, ok bool) {
+	loc := marshalAddressRe.FindStringIndex(text)
+	if loc == nil {
+		return "", false
+	}
+	return text[loc[1]:], true
+}
+
+// callsignTokenRe finds a "<word> <number>" callsign — "Raider 331",
+// "Raider033", "Venom 2-1-2".
+var callsignTokenRe = regexp.MustCompile(`(?i)\b([a-z]{3,})[\s-]*(\d(?:[\s-]?\d){0,3})\b`)
+
+// notCallsignWords are words that precede a number in a Marshal call without
+// being a callsign ("marking moms 350", "angels 16", "state 3.5").
+var notCallsignWords = map[string]bool{
+	"angels": true, "angel": true, "state": true, "mom": true, "moms": true,
+	"mother": true, "mothers": true, "for": true, "dme": true, "mile": true,
+	"miles": true, "bearing": true, "radial": true, "channel": true,
+	"button": true, "case": true, "runway": true, "brc": true, "heading": true,
+	"altimeter": true, "see": true, "you": true, "ten": true, "marshal": true,
+	"marshall": true, "platform": true, "passing": true, "cat": true,
+	"minutes": true, "plus": true, "minus": true, "point": true,
+}
+
+// marshalCallsignFromText pulls the caller's callsign out of a Marshal call:
+// the first "<word> <number>" after the address, so "Marshal, see you at ten.
+// Raider 331, see you at ten." yields "Raider 331" rather than "see you at
+// ten." Returns "" when the call isn't addressed to Marshal or carries no
+// "<word> <number>" at all — squadron callsigns always have the number, and a
+// numberless guess ("signal Charlie") would be answered and echo back.
+func marshalCallsignFromText(text string) string {
+	rest, ok := splitMarshalAddress(text)
+	if !ok {
+		return ""
+	}
+	rest = normalizeCallsignLocal(rest)
+	for _, m := range callsignTokenRe.FindAllStringSubmatch(rest, -1) {
+		if notCallsignWords[strings.ToLower(m[1])] {
+			continue
+		}
+		digits := strings.NewReplacer(" ", "", "-", "").Replace(m[2])
+		word := strings.ToUpper(m[1][:1]) + m[1][1:]
+		return word + " " + digits
+	}
+	return ""
+}
+
+// marshalIntent is what a Marshal call asks for.
+type marshalIntent int
+
+const (
+	marshalNone marshalIntent = iota
+	marshalRadioCheck
+	marshalRadarCheck
+	marshalBRCRequest
+	marshalMarkingMom
+	marshalSeeYouAtTen
+	marshalDepartureClear
+	marshalDME
+	marshalState
+	marshalEstablished
+	marshalCommencing
+	marshalPlatform
+	marshalPushCommand
+	marshalPushPaddles
+	marshalInitial
+	marshalCheckIn
+)
+
+// establishedRe covers "established angels 2" and Whisper's flown variants
+// "establish angels 2" and "established, angels two".
+var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b`)
+
+// brcWordRe catches a BRC question however it's phrased: "BRC", "B R C",
+// "B.R.C.", and Whisper's "VRC".
+var brcWordRe = regexp.MustCompile(`\b(?:brc|vrc|b\.?\s?r\.?\s?c)\b`)
+
+// classifyMarshalCall maps a lowercased, address-led call to its intent. Order
+// matters and mirrors the original switch: e.g. the departure check must beat
+// the DME report, and a BRC word inside a marking-mom's call is still a
+// check-in.
+func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
+	switch {
+	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comp check", "comcheck", "how copy"):
+		return marshalRadioCheck
+	case containsAny(lower, "radar check", "radar contact", "request radar", "radar service"):
+		return marshalRadarCheck
+	case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "confirm brc", "current brc",
+		"what's brc", "what is brc", "say bearing", "say mother's heading", "mother's heading", "mothers heading",
+		"say heading of mother", "base recovery course"):
+		return marshalBRCRequest
+	case containsAny(lower, "marking mom", "marking moms", "marking mum", "marking bomb", "marking bombs", "mark your mom", "mark your mum"):
+		return marshalMarkingMom
+	case containsAny(lower, "see you at 10", "see you at ten", "see me at 10", "see me at ten"):
+		return marshalSeeYouAtTen
+	case isDepartureClearCall(lower):
+		return marshalDepartureClear
+	case containsAny(lower, " dme", " mile"):
+		return marshalDME
+	case containsAny(lower, "state") && fuelState > 0:
+		return marshalState
+	case establishedRe.MatchString(lower):
+		return marshalEstablished
+	case containsAny(lower, "commencing"):
+		return marshalCommencing
+	case containsAny(lower, "platform", "passing five thousand", "passing 5000", "at platform"):
+		return marshalPlatform
+	case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
+		"pushing strike", "switching strike"):
+		return marshalPushCommand
+	case containsAny(lower, "pushing paddles", "switching paddles", "push paddles", "switch paddles",
+		"pushing lso", "switching lso", "pushing button", "pushing channel"):
+		return marshalPushPaddles
+	case containsAny(lower, "initial"):
+		return marshalInitial
+	case brcWordRe.MatchString(lower):
+		return marshalBRCRequest
+	case containsAny(lower, "checking in", "check in", "checkin"):
+		return marshalCheckIn
+	}
+	return marshalNone
 }
 
 // marshalZoneName derives the control-zone name spoken in the departure release
@@ -100,6 +236,11 @@ const (
 	// 9-10° left of BRC.
 	marshalFinalBearingOffset = 9
 )
+
+// magneticDeg converts a true bearing in whole degrees to magnetic for speech.
+func magneticDeg(atcCtrl *controller.ATCController, trueDeg int) int {
+	return int(math.Round(atcCtrl.ToMagnetic(float64(trueDeg)))) % 360
+}
 
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
 func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword, voice string,
@@ -297,17 +438,23 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 						delete(transmissions, origin)
 						go func(f [][]byte) {
 							text, err := transcribeFrames(ctx, apiKey, f)
-							if err != nil || text == "" {
+							if err != nil {
+								// Was a silent return: a failing Whisper call
+								// looked exactly like nobody transmitting.
+								log.Warn().Err(err).Int("frames", len(f)).Msg("Marshal: transcription failed")
+								return
+							}
+							if text == "" {
+								log.Debug().Int("frames", len(f)).Msg("Marshal: empty transcription")
 								return
 							}
 							// Filter Whisper hallucinations — prompt echo and nonsense
 							if isWhisperHallucination(text) {
-								log.Debug().Str("text", text).Msg("Marshal: hallucination filtered")
+								log.Info().Str("text", text).Msg("Marshal: hallucination filtered")
 								return
 							}
 							log.Info().Str("text", text).Msg("Marshal heard")
-							cs := extractCallsignSkippingAddress(text, "union marshal", "union marshall", "unit marshal", "marshall", "marshal")
-							handleMarshalCall(text, cs, stack, comp, transmit, atcCtrl)
+							handleMarshalCall(text, marshalCallsignFromText(text), stack, comp, transmit, atcCtrl)
 						}(frames)
 					}
 				}
@@ -355,54 +502,58 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 // handleMarshalCall processes a recognized marshal transmission.
 func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *composer.ATCComposer, transmit func(string), atcCtrl *controller.ATCController) {
 	lower := strings.ToLower(text)
-	// Self-echo guard: pilot calls always lead with the address word
-	// ("Marshal" / "Union Marshal", or Whisper variants "Marshall" /
-	// "Unit Marshal"). Marshal's own TX has the inverse shape
-	// "<callsign>, marshal, …" — so if the heard text doesn't start with one
-	// of those address tokens, treat it as our own echo coming back through
-	// SRS and drop it. Without this we self-loop on responses containing
-	// "state X" (CopyState ack → retranscribed → fires CopyState again).
-	addrPrefixes := []string{"marshal", "marshall", "union marshal", "unit marshal", "union marshall"}
-	leadsWithAddress := false
-	for _, p := range addrPrefixes {
-		if strings.HasPrefix(lower, p) {
-			leadsWithAddress = true
-			break
-		}
+	// Self-echo guard: pilot calls lead with the address — "Marshal", "Union
+	// Marshal", or one of Whisper's garbles of it (see marshalAddressRe).
+	// Marshal's own TX has the inverse shape "<callsign>, Union Marshal, …", so
+	// a call that doesn't open with the address is our echo coming back through
+	// SRS, or traffic for someone else. Without this we self-loop on responses
+	// containing "state X" (CopyState ack → retranscribed → fires CopyState
+	// again). Logged at info: at debug these drops were invisible, and on
+	// 2026-09-14 they read in the log as Marshal ignoring the pilot.
+	if _, ok := splitMarshalAddress(text); !ok {
+		log.Info().Str("text", text).Msg("Marshal: not addressed to Marshal — ignored")
+		return
 	}
-	if !leadsWithAddress {
-		log.Debug().Str("text", text).Msg("Marshal: dropped — not address-led, likely self-echo")
+	// Every response leads with the callsign. Without one the TX would open
+	// ", Union Marshal, …" and its echo would pass the guard above.
+	if callsign == "" {
+		log.Info().Str("text", text).Msg("Marshal: no callsign in call — ignored")
 		return
 	}
 	fuelState := extractFuelStateMarshal(lower)
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
-	switch {
-	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comp check", "comcheck", "how copy"):
+	switch classifyMarshalCall(lower, fuelState) {
+	case marshalRadioCheck:
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
 
-	case containsAny(lower, "radar check", "radar contact", "request radar", "radar service"):
+	case marshalRadarCheck:
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
-		log.Info().Str("callsign", callsign).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Msg("Marshal: radar check")
+		rBrg = magneticDeg(atcCtrl, rBrg)
+		log.Info().Str("callsign", callsign).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Msg("Marshal: radar check")
 		if rFound {
 			transmit(comp.MarshalRadarCheck(callsign, rAng, rDist, rBrg))
 		} else {
 			transmit(comp.MarshalRadarCheckNoContact(callsign))
 		}
 
-	case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing"):
-		brc := atcCtrl.GetCarrierBRC()
-		log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Marshal: BRC request")
+	case marshalBRCRequest:
+		// Magnetic, off the carrier nearest the caller. Both were wrong on
+		// 2026-09-14: the true heading was spoken, and a second CVN on the map
+		// would have been ignored.
+		brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
+		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Msg("Marshal: BRC request")
 		transmit(comp.MarshalSayBRC(callsign, brc))
 
-	case containsAny(lower, "marking mom", "marking moms", "marking bomb", "marking bombs", "mark your mom", "mark your mum"):
+	case marshalMarkingMom:
 		pos, _ := stack.Enqueue(callsign, fuelState)
 		reserved := stack.ReservedAngels(callsign)
 		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
 		stack.SetAngels(callsign, stackAngels)
-		brc := atcCtrl.GetCarrierBRC()
+		brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		rBrg = magneticDeg(atcCtrl, rBrg)
 		// Pull live recovery case from state so phraseology stays in sync with
 		// any mid-recovery transition the watcher already announced.
 		recCase := atcCtrl.GetRecoveryCase()
@@ -420,29 +571,39 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			// BRC clause is omitted in the response.
 			radial := 0
 			if brc >= 0 {
-				radial = (int(brc) + 180) % 360
+				radial = (int(math.Round(brc)) + 180) % 360
 			}
 			eat := time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin) * time.Minute)
 			stack.SetAssignedRadial(callsign, radial)
 			stack.SetEAT(callsign, eat)
-			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Msg("Marshal: Case 3 aircraft checking in")
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Msg("Marshal: Case 3 aircraft checking in")
 			transmit(comp.MarshalMarkingMomCase3(callsign, stackAngels, radial, eat.Minute(), altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
 		} else {
-			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brc", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearing", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
 			transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
 		}
 
-	case containsAny(lower, "see you at 10", "see you at ten"):
+	case marshalCheckIn:
+		// Bare "checking in" with no marking mom's — flown twice on 2026-09-14
+		// and answered with silence. Radar picture plus a prompt for marking
+		// mom's; no stack slot until the pilot gives it.
+		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		rBrg = magneticDeg(atcCtrl, rBrg)
+		log.Info().Str("callsign", callsign).Bool("radarFound", rFound).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Msg("Marshal: check-in without marking mom's")
+		transmit(comp.MarshalCheckIn(callsign, rAng, rDist, rBrg, rFound))
+
+	case marshalSeeYouAtTen:
 		transmit(comp.MarshalRadarContact(callsign, 10))
 
-	case isDepartureClearCall(lower):
+	case marshalDepartureClear:
 		// Departing aircraft, handed over by Deckboss with the airborne ack.
 		// Marshal releases them from the carrier's control zone and pushes them
 		// to Command for tasking. Deliberately no stack interaction: a departure
 		// is leaving, so enqueuing it would put a phantom in the recovery stack
 		// and skew the angels assignment for aircraft actually coming back.
 		//
-		// Must stay above the " dme"/" mile" case below — see isDepartureClearCall.
+		// classifyMarshalCall tests this ahead of the DME report — see
+		// isDepartureClearCall.
 		dist := extractDMEDistance(lower)
 		log.Info().Str("callsign", callsign).Int("distNm", dist).
 			Str("to", flagHandoffCommandName).Float64("freq", flagHandoffCommandFreq).
@@ -450,20 +611,20 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		transmit(comp.MarshalDepartureClear(callsign, marshalZoneName(),
 			flagHandoffCommandName, flagHandoffCommandFreq, flagHandoffCommandPreset))
 
-	case containsAny(lower, " dme", " mile"):
+	case marshalDME:
 		dist := extractDMEDistance(lower)
 		if dist <= 0 {
-			log.Debug().Str("text", text).Msg("Marshal: DME-shaped call but no parseable distance — dropped")
+			log.Info().Str("text", text).Msg("Marshal: DME-shaped call but no parseable distance — dropped")
 			break
 		}
 		_, _, _, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		log.Info().Str("callsign", callsign).Int("distNm", dist).Bool("radarFound", rFound).Msg("Marshal: DME position report")
 		transmit(comp.MarshalAckDME(callsign, dist, rFound))
 
-	case containsAny(lower, "state") && fuelState > 0:
+	case marshalState:
 		transmit(comp.MarshalCopyState(callsign, fuelState))
 
-	case containsAny(lower, "established angels", "established at angels"):
+	case marshalEstablished:
 		stack.SetPhase(callsign, "holding")
 		angels := 6
 		position := 1
@@ -492,18 +653,18 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			transmit(comp.MarshalEstablishedAck(callsign, angels, position))
 		}
 
-	case containsAny(lower, "commencing"):
+	case marshalCommencing:
 		stack.SetPhase(callsign, "commencing")
 		stack.Remove(callsign)
 		if atcCtrl.GetRecoveryCase() == state.CaseThree {
-			brc := atcCtrl.GetCarrierBRC()
+			brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
 			finalBearing := 0
 			brcDeg := -1
 			if brc >= 0 {
-				finalBearing = ((int(brc) - marshalFinalBearingOffset) + 360) % 360
-				brcDeg = int(brc)
+				brcDeg = int(math.Round(brc)) % 360
+				finalBearing = (brcDeg - marshalFinalBearingOffset + 360) % 360
 			}
-			log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
+			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
 			transmit(comp.MarshalCopyCommencingCase3(callsign, fuelState, finalBearing, brcDeg))
 		} else {
 			transmit(comp.MarshalCopyCommencing(callsign, fuelState))
@@ -515,24 +676,23 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			log.Info().Str("callsign", sd.Callsign).Int("from", sd.OldAngels).Int("to", sd.NewAngels).Msg("Marshal: stack step-down (internal, no TX)")
 		}
 
-	case containsAny(lower, "platform", "passing five thousand", "passing 5000", "at platform"):
+	case marshalPlatform:
 		// Case 3 platform call — pilot is descending through 5000 ft inside
 		// ~20 nm. Ack with final bearing + dirty-up reminder. No state
 		// transition needed; pilot continues to glideslope intercept and
 		// hands off to LSO at ball call. Only meaningful in Case 3; in Case
 		// 1/2 we still ack (rare but harmless) on the same final bearing
 		// math so the pilot isn't ignored.
-		brc := atcCtrl.GetCarrierBRC()
+		brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
 		finalBearing := 0
 		if brc >= 0 {
-			finalBearing = ((int(brc) - marshalFinalBearingOffset) + 360) % 360
+			finalBearing = (int(math.Round(brc)) - marshalFinalBearingOffset + 360) % 360
 		}
 		stack.SetPhase(callsign, "platform")
-		log.Info().Str("callsign", callsign).Float64("brc", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
+		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
 		transmit(comp.MarshalAtPlatform(callsign, finalBearing))
 
-	case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
-		"pushing strike", "switching strike"):
+	case marshalPushCommand:
 		// Pilot's courtesy call on the departure push issued above. Short ack
 		// only. Sits after the DME case for the same reason as the paddles ack
 		// below, and our own departure TX ends in "push <command> for tasking",
@@ -541,8 +701,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Msg("Marshal: pilot-initiated command handoff ack")
 		transmit(comp.HandoffAck(callsign, flagHandoffCommandName))
 
-	case containsAny(lower, "pushing paddles", "switching paddles", "push paddles", "switch paddles",
-		"pushing lso", "switching lso", "pushing button", "pushing channel"):
+	case marshalPushPaddles:
 		// Pilot's courtesy call announcing they're leaving Marshal for the
 		// LSO — the other half of the §6 handoff. Short ack only; the
 		// destination was already issued so repeating it burns radio time.
@@ -552,13 +711,14 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Msg("Marshal: pilot-initiated paddles handoff ack")
 		transmit(comp.HandoffAck(callsign, "paddles"))
 
-	case containsAny(lower, "initial"):
+	case marshalInitial:
 		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.
 		// Marshal's last call before pilot pushes to the LSO freq. TACAN
 		// button reference was dropped — pilots know to switch.
 		log.Info().Str("callsign", callsign).Msg("Marshal: 3nm initial, handing off to LSO")
 		transmit(comp.MarshalPushButton(callsign))
 
+	default:
+		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal intent miss")
 	}
 }
-

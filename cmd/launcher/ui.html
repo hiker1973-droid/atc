@@ -557,11 +557,16 @@ const THEATRES = {
       { icao: 'UGKS', label: 'Senaki',   freq: '261.000', port: 6013, role: 'Senaki Tower' },
       { icao: 'UGKO', label: 'Kutaisi',  freq: '263.000', port: 6014, role: 'Kutaisi Tower' },
     ],
-    // CA carrier roles not wired yet — target the four towers only.
-    wxPorts: [6011, 6012, 6013, 6014],
-    // No Marshal/Deckboss bat for this theatre yet — Command only.
+    // Four towers + Marshal (6004) + Deckboss (6005) on the shared carrier ports.
+    wxPorts: [6011, 6012, 6013, 6014, 6004, 6005],
+    // Black Sea CVN-72: Marshal 306.100 is the card's LIVE MARSHALL (COMM 1
+    // CH 2); 306.300 on that card is the AI Airboss. Deckboss 128.600 as in
+    // every other theatre (operator ruling 2026-09-15). These MUST target the
+    // _caucasus bats — the PG roles put Marshal on 306.300.
     combos: [
-      { id: 'command', label: 'Command', freq: '282.000', extras: 'vSFG-7 Command (Caucasus)', roles: ['vSFG-7 Command (Caucasus)'], stopLabel: 'Stop Command' },
+      { id: 'marshal',  label: 'Marshal',  freq: '306.100', extras: 'CVN-72 · Black Sea',       roles: ['Marshal (Caucasus)'],        stopLabel: 'Stop Marshal' },
+      { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Caucasus)', roles: ['vSFG-7 Command (Caucasus)'], stopLabel: 'Stop Command' },
+      { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Black Sea carrier UHF',    roles: ['Deckboss (Caucasus)'],       stopLabel: 'Stop Deckboss' },
     ],
   },
   germany: {
@@ -627,7 +632,7 @@ const THEATRES = {
     combos: [
       { id: 'marshal',  label: 'Marshal',  freq: '306.100', extras: 'CVN-72 ABE · TACAN 72X',   roles: ['Marshal (Syria)'],          stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Syria)',   roles: ['vSFG-7 Command (Syria)'],   stopLabel: 'Stop Command' },
-      { id: 'deckboss', label: 'Deckboss', freq: '306.200', extras: 'Eastern Med carrier UHF',  roles: ['Deckboss (Syria)'],         stopLabel: 'Stop Deckboss' },
+      { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Eastern Med carrier UHF',  roles: ['Deckboss (Syria)'],         stopLabel: 'Stop Deckboss' },
     ],
   },
 };

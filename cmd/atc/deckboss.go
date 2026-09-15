@@ -287,8 +287,10 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				return
 			}
 			// §7 BRC request: pilot asks mother's bow heading
-			brc := atcCtrl.GetCarrierBRC()
-			log.Info().Str("callsign", callsign).Float64("brc", brc).Msg("Deckboss: BRC request")
+			// Spoken magnetic, off the carrier nearest the caller — see Marshal's
+			// BRC request for why.
+			brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
+			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Msg("Deckboss: BRC request")
 			transmit(comp.MarshalSayBRC(callsign, brc))
 
 		case containsAny(lower, "tension"):

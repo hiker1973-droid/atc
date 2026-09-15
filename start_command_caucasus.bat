@@ -26,4 +26,6 @@ set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: Command freq 282.0 is shared across theatres; --map caucasus makes the
 :: proactive handoff scan the Black Sea towers instead of the PG ones.
-start "vSFG-7 Command (Caucasus)" cmd /c "%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
+:: --handoff-marshal-freq 306.1: Black Sea Marshal (start_marshal_caucasus.bat).
+:: The default is PG's 306.3, the AI Airboss channel on the Black Sea card.
+start "vSFG-7 Command (Caucasus)" cmd /c "%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --handoff-marshal-freq 306.1 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"

@@ -724,6 +724,26 @@ func (c *ATCComposer) MarshalRadarCheckNoContact(callsign string) string {
 	})
 }
 
+// MarshalCheckIn answers a bare "checking in" on the Marshal freq, before the
+// pilot has given marking mom's. Gives the radar picture when Tacview has the
+// caller and asks for marking mom's and state. Deliberately no stack slot: a
+// check-in alone doesn't say whether the jet is recovering.
+func (c *ATCComposer) MarshalCheckIn(callsign string, angels, distNm, bearingDeg int, radarFound bool) string {
+	if radarFound {
+		ang := numberWord(angels)
+		dist := milesToWord(distNm)
+		brg := bearingWord(bearingDeg)
+		return pick([]string{
+			fmt.Sprintf("%s, %s, radar contact, angels %s, %s from mother, bearing %s, say marking mom's and state.", callsign, c.towerCallsign, ang, dist, brg),
+			fmt.Sprintf("%s, %s, radar contact, %s on the %s from mother, angels %s, report marking mom's and state.", callsign, c.towerCallsign, dist, brg, ang),
+		})
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, go ahead with marking mom's and state.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, loud and clear, say marking mom's and state.", callsign, c.towerCallsign),
+	})
+}
+
 // SequencedInitialAck — Tacview-aware initial ack with named traffic ahead.
 // Carries the same 3-10-12 pattern-altitude / direction-of-traffic elements as
 // InboundAck, since this is the same arrival call with a lead aircraft named.

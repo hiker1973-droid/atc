@@ -20,6 +20,10 @@ func TestIsDepartureClearCall(t *testing.T) {
 		{"word-form distance", "union marshal, raider 32, clear seven miles", true},
 		{"outbound phrasing", "marshal, raider 32, clear and outbound", true},
 		{"cleared past tense", "union marshal, raider 32, cleared 10 miles", true},
+		// Flown 2026-09-14 on Syria Marshal and dropped: "mother" with no "of".
+		{"clear mothers", "marshal, raider 331, clear mothers.", true},
+		{"clear mother's with push", "union marshall, raider 331, clear mother's push command.", true},
+		{"clear the boat", "marshal, raider 331, clear the boat", true},
 
 		// Inbound recoveries — must keep the existing DME/stack handling.
 		{"bare dme report is inbound", "marshal, raider 39, 7 dme", false},

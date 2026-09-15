@@ -1844,7 +1844,24 @@ func (c *ATCController) lookupContact(callsign string) *TacviewContact {
 			return v
 		}
 	}
+	// Tacview keys don't space the number consistently ("Raider033" on
+	// Training 1, "Raider 331" on foothold) while callsigns parsed off the
+	// radio always come out "Raider 033". Compare with spaces and dashes gone.
+	want := compactCallsign(callsign)
+	if want == "" {
+		return nil
+	}
+	for k, v := range c.allPositions {
+		if compactCallsign(k) == want {
+			return v
+		}
+	}
 	return nil
+}
+
+// compactCallsign lowercases a callsign and drops spaces and dashes.
+func compactCallsign(s string) string {
+	return strings.ToLower(strings.NewReplacer(" ", "", "-", "").Replace(s))
 }
 
 // UpdateAnyPosition records position for ANY Tacview aircraft and updates ATC
@@ -1998,6 +2015,17 @@ var cvnHullNames = []string{
 // All candidates are logged so future mismatches are debuggable from the JSONL
 // trail. Caller must hold c.allPositionsMu (read).
 func (c *ATCController) findCarrierContact() (callsign string, contact *TacviewContact, found bool) {
+	return c.findCarrierContactNear(nil)
+}
+
+// findCarrierContactNear is findCarrierContact with a tie-break for missions
+// that float more than one hull in the best tier. Foothold Syria exports both
+// CVN-72 and CVN-74 Stennis; lowest-key-wins handed every pilot CVN-72's BRC,
+// right for an Abe pilot and wrong for anyone recovering to Stennis. Given the
+// caller's contact, the hull nearest the caller wins instead — the boat a pilot
+// checks in to is the one they are flying toward. With ref nil the stable
+// lowest-key answer stands. Caller must hold c.allPositionsMu (read).
+func (c *ATCController) findCarrierContactNear(ref *TacviewContact) (callsign string, contact *TacviewContact, found bool) {
 	type candidate struct {
 		cs string
 		ct *TacviewContact
@@ -2038,6 +2066,15 @@ func (c *ATCController) findCarrierContact() (callsign string, contact *TacviewC
 		}
 		sort.Slice(group, func(i, j int) bool { return group[i].cs < group[j].cs })
 		best := group[0]
+		if ref != nil && len(group) > 1 {
+			refPt := orb.Point{ref.Lon, ref.Lat}
+			bestNm := haversineNm(refPt, orb.Point{best.ct.Lon, best.ct.Lat})
+			for _, cand := range group[1:] {
+				if d := haversineNm(refPt, orb.Point{cand.ct.Lon, cand.ct.Lat}); d < bestNm {
+					best, bestNm = cand, d
+				}
+			}
+		}
 		c.logCarrierChoice(best.cs, candidates, "carrier match ("+tierNames[tier]+")")
 		return best.cs, best.ct, true
 	}
@@ -2081,15 +2118,61 @@ func (c *ATCController) logCarrierChoice(chosen string, candidates []string, msg
 // inversion here; every 180°-out report so far has been findCarrierContact
 // locking onto the wrong hull, not a bad heading.
 func (c *ATCController) GetCarrierBRC() float64 {
+	return c.GetCarrierBRCFor("")
+}
+
+// GetCarrierBRCFor is GetCarrierBRC for a caller: with more than one carrier in
+// the best tier, the one nearest the caller's Tacview contact. An empty or
+// unknown callsign behaves exactly like GetCarrierBRC. Degrees TRUE — pass the
+// result through ToMagnetic before speaking it.
+func (c *ATCController) GetCarrierBRCFor(callsign string) float64 {
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
-	cs, contact, found := c.findCarrierContact()
+	cs, contact, found := c.findCarrierContactNear(c.callerRefLocked(callsign))
 	if !found {
 		log.Info().Msg("GetCarrierBRC no match — returning -1")
 		return -1
 	}
-	log.Info().Str("callsign", cs).Float64("heading", contact.HeadingDeg).Msg("GetCarrierBRC matched")
+	log.Info().Str("callsign", cs).Str("caller", callsign).Float64("heading", contact.HeadingDeg).Msg("GetCarrierBRC matched")
 	return contact.HeadingDeg
+}
+
+// callerRefLocked returns the caller's contact for a carrier tie-break, or nil
+// when the callsign is empty, unknown, or not seen for a minute. Caller must
+// hold allPositionsMu.
+func (c *ATCController) callerRefLocked(callsign string) *TacviewContact {
+	if callsign == "" {
+		return nil
+	}
+	contact := c.lookupContact(callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 60*time.Second {
+		return nil
+	}
+	return contact
+}
+
+// MagVar is the role airfield's magnetic variation, degrees, positive east.
+func (c *ATCController) MagVar() float64 {
+	if c.airfieldState == nil || c.airfieldState.Airfield == nil {
+		return 0
+	}
+	return c.airfieldState.Airfield.MagVar
+}
+
+// ToMagnetic converts a true bearing to magnetic with the role airfield's
+// variation, normalised to [0, 360). Tacview headings and computed bearings are
+// true, but pilots fly BRC, final bearing and radials magnetic — speaking the
+// true value put the 2026-09-14 Syria BRC 5° off. A negative input is the
+// "unknown" sentinel (GetCarrierBRC's -1) and is returned unchanged.
+func (c *ATCController) ToMagnetic(trueDeg float64) float64 {
+	if trueDeg < 0 {
+		return trueDeg
+	}
+	m := math.Mod(trueDeg-c.MagVar(), 360)
+	if m < 0 {
+		m += 360
+	}
+	return m
 }
 
 // GetCarrierPosition returns the carrier lon/lat from Tacview.
@@ -2108,17 +2191,17 @@ func (c *ATCController) GetCarrierPosition() (lon, lat float64, found bool) {
 // Marshal to give a radar readback alongside stack assignment. Returns
 // found=false if either Tacview contact or carrier position is unavailable.
 func (c *ATCController) LookupCallerRelativeToCarrier(callsign string) (angels, distNm, bearingDeg int, found bool) {
-	carLon, carLat, carFound := c.GetCarrierPosition()
-	if !carFound {
-		return 0, 0, 0, false
-	}
 	c.allPositionsMu.RLock()
 	defer c.allPositionsMu.RUnlock()
 	contact := c.lookupContact(callsign)
 	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
 		return 0, 0, 0, false
 	}
-	carrierPt := orb.Point{carLon, carLat}
+	_, carrier, carFound := c.findCarrierContactNear(contact)
+	if !carFound {
+		return 0, 0, 0, false
+	}
+	carrierPt := orb.Point{carrier.Lon, carrier.Lat}
 	callerPt := orb.Point{contact.Lon, contact.Lat}
 	angels = int(math.Round(contact.AltFt / 1000.0))
 	if angels < 0 {

@@ -46,5 +46,8 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: events land in atc-lcra.log alongside Akrotiri Tower -- filter on
 :: Deckboss/128.6 when monitoring, same caveat as PG's atc-omdm.log.
 ::
+:: --handoff-marshal-freq 306.1: the airborne ack pushes departures to Marshal,
+:: and the flag defaults to PG's 306.3 -- pilots were sent to the wrong freq.
+::
 :: Voice shimmer, same as PG Deckboss: only one map runs at a time.
-start "Deckboss (Syria)" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+start "Deckboss (Syria)" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.1 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
