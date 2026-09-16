@@ -71,6 +71,25 @@ func TestParseIntentClassification(t *testing.T) {
 		{"3 mile final is not the overhead", "Senaki Tower, Raider 11, 3 mile final", RequestLandingClear},
 		{"5 mile final touch and go", "Senaki Tower, Raider 11, 5 mile final, touch and go", RequestLandingClear},
 
+		// Live misses from Foothold Akrotiri (.222:6046), 2026-09-15 19:30-21:21.
+		// Venom flight addressed the tower correctly, fell through to
+		// RequestUnknown and got silence -- then said so on frequency.
+		{"ready for taxi", "Senaki Tower, Venom 2020, ready for taxi.", RequestTaxiClear},
+		{"request tower taxi", "Senaki Tower, Venom 020, request tower taxi.", RequestTaxiClear},
+		{"ready taxi", "Senaki Tower, Venom 2, ready taxi", RequestTaxiClear},
+		{"taxi for departure", "Senaki Tower, Venom 2, taxi for departure", RequestTaxiClear},
+		{"ready for start", "Senaki Tower, Venom 2, ready for start", RequestStartup},
+		{"request engine start", "Senaki Tower, Venom 2, request engine start", RequestStartup},
+
+		// The "ready for" additions must not swallow the takeoff or startup
+		// phrasings that already worked -- takeoff and startup are both matched
+		// ahead of taxi, so a bad substring here would silently re-route them.
+		{"ready for departure stays takeoff", "Senaki Tower, Raider 11, ready for departure", RequestTakeoffClear},
+		{"ready for takeoff stays takeoff", "Senaki Tower, Raider 11, ready for takeoff", RequestTakeoffClear},
+		{"ready for startup stays startup", "Senaki Tower, Raider 11, ready for startup", RequestStartup},
+		{"ready to taxi still taxi", "Senaki Tower, Raider 11, ready to taxi", RequestTaxiClear},
+		{"taxi to parking still taxi", "Senaki Tower, Raider 11, taxi to parking", RequestTaxiClear},
+
 		// Existing behaviour that must survive.
 		{"turning base", "Senaki Tower, Raider 11, turning base", RequestBase},
 		{"left base", "Senaki Tower, Raider 11, left base runway 09", RequestBase},
