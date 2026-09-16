@@ -47,7 +47,7 @@ var (
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
 	flagSkyEyeImage = flag.String("skyeye-image", "skyeye.exe", "SkyEye GCI process image name the health probe looks for")
 	flagSkyEyeDir   = flag.String("skyeye-dir", "", "SkyEye install dir, used to tell GCI offline from not installed (default: Skyeye beside the SkyeyeATC root)")
-	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,dev=vSFG-7 Night Training ATC/ATIS@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name[=Display Label]@host:port,...")
+	flagFleet       = flag.String("fleet", "host@192.168.1.231:7000,night=Night Server@192.168.1.221:7000,training1@192.168.1.220:7000,foothold@192.168.1.222:7000", "Rigs the /fleet monitor polls: name[=Display Label]@host:port,...")
 )
 
 var fleetRigs []Rig
