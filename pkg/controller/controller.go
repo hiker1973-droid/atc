@@ -1353,7 +1353,11 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		"line up", "lining up", "lineup"):
 		req.Type = RequestTakeoffClear
 	case containsAny(lower, "request startup", "ready for startup", "ready to start", "request start",
-		"requesting startup", "requesting start"):
+		"requesting startup", "requesting start",
+		// "ready to start" matched but "ready for start" did not, while the
+		// takeoff case above takes "ready for departure"/"ready for takeoff".
+		// Pilots carry the "ready for" form across all three phases.
+		"ready for start", "engine start", "start engines"):
 		req.Type = RequestStartup
 	case containsAny(lower, "pushing command", "pushing to command",
 		"switching command", "switching to command", "switching over to command", "switching over",
@@ -1368,7 +1372,13 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	case containsAny(lower, "request taxi", "request ground", "taxi to", "ready to taxi",
 		"requests taxi", "requested taxi", "requesting taxi", "requesting ground",
 		"request clearance", "requesting clearance", "requests clearance", "requested clearance",
-		"clearance to the active", "clearance to active", "clearance to taxi", "clearance for taxi"):
+		"clearance to the active", "clearance to active", "clearance to taxi", "clearance for taxi",
+		// Live misses from Foothold Akrotiri (.222:6046), 2026-09-15: Venom
+		// flight said "ready for taxi" and "request tower taxi", both fell
+		// through to RequestUnknown, and the flight got silence on a correctly
+		// addressed call. "tower taxi" is Whisper folding the prompt's own
+		// callsign into "request taxi" -- the prompt feeds it both.
+		"ready for taxi", "ready taxi", "taxi for departure", "tower taxi"):
 		req.Type = RequestTaxiClear
 	case containsAny(lower, "on final", "final", "request landing", "cleared to land", "full stop") ||
 		req.Option != composer.OptionNone:
