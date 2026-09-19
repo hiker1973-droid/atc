@@ -50,8 +50,9 @@ echo   Ramat David Tower (LLRD) -^> dashboard 6042   [PRIMARY]
 start "Ramat David Tower" cmd /c "%~dp0atc.exe --airfield LLRD --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6042 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 3 /nobreak >nul
 
+:: Akrotiri: British female RAF controller (nova + raf-british), operator 2026-09-19.
 echo   Akrotiri Tower (LCRA) -^> dashboard 6046   [PRIMARY]
-start "Akrotiri Tower" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice onyx --dashboard-port 6046 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+start "Akrotiri Tower" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --voice-style-tower raf-british --dashboard-port 6046 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 3 /nobreak >nul
 
 echo   Bassel Al-Assad Tower (OSLK) -^> dashboard 6049   [DIVERT]

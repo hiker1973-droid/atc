@@ -154,7 +154,7 @@ Foothold Syria runs on this rig now, **not PG**. One map at a time, so the PG sc
 | H4 OJHR tower / ATIS | 252.250 / 240.850 | CH 16 / 17 |
 | Akrotiri LCRA tower | 252.000 | CH 18 |
 | Paphos LCPH tower / ATIS | 249.100 / 249.000 | CH 19 / 20 |
-| Marshal | 306.100 | COMM 1 CH 2 |
+| Marshal | 306.300 (stern female voice, since 2026-09-19; was 306.100 CH 2) | COMM 1 CH 3 "CVN-72 AI MARSHALL" |
 | Command | 282.000 | COMM 1 CH 4 |
 | **Deckboss** | **128.600** | **deviates — card says COMM 2 CH 1 = 306.200** |
 

@@ -4,7 +4,7 @@
 :: Does NOT start the launcher (already running when the dashboard fires this).
 ::
 :: CARRIER OPS ARE RUN ON THIS MAP: CVN-72 "ABE", TACAN 72X / ICLS 12 / Link 4
-:: 336.000. Marshal 306.100, Deckboss 306.200, LSO 128.100 -- the mission's own
+:: 336.000. Marshal 306.300 (since 2026-09-19), Deckboss 128.600, LSO 128.100 -- the mission's own
 :: AI carrier ATC sits on 128.600, so Deckboss uses 306.200 here. LSO has no
 :: atc.exe role - handoff to it is verbal only. See SYRIA_PLAN.md section 3.
 ::
@@ -20,7 +20,7 @@ call "%~dp0start_towers_syria.bat"
 echo [vSFG-7] Launching Command...
 call "%~dp0start_command_syria.bat"
 
-echo [vSFG-7] Launching Marshal (306.100)...
+echo [vSFG-7] Launching Marshal (306.300)...
 call "%~dp0start_marshal_syria.bat"
 
 echo [vSFG-7] Launching Deckboss (306.200)...

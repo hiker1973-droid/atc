@@ -27,9 +27,9 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
 :: Syria / Eastern Med Marshal -- CVN-72 "ABE", TACAN 72X / ICLS 12 / ACLS on.
 ::
-:: 306.100, NOT the PG 306.300 (SYRIA_PLAN.md section 3, user ruling
-:: 2026-08-29). Launching the PG bat on this map puts Marshal on the wrong
-:: freq, which is exactly what the theatre-blind dashboard cards used to do.
+:: 306.300 since 2026-09-19 (operator ruling; was 306.100 from 2026-08-29).
+:: Still use THIS bat on this map, not the PG one: --airfield LCRA sets the
+:: Levant magnetic variation BRC is spoken with.
 ::
 :: --airfield LCRA (Akrotiri): Marshal is carrier-only and does not register a
 :: tower, so this only sets the weather/divert context and the log slug. Akrotiri
@@ -38,4 +38,6 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 ::
 :: Voice coral, same as PG Marshal: only one map runs at a time, so there is no
 :: collision. Dashboard 6004 is likewise shared with PG Marshal by design.
-start "Marshal (Syria)" cmd /c "%~dp0atc.exe --marshal-only --airfield LCRA --marshal-freq 306.1 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"
+:: 306.3 + stern female voice (operator ruling 2026-09-19): Hornet COMM1 CH3
+:: "CVN-72 AI MARSHALL". Was 306.1 (card CH2 "LIVE MARSHALL", now unused).
+start "Marshal (Syria)" cmd /c "%~dp0atc.exe --marshal-only --airfield LCRA --marshal-freq 306.3 --marshal-voice sage --voice-style-marshal marshal-stern --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"

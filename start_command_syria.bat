@@ -19,7 +19,7 @@ set TACVIEW_FLAG=
 if defined SKYEYE_TACVIEW set TACVIEW_FLAG=--tacview-addr "%SKYEYE_TACVIEW%"
 
 echo [vSFG-7] Starting Syria Command (282.0)...
-:: --handoff-marshal-freq 306.1: Syria Marshal. The default is PG's 306.3, so
-:: RTB pilots were told to call Marshal on a frequency nobody listens to.
-start "vSFG-7 Command (Syria)" cmd /c "%~dp0atc.exe --command-only --map syria --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --handoff-marshal-freq 306.1 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7775 --log-level %LOG%"
+:: --handoff-marshal-freq 306.3: Syria Marshal (Hornet COMM1 CH3 "CVN-72 AI
+:: MARSHALL", operator ruling 2026-09-19; was 306.1).
+start "vSFG-7 Command (Syria)" cmd /c "%~dp0atc.exe --command-only --map syria --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7775 --log-level %LOG%"
 echo [vSFG-7] Syria Command launched.

@@ -294,6 +294,7 @@ func rotateLogIfNeeded(logPath string) {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	resolveStylePresets()
 	level, _ := zerolog.ParseLevel(flagLogLevel)
 	// Write logs to both stderr (console) and a rotating log file
 	logDir := "C:\\SkyeyeATC\\logs"
@@ -1733,7 +1734,50 @@ const (
 
 	styleATIS = "Read as a recorded automated terminal information broadcast. " +
 		"Even, neutral, unhurried, identical inflection on every phrase. No emphasis anywhere."
+
+	// Foothold voice casting, operator 2026-09-19. Passed per role (tower via
+	// --voice-style-tower in start_towers_syria.bat, Marshal via
+	// --voice-style-marshal in start_marshal_syria.bat) or per ATIS station.
+	styleTowerBritish = "Speak as a Royal Air Force air traffic controller at RAF Akrotiri: " +
+		"a woman with a crisp southern British (Received Pronunciation) accent. " +
+		"Clipped, precise, brisk, matter-of-fact. Flat affect, no warmth. " +
+		"Run grouped numbers together as a single phrase rather than reading them one by one."
+
+	styleATISBritish = "Read as a recorded RAF aerodrome information broadcast by a woman " +
+		"with a British (Received Pronunciation) accent. Even, neutral, unhurried, " +
+		"identical inflection on every phrase. No emphasis anywhere."
+
+	// Syria ATIS: English read in the local accent (operator 2026-09-19: "make sure
+	// the other ATIS airfields reflect English and local dialect"). The second-language
+	// pass uses the same instructions, so it sounds native too.
+	styleMarshalStern = "Speak as a US Navy carrier Marshal controller, a woman: stern, firm, " +
+		"no-nonsense and exacting. Calm, measured, deliberate pacing. Authoritative and " +
+		"clipped, never warm, never rushed."
 )
+
+// stylePresets are short names a start script can pass to --voice-style-* in
+// place of a whole sentence, which is fragile inside the bats' nested cmd /c
+// quoting. Anything that is not a preset name is used as literal instructions.
+var stylePresets = map[string]string{
+	"raf-british":   styleTowerBritish,
+	"marshal-stern": styleMarshalStern,
+}
+
+func resolveStylePresets() {
+	for _, p := range []*string{&flagVoiceStyleTower, &flagVoiceStyleMarshal,
+		&flagVoiceStyleDeckboss, &flagVoiceStyleCommand, &flagVoiceStyleATIS} {
+		if full, ok := stylePresets[*p]; ok {
+			*p = full
+		}
+	}
+}
+
+// styleATISAccent is the shared ATIS delivery read in a given local accent.
+func styleATISAccent(accent string) string {
+	return "Read as a recorded automated terminal information broadcast, spoken by a local " +
+		"controller with a " + accent + " accent. Even, neutral, unhurried, identical " +
+		"inflection on every phrase. No emphasis anywhere."
+}
 
 // Per-role speeds. All roles run at 1.15 since 2026-09-19 (operator: "we need
 // speech speed to be 1.15"); before that 1.10 from 2026-08-16, the Deckboss rate
@@ -1773,6 +1817,15 @@ func commandVoice(v string) voiceProfile {
 
 func atisVoice(v string) voiceProfile {
 	return voiceProfile{v, speedATIS, flagVoiceStyleATIS}
+}
+
+// atisVoiceFor is atisVoice with the station's own Style, when it has one.
+func atisVoiceFor(st *atisStation) voiceProfile {
+	p := atisVoice(st.Voice)
+	if st.Style != "" {
+		p.instructions = st.Style
+	}
+	return p
 }
 
 // synthesizeSpeech checks cache first, falls back to API on miss.

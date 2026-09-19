@@ -153,6 +153,10 @@ type atisStation struct {
 	// second pass at all. Set per-field where one theatre spans several
 	// countries; Syria is the case that forced it.
 	Lang      string
+	// Style overrides --voice-style-atis for this one station (the gpt-4o-mini-tts
+	// instructions). Empty = the shared ATIS delivery. Akrotiri uses it for a
+	// British female read (operator 2026-09-19).
+	Style     string
 }
 
 type atisState struct {
@@ -339,7 +343,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 				Str("secondLang", langField).
 				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio")
 
-			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, atisVoice(station.Voice))
+			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, atisVoiceFor(station))
 			if err != nil {
 				log.Error().Err(err).Str("station", station.Name).Msg("ATIS English TTS failed")
 				state.mu.Unlock()
@@ -352,7 +356,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 			if wantSecond {
 				if l2Text, terr := translateATIS(ctx, apiKey, enText, secondLang); terr != nil {
 					log.Warn().Err(terr).Str("station", station.Name).Str("lang", secondLang).Msg("ATIS local-language translate failed — broadcasting English only")
-				} else if mp3, mErr := synthesizeSpeechAPI(ctx, apiKey, l2Text, atisVoice(station.Voice)); mErr != nil {
+				} else if mp3, mErr := synthesizeSpeechAPI(ctx, apiKey, l2Text, atisVoiceFor(station)); mErr != nil {
 					log.Warn().Err(mErr).Str("station", station.Name).Str("lang", secondLang).Msg("ATIS local-language TTS failed — broadcasting English only")
 				} else {
 					l2MP3 = mp3
@@ -658,36 +662,47 @@ func atisStationsForMap(m string) []*atisStation {
 		// Akrotiri -- it is a UK Sovereign Base Area and operates in English.
 		return []*atisStation{
 			{Name: "Incirlik ATIS", FreqMHz: 360.200, Voice: "nova", ICAO: "LTAG",
+				Style: styleATISAccent("Turkish"),
 				Lang: "Turkish", // Turkey
 				TACAN: "TACAN 21X.", ILS: "ILS 109.30 runway 05. ILS 111.70 runway 23.", Advisory: advisory},
 			{Name: "Ramat David ATIS", FreqMHz: 256.150, Voice: "shimmer", ICAO: "LLRD",
+				Style: styleATISAccent("Israeli"),
 				Lang: "Hebrew", // Israel
 				// ILS is on 33, not 15, and the field has TACAN 84X / VOR 113.70
 				// (DimOn Aerodrome Data 01 Feb 2026).
 				TACAN: "TACAN 84X. VOR 113.7.", ILS: "ILS 111.10 runway 33.", Advisory: advisory},
 			{Name: "King Hussein ATIS", FreqMHz: 255.550, Voice: "alloy", ICAO: "OJMF",
+				Style: styleATISAccent("Jordanian Arabic"),
 				Lang: "Arabic", // Jordan
 				TACAN: "VORTAC 115.90, channel 106.", ILS: "ILS 111.70 runway 13.", Advisory: advisory},
 			{Name: "Hatay ATIS", FreqMHz: 249.300, Voice: "echo", ICAO: "LTDA",
+				Style: styleATISAccent("Turkish"),
 				Lang: "Turkish", // Turkey
 				TACAN: "VOR DME 112.05.", ILS: "ILS 108.90 runway 04. ILS 108.15 runway 22.", Advisory: advisory},
 			{Name: "Gaziantep ATIS", FreqMHz: 249.400, Voice: "fable", ICAO: "LTAJ",
+				Style: styleATISAccent("Turkish"),
 				Lang: "Turkish", // Turkey
 				TACAN: "VOR DME 116.70.", ILS: "ILS 109.10 runway 28.", Advisory: advisory},
-			{Name: "Akrotiri ATIS", FreqMHz: 249.500, Voice: "onyx", ICAO: "LCRA",
+			// British female read, a different voice from the Akrotiri tower's
+			// (operator 2026-09-19): RAF Akrotiri is a UK Sovereign Base Area.
+			{Name: "Akrotiri ATIS", FreqMHz: 249.500, Voice: "shimmer", ICAO: "LCRA",
+				Style: styleATISBritish,
 				Lang: "English", // UK Sovereign Base Area -- English only
 				TACAN: "TACAN 107X.", ILS: "ILS 109.70 runway 28.", Advisory: advisory},
 			{Name: "Paphos ATIS", FreqMHz: 249.000, Voice: "nova", ICAO: "LCPH",
+				Style: styleATISAccent("Greek Cypriot"),
 				Lang: "Greek", // Cyprus
 				TACAN: "TACAN 79X.", ILS: "ILS 108.90 runway 29.", Advisory: advisory},
 			// H4 has NO ILS, TACAN, VOR or NDB anywhere on the field -- both strings
 			// are deliberately empty so the ATIS does not claim an aid that is not there.
 			{Name: "H4 ATIS", FreqMHz: 240.850, Voice: "shimmer", ICAO: "OJHR",
+				Style: styleATISAccent("Jordanian Arabic"),
 				Lang: "Arabic", // Jordan
 				Advisory: advisory},
 			// DIVERT FIELDS, added 2026-09-19. Neither is on the card, so both ATIS
 			// frequencies are ASSIGNED BY US -- pilots have no preset for either.
 			{Name: "Bassel Al-Assad ATIS", FreqMHz: 249.600, Voice: "coral", ICAO: "OSLK",
+				Style: styleATISAccent("Syrian Levantine Arabic"),
 				Lang: "Arabic", // Syria
 				// VOR/NDB and the ILS runway per DimOn Aerodrome Data (01 Feb 2026): the
 				// field has parallels 17L/35R and 17R/35L, and the ILS is on 17R.
@@ -696,6 +711,7 @@ func atisStationsForMap(m string) []*atisStation {
 			// three ILS (16 110.10, 17 109.50, 03 110.70). The earlier "NDB only" reading came
 			// from beacons.lua's display names and missed the KAD/IBB/BIL/IKK entries.
 			{Name: "Beirut ATIS", FreqMHz: 249.700, Voice: "sage", ICAO: "OLBA",
+				Style: styleATISAccent("Lebanese"),
 				Lang: "Arabic", // Lebanon
 				TACAN: "VOR DME 112.60. NDB 351.",
 				ILS: "ILS 110.10 runway 16. ILS 109.50 runway 17. ILS 110.70 runway 03.", Advisory: advisory},
