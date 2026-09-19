@@ -91,6 +91,7 @@ var (
 	flagMizDir          string
 	flagTacviewAddr     string
 	flagATISFreq        string
+	flagATISStations    string
 	flagATISBroadcast   bool
 	flagCommandFreq     string
 	flagCommandName     string
@@ -163,6 +164,8 @@ func main() {
 		"Broadcast ATIS on airfield ATIS frequency (replaces MOOSE ATIS)")
 	f.StringVar(&flagATISFreq, "atis-freq", "0",
 		"ATIS frequency in MHz to monitor for weather (0=auto from airfield)")
+	f.StringVar(&flagATISStations, "atis-stations", "",
+		"Comma-separated ICAOs to limit --atis-only to (empty=every station in the theatre set)")
 	f.StringVar(&flagTacviewAddr, "tacview-addr", "192.168.1.221:42676",
 		"Tacview real-time telemetry address:port")
 	f.IntVar(&flagDashboardPort, "dashboard-port", 0,

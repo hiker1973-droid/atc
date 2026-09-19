@@ -63,6 +63,9 @@ var towerDashboardPortByICAO = map[string]int{
 	"LCRA": 6046,
 	"LCPH": 6047,
 	"OJHR": 6048,
+	// Divert fields (not on the card), added 2026-09-19.
+	"OSLK": 6049,
+	"OLBA": 6050,
 }
 
 // fetchTowerRunway returns the active runway reported by the tower /status
@@ -680,6 +683,16 @@ func atisStationsForMap(m string) []*atisStation {
 			{Name: "H4 ATIS", FreqMHz: 240.850, Voice: "shimmer", ICAO: "OJHR",
 				Lang: "Arabic", // Jordan
 				Advisory: advisory},
+			// DIVERT FIELDS, added 2026-09-19. Neither is on the card, so both ATIS
+			// frequencies are ASSIGNED BY US -- pilots have no preset for either.
+			{Name: "Bassel Al-Assad ATIS", FreqMHz: 249.600, Voice: "coral", ICAO: "OSLK",
+				Lang: "Arabic", // Syria
+				TACAN: "VOR DME 114.80. NDB 414.", ILS: "ILS 109.10 runway 17.", Advisory: advisory},
+			// Beirut has NO ILS, TACAN or VOR -- beacons.lua carries one NDB (BOD 351)
+			// and nothing else, so ILS is deliberately empty as at H4.
+			{Name: "Beirut ATIS", FreqMHz: 249.700, Voice: "sage", ICAO: "OLBA",
+				Lang: "Arabic", // Lebanon
+				TACAN: "NDB 351.", Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{
@@ -697,6 +710,43 @@ func atisStationsForMap(m string) []*atisStation {
 	}
 }
 
+// filterATISStations narrows a theatre ATIS set to the ICAOs named in a
+// comma-separated list (--atis-stations). An empty list means "every station in
+// the set", so the default behaviour of every existing theatre is unchanged.
+//
+// ⚠ THIS DELIBERATELY DOES NOT FAIL OPEN. FieldsForMap silently returns the
+// Persian Gulf on a typo and that has cost debugging time before, so here an
+// ICAO matching no station is a warn and a filter selecting nothing is fatal —
+// a mistyped start script stops ATIS loudly instead of quietly putting all
+// eight Syria stations back on the air.
+func filterATISStations(stations []*atisStation, list string) []*atisStation {
+	if strings.TrimSpace(list) == "" {
+		return stations
+	}
+	wanted := map[string]bool{}
+	for _, name := range strings.Split(list, ",") {
+		if icao := strings.ToUpper(strings.TrimSpace(name)); icao != "" {
+			wanted[icao] = false
+		}
+	}
+	var kept []*atisStation
+	for _, st := range stations {
+		if _, ok := wanted[st.ICAO]; ok {
+			wanted[st.ICAO] = true
+			kept = append(kept, st)
+		}
+	}
+	for icao, matched := range wanted {
+		if !matched {
+			log.Warn().Str("icao", icao).Msg("--atis-stations names an ICAO with no station in this theatre — ignored")
+		}
+	}
+	if len(kept) == 0 {
+		log.Fatal().Str("atis-stations", list).Msg("--atis-stations matched no station in this theatre — refusing to start")
+	}
+	return kept
+}
+
 // atisOnlyLoop runs the theatre's ATIS station set with static weather.
 func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 	// Static weather from flags
@@ -709,7 +759,7 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 	if ceilFt < 0   { ceilFt = 8202 }
 	if altInHg <= 0 { altInHg = 29.88 }
 
-	stations := atisStationsForMap(flagMap)
+	stations := filterATISStations(atisStationsForMap(flagMap), flagATISStations)
 
 	var atcCtrl *controller.ATCController
 	if windDir >= 0 {

@@ -45,6 +45,8 @@ func TestSyriaATISLanguages(t *testing.T) {
 		"LCRA": "English", // Akrotiri, UK SBA -- English only
 		"OJMF": "Arabic",  // King Hussein, Jordan
 		"OJHR": "Arabic",  // H4, Jordan
+		"OSLK": "Arabic",  // Bassel Al-Assad, Syria -- divert field
+		"OLBA": "Arabic",  // Beirut, Lebanon -- divert field
 	}
 
 	stations := atisStationsForMap("syria")

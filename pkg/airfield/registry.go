@@ -13,6 +13,7 @@ var registry = map[string]*Airfield{
 	"ORBD": ORBD, "ORBB": ORBB, "ORER": ORER, "ORKK": ORKK, "ORSU": ORSU, // Iraq
 	"LTAG": LTAG, "LLRD": LLRD, "OJMF": OJMF, "LTDA": LTDA, // Syria / Eastern Med
 	"LTAJ": LTAJ, "LCRA": LCRA, "LCPH": LCPH, "OJHR": OJHR, // Syria / Eastern Med
+	"OSLK": OSLK, "OLBA": OLBA, // Syria / Eastern Med divert fields (not on the card)
 }
 
 // ByICAO returns the airfield for an ICAO (case-insensitive), or nil if unknown.
@@ -34,7 +35,11 @@ var (
 	// Eastern Med" card (tower on UHF), in launch order. Carrier ops ARE run on
 	// this map: CVN-72 ABE, with Marshal/Deckboss/LSO on 306.100/306.200/128.100.
 	// ⚠ H4 (OJHR) has no ILS/TACAN/VOR/NDB at all — its ATIS reports no aids.
-	Syria = []*Airfield{LTAG, LLRD, OJMF, LTDA, LTAJ, LCRA, LCPH, OJHR}
+	// ⚠ OSLK (Bassel Al-Assad) and OLBA (Beirut) are DIVERT fields added
+	// 2026-09-19 and are NOT on the card — pilots have no preset for either.
+	// They are listed so Command can hand off and position-report against
+	// them; which fields actually launch is decided by the start scripts.
+	Syria = []*Airfield{LTAG, LLRD, OJMF, LTDA, LTAJ, LCRA, LCPH, OJHR, OSLK, OLBA}
 )
 
 // FieldsForMap returns the tower fields for a map name (default: Persian Gulf).
