@@ -266,6 +266,7 @@
   .airfield-cell.OJMF { color: #ffa657; } .airfield-cell.LTDA { color: #d2a8ff; }
   .airfield-cell.LTAJ { color: #f778ba; } .airfield-cell.LCRA { color: #ffdf5d; }
   .airfield-cell.LCPH { color: #56d4dd; } .airfield-cell.OJHR { color: #ff9492; }
+  .airfield-cell.OSLK { color: #ffa657; } .airfield-cell.OLBA { color: #d2a8ff; }
 </style>
 </head>
 <body>
@@ -612,16 +613,15 @@ const THEATRES = {
     towers: [
       { icao: 'LTAG', label: 'Incirlik',     freq: '360.100', port: 6041, role: 'Incirlik Tower' },
       { icao: 'LLRD', label: 'Ramat David',  freq: '251.300', port: 6042, role: 'Ramat David Tower' },
-      { icao: 'OJMF', label: 'King Hussein', freq: '250.450', port: 6043, role: 'King Hussein Tower' },
-      { icao: 'LTDA', label: 'Hatay',        freq: '250.300', port: 6044, role: 'Hatay Tower' },
-      { icao: 'LTAJ', label: 'Gaziantep',    freq: '250.100', port: 6045, role: 'Gaziantep Tower' },
       { icao: 'LCRA', label: 'Akrotiri',     freq: '252.000', port: 6046, role: 'Akrotiri Tower' },
-      { icao: 'LCPH', label: 'Paphos',       freq: '249.100', port: 6047, role: 'Paphos Tower' },
-      { icao: 'OJHR', label: 'H4',           freq: '252.250', port: 6048, role: 'H4 Tower' },
+      // Divert fields (Foothold roster 2026-09-19). King Hussein, Hatay, Gaziantep,
+      // Paphos and H4 are parked -- see start_towers_syria.bat.
+      { icao: 'OSLK', label: 'Bassel Al-Assad', freq: '250.600', port: 6049, role: 'Bassel Al-Assad Tower' },
+      { icao: 'OLBA', label: 'Beirut',       freq: '250.650', port: 6050, role: 'Beirut Tower' },
     ],
     // Carrier ops ARE run on Syria: CVN-72 ABE, with Marshal (6004) and
     // Deckboss (6005) on the shared carrier ports, same as PG.
-    wxPorts: [6041, 6042, 6043, 6044, 6045, 6046, 6047, 6048, 6004, 6005],
+    wxPorts: [6041, 6042, 6046, 6049, 6050, 6004, 6005],
     // Carrier ops are flown here (CVN-72 ABE). Syria's carrier freqs differ
     // from PG — Marshal 306.100 (not 306.300) and Deckboss 306.200 (not
     // 128.600, which is the mission's own AI carrier ATC) — so these MUST

@@ -22,6 +22,13 @@ func TestParseIntentAddressing(t *testing.T) {
 		{"king hussein without tower", "Mafraq Tower", "King Hussein, Raider 11, inbound", true},
 		{"h4 hyphenated", "H4 Tower", "H-4 Tower, Raider 11, radio check", true},
 		{"h4 without tower", "H4 Tower", "H4, Raider 11, radio check", true},
+		{"bassel tower", "Bassel Al-Assad Tower", "Bassel Tower, Raider 11, request taxi", true},
+		{"bassel without tower", "Bassel Al-Assad Tower", "Bassel, Raider 11, inbound", true},
+		{"basel misspelt", "Bassel Al-Assad Tower", "Basel Tower, Raider 11, radio check", true},
+		{"bassel full name", "Bassel Al-Assad Tower", "Bassel al-Assad Tower, Raider 11, ready to taxi", true},
+		{"latakia is bassel", "Bassel Al-Assad Tower", "Latakia Tower, Raider 11, radio check", true},
+		{"beirut", "Beirut Tower", "Beirut, Raider 11, request taxi", true},
+		{"beirut is not bassel", "Bassel Al-Assad Tower", "Beirut Tower, Raider 11, request taxi", false},
 
 		// Other shapes of the field-name address.
 		{"misspelt without tower", "Incirlik Tower", "Injirlik, Raider 11, request taxi", true},

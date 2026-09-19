@@ -7,9 +7,14 @@ import "strings"
 // "King Hussein Tower" and "H-4 Tower" also match the "[field] tower" check.
 //   - Mafraq (OJMF): the role, dashboard and preset card all say King Hussein.
 //   - H4 (OJHR): Whisper writes it "H-4" / "H 4".
+//   - Bassel Al-Assad (OSLK): the longest word, "al-assad", becomes the
+//     primary key, so the first word needs listing; DCS names the field Latakia.
+//   - Beirut (OLBA): the airport's own name is Rafic Hariri.
 var fieldSpokenAliases = map[string][]string{
-	"mafraq tower": {"king hussein", "hussein"},
-	"h4 tower":     {"h 4", "h-4", "h four"},
+	"mafraq tower":          {"king hussein", "hussein"},
+	"h4 tower":              {"h 4", "h-4", "h four"},
+	"bassel al-assad tower": {"bassel", "basel", "basil", "bassil", "latakia", "lattakia"},
+	"beirut tower":          {"beyrouth", "hariri", "rafic hariri"},
 }
 
 func extraFieldAliases(towerCallsign string) []string {

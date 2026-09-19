@@ -36,10 +36,15 @@ var (
 	// this map: CVN-72 ABE, with Marshal/Deckboss/LSO on 306.100/306.200/128.100.
 	// ⚠ H4 (OJHR) has no ILS/TACAN/VOR/NDB at all — its ATIS reports no aids.
 	// ⚠ OSLK (Bassel Al-Assad) and OLBA (Beirut) are DIVERT fields added
-	// 2026-09-19 and are NOT on the card — pilots have no preset for either.
-	// They are listed so Command can hand off and position-report against
-	// them; which fields actually launch is decided by the start scripts.
-	Syria = []*Airfield{LTAG, LLRD, OJMF, LTDA, LTAJ, LCRA, LCPH, OJHR, OSLK, OLBA}
+	// 2026-09-19; they are on the Foothold v1.10 Hornet presets (COMM1 CH14-17).
+	//
+	// ⚠ ONLY THE FIVE LIVE FIELDS (Foothold roster, operator 2026-09-19). Command's
+	// handoff scan and position reports walk this list, so a parked field here gets
+	// pilots told to call a tower nobody is running. King Hussein, Hatay, Gaziantep,
+	// Paphos and H4 keep their definitions (registry above) and ATIS entries; to bring
+	// one back, uncomment it in start_towers_syria.bat, add it to --atis-stations in
+	// start_atis_syria.bat, AND add it here.
+	Syria = []*Airfield{LTAG, LLRD, LCRA, OSLK, OLBA}
 )
 
 // FieldsForMap returns the tower fields for a map name (default: Persian Gulf).

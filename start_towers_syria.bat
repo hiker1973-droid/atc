@@ -33,13 +33,14 @@ echo [vSFG-7] Starting Syria ATC system (5 fields)...
 :: alternate/divert fields. The other five towers are PARKED at the
 :: bottom of this file, not deleted -- their airfield definitions and
 :: ATIS stations are still in the code, so restoring one is uncommenting
-:: its line here and adding its ICAO to --atis-stations in
-:: start_atis_syria.bat.
+:: its line here, adding its ICAO to --atis-stations in
+:: start_atis_syria.bat, AND adding it to the Syria list in
+:: pkg/airfield/registry.go (Command only hands off to fields in that list).
 ::
-:: ** Bassel Al-Assad and Beirut are NOT on the presets card. ** Their
-:: tower frequencies (250.600 / 253.200) are the DCS terrain values from
-:: Mods/terrains/Syria/radio.lua, which is the same source the card
-:: follows, but no pilot has a preset for either -- BRIEF THEM.
+:: Bassel Al-Assad 250.600 / ATIS 249.600 and Beirut 250.650 / ATIS 249.700
+:: are on the Foothold v1.10 Hornet presets (COMM1 CH14-17). Beirut is NOT the
+:: DCS terrain's 253.200 -- that is the SHELL 2 tanker (operator ruling
+:: 2026-09-18). Tower frequencies live in pkg/airfield/{oslk,olba}.go.
 
 echo   Incirlik Tower (LTAG) -^> dashboard 6041   [PRIMARY]
 start "Incirlik Tower" cmd /c "%~dp0atc.exe --airfield LTAG --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6041 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"

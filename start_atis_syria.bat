@@ -23,8 +23,8 @@ echo [vSFG-7] Starting Syria ATIS (5 stations, English + Arabic)...
 :: is the selector -- the theatre set in atisStationsForMap still holds all
 :: ten, so restoring King Hussein / Hatay / Gaziantep / Paphos / H4 is an
 :: edit to THIS LINE, not a code change.
-:: Bassel Al-Assad 249.600 and Beirut 249.700 are ASSIGNED BY US -- neither
-:: field is on the presets card, so pilots have no preset for either.
-:: Beirut broadcasts NDB 351 only; it has no ILS, TACAN or VOR.
+:: Bassel Al-Assad 249.600 and Beirut 249.700 are assigned by us and are on the
+:: Foothold v1.10 Hornet presets (COMM1 CH15 / CH17).
+:: Beirut has VOR/DME 112.60, NDB 351 and ILS 16/17/03 (DimOn Aerodrome Data).
 start "vSFG-7 ATIS (Syria)" cmd /c "%~dp0atc.exe --atis-only --map syria --atis-stations LTAG,LLRD,LCRA,OSLK,OLBA --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%"
 echo [vSFG-7] Syria ATIS launched.

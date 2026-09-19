@@ -1081,7 +1081,7 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 // abused as an open proxy to arbitrary localhost services. Covers every
 // theatre: PG towers 6001-6003 + Marshal 6004 + Deckboss 6005, Caucasus
 // towers 6011-6014, Cold War Germany towers 6021-6028, Iraq towers
-// 6031-6039, and Syria towers 6041-6048.
+// 6031-6039, and Syria towers 6041-6050 (6049/6050 = Bassel Al-Assad / Beirut).
 var proxyPorts = map[int]bool{
 	6001: true, 6002: true, 6003: true, 6004: true, 6005: true,
 	6011: true, 6012: true, 6013: true, 6014: true,
@@ -1091,6 +1091,7 @@ var proxyPorts = map[int]bool{
 	6036: true, 6037: true, 6038: true, 6039: true,
 	6041: true, 6042: true, 6043: true, 6044: true,
 	6045: true, 6046: true, 6047: true, 6048: true,
+	6049: true, 6050: true,
 }
 
 // handleTowerProxy reverse-proxies /tower/<port>/<rest> to http://127.0.0.1:<port>/<rest>
