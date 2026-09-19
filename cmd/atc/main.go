@@ -89,6 +89,7 @@ var (
 	flagStaticNight     bool
 	flagMizPath         string
 	flagMizDir          string
+	flagMizWatchFile    string
 	flagTacviewAddr     string
 	flagATISFreq        string
 	flagATISStations    string
@@ -155,6 +156,8 @@ func main() {
 	f.Float64Var(&flagStaticTempC,   "static-temp-c",   15, "Static temperature Celsius (Training VM)")
 	f.BoolVar(&flagStaticNight,      "static-night",    false, "Treat mission as night (sets IsNight + 'VFR Night' mode). Real-world server clock is unrelated to DCS mission time, so this must be set explicitly.")
 	f.StringVar(&flagMizPath, "miz-path", "", "Path to a specific .miz to read weather from at boot (overrides --miz-dir)")
+	f.StringVar(&flagMizWatchFile, "miz-watch-file", `C:\SkyeyeATC\current_mission.txt`,
+		"File the DCS server hook (tools/dcs-hooks/vsfg7-current-mission.lua) writes the loaded mission's path to; polled every 30s and the new mission's weather applied live. Empty disables. Missing file = keep boot weather.")
 	f.StringVar(&flagMizDir,  "miz-dir",  `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for the newest .miz when --miz-path is empty. Empty disables .miz auto-load.")
 	f.BoolVar(&flagCommandOnly, "command-only", false,
 		"Run as command channel only — no tower, no ATIS, no marshal")
@@ -421,6 +424,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// --static-* flags. .miz wind is true degrees (controller applies MagVar
 	// internally). IsNight always comes from --static-night until Tacview's
 	// mission time overrides it on the dashboard side.
+	bootMiz := "" // the .miz the boot weather came from, for the live-weather watcher
 	seedFromMiz := func() bool {
 		var mizPath string
 		switch {
@@ -451,11 +455,20 @@ func run(cmd *cobra.Command, args []string) error {
 			Float64("altInHg", w.AltInHg).
 			Float64("tempC", w.TempC).
 			Msg("Weather loaded from .miz")
+		bootMiz = mizPath
 		return true
 	}
 	if !seedFromMiz() {
 		atcCtrl.SetFullWeather(flagStaticWindDir, flagStaticWindKts, flagStaticCeilFt, flagStaticVisSm, flagStaticAltInHg, flagStaticNight)
 	}
+	// Follow the mission the DCS server actually has loaded (weather rotation).
+	go runMizWatch(ctx, &mizWatcher{
+		pointerFile: flagMizWatchFile,
+		read:        miz.ReadMizWeather,
+		apply: func(w miz.Weather) {
+			atcCtrl.SetFullWeather(w.WindDirTrue, w.WindKts, w.CeilFt, w.VisNm, w.AltInHg, flagStaticNight)
+		},
+	}, bootMiz)
 	marshStack := state.NewMarshalStack()
 
 	// ATIS-only mode — Training VM, static weather
@@ -1669,7 +1682,7 @@ func icaoVoiceBucket(icao string) int {
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
 // 14 chars/sec rate is empirical at our old 0.88 speed; every role now runs at
-// 1.10, where actual playback is faster still, so 14 keeps the estimate
+// 1.15, where actual playback is faster still, so 14 keeps the estimate
 // conservative (over-cools rather than under-cools) — deliberately left alone
 // when the rates went up, since under-cooling is the failure that bites.
 // The 5s margin covers ExternalAudio.exe
@@ -1722,20 +1735,21 @@ const (
 		"Even, neutral, unhurried, identical inflection on every phrase. No emphasis anywhere."
 )
 
-// Per-role speeds. All roles run at the Deckboss rate (2026-08-16, operator
-// preference): the deck boss's clip was the one that sounded right, so every
+// Per-role speeds. All roles run at 1.15 since 2026-09-19 (operator: "we need
+// speech speed to be 1.15"); before that 1.10 from 2026-08-16, the Deckboss rate
+// (operator preference): the deck boss's clip was the one that sounded right, so every
 // channel — live controller and recorded loop alike — now reads at that pace.
 // Marshal was 1.00 (a Case III approach is read to a pilot who is writing it
 // down) and ATIS was 0.97 (clarity on a loop); both were raised to match.
 //
 // Tower/Command speed is the --tts-speed flag, whose default is speedDeckboss.
-// The constants stay separate so a single role can be pulled back off 1.10
+// The constants stay separate so a single role can be pulled back off 1.15
 // without disturbing the others, and overriding --tts-speed on one process
 // still works if a field needs to differ.
 const (
-	speedMarshal  = 1.10
-	speedDeckboss = 1.10
-	speedATIS     = 1.10
+	speedMarshal  = 1.15
+	speedDeckboss = 1.15
+	speedATIS     = 1.15
 )
 
 // towerVoice / marshalVoice / deckbossVoice / commandVoice / atisVoice build the

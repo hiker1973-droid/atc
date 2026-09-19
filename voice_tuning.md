@@ -27,19 +27,21 @@ prose — rewrite them freely and rebuild; there is no schema.
 
 ## Speech rate
 
-Every role runs at **1.10** as of 2026-08-16 (operator preference). The rates
-used to differ per role; Marshal (`1.00`) and ATIS (`0.97`) were raised to match
-the Deckboss rate that sounded right.
+Every role runs at **1.15** as of 2026-09-19 (operator: "we need speech speed to
+be 1.15"). Before that, **1.10** from 2026-08-16; the rates used to differ per
+role, and Marshal (`1.00`) and ATIS (`0.97`) were raised to match the Deckboss
+rate that sounded right. ATIS regenerates its audio on its first broadcast after
+a restart, so a speed change needs a rebuild + role restart, not a cache clear.
 
 | Role | Rate | Knob |
 |---|---|---|
-| Tower / Command | `1.10` | `--tts-speed` (default is `speedDeckboss`) |
-| Deckboss | `1.10` | `speedDeckboss` |
-| Marshal | `1.10` | `speedMarshal` |
-| ATIS | `1.10` | `speedATIS` |
+| Tower / Command | `1.15` | `--tts-speed` (default is `speedDeckboss`) |
+| Deckboss | `1.15` | `speedDeckboss` |
+| Marshal | `1.15` | `speedMarshal` |
+| ATIS | `1.15` | `speedATIS` |
 
 The per-role constants are in `cmd/atc/main.go` and are kept as three separate
-names even though they're now equal, so one role can be pulled back off 1.10
+names even though they're now equal, so one role can be pulled back off 1.15
 without disturbing the others. Only the Tower/Command rate is exposed as a flag.
 
 ## Voice casting

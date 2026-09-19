@@ -43,6 +43,7 @@ var (
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
 	flagMizDir      = flag.String("miz-dir", "", "Dir scanned for newest .miz when --miz-path is empty (default: this user's DCS Saved Games)")
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
+	flagMizWatch    = flag.String("miz-watch-file", `C:\SkyeyeATC\current_mission.txt`, "File the DCS server hook writes the loaded mission's path to; when it names an existing .miz, /api/miz-weather reports that mission (matches atc.exe --miz-watch-file)")
 	flagTacviewPort = flag.Int("tacview-port", 42676,
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
 	flagSkyEyeImage = flag.String("skyeye-image", "skyeye.exe", "SkyEye GCI process image name the health probe looks for")
@@ -1246,7 +1247,15 @@ func handleMizWeather(w http.ResponseWriter, r *http.Request) {
 	// Priority mirrors atc.exe's boot seed (cmd/atc/main.go): an explicit
 	// --miz-path (fed SKYEYE_MIZ by start_launcher.bat) wins, so the widget
 	// reflects the mission the roles actually loaded rather than whatever .miz
-	// happens to be newest on disk.
+	// happens to be newest on disk. Ahead of both: the mission the DCS server
+	// actually has loaded, as written by the server hook -- the roles follow it
+	// live (cmd/atc/mizwatch.go), so the widget must too.
+	if path := currentMissionFromHook(*flagMizWatch); path != "" {
+		if wx, err := miz.ReadMizWeather(path); err == nil {
+			writeMizWeather(w, path, wx)
+			return
+		}
+	}
 	if path := *flagMizPath; path != "" {
 		wx, err := miz.ReadMizWeather(path)
 		if err != nil {
@@ -1269,6 +1278,26 @@ func handleMizWeather(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeMizWeather(w, path, wx)
+}
+
+// currentMissionFromHook returns the .miz named in the hook's pointer file, or ""
+// when there is none (hook not installed, empty, or the mission is not on disk).
+func currentMissionFromHook(pointerFile string) string {
+	if pointerFile == "" {
+		return ""
+	}
+	b, err := os.ReadFile(pointerFile)
+	if err != nil {
+		return ""
+	}
+	p := strings.TrimSpace(strings.TrimPrefix(string(b), "\uFEFF"))
+	if p == "" || !strings.EqualFold(filepath.Ext(p), ".miz") {
+		return ""
+	}
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
 }
 
 func writeMizWeather(w http.ResponseWriter, path string, wx miz.Weather) {
