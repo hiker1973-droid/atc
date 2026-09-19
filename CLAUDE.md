@@ -158,6 +158,45 @@ Foothold Syria runs on this rig now, **not PG**. One map at a time, so the PG sc
 
 Dashboards 6041–6048 for the towers, 6004 Marshal, 6005 Deckboss.
 
+### ROSTER CUT TO FIVE FIELDS (2026-09-19, operator ruling)
+
+**Only five Syria fields now run ATC and ATIS.** The table above still lists
+every field the card covers — it is the frequency reference, not the roster.
+
+| Field | Role | Tower | ATIS | Dashboard |
+|---|---|---|---|---|
+| Akrotiri LCRA | primary | 252.000 | 249.500 | 6046 |
+| Incirlik LTAG | primary | 360.100 | 360.200 | 6041 |
+| Ramat David LLRD | primary | 251.300 | 256.150 | 6042 |
+| **Bassel Al-Assad OSLK** | divert | **250.600** | **249.600** | **6049** |
+| **Beirut OLBA** | divert | **253.200** | **249.700** | **6050** |
+
+**King Hussein (OJMF), Hatay (LTDA), Gaziantep (LTAJ), Paphos (LCPH) and H4
+(OJHR) are PARKED, not deleted.** Their airfield definitions and ATIS stations
+are still in the code. Restoring one is two edits: uncomment its line at the
+bottom of `start_towers_syria.bat`, and add its ICAO to `--atis-stations` in
+`start_atis_syria.bat`. Do only the first and you get a tower with no ATIS.
+
+**`--atis-stations` is the ATIS selector** (new, `587609d`) — a comma-separated
+ICAO list narrowing `--atis-only`. Empty means the whole theatre set, so PG /
+Caucasus / Germany / Iraq are unchanged. It does **not** fail open: an unknown
+ICAO warns, and a filter matching nothing is fatal rather than quietly putting
+all eight Syria stations back on the air.
+
+**The two divert fields are NOT on the card — pilots have no preset for
+either.** Their tower frequencies are the DCS terrain values from
+`Mods/terrains/Syria/radio.lua` (entries "Latakia" and "Beirut"), which is the
+same source the card follows — Akrotiri's 252.000 is that file's Akrotiri UHF
+verbatim. That also means we transmit on top of the DCS AI tower at both, the
+same deviation Deckboss runs on 128.600. ATIS 249.600 / 249.700 are assigned by
+us. **Brief both fields or nobody hears them.**
+
+Navaids: Bassel Al-Assad has ILS 109.10 (IBA) on RWY 17, VOR/DME LTK 114.80,
+NDB 414. **Beirut has one beacon — NDB BOD 351, no ILS/TACAN/VOR** — so its
+ATIS reports the NDB only, like H4. ⚠ Position data for both is **derived, not
+surveyed** (Beirut especially, having no localizer to resolve against); verify
+before enabling `--position-check`.
+
 **Deckboss deviation.** The card puts Deckboss on 306.200, and 128.600 on COMM 1 CH 1 = CVN-72 **AI**, the mission's own carrier controller. Operator ruled 128.600 anyway on 2026-09-02, so we transmit on top of the DCS AI and a pilot using COMM 2 CH 1 as briefed will not hear us. Called out in `start_deckboss_syria.bat`. **If Deckboss is ever reported silent, start here.** Cautionary tale: pilots seen tuned to `128.600 + 306.200` are on COMM 1 CH 1 + COMM 2 CH 1 — i.e. correctly tuned to Deckboss on **306.200**. That was misread once as evidence they wanted Deckboss moved.
 
 Hatay / Gaziantep / Akrotiri ATIS (249.300 / 249.400 / 249.500) are **assigned by us**, not on the card — the card gives those three tower-only, so pilots have no preset for them.
