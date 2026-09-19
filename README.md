@@ -117,7 +117,7 @@ In DCS → Options → Special → Tacview:
 | OMAM | Al Dhafra | 13L/31R + 13R/31L | 128°/308° | 126.800 | 52 |
 | OMAL | Al Ain | 01/19 | 010°/190° | 119.850 | 814 |
 
-MagVar: +2.25°E (all three, per AFD-3351 July 2020)
+MagVar: +2.5°E (all three; DimOn Aerodrome Data 2016-2025 value, 2026-09-19 -- was +2.25°E per AFD-3351 July 2020)
 
 ---
 

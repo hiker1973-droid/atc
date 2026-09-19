@@ -10,7 +10,7 @@ var OMDM = &Airfield{
 	DCSName:         "Al Minhad AFB",
 	Center:          orb.Point{55.36582, 25.02684}, // [lon, lat] DimOn Aerodrome Data 01 Feb 2026 (was 55.3692/25.0333 off the diagram grid, ~740 m north)
 	ElevationFt:     190,
-	MagVar:          2.25, // +2.25°E per diagram
+	MagVar:          2.5, // +2.5°E, DimOn 2016-2025 value for the PG map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    250.100,
 	ApproachFreqMHz: 250.100, // No separate approach freq on diagram — use tower

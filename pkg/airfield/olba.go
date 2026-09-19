@@ -23,7 +23,7 @@ var OLBA = &Airfield{
 	DCSName:         "Beirut-Rafic Hariri",         // VERIFY exact ME name on the Syria map
 	Center:          orb.Point{35.48757, 33.82740}, // [lon, lat]
 	ElevationFt:     39,
-	MagVar:          5.0, // ~+5.0°E over the Levant; documentation only
+	MagVar:          5.5, // +5.5°E, DimOn 2025 value for the Syria map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    250.650,
 	ApproachFreqMHz: 250.650,

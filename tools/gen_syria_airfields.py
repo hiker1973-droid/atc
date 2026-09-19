@@ -23,7 +23,9 @@ import os
 # tools/ -> repo root -> pkg/airfield (the script moved into tools/ after it was written).
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pkg", "airfield")
 
-MAGVAR = 5.0          # ~+5°E over the Levant; documentation only, unused in wind logic
+MAGVAR = 5.5          # DimOn 2025 value for the Syria map (operator 2026-09-19; was 5.0).
+                      # Used for wind -> magnetic, spoken BRC and Command bearings -- NOT
+                      # documentation only, whatever older comments say.
 PATTERN_ALT = 1500
 HANDOFF = ("command", 282.000, "channel four")   # COMMAND is COMM1 P4 on the E-Med card
 

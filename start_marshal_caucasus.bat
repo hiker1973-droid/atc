@@ -34,7 +34,7 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 ::
 :: --airfield UGSB (Batumi): Marshal is carrier-only and registers no tower, so
 :: this sets the weather/divert context and the magnetic variation BRC is
-:: spoken with (+6.5 E). Log goes to atc-marshal.log -- --marshal-only wins the
+:: spoken with (+7.5 E, DimOn 2020s value, 2026-09-19). Log goes to atc-marshal.log -- --marshal-only wins the
 :: log-slug switch in cmd/atc/main.go.
 ::
 :: Voice coral and dashboard 6004 are shared with the PG and Syria Marshals by

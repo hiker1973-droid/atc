@@ -28,7 +28,7 @@ thresholds in the `.go` files are computed from center + heading + length.
 - **Batumi ILS** — AOR card says `09 / 108.90`, but Batumi's runway is 13/31 and
   108.90 is Senaki's ILS (copy error). Real DCS Batumi ILS is RWY 13; placeholder
   `110.30` pending confirmation. **VERIFY.**
-- **MagVar** — set to `+6.5°E` for all four (Caucasus); confirm against DCS.
+- **MagVar** — `+7.5°E` for all four since 2026-09-19 (DimOn Aerodrome Data, 2020s value; was +6.5°E).
 
 ## 2. Frequencies
 
@@ -70,7 +70,7 @@ COMM 1 CH 2), Deckboss **128.600** (same as every theatre — deviates from the
 card's 306.200, and sits on the mission's AI carrier controller). Command and
 Deckboss hand departures/recoveries to Marshal with `--handoff-marshal-freq 306.1`.
 Scripts: `start_marshal_caucasus.bat`, `start_deckboss_caucasus.bat`, both
-`--airfield UGSB` (weather + the +6.5°E variation BRC is spoken with). Dashboard
+`--airfield UGSB` (weather + the +7.5°E variation BRC is spoken with). Dashboard
 ports 6004 / 6005, shared with PG and Syria. Before this, Training 1 flew Black
 Sea missions on the **PG** `start_marshal.bat` (306.300) and `start_deckboss.bat`.
 
@@ -106,7 +106,7 @@ Remaining:
 - [x] Carrier ops CA scripts — `start_marshal_caucasus.bat` (306.300 since 2026-09-18),
       `start_deckboss_caucasus.bat` (128.600), both in `start_region_caucasus.bat`
       / `start_all_caucasus.bat` and on the dashboard's Caucasus theatre.
-- [ ] Verify the Black Sea MagVar (+6.5°E) against DCS — Marshal and Deckboss
+- [x] Black Sea MagVar set to +7.5°E from DimOn (2026-09-19) -- was +6.5°E, unverified against DCS — Marshal and Deckboss
       speak BRC magnetic with it.
 - [ ] Point `SKYEYE_MIZ` at the Caucasus mission `.miz` when running Black Sea.
 - [ ] Live validation on a CA mission (runway selection, ATIS mirror, handoff),

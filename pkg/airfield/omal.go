@@ -12,7 +12,7 @@ var OMAL = &Airfield{
 	DCSName:         "Al Ain Intl",
 	Center:          orb.Point{55.6083, 24.2617}, // [lon, lat] derived from diagram grid
 	ElevationFt:     814,
-	MagVar:          2.25, // +2.25°E per diagram
+	MagVar:          2.5, // +2.5°E, DimOn 2016-2025 value for the PG map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    2000, // Higher pattern alt due to field elevation
 	TowerFreqMHz:    250.700,
 	ApproachFreqMHz: 250.700,

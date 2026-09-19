@@ -12,7 +12,7 @@ var UG5X = &Airfield{
 	DCSName:         "Kobuleti",
 	Center:          orb.Point{41.87648, 41.93210}, // [lon, lat] — 67X (KBL) TACAN antenna
 	ElevationFt:     59,
-	MagVar:          6.5, // +6.5°E Caucasus — VERIFY vs DCS
+	MagVar:          7.5, // +7.5°E, DimOn 2020s value for the Caucasus map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    262.000,
 	ApproachFreqMHz: 262.000,

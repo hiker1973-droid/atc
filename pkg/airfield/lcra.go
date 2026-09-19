@@ -23,7 +23,7 @@ var LCRA = &Airfield{
 	DCSName:         "Akrotiri",                    // VERIFY exact ME name on the Syria map
 	Center:          orb.Point{32.98806, 34.59056}, // [lon, lat]
 	ElevationFt:     69,
-	MagVar:          5.0, // ~+5.0°E over the Levant; documentation only
+	MagVar:          5.5, // +5.5°E, DimOn 2025 value for the Syria map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    252.000,
 	ApproachFreqMHz: 252.000,

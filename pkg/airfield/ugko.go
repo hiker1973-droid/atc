@@ -15,7 +15,7 @@ var UGKO = &Airfield{
 	DCSName:         "Kutaisi",
 	Center:          orb.Point{42.49568, 42.17915}, // [lon, lat] — 44X (KTS) TACAN antenna
 	ElevationFt:     148,
-	MagVar:          6.5, // +6.5°E Caucasus — VERIFY vs DCS
+	MagVar:          7.5, // +7.5°E, DimOn 2020s value for the Caucasus map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    263.000,
 	ApproachFreqMHz: 263.000,

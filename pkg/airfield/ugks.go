@@ -12,7 +12,7 @@ var UGKS = &Airfield{
 	DCSName:         "Senaki-Kolkhi",
 	Center:          orb.Point{42.04760, 42.24108}, // [lon, lat] — 31X (TSK) TACAN antenna
 	ElevationFt:     43,
-	MagVar:          6.5, // +6.5°E Caucasus — VERIFY vs DCS
+	MagVar:          7.5, // +7.5°E, DimOn 2020s value for the Caucasus map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    261.000,
 	ApproachFreqMHz: 261.000,

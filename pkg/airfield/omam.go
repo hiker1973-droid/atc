@@ -14,7 +14,7 @@ var OMAM = &Airfield{
 	DCSName:         "Al Dhafra AFB",
 	Center:          orb.Point{54.5483, 24.2467}, // [lon, lat] derived from diagram grid
 	ElevationFt:     52,
-	MagVar:          2.25, // +2.25°E per diagram
+	MagVar:          2.5, // +2.5°E, DimOn 2016-2025 value for the PG map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    251.100,
 	ApproachFreqMHz: 251.100,

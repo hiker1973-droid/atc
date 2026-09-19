@@ -18,7 +18,7 @@ var LTDA = &Airfield{
 	DCSName:         "Hatay",                       // VERIFY exact ME name on the Syria map
 	Center:          orb.Point{36.28500, 36.36028}, // [lon, lat]
 	ElevationFt:     253,
-	MagVar:          5.0, // ~+5.0°E over the Levant; documentation only
+	MagVar:          5.5, // +5.5°E, DimOn 2025 value for the Syria map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    250.300,
 	ApproachFreqMHz: 250.300,

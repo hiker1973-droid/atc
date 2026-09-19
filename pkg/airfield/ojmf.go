@@ -18,7 +18,7 @@ var OJMF = &Airfield{
 	DCSName:         "King Hussein Air College",    // VERIFY exact ME name on the Syria map
 	Center:          orb.Point{36.25917, 32.35639}, // [lon, lat]
 	ElevationFt:     2204,
-	MagVar:          5.0, // ~+5.0°E over the Levant; documentation only
+	MagVar:          5.5, // +5.5°E, DimOn 2025 value for the Syria map (operator 2026-09-19); wind, BRC, bearings
 	PatternAltFt:    1500,
 	TowerFreqMHz:    250.450,
 	ApproachFreqMHz: 250.450,
