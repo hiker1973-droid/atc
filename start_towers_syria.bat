@@ -25,40 +25,50 @@ set GOMEMLIMIT=512MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-echo [vSFG-7] Starting Syria ATC system (8 recovery bases)...
+echo [vSFG-7] Starting Syria ATC system (5 fields)...
 :: NOTE: the Foothold VM runs SRS on :5002, NOT the :5008 the Training rig uses.
 :: SKYEYE_SRS must say localhost:5002 on that host.
+::
+:: ROSTER 2026-09-19 (operator ruling): three primaries and two
+:: alternate/divert fields. The other five towers are PARKED at the
+:: bottom of this file, not deleted -- their airfield definitions and
+:: ATIS stations are still in the code, so restoring one is uncommenting
+:: its line here and adding its ICAO to --atis-stations in
+:: start_atis_syria.bat.
+::
+:: ** Bassel Al-Assad and Beirut are NOT on the presets card. ** Their
+:: tower frequencies (250.600 / 253.200) are the DCS terrain values from
+:: Mods/terrains/Syria/radio.lua, which is the same source the card
+:: follows, but no pilot has a preset for either -- BRIEF THEM.
 
-echo   Incirlik Tower (LTAG) -^> dashboard 6041
+echo   Incirlik Tower (LTAG) -^> dashboard 6041   [PRIMARY]
 start "Incirlik Tower" cmd /c "%~dp0atc.exe --airfield LTAG --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6041 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 
-echo   Ramat David Tower (LLRD) -^> dashboard 6042
+echo   Ramat David Tower (LLRD) -^> dashboard 6042   [PRIMARY]
 start "Ramat David Tower" cmd /c "%~dp0atc.exe --airfield LLRD --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6042 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 
-echo   King Hussein Tower (OJMF) -^> dashboard 6043
-start "King Hussein Tower" cmd /c "%~dp0atc.exe --airfield OJMF --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --dashboard-port 6043 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
-
-echo   Hatay Tower (LTDA) -^> dashboard 6044
-start "Hatay Tower" cmd /c "%~dp0atc.exe --airfield LTDA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice echo --dashboard-port 6044 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
-
-echo   Gaziantep Tower (LTAJ) -^> dashboard 6045
-start "Gaziantep Tower" cmd /c "%~dp0atc.exe --airfield LTAJ --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice fable --dashboard-port 6045 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
-
-echo   Akrotiri Tower (LCRA) -^> dashboard 6046
+echo   Akrotiri Tower (LCRA) -^> dashboard 6046   [PRIMARY]
 start "Akrotiri Tower" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice onyx --dashboard-port 6046 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 
-echo   Paphos Tower (LCPH) -^> dashboard 6047
-start "Paphos Tower" cmd /c "%~dp0atc.exe --airfield LCPH --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6047 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
+echo   Bassel Al-Assad Tower (OSLK) -^> dashboard 6049   [DIVERT]
+start "Bassel Al-Assad Tower" cmd /c "%~dp0atc.exe --airfield OSLK --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --dashboard-port 6049 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+timeout /t 3 /nobreak >nul
 
-echo   H4 Tower (OJHR) -^> dashboard 6048
-start "H4 Tower" cmd /c "%~dp0atc.exe --airfield OJHR --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6048 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
-timeout /t 2 /nobreak >nul
+echo   Beirut Tower (OLBA) -^> dashboard 6050   [DIVERT]
+start "Beirut Tower" cmd /c "%~dp0atc.exe --airfield OLBA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice echo --dashboard-port 6050 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+timeout /t 3 /nobreak >nul
 
+:: ---------------------------------------------------------------------
+:: PARKED 2026-09-19 -- these five were on the card and ran until today.
+:: Uncomment to bring one back, and add its ICAO to --atis-stations in
+:: start_atis_syria.bat or it will have a tower and no ATIS.
+:: start "King Hussein Tower" cmd /c "%~dp0atc.exe --airfield OJMF --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --dashboard-port 6043 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: start "Hatay Tower" cmd /c "%~dp0atc.exe --airfield LTDA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice echo --dashboard-port 6044 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: start "Gaziantep Tower" cmd /c "%~dp0atc.exe --airfield LTAJ --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice fable --dashboard-port 6045 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: start "Paphos Tower" cmd /c "%~dp0atc.exe --airfield LCPH --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6047 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: start "H4 Tower" cmd /c "%~dp0atc.exe --airfield OJHR --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6048 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: ---------------------------------------------------------------------
 echo [vSFG-7] Syria towers launched.
