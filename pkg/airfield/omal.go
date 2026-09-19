@@ -4,7 +4,8 @@ import "github.com/paulmach/orb"
 
 // OMAL is Al Ain International Airport, UAE.
 // Data sourced from [USAF] AFD-3351 airport diagram, July 2020.
-// Single runway 01/19 — heading 010°/190° magnetic.
+// Single runway 01/19 — heading 006°/186° magnetic in DCS (DimOn Aerodrome Data
+// 01 Feb 2026; the real-world diagram says 010/190).
 var OMAL = &Airfield{
 	ICAO:            "OMAL",
 	Name:            "Al Ain",
@@ -33,12 +34,12 @@ var OMAL = &Airfield{
 			// VOR: 112.60 MHz ALA 119
 			Primary: Runway{
 				Designator:      "19",
-				MagneticHeading: 190.0,
+				MagneticHeading: 186.0,
 				ThresholdLatLon: orb.Point{55.6083, 24.2833}, // North threshold (RWY 19 landing north→south)
 			},
 			Reciprocal: Runway{
 				Designator:      "01",
-				MagneticHeading: 10.0,
+				MagneticHeading: 6.0,
 				ThresholdLatLon: orb.Point{55.6083, 24.2367}, // South threshold
 			},
 		},

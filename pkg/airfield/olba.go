@@ -2,42 +2,31 @@ package airfield
 
 import "github.com/paulmach/orb"
 
-// OLBA is Beirut–Rafic Hariri International — Syria (Eastern Med) theatre,
-// DIVERT field.
+// OLBA is Beirut — Syria (Eastern Med) theatre.
+// Foothold alternate/divert field (operator ruling 2026-09-18). Tower/ATIS are
+// the operator's picks, not the Eastern Med card; position, elevation, runways
+// and ILS from DimOn Aerodrome Data 01 Feb 2026 and the DCS Syria beacons.lua.
+// Thresholds are COMPUTED from center + heading + length — verify against DCS
+// before enabling --position-check.
 //
-// ⚠ NOT ON THE SQUADRON CARD. Pilots have NO preset for this field; the tower
-// frequency has to be briefed or dialled manually. Added 2026-09-19 on operator
-// request as an alternate/divert field.
-//
-// Tower 253.200 is the DCS terrain frequency, read from the Syria
-// Mods/terrains/Syria/radio.lua entry "Beirut" (callsign "Hariri", UHF AM
-// 253200000). As at Bassel Al-Assad, this shares the frequency with the DCS AI
-// tower.
-//
-// ATIS 249.700 is ASSIGNED BY US — DCS has no ATIS and the card has no entry.
-// Chosen clear of the existing Syria ATIS block and of Bassel Al-Assad 249.600.
-//
-// ⚠ NO ILS, NO TACAN, NO VOR. beacons.lua carries exactly one Beirut entry, an
-// AIRPORT_HOMER_WITH_MARKER on 351 kHz, callsign BOD. The ATIS reports that NDB
-// and nothing else — the same treatment H4 (OJHR) gets — so we never claim an
-// approach aid the field does not have.
-//
-// ⚠ POSITION DATA IS DERIVED, NOT SURVEYED, AND WEAKER THAN OSLK's. beacons.lua
-// gives only the NDB, so there is no localizer course to resolve the runway
-// layout against — center, headings and thresholds come from the real-world
-// OLBA plate (03/21 3395 m, 16/34 3180 m) and are approximate. Both pairs are
-// declared so wind-driven selection has a sensible choice, but VERIFY AGAINST
-// DCS before enabling --position-check.
+// Three runways (03/21, 16/34, 17/35); 16/34 (10,300 ft) and 03/21 modelled.
+// ILS 16 IBB 110.10, ILS 17 BIL 109.50, ILS 03 IKK 110.70. VOR/DME KAD 112.60,
+// NDB 351. Position (2026-09-19: moved ~700 m from the beacons.lua estimate),
+// elevation and runways from DimOn Aerodrome Data 01 Feb 2026. ⚠ DCS terrain
+// tower is UHF 253.200 -- the SHELL 2 tanker's frequency in Foothold -- so
+// SkyEye uses 250.650 (operator ruling 2026-09-18). ATIS 249.700 ASSIGNED.
+// Both pairs share one computed centre, so thresholds are rougher than usual;
+// keep --position-check off.
 var OLBA = &Airfield{
 	ICAO:            "OLBA",
 	Name:            "Beirut",
-	DCSName:         "Beirut",                      // VERIFY exact ME name
-	Center:          orb.Point{35.48840, 33.82090}, // [lon, lat]
-	ElevationFt:     87,
+	DCSName:         "Beirut-Rafic Hariri",         // VERIFY exact ME name on the Syria map
+	Center:          orb.Point{35.48757, 33.82740}, // [lon, lat]
+	ElevationFt:     39,
 	MagVar:          5.0, // ~+5.0°E over the Levant; documentation only
 	PatternAltFt:    1500,
-	TowerFreqMHz:    253.200,
-	ApproachFreqMHz: 253.200,
+	TowerFreqMHz:    250.650,
+	ApproachFreqMHz: 250.650,
 	ATISFreqMHz:     249.700,
 	DepartureDistNm: 7,
 	DepartureAngels: 3,
@@ -45,19 +34,19 @@ var OLBA = &Airfield{
 	HandoffFreqMHz:  282.000,
 	HandoffPreset:   "channel four", // COMMAND is COMM1 P4 on the Eastern Med card
 	BreakDirections: map[string]string{
-		"03": "left", // TODO verify pattern side vs terminal in DCS
-		"21": "left",
-		"16": "left",
+		"16": "left", // TODO verify pattern side vs ramp in DCS
 		"34": "left",
+		"03": "left", // TODO verify pattern side vs ramp in DCS
+		"21": "left",
 	},
 	RunwayPairs: []RunwayPair{
 		{
-			Primary:    Runway{Designator: "03", MagneticHeading: 34.0, ThresholdLatLon: orb.Point{35.48000, 33.81000}},
-			Reciprocal: Runway{Designator: "21", MagneticHeading: 214.0, ThresholdLatLon: orb.Point{35.49800, 33.83600}},
+			Primary:    Runway{Designator: "16", MagneticHeading: 164.0, ThresholdLatLon: orb.Point{35.48433, 33.84124}},
+			Reciprocal: Runway{Designator: "34", MagneticHeading: 344.0, ThresholdLatLon: orb.Point{35.49081, 33.81356}},
 		},
 		{
-			Primary:    Runway{Designator: "16", MagneticHeading: 164.0, ThresholdLatLon: orb.Point{35.49300, 33.83500}},
-			Reciprocal: Runway{Designator: "34", MagneticHeading: 344.0, ThresholdLatLon: orb.Point{35.48500, 33.80800}},
+			Primary:    Runway{Designator: "03", MagneticHeading: 30.0, ThresholdLatLon: orb.Point{35.47784, 33.81585}},
+			Reciprocal: Runway{Designator: "21", MagneticHeading: 210.0, ThresholdLatLon: orb.Point{35.49731, 33.83895}},
 		},
 	},
 }

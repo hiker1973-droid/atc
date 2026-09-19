@@ -8,7 +8,7 @@ var OMDM = &Airfield{
 	ICAO:            "OMDM",
 	Name:            "Al Minhad",
 	DCSName:         "Al Minhad AFB",
-	Center:          orb.Point{55.3692, 25.0333}, // [lon, lat] derived from diagram grid
+	Center:          orb.Point{55.36582, 25.02684}, // [lon, lat] DimOn Aerodrome Data 01 Feb 2026 (was 55.3692/25.0333 off the diagram grid, ~740 m north)
 	ElevationFt:     190,
 	MagVar:          2.25, // +2.25°E per diagram
 	PatternAltFt:    1500,
@@ -29,20 +29,22 @@ var OMDM = &Airfield{
 	RunwayPairs: []RunwayPair{
 		{
 			// Single runway 09/27 — 11,865 ft long
-			// Heading 090°/270° magnetic (diagram confirmed)
+			// Heading 088°/268° magnetic in DCS (DimOn Aerodrome Data 01 Feb
+			// 2026; the real-world diagram says 090/270). Thresholds recomputed
+			// 2026-09-19 from the corrected centre, 12,600 ft and 090.5 true.
 			// ILS 09: 110.70 MHz | ILS 27: 110.75 MHz
 			// Primary set to 09 — calm-wind default. Wind-based picker still
 			// flips to 27 when easterly winds exceed 3 kts (see
 			// airfield.ActiveRunway).
 			Primary: Runway{
 				Designator:      "09",
-				MagneticHeading: 90.0,
-				ThresholdLatLon: orb.Point{55.3550, 25.0333}, // West threshold (point A)
+				MagneticHeading: 88.0,
+				ThresholdLatLon: orb.Point{55.34678, 25.02699}, // West threshold (computed)
 			},
 			Reciprocal: Runway{
 				Designator:      "27",
-				MagneticHeading: 270.0,
-				ThresholdLatLon: orb.Point{55.3833, 25.0333}, // East threshold (point G)
+				MagneticHeading: 268.0,
+				ThresholdLatLon: orb.Point{55.38485, 25.02669}, // East threshold (computed)
 			},
 		},
 	},

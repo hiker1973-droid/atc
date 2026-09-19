@@ -5,7 +5,8 @@ import "github.com/paulmach/orb"
 // LCRA is Akrotiri — Syria (Eastern Med) theatre.
 // Tower/ATIS from the ratified vSFG-7 "Hornet Radio Presets — Eastern Med" card;
 // position, elevation, runways and ILS from CombatWombat's Airfield Diagrams
-// (Syrian Theatre v5.0) AIRFIELD SUMMARY, cross-checked with the DCS beacons.lua.
+// (Syrian Theatre v5.0) AIRFIELD SUMMARY, cross-checked with the DCS beacons.lua
+// and (2026-09-19) DimOn Aerodrome Data 01 Feb 2026.
 // Thresholds are COMPUTED from center + heading + length — verify against DCS
 // before enabling --position-check.
 //
@@ -14,13 +15,14 @@ import "github.com/paulmach/orb"
 // real RAF Akrotiri are both 10/28, with the ILS on 28 (109.70/291). The chart
 // wins. TACAN AK ch107, DME 116.00. ⚠ DCS terrain tower is 251.70; the card
 // says 252.000. ATIS 249.500 is ASSIGNED -- the card gives Akrotiri
-// tower-only.
+// tower-only. 2026-09-19: elevation 76 -> 69 ft per DimOn Aerodrome Data 01
+// Feb 2026 (which also confirms 10/28, ILS 28 109.70 and TACAN 107X).
 var LCRA = &Airfield{
 	ICAO:            "LCRA",
 	Name:            "Akrotiri",
 	DCSName:         "Akrotiri",                    // VERIFY exact ME name on the Syria map
 	Center:          orb.Point{32.98806, 34.59056}, // [lon, lat]
-	ElevationFt:     76,
+	ElevationFt:     69,
 	MagVar:          5.0, // ~+5.0°E over the Levant; documentation only
 	PatternAltFt:    1500,
 	TowerFreqMHz:    252.000,

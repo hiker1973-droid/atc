@@ -5,7 +5,9 @@ import "github.com/paulmach/orb"
 // OMAM is Al Dhafra Air Base, UAE (Al Dhafra AFB in DCS).
 // Data sourced from [USAF] AFD-3351 airport diagram, July 2020.
 // Parallel runways 13L/31R (upper) and 13R/31L (lower).
-// Heading 128°/308° magnetic (diagram confirmed).
+// Heading 126°/306° magnetic in DCS (DimOn Aerodrome Data 01 Feb 2026; the
+// real-world diagram says 128/308). In DCS only 13L/31R has a localizer:
+// 109.10 on 13L, 111.10 on 31R, no glideslope.
 var OMAM = &Airfield{
 	ICAO:            "OMAM",
 	Name:            "Al Dhafra",
@@ -36,12 +38,12 @@ var OMAM = &Airfield{
 			// ILS 31L: 111.10 MHz Chan 48 | ILS 13R: 114.90 MHz Chan 24
 			Primary: Runway{
 				Designator:      "31L",
-				MagneticHeading: 308.0,
+				MagneticHeading: 306.0,
 				ThresholdLatLon: orb.Point{54.5633, 24.2250}, // SE threshold
 			},
 			Reciprocal: Runway{
 				Designator:      "13R",
-				MagneticHeading: 128.0,
+				MagneticHeading: 126.0,
 				ThresholdLatLon: orb.Point{54.5333, 24.2417}, // NW threshold
 			},
 		},
@@ -50,12 +52,12 @@ var OMAM = &Airfield{
 			// ILS 31R: 109.1 MHz Chan 28 | ILS 13L: 108.7 MHz Chan 24
 			Primary: Runway{
 				Designator:      "31R",
-				MagneticHeading: 308.0,
+				MagneticHeading: 306.0,
 				ThresholdLatLon: orb.Point{54.5633, 24.2583}, // NE threshold
 			},
 			Reciprocal: Runway{
 				Designator:      "13L",
-				MagneticHeading: 128.0,
+				MagneticHeading: 126.0,
 				ThresholdLatLon: orb.Point{54.5333, 24.2667}, // SW threshold
 			},
 		},

@@ -609,7 +609,7 @@ func atisStationsForMap(m string) []*atisStation {
 			{Name: "Kobuleti ATIS", FreqMHz: 232.000, Voice: "shimmer", ICAO: "UG5X",
 				TACAN: "TACAN 67X.", ILS: "ILS 111.50 runway 07.", Advisory: advisory},
 			{Name: "Kutaisi ATIS", FreqMHz: 233.000, Voice: "alloy", ICAO: "UGKO",
-				TACAN: "TACAN 44X.", ILS: "ILS 109.75 runway 07.", Advisory: advisory},
+				TACAN: "TACAN 44X. VOR 113.6.", ILS: "ILS 109.75 runway 07.", Advisory: advisory},
 			{Name: "Senaki ATIS", FreqMHz: 234.000, Voice: "echo", ICAO: "UGKS",
 				TACAN: "TACAN 31X.", ILS: "ILS 108.90 runway 09.", Advisory: advisory},
 		}
@@ -662,7 +662,9 @@ func atisStationsForMap(m string) []*atisStation {
 				TACAN: "TACAN 21X.", ILS: "ILS 109.30 runway 05. ILS 111.70 runway 23.", Advisory: advisory},
 			{Name: "Ramat David ATIS", FreqMHz: 256.150, Voice: "shimmer", ICAO: "LLRD",
 				Lang: "Hebrew", // Israel
-				ILS: "ILS 111.10 runway 15.", Advisory: advisory},
+				// ILS is on 33, not 15, and the field has TACAN 84X / VOR 113.70
+				// (DimOn Aerodrome Data 01 Feb 2026).
+				TACAN: "TACAN 84X. VOR 113.7.", ILS: "ILS 111.10 runway 33.", Advisory: advisory},
 			{Name: "King Hussein ATIS", FreqMHz: 255.550, Voice: "alloy", ICAO: "OJMF",
 				Lang: "Arabic", // Jordan
 				TACAN: "VORTAC 115.90, channel 106.", ILS: "ILS 111.70 runway 13.", Advisory: advisory},
@@ -687,25 +689,35 @@ func atisStationsForMap(m string) []*atisStation {
 			// frequencies are ASSIGNED BY US -- pilots have no preset for either.
 			{Name: "Bassel Al-Assad ATIS", FreqMHz: 249.600, Voice: "coral", ICAO: "OSLK",
 				Lang: "Arabic", // Syria
-				TACAN: "VOR DME 114.80. NDB 414.", ILS: "ILS 109.10 runway 17.", Advisory: advisory},
-			// Beirut has NO ILS, TACAN or VOR -- beacons.lua carries one NDB (BOD 351)
-			// and nothing else, so ILS is deliberately empty as at H4.
+				// VOR/NDB and the ILS runway per DimOn Aerodrome Data (01 Feb 2026): the
+				// field has parallels 17L/35R and 17R/35L, and the ILS is on 17R.
+				TACAN: "VOR DME 114.80. NDB 414.", ILS: "ILS 109.10 runway 17 right.", Advisory: advisory},
+			// Beirut per DimOn Aerodrome Data (01 Feb 2026): VOR/DME KAD 112.60, NDB 351 and
+			// three ILS (16 110.10, 17 109.50, 03 110.70). The earlier "NDB only" reading came
+			// from beacons.lua's display names and missed the KAD/IBB/BIL/IKK entries.
 			{Name: "Beirut ATIS", FreqMHz: 249.700, Voice: "sage", ICAO: "OLBA",
 				Lang: "Arabic", // Lebanon
-				TACAN: "NDB 351.", Advisory: advisory},
+				TACAN: "VOR DME 112.60. NDB 351.",
+				ILS: "ILS 110.10 runway 16. ILS 109.50 runway 17. ILS 110.70 runway 03.", Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{
 			{Name: "Al Dhafra ATIS", FreqMHz: 248.200, Voice: "nova", ICAO: "OMAM",
+				// ILS per DimOn Aerodrome Data 01 Feb 2026: in DCS only 13L/31R has a
+				// localizer (109.10 on 13L, 111.10 on 31R) and neither has a glideslope.
+				// Until 2026-09-19 this read 111.10 on 13L and 109.10 on 31L.
 				TACAN: "TACAN 96X. VOR 114.9.",
-				ILS:   "ILS 111.10 runway 13 left. ILS 109.10 runway 31 left.", Advisory: advisory},
+				ILS:   "Localizer 109.10 runway 13 left. Localizer 111.10 runway 31 right. No glideslope.", Advisory: advisory},
 			{Name: "Al Minhad ATIS", FreqMHz: 248.300, Voice: "shimmer", ICAO: "OMDM",
 				TACAN: "TACAN 99X.", ILS: "ILS 110.70 runway 09. ILS 110.75 runway 27.", Advisory: advisory},
 			{Name: "Liwa ATIS", FreqMHz: 248.550, Voice: "alloy", ICAO: "OMAB",
 				TACAN: "TACAN 121X. VOR 117.4.", Advisory: advisory},
+			// Al Ain has a VOR and no TACAN (DimOn Aerodrome Data 01 Feb 2026); the
+			// "TACAN 79X" this used to read is Paphos's channel.
 			{Name: "Al Ain ATIS", FreqMHz: 248.850, Voice: "echo", ICAO: "OMAL",
-				TACAN: "TACAN 79X. VOR 112.6.", Advisory: advisory},
-			{Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OIBK", Advisory: advisory},
+				TACAN: "VOR 112.6.", Advisory: advisory},
+			{Name: "Kish ATIS", FreqMHz: 248.500, Voice: "fable", ICAO: "OIBK",
+				TACAN: "TACAN 112X. VOR 117.4.", Advisory: advisory}, // DimOn Aerodrome Data 01 Feb 2026
 		}
 	}
 }

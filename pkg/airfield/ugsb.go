@@ -15,7 +15,7 @@ var UGSB = &Airfield{
 	Name:            "Batumi",
 	DCSName:         "Batumi",
 	Center:          orb.Point{41.60927, 41.60327}, // [lon, lat] — 16X (BTM) TACAN antenna
-	ElevationFt:     32,
+	ElevationFt:     33, // DimOn Aerodrome Data 01 Feb 2026 (was 32)
 	MagVar:          6.5, // +6.5°E Caucasus — VERIFY vs DCS
 	PatternAltFt:    1500,
 	TowerFreqMHz:    260.000, // presets card (AOR card's 261 is a typo)
