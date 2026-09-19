@@ -61,6 +61,10 @@ plan (from Common Freq/Nav card) vs current PG bat config:
 | Deckboss | 128.600 | **306.200** | 128.600 is "LSO (AI)" on Black Sea |
 | Command | 282.000 | 282.000 | unchanged |
 
+**Superseded again 2026-09-19 (operator): the live Marshal is 306.200 = Hornet COMM1 CH2;
+COMM1 CH3 306.300 is the DCS AI Marshal.** Command and Deckboss hand off with
+`--handoff-marshal-freq 306.2`. The 2026-09-18 ruling it replaces:
+
 **Superseded 2026-09-18 (operator): Marshal is 306.300 on Training day and Night,
 same as PG** — pilots tuned 306.3 and the 306.1 Marshal never heard them. Command
 and Deckboss now hand off with `--handoff-marshal-freq 306.3`. Original ruling:

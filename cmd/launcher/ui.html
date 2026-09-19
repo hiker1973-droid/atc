@@ -559,11 +559,11 @@ const THEATRES = {
     ],
     // Four towers + Marshal (6004) + Deckboss (6005) on the shared carrier ports.
     wxPorts: [6011, 6012, 6013, 6014, 6004, 6005],
-    // Black Sea CVN-72: Marshal 306.300 as in PG (operator ruling 2026-09-18),
+    // Black Sea CVN-72: live Marshal 306.200 = Hornet COMM1 CH2 (operator 2026-09-19; CH3 306.3 is DCS AI),
     // Deckboss 128.600 as in every other theatre (2026-09-15). These still
     // target the _caucasus bats — they set --airfield UGSB for BRC variation.
     combos: [
-      { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 · Black Sea',       roles: ['Marshal (Caucasus)'],        stopLabel: 'Stop Marshal' },
+      { id: 'marshal',  label: 'Marshal',  freq: '306.200', extras: 'CVN-72 · Black Sea',       roles: ['Marshal (Caucasus)'],        stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Caucasus)', roles: ['vSFG-7 Command (Caucasus)'], stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Black Sea carrier UHF',    roles: ['Deckboss (Caucasus)'],       stopLabel: 'Stop Deckboss' },
     ],

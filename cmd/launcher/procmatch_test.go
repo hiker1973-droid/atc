@@ -12,15 +12,15 @@ const (
 	batCommandCauc   = `%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%`
 	batBatumiTower   = `%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6011 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%`
 	batKobuletiTower = `%~dp0atc.exe --airfield UG5X --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6012 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%`
-	batMarshalCauc   = `%~dp0atc.exe --marshal-only --airfield UGSB --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%`
-	batDeckbossCauc  = `%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%`
+	batMarshalCauc   = `%~dp0atc.exe --marshal-only --airfield UGSB --marshal-freq 306.2 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%`
+	batDeckbossCauc  = `%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.2 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%`
 )
 
 // Caucasus carrier roles share --airfield UGSB with Batumi Tower and dashboard
 // ports with the PG/Syria carrier roles; only the exact flag set tells them apart.
 func TestRoleMatchesProcCaucasusCarrier(t *testing.T) {
-	marshalCauc := proc(1, `C:\SkyeyeATC\atc.exe --marshal-only --airfield UGSB --marshal-freq 306.3 --marshal-voice coral --srs-addr localhost:5008 --tacview-addr localhost:42676 --eam-password hunter2 --dashboard-port 6004 --log-level info`)
-	deckCauc := proc(2, `C:\SkyeyeATC\atc.exe --airfield UGSB --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 --log-level info`)
+	marshalCauc := proc(1, `C:\SkyeyeATC\atc.exe --marshal-only --airfield UGSB --marshal-freq 306.2 --marshal-voice coral --srs-addr localhost:5008 --tacview-addr localhost:42676 --eam-password hunter2 --dashboard-port 6004 --log-level info`)
+	deckCauc := proc(2, `C:\SkyeyeATC\atc.exe --airfield UGSB --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.2 --no-atis --dashboard-port 6005 --log-level info`)
 	batumi := proc(3, `C:\SkyeyeATC\atc.exe --airfield UGSB --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --tts-voice nova --dashboard-port 6011 --runway-rotation=false --log-level info`)
 	cases := []struct {
 		name string

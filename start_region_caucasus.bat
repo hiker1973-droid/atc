@@ -1,11 +1,11 @@
 @echo off
 :: vSFG-7 — Caucasus (Black Sea) region launcher (dashboard-driven).
 :: Starts ATIS -> Towers (Batumi, Kobuleti, Senaki, Kutaisi) -> Command ->
-:: Marshal (306.300) -> Deckboss (128.600).
+:: Marshal (306.200) -> Deckboss (128.600).
 :: Does NOT start the launcher (already running when the dashboard fires this).
 :: For the full cold-boot that also opens the dashboard, use start_all_caucasus.bat.
 ::
-:: Carrier freqs by operator ruling: Marshal 306.300 (2026-09-18, as in PG),
+:: Carrier freqs by operator ruling: Marshal 306.200 (2026-09-19, COMM1 CH2 live Marshal),
 :: Deckboss stays 128.600 as in every theatre (2026-09-15). Do not start
 :: the PG start_marshal.bat / start_deckboss.bat on a Black Sea mission.
 cd /d %~dp0
@@ -19,7 +19,7 @@ call "%~dp0start_towers_caucasus.bat"
 echo [vSFG-7] Launching Command...
 call "%~dp0start_command_caucasus.bat"
 
-echo [vSFG-7] Launching Marshal (306.300)...
+echo [vSFG-7] Launching Marshal (306.200)...
 call "%~dp0start_marshal_caucasus.bat"
 
 echo [vSFG-7] Launching Deckboss (128.600)...
