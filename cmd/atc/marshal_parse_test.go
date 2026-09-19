@@ -64,6 +64,8 @@ func TestMarshalEchoesStayRejected(t *testing.T) {
 		"Raider 331, Union Marshal, state 1.9, priority recovery.",
 		"Raider, Union Marshal, five by five, go ahead.",
 		"Raider 331.",
+		"Raider 331, Union Marshal, copy established. Angels 2, position 1 in the stack.",
+		"Raider 331, Union Marshal, contact paddles. Good luck.",
 	}
 	for _, e := range echoes {
 		if _, ok := splitMarshalAddress(e); ok {
@@ -77,6 +79,31 @@ func TestMarshalEchoesStayRejected(t *testing.T) {
 	// answered, or the TX would open ", Union Marshal" and loop.
 	if cs := marshalCallsignFromText("You to Marshall, signal Charlie."); cs != "" {
 		t.Errorf("callsign-less call produced callsign %q", cs)
+	}
+}
+
+// Garbled addresses from the Syria Marshal on 2026-09-17, Raider 331 — all
+// four were dropped as "not addressed to Marshal".
+func TestMarshalCallsFlown20260917(t *testing.T) {
+	cases := []struct {
+		text   string
+		intent marshalIntent
+	}{
+		{"You there, Marshall, Raider 331, marking moms, 044 for 50 miles, angels 31, state 5.0.", marshalMarkingMom},
+		{"You did Marshal, Raider 331, Marking mom 044 for 50 miles, Angels 31, State 4.9.", marshalMarkingMom},
+		{"Inner Marshall Raider 331, see you at 10, state 3.9, angels 2.", marshalSeeYouAtTen},
+		{"Ma- either Marshal Raider 331, initial.", marshalInitial},
+	}
+	for _, tc := range cases {
+		t.Run(tc.text, func(t *testing.T) {
+			if cs := marshalCallsignFromText(tc.text); cs != "Raider 331" {
+				t.Fatalf("callsign = %q, want Raider 331", cs)
+			}
+			lower := strings.ToLower(tc.text)
+			if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != tc.intent {
+				t.Errorf("intent = %d, want %d", got, tc.intent)
+			}
+		})
 	}
 }
 
