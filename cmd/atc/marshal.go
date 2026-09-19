@@ -77,11 +77,12 @@ func isDepartureClearCall(lower string) bool {
 // marshalAddressRe matches the address a pilot opens a Marshal call with.
 // Whisper rarely hears "Union" cleanly: one pilot on 2026-09-14 came out as
 // "Unit Marshall", "Here Marshall", "In here, Marshall", "Leader, Marshal" and
-// "You to Marshall". So up to two short filler words may precede
+// "You to Marshall", and on 2026-09-17 as "You there, Marshall", "You did
+// Marshal", "Inner Marshall" and "Ma- either Marshal". So up to two short filler words may precede
 // "Marshal"/"Marshall". The filler list is closed on purpose — our own TX comes
 // back as "<callsign>, Union Marshal, …" and a callsign is never one of these
 // words, so the echo still fails to match.
-var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|leader|you|to|hey|uh|um|okay|ok|and|so)\W+){0,2}marshall?\b\W*`)
+var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|inner|leader|you|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so)\W+){0,2}marshall?\b\W*`)
 
 // splitMarshalAddress reports whether text opens with the Marshal address and
 // returns what follows it.

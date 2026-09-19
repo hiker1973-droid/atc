@@ -61,6 +61,10 @@ plan (from Common Freq/Nav card) vs current PG bat config:
 | Deckboss | 128.600 | **306.200** | 128.600 is "LSO (AI)" on Black Sea |
 | Command | 282.000 | 282.000 | unchanged |
 
+**Superseded 2026-09-18 (operator): Marshal is 306.300 on Training day and Night,
+same as PG** — pilots tuned 306.3 and the 306.1 Marshal never heard them. Command
+and Deckboss now hand off with `--handoff-marshal-freq 306.3`. Original ruling:
+
 **Decided 2026-09-15 (operator):** Marshal **306.100** (the card's LIVE MARSHALL,
 COMM 1 CH 2), Deckboss **128.600** (same as every theatre — deviates from the
 card's 306.200, and sits on the mission's AI carrier controller). Command and
@@ -81,7 +85,7 @@ Sea missions on the **PG** `start_marshal.bat` (306.300) and `start_deckboss.bat
      three hardcoded lists into one and makes map #3 trivial.
    - *(quick)* Just extend each hardcoded list with the CA ICAOs and add a CA
      ATIS branch. Less clean, faster.
-2. ~~**Carrier freq mapping**~~ — **decided 2026-09-15**: Marshal 306.100,
+2. ~~**Carrier freq mapping**~~ — **decided 2026-09-15**, Marshal changed to 306.300 on 2026-09-18: Marshal 306.300,
    Deckboss 128.600. See §4.
 3. **Confirm the flagged data** — Batumi ILS runway/freq, MagVar, and whether
    break directions are left-pattern at all four fields.
@@ -99,7 +103,7 @@ Done (branch `feat/caucasus-map`):
       `start_command_caucasus.bat`, `start_all_caucasus.bat`.
 
 Remaining:
-- [x] Carrier ops CA scripts — `start_marshal_caucasus.bat` (306.100),
+- [x] Carrier ops CA scripts — `start_marshal_caucasus.bat` (306.300 since 2026-09-18),
       `start_deckboss_caucasus.bat` (128.600), both in `start_region_caucasus.bat`
       / `start_all_caucasus.bat` and on the dashboard's Caucasus theatre.
 - [ ] Verify the Black Sea MagVar (+6.5°E) against DCS — Marshal and Deckboss
