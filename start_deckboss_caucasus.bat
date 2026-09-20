@@ -33,8 +33,9 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: we transmit on top of the DCS AI ATC, and a pilot using COMM 2 CH 1 as
 :: printed will not hear us. The Comms Packet tells pilots 128.600.
 ::
-:: --handoff-marshal-freq 306.2: the airborne ack pushes departures to the live
-:: Marshal (start_marshal_caucasus.bat, COMM1 CH2, operator ruling 2026-09-19).
+:: --handoff-marshal-freq 306.3: the airborne ack pushes departures to our Marshal
+:: (start_marshal_caucasus.bat), Hornet COMM1 CH3 "CVN-72 AI MARSHALL". Operator
+:: ruling 2026-09-20 -- 306.200 stays clear for a live human Marshal.
 ::
 :: --airfield UGSB (Batumi): --deckboss-freq makes this a deckboss-only instance
 :: and the tower srsLoop is skipped (cmd/atc/main.go), so no duplicate Batumi
@@ -44,4 +45,4 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 ::
 :: Voice shimmer and dashboard 6005, same as PG and Syria Deckboss: only one map
 :: runs at a time.
-start "Deckboss (Caucasus)" cmd /c "%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.2 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+start "Deckboss (Caucasus)" cmd /c "%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"

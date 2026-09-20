@@ -61,7 +61,23 @@ plan (from Common Freq/Nav card) vs current PG bat config:
 | Deckboss | 128.600 | **306.200** | 128.600 is "LSO (AI)" on Black Sea |
 | Command | 282.000 | 282.000 | unchanged |
 
-**Superseded again 2026-09-19 (operator): the live Marshal is 306.200 = Hornet COMM1 CH2;
+### CURRENT (2026-09-20 operator ruling): SkyeyeATC Marshal is **306.300**
+
+**"306.3 is our SkyeyeATC Marshall; 306.2 is when we have a live human Marshall."**
+Command and Deckboss hand off with `--handoff-marshal-freq 306.3`. Live on
+Training 1 since 2026-09-20 15:03 (`Union Marshal` on 306.3 in `clients-list.json`).
+
+**Read the card's labels this way, or this flips a fifth time:** COMM1 CH3
+"CVN-72 **AI** MARSHALL" means the *robot* controller — that is **us**, SkyeyeATC,
+not the DCS mission's own AI. COMM1 CH2 "CVN-72 MARSHAL" is reserved for a
+squadron member controlling by voice, and we stay off it so we never transmit
+over a human. The 2026-09-19 ruling below inverted this, reading "AI" as the DCS
+AI and moving us to 306.200; that was wrong and is reverted. The 2026-09-18
+ruling had it right by accident (pilots tuned 306.3 and heard us).
+
+The superseded 2026-09-19 ruling, kept for history:
+
+**Superseded 2026-09-19 (operator): the live Marshal is 306.200 = Hornet COMM1 CH2;
 COMM1 CH3 306.300 is the DCS AI Marshal.** Command and Deckboss hand off with
 `--handoff-marshal-freq 306.2`. The 2026-09-18 ruling it replaces:
 
