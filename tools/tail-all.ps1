@@ -1,34 +1,37 @@
-param()
-$ErrorActionPreference = 'Stop'
-$files = @(
-  @{Site='OMDM';    Path='logs/atc-omdm.log'},
-  @{Site='OMAM';    Path='logs/atc-omam.log'},
-  @{Site='OMAL';    Path='logs/atc-omal.log'},
-  @{Site='MARSHAL'; Path='logs/atc-marshal.log'},
-  @{Site='COMMAND'; Path='logs/atc-command.log'},
-  @{Site='ATIS';    Path='logs/atc-atis.log'}
+﻿# Live tail across every running role, site-prefixed and filtered.
+# Theatre-agnostic: by default it watches whatever atc.exe processes are up, so
+# the same command works on PG, Caucasus, Syria, Germany and Iraq.
+#
+#   .\tools\tail-all.ps1                      # whatever is running now
+#   .\tools\tail-all.ps1 -Theatre caucasus    # a named set (nothing running)
+#   .\tools\tail-all.ps1 -Sites UGSB,UGKO     # just these fields
+#   .\tools\tail-all.ps1 -All -Raw            # every log, raw JSONL
+#
+# Deckboss has no log of its own — it interleaves into its airfield's log
+# (UGSB on Caucasus, OMDM on PG), so its events appear under that site.
+param(
+  [string[]]$Sites,
+  [string]$Theatre,
+  [switch]$All,
+  [switch]$Raw
 )
-foreach ($f in $files) {
-  if (Test-Path $f.Path) { $f.Position = (Get-Item $f.Path).Length } else { $f.Position = 0 }
-}
-$keep = 'recognized|"ATC request"|TX via|intent miss|Whisper hallu|registered on SRS|stack online|"level":"warn"|"level":"error"|ATC online'
-$drop = 'Tacview telemetry offline|Tacview nominal|Tacview connected but no position|TX done|flushing transmission|converting and sending|SRS TCP failed - retrying|SRS connect failed, retrying'
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/log-sites.ps1"
+
+$files = Resolve-LogSites -Sites $Sites -Theatre $Theatre -All:$All
+
+# Start at the current end of each file: this is a live tail, not a replay.
+foreach ($f in $files) { $f.Position = (Get-Item -LiteralPath $f.Path).Length }
+
+Write-Host 'Ctrl+C to stop.' -ForegroundColor DarkGray
 while ($true) {
   foreach ($f in $files) {
     if (-not (Test-Path $f.Path)) { continue }
-    $len = (Get-Item $f.Path).Length
-    if ($len -le $f.Position) { if ($len -lt $f.Position) { $f.Position = 0 }; continue }
-    $fs = [System.IO.File]::Open($f.Path, 'Open', 'Read', 'ReadWrite')
-    [void]$fs.Seek($f.Position, 'Begin')
-    $sr = New-Object System.IO.StreamReader($fs)
-    while (-not $sr.EndOfStream) {
-      $line = $sr.ReadLine()
-      if ($line -match $keep -and $line -notmatch $drop) {
-        Write-Output ("[{0}] {1}" -f $f.Site, $line)
-      }
+    $r = Read-NewLines -Path $f.Path -Start $f.Position
+    foreach ($line in $r.Lines) {
+      if (Test-KeepLine $line) { Format-Event -Site $f.Site -Line $line -Raw:$Raw }
     }
-    $f.Position = $fs.Position
-    $sr.Close(); $fs.Close()
+    $f.Position = $r.Next
   }
   Start-Sleep -Milliseconds 500
 }

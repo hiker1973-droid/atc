@@ -1,42 +1,67 @@
-param([switch]$Init)
-$ErrorActionPreference = 'Stop'
-$base = 'C:/SkyeyeATC/logs'
-$stateFile = 'C:/SkyeyeATC/tools/.watch-offsets.json'
-$files = @(
-  @{Site='OMDM';    Path="$base/atc-omdm.log"},
-  @{Site='OMAM';    Path="$base/atc-omam.log"},
-  @{Site='OMAL';    Path="$base/atc-omal.log"},
-  @{Site='MARSHAL'; Path="$base/atc-marshal.log"},
-  @{Site='COMMAND'; Path="$base/atc-command.log"},
-  @{Site='ATIS';    Path="$base/atc-atis.log"}
+﻿# Offset-based sweep: prints every kept event appended since the last run.
+# Built for periodic check-ins ("tail the training for the next 30 min") where a
+# blocking tail would not survive between turns — state lives in the offsets file.
+#
+#   .\tools\watch-since.ps1 -Init             # set the baseline, print nothing
+#   .\tools\watch-since.ps1                   # everything since that baseline
+#   .\tools\watch-since.ps1 -Theatre caucasus # named set (nothing running)
+#   .\tools\watch-since.ps1 -Sites UGSB -Raw  # one field, raw JSONL
+#
+# Theatre-agnostic: the default site list comes from the running atc.exe
+# processes, so it follows whichever map the rig is on.
+param(
+  [switch]$Init,
+  [string[]]$Sites,
+  [string]$Theatre,
+  [switch]$All,
+  [switch]$Raw
 )
-# Keep operational events; surface anomalies. Drop routine noise.
-$keep = 'heard"|transcribed"|TX via|TX"|ATC request|intent miss|auto-release|LUAW issued|Whisper hallu|registered on SRS|stack online|"level":"warn"|"level":"error"|ATC online|already in progress|empty transcription|SRS disconnected|ExternalAudio file error|prewarm failed'
-$drop = 'Tacview telemetry offline|Tacview nominal|Tacview connected but no position|TX done|flushing transmission|converting and sending|SRS TCP failed - retrying|SRS connect failed, retrying'
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/log-sites.ps1"
 
+$stateFile = "$PSScriptRoot/.watch-offsets.json"
+$files = Resolve-LogSites -Sites $Sites -Theatre $Theatre -All:$All
+
+# Load unconditionally, including under -Init: the offsets of sites this run does
+# not touch have to be carried through either way. -Init still ignores them for
+# reading (each resolved site jumps straight to the current end of its log).
 $offsets = @{}
-if ((Test-Path $stateFile) -and -not $Init) {
-  $offsets = Get-Content $stateFile -Raw | ConvertFrom-Json
+if (Test-Path $stateFile) {
+  $json = Get-Content $stateFile -Raw | ConvertFrom-Json
+  foreach ($p in $json.PSObject.Properties) { $offsets[$p.Name] = [int64]$p.Value }
 }
+
+# Start from the stored offsets rather than an empty map: a narrowed run
+# (-Sites / -Theatre) must not drop the baselines of the sites it skipped, or the
+# next full sweep restarts them at 0 and replays the entire log.
 $new = @{}
+foreach ($k in $offsets.Keys) { $new[$k] = $offsets[$k] }
+$shown = 0
 foreach ($f in $files) {
   if (-not (Test-Path $f.Path)) { continue }
-  $len = (Get-Item $f.Path).Length
+  $len = (Get-Item -LiteralPath $f.Path).Length
+
+  if ($Init) { $new[$f.Site] = $len; continue }
+
   $start = 0
-  if ($offsets.$($f.Site)) { $start = [int64]$offsets.$($f.Site) }
-  if ($len -lt $start) { $start = 0 } # rotated/truncated
-  if (-not $Init -and $len -gt $start) {
-    $fs = [System.IO.File]::Open($f.Path, 'Open', 'Read', 'ReadWrite')
-    [void]$fs.Seek($start, 'Begin')
-    $sr = New-Object System.IO.StreamReader($fs)
-    while (-not $sr.EndOfStream) {
-      $line = $sr.ReadLine()
-      if ($line -match $keep -and $line -notmatch $drop) {
-        Write-Output ("[{0}] {1}" -f $f.Site, $line)
-      }
+  if ($offsets.ContainsKey($f.Site)) { $start = $offsets[$f.Site] }
+
+  $r = Read-NewLines -Path $f.Path -Start $start
+  foreach ($line in $r.Lines) {
+    if (Test-KeepLine $line) {
+      Format-Event -Site $f.Site -Line $line -Raw:$Raw
+      $shown++
     }
-    $sr.Close(); $fs.Close()
   }
-  $new[$f.Site] = $len
+  # Advance only past complete lines, so a half-written record is re-read whole
+  # on the next sweep instead of being reported twice in two broken halves.
+  $new[$f.Site] = $r.Next
 }
+
 ($new | ConvertTo-Json) | Set-Content -Encoding utf8 $stateFile
+
+if ($Init) {
+  Write-Host "baseline set for $($files.Count) log(s) — nothing printed by design." -ForegroundColor DarkGray
+} elseif ($shown -eq 0) {
+  Write-Host 'no new events.' -ForegroundColor DarkGray
+}
