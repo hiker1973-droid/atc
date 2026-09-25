@@ -1683,7 +1683,7 @@ func icaoVoiceBucket(icao string) int {
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to
 // size the RX cooldown so the bot doesn't transcribe its own transmission. The
 // 14 chars/sec rate is empirical at our old 0.88 speed; every role now runs at
-// 1.15, where actual playback is faster still, so 14 keeps the estimate
+// 1.20, where actual playback is faster still, so 14 keeps the estimate
 // conservative (over-cools rather than under-cools) — deliberately left alone
 // when the rates went up, since under-cooling is the failure that bites.
 // The 5s margin covers ExternalAudio.exe
@@ -1779,21 +1779,21 @@ func styleATISAccent(accent string) string {
 		"inflection on every phrase. No emphasis anywhere."
 }
 
-// Per-role speeds. All roles run at 1.15 since 2026-09-19 (operator: "we need
-// speech speed to be 1.15"); before that 1.10 from 2026-08-16, the Deckboss rate
-// (operator preference): the deck boss's clip was the one that sounded right, so every
-// channel — live controller and recorded loop alike — now reads at that pace.
+// Per-role speeds. All roles run at 1.20 since 2026-09-25 (operator request);
+// 1.15 from 2026-09-19, and 1.10 from 2026-08-16, the Deckboss rate (operator
+// preference): the deck boss's clip was the one that sounded right, so every
+// channel — live controller and recorded loop alike — reads at one pace.
 // Marshal was 1.00 (a Case III approach is read to a pilot who is writing it
 // down) and ATIS was 0.97 (clarity on a loop); both were raised to match.
 //
 // Tower/Command speed is the --tts-speed flag, whose default is speedDeckboss.
-// The constants stay separate so a single role can be pulled back off 1.15
+// The constants stay separate so a single role can be pulled back off 1.20
 // without disturbing the others, and overriding --tts-speed on one process
 // still works if a field needs to differ.
 const (
-	speedMarshal  = 1.15
-	speedDeckboss = 1.15
-	speedATIS     = 1.15
+	speedMarshal  = 1.20
+	speedDeckboss = 1.20
+	speedATIS     = 1.20
 )
 
 // towerVoice / marshalVoice / deckbossVoice / commandVoice / atisVoice build the
