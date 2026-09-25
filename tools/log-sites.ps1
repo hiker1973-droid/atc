@@ -36,11 +36,19 @@ $TheatreSites = @{
 # line the filter was written to suppress (425 of them in atc-ugsb.log alone).
 # Match on the stable prefix before the dash instead.
 #
-# 'recognized' used to be in tail-all's keep list and matches nothing: no log
-# line uses that word. The pilot-call events are "ATC request" (towers) and
-# "<Role> heard" (Marshal / Command / Deckboss), so tail-all was blind to every
-# non-tower pilot call.
-$KeepPattern = 'ATC request|heard"|TX via|intent miss|auto-release|LUAW|Whisper hallu|' +
+# The pilot-call events are "ATC request" (towers) and "<Role> heard" (Marshal /
+# Command / Deckboss), which watch-since had and tail-all did not — so tail-all
+# was blind to every non-tower pilot call.
+#
+# `{"message":"recognized","text":"..."}` carries the raw Whisper transcription
+# and must stay in this list. It is the only line that shows what the STT
+# actually heard, which is what tells "tower alive but silent" (a garbled field
+# name dropped before intent matching, logging `recognized` with no `intent
+# miss`) apart from a radio fault. It is quiet on a field with no traffic — 808
+# in atc-omdm.log, 0 in atc-ugsb.log — so an empty grep means no pilot called
+# that field, NOT that the term is dead. It was briefly cut from this list on
+# exactly that mistaken reading.
+$KeepPattern = 'ATC request|heard"|"message":"recognized"|TX via|intent miss|auto-release|LUAW|Whisper hallu|' +
                'registered on SRS|stack online|"level":"warn"|"level":"error"|ATC online|' +
                'already in progress|empty transcription|SRS disconnected|' +
                'ExternalAudio file error|ExternalAudio file TX timed out|prewarm failed|' +
