@@ -22,7 +22,7 @@ $FixedRoleLogs = [ordered]@{
 # so if these drift the damage is limited to the explicit -Theatre shortcut.
 $TheatreSites = @{
   pg       = @('OMDM', 'OMAM', 'OMAL')
-  caucasus = @('UGSB', 'UG5X', 'UGKS', 'UGKO')
+  caucasus = @('UGSB', 'UG5X', 'UGKS', 'UGKO', 'UGTB')
   syria    = @('LCRA', 'LTAG', 'LLRD', 'OSLK', 'OLBA')
   germany  = @('ETAR', 'ETAD', 'EDFH', 'EDDF', 'EDDK', 'EDDL', 'EDDV', 'EDDH')
   iraq     = @('ORAA', 'ORSH', 'ORBR', 'ORBI', 'ORBD', 'ORBB', 'ORER', 'ORKK', 'ORSU')

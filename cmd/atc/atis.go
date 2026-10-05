@@ -31,6 +31,7 @@ var towerDashboardPortByICAO = map[string]int{
 	"UG5X": 6012,
 	"UGKS": 6013,
 	"UGKO": 6014,
+	"UGTB": 6015,
 	// Cold War Germany towers (8 recovery bases, own range 6021-6028)
 	"ETAR": 6021,
 	"ETAD": 6022,
@@ -616,6 +617,8 @@ func atisStationsForMap(m string) []*atisStation {
 				TACAN: "TACAN 44X. VOR 113.6.", ILS: "ILS 109.75 runway 07.", Advisory: advisory},
 			{Name: "Senaki ATIS", FreqMHz: 234.000, Voice: "echo", ICAO: "UGKS",
 				TACAN: "TACAN 31X.", ILS: "ILS 108.90 runway 09.", Advisory: advisory},
+			{Name: "Tbilisi ATIS", FreqMHz: 237.000, Voice: "onyx", ICAO: "UGTB",
+				TACAN: "", ILS: "ILS 110.30 runway 13 right. ILS 108.90 runway 31 left.", Advisory: advisory},
 		}
 	case "germany", "de", "coldwargermany", "cold-war-germany", "cwg":
 		return []*atisStation{

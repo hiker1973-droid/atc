@@ -6,7 +6,7 @@ import "strings"
 // per-call-site switch/slice literals that used to hardcode the PG fields.
 var registry = map[string]*Airfield{
 	"OMDM": OMDM, "OMAM": OMAM, "OMAL": OMAL, // Persian Gulf
-	"UGSB": UGSB, "UG5X": UG5X, "UGKS": UGKS, "UGKO": UGKO, // Caucasus / Black Sea
+	"UGSB": UGSB, "UG5X": UG5X, "UGKS": UGKS, "UGKO": UGKO, "UGTB": UGTB, // Caucasus / Black Sea
 	"ETAR": ETAR, "ETAD": ETAD, "EDFH": EDFH, "EDDF": EDDF, // Cold War Germany
 	"EDDK": EDDK, "EDDL": EDDL, "EDDV": EDDV, "EDDH": EDDH, // Cold War Germany
 	"ORAA": ORAA, "ORSH": ORSH, "ORBR": ORBR, "ORBI": ORBI, // Iraq
@@ -23,7 +23,7 @@ func ByICAO(icao string) *Airfield { return registry[strings.ToUpper(strings.Tri
 // the Command proactive-handoff scan, and the start scripts.
 var (
 	PersianGulf = []*Airfield{OMDM, OMAM, OMAL}
-	Caucasus    = []*Airfield{UGSB, UG5X, UGKS, UGKO}
+	Caucasus    = []*Airfield{UGSB, UG5X, UGKS, UGKO, UGTB}
 	// Germany is the 8 F/A-18 recovery bases from the Cold War Germany COMM1
 	// preset card (tower on VHF, ATIS on UHF), in launch order.
 	Germany = []*Airfield{ETAR, ETAD, EDFH, EDDF, EDDK, EDDL, EDDV, EDDH}

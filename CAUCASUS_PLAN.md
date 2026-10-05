@@ -18,9 +18,14 @@ and live data verification (§5.3). PG production is unchanged.
 | Kobuleti | UG5X | Kobuleti | 262.000 | 232.000 | 07/25 | 063/243 | 59 | 7,406 | 67X (KBL) | 07 / 111.50 |
 | Senaki-Kolkhi | UGKS | Senaki-Kolkhi | 261.000 | 234.000 | 09/27 | 088/268 | 43 | 7,256 | 31X (TSK) | 09 / 108.90 |
 | Kutaisi | UGKO | Kutaisi | 263.000 | 233.000 | 07/25 | 074/247 | 147 | 7,936 | 44X (KTS) | 07 / 109.75 |
+| Tbilisi-Lochini | UGTB | Tbilisi-Lochini | 267.000 | 237.000 | 13R/31L | 121/301 | 1574 | 7,690 | none | 13R / 110.30 · 31L / 108.90 |
 
 Center coords are the TACAN antenna positions from the AOR card; runway
 thresholds in the `.go` files are computed from center + heading + length.
+Tbilisi (added 2026-10-05, RED field for the BFM mission) is the exception: its
+centre, elevation, MagVar (+7.0°E, DCS 6.98 at the field) and runway ends are
+DCS Mission Editor values, and 7,690 ft is the distance between the two ME
+runway edges (approximate). Dashboard 6015, tower voice `onyx`.
 
 **Kneeboard discrepancies found & resolved:**
 - **Batumi tower freq** — AOR card says `261.000`, presets card says `260.000`.
@@ -35,7 +40,7 @@ thresholds in the `.go` files are computed from center + heading + length.
 - **Command**: 282.000 — same as PG, so the departure handoff target is unchanged.
   On Black Sea, Command is **COMM1 preset 1** (`channel one`), vs PG's `channel four`.
   Airfield `HandoffPreset` set to "channel one" accordingly.
-- **ATIS**: 230 (Batumi), 232 (Kobuleti), 233 (Kutaisi), 234 (Senaki).
+- **ATIS**: 230 (Batumi), 232 (Kobuleti), 233 (Kutaisi), 234 (Senaki), 237 (Tbilisi).
 - No conflicts once Batumi = 260 (each tower and ATIS is unique).
 
 ## 3. ATIS station list (for the ATIS wiring)
@@ -49,6 +54,7 @@ strings live on the ATIS station, not the `Airfield`:
 | Kobuleti ATIS | 232.000 | UG5X | TACAN 67X. | ILS 111.50 runway 07. |
 | Kutaisi ATIS | 233.000 | UGKO | TACAN 44X. | ILS 109.75 runway 07. |
 | Senaki ATIS | 234.000 | UGKS | TACAN 31X. | ILS 108.90 runway 09. |
+| Tbilisi ATIS | 237.000 | UGTB | (none) | ILS 110.30 runway 13 right. ILS 108.90 runway 31 left. |
 
 ## 4. Carrier ops — freq remap (Black Sea)
 

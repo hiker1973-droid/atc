@@ -1081,11 +1081,11 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 // reverse-proxy. Restricting to known role ports keeps /tower/ from being
 // abused as an open proxy to arbitrary localhost services. Covers every
 // theatre: PG towers 6001-6003 + Marshal 6004 + Deckboss 6005, Caucasus
-// towers 6011-6014, Cold War Germany towers 6021-6028, Iraq towers
+// towers 6011-6015, Cold War Germany towers 6021-6028, Iraq towers
 // 6031-6039, and Syria towers 6041-6050 (6049/6050 = Bassel Al-Assad / Beirut).
 var proxyPorts = map[int]bool{
 	6001: true, 6002: true, 6003: true, 6004: true, 6005: true,
-	6011: true, 6012: true, 6013: true, 6014: true,
+	6011: true, 6012: true, 6013: true, 6014: true, 6015: true,
 	6021: true, 6022: true, 6023: true, 6024: true,
 	6025: true, 6026: true, 6027: true, 6028: true,
 	6031: true, 6032: true, 6033: true, 6034: true, 6035: true,

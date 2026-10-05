@@ -43,4 +43,8 @@ start "Senaki Tower" cmd /c "%~dp0atc.exe --airfield UGKS --srs-addr %SRS% --eam
 start "Kutaisi Tower" cmd /c "%~dp0atc.exe --airfield UGKO --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice fable --dashboard-port 6014 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
+:: Tbilisi Tower — UGTB, 267.0, dashboard 6015
+start "Tbilisi Tower" cmd /c "%~dp0atc.exe --airfield UGTB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice onyx --dashboard-port 6015 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+%SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
+
 echo [vSFG-7] Caucasus towers launched.

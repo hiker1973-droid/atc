@@ -1,6 +1,6 @@
 @echo off
 :: vSFG-7 — Caucasus (Black Sea) region launcher (dashboard-driven).
-:: Starts ATIS -> Towers (Batumi, Kobuleti, Senaki, Kutaisi) -> Command ->
+:: Starts ATIS -> Towers (Batumi, Kobuleti, Senaki, Kutaisi, Tbilisi) -> Command ->
 :: Marshal (306.300) -> Deckboss (128.600).
 :: Does NOT start the launcher (already running when the dashboard fires this).
 :: For the full cold-boot that also opens the dashboard, use start_all_caucasus.bat.
