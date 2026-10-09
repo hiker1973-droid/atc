@@ -213,6 +213,20 @@ Hatay / Gaziantep / Akrotiri ATIS (249.300 / 249.400 / 249.500) are **assigned b
 
 LSO 128.100 is on the card but `atc.exe` has no LSO role; handoff is verbal.
 
+## Kola — Operation WHITE NIGHT (added 2026-10-09 on feat/kola-map, NOT deployed, NOT flown)
+
+Theatre `--map kola`, bats `start_*_kola.bat`, ports 6051-6054. Four fields are defined
+(ENBO Bodo, ENDU Bardufoss, ENNA Banak, EFRO Rovaniemi) but **only the field in play is
+live** — Bodo for mission 1 — by operator ruling ("only the appropriate airfield"). The
+four places to change when the campaign moves to the next base, where every number came
+from, and what is still unratified (Marshal 306.300 / Deckboss 128.600 by analogy, the
+assigned ATIS frequencies nobody has on a preset) are in `KOLA_PLAN.md`.
+
+- ATIS is English + the field's own language: Norwegian in Norway, Finnish at Rovaniemi
+  (per-station `Lang`, same mechanism as Syria).
+- Magvar is per field here (8°E to 15°E across the map), and runway headings are computed
+  from TRUE bearings — the Mission Editor's `course_deg` is a grid bearing, 6-9° off.
+
 ## ExternalAudio crashes mid-transmission — read before debugging "SRS not transmitting"
 
 All TX goes out through `DCS-SR-ExternalAudio.exe`. **It has a .NET bug that kills it partway through a transmission:**
