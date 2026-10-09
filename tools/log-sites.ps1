@@ -24,6 +24,7 @@ $TheatreSites = @{
   pg       = @('OMDM', 'OMAM', 'OMAL')
   caucasus = @('UGSB', 'UG5X', 'UGKS', 'UGKO', 'UGTB')
   syria    = @('LCRA', 'LTAG', 'LLRD', 'OSLK', 'OLBA')
+  kola     = @('ENBO')
   germany  = @('ETAR', 'ETAD', 'EDFH', 'EDDF', 'EDDK', 'EDDL', 'EDDV', 'EDDH')
   iraq     = @('ORAA', 'ORSH', 'ORBR', 'ORBI', 'ORBD', 'ORBB', 'ORER', 'ORKK', 'ORSU')
 }

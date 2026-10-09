@@ -251,6 +251,8 @@
   .airfield-cell.UGSB { color: #7ee787; } .airfield-cell.UG5X { color: #79c0ff; }
   .airfield-cell.UGKS { color: #ffa657; } .airfield-cell.UGKO { color: #d2a8ff; }
   .airfield-cell.UGTB { color: #ff7b72; }
+  /* Kola airfield accent colours */
+  .airfield-cell.ENBO { color: #7ee787; } .airfield-cell.ENDU { color: #79c0ff; } .airfield-cell.ENNA { color: #ffa657; } .airfield-cell.EFRO { color: #d2a8ff; }
   /* Cold War Germany airfield accent colours (8 recovery bases) */
   .airfield-cell.ETAR { color: #7ee787; } .airfield-cell.ETAD { color: #79c0ff; }
   .airfield-cell.EDFH { color: #ffa657; } .airfield-cell.EDDF { color: #d2a8ff; }
@@ -290,6 +292,7 @@
     <button class="theatre-btn" data-theatre="germany" onclick="switchTheatre('germany')">Germany</button>
     <button class="theatre-btn" data-theatre="iraq" onclick="switchTheatre('iraq')">Iraq</button>
     <button class="theatre-btn" data-theatre="syria" onclick="switchTheatre('syria')">Syria</button>
+    <button class="theatre-btn" data-theatre="kola" onclick="switchTheatre('kola')">Kola</button>
     <span class="region-sep"></span>
     <button class="region-btn start" id="startRegionBtn" onclick="startRegion()" title="Start every role in the selected theatre">▶ Start</button>
     <button class="region-btn atis" id="startAtisBtn" onclick="startAtis()" title="Start only the ATIS set for the selected theatre">🔊 ATIS</button>
@@ -634,6 +637,23 @@ const THEATRES = {
       { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 ABE · TACAN 72X',   roles: ['Marshal (Syria)'],          stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Syria)',   roles: ['vSFG-7 Command (Syria)'],   stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Eastern Med carrier UHF',  roles: ['Deckboss (Syria)'],         stopLabel: 'Stop Deckboss' },
+    ],
+  },
+  kola: {
+    label: 'Kola', primaryLabel: 'Bodo (ENBO)', atisRole: 'vSFG-7 ATIS (Kola)',
+    towers: [
+      { icao: 'ENBO', label: 'Bodo', freq: '251.150', port: 6051, role: 'Bodo Tower' },
+      // Bardufoss (ENDU 6052), Banak (ENNA 6053) and Rovaniemi (EFRO 6054) are parked --
+      // see start_towers_kola.bat. Add the row here when its mission comes up.
+    ],
+    // The field in play + Marshal (6004) + Deckboss (6005) on the shared carrier ports.
+    wxPorts: [6051, 6004, 6005],
+    // CVN-72 in the Vestfjord. Marshal 306.300 and Deckboss 128.600 follow the
+    // standing operator rulings (2026-09-20 / 2026-09-15); these target the _kola bats.
+    combos: [
+      { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 ABE · TACAN 72X', roles: ['Marshal (Kola)'],        stopLabel: 'Stop Marshal' },
+      { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Kola)',  roles: ['vSFG-7 Command (Kola)'], stopLabel: 'Stop Command' },
+      { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Vestfjord carrier UHF',  roles: ['Deckboss (Kola)'],       stopLabel: 'Stop Deckboss' },
     ],
   },
 };

@@ -238,6 +238,8 @@ func regionForBat(bat string) string {
 		return "iraq"
 	case strings.Contains(l, "syria"):
 		return "syria"
+	case strings.Contains(l, "kola"):
+		return "kola"
 	default:
 		return "pg"
 	}
@@ -1016,6 +1018,7 @@ var regionBats = map[string]string{
 	"germany":  "start_region_germany.bat",
 	"iraq":     "start_region_iraq.bat",
 	"syria":    "start_region_syria.bat",
+	"kola":     "start_region_kola.bat",
 }
 
 // startRegion runs a theatre's region bat, spawning all of its role windows in
@@ -1082,7 +1085,8 @@ func serveUI(w http.ResponseWriter, r *http.Request) {
 // abused as an open proxy to arbitrary localhost services. Covers every
 // theatre: PG towers 6001-6003 + Marshal 6004 + Deckboss 6005, Caucasus
 // towers 6011-6015, Cold War Germany towers 6021-6028, Iraq towers
-// 6031-6039, and Syria towers 6041-6050 (6049/6050 = Bassel Al-Assad / Beirut).
+// 6031-6039, Syria towers 6041-6050 (6049/6050 = Bassel Al-Assad / Beirut), and
+// Kola towers 6051-6054.
 var proxyPorts = map[int]bool{
 	6001: true, 6002: true, 6003: true, 6004: true, 6005: true,
 	6011: true, 6012: true, 6013: true, 6014: true, 6015: true,
@@ -1093,6 +1097,7 @@ var proxyPorts = map[int]bool{
 	6041: true, 6042: true, 6043: true, 6044: true,
 	6045: true, 6046: true, 6047: true, 6048: true,
 	6049: true, 6050: true,
+	6051: true, 6052: true, 6053: true, 6054: true,
 }
 
 // handleTowerProxy reverse-proxies /tower/<port>/<rest> to http://127.0.0.1:<port>/<rest>

@@ -14,6 +14,7 @@ var registry = map[string]*Airfield{
 	"LTAG": LTAG, "LLRD": LLRD, "OJMF": OJMF, "LTDA": LTDA, // Syria / Eastern Med
 	"LTAJ": LTAJ, "LCRA": LCRA, "LCPH": LCPH, "OJHR": OJHR, // Syria / Eastern Med
 	"OSLK": OSLK, "OLBA": OLBA, // Syria / Eastern Med divert fields (not on the card)
+	"ENBO": ENBO, "ENDU": ENDU, "ENNA": ENNA, "EFRO": EFRO, // Kola (Operation WHITE NIGHT)
 }
 
 // ByICAO returns the airfield for an ICAO (case-insensitive), or nil if unknown.
@@ -45,11 +46,21 @@ var (
 	// one back, uncomment it in start_towers_syria.bat, add it to --atis-stations in
 	// start_atis_syria.bat, AND add it here.
 	Syria = []*Airfield{LTAG, LLRD, LCRA, OSLK, OLBA}
+	// Kola is Operation WHITE NIGHT (vSFG-7 monthly campaign, from 2026-11). Hornets fly
+	// from CVN-72; the land fields are the Viper bases, one per phase: Bodo (mission 1),
+	// Bardufoss (2-5), Rovaniemi (6-7), Banak (8-10).
+	//
+	// ⚠ ONLY THE FIELD(S) IN PLAY (operator 2026-10-09: "only the appropriate airfield").
+	// Command's handoff scan walks this list, so a parked field here gets pilots told to
+	// call a tower nobody is running. ENDU, ENNA and EFRO keep their definitions (registry
+	// above) and ATIS entries; to bring one up, uncomment it in start_towers_kola.bat, add
+	// it to --atis-stations in start_atis_kola.bat, AND add it here.
+	Kola = []*Airfield{ENBO}
 )
 
 // FieldsForMap returns the tower fields for a map name (default: Persian Gulf).
 // Accepts "pg"/"persiangulf", "ca"/"caucasus"/"blacksea", "germany"/"de",
-// "iraq"/"iq"/"or", and "syria"/"sy"/"easternmed".
+// "iraq"/"iq"/"or", "syria"/"sy"/"easternmed", and "kola"/"ko".
 //
 // ⚠ THIS FAILS OPEN: an unrecognised name silently returns the Persian Gulf
 // fields rather than erroring, so a typo in a start script gives you PG towers
@@ -64,6 +75,8 @@ func FieldsForMap(name string) []*Airfield {
 		return Iraq
 	case "syria", "sy", "easternmed", "eastern-med", "eastern med", "emed":
 		return Syria
+	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
+		return Kola
 	default:
 		return PersianGulf
 	}

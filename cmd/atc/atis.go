@@ -67,6 +67,12 @@ var towerDashboardPortByICAO = map[string]int{
 	// Divert fields (not on the card), added 2026-09-19.
 	"OSLK": 6049,
 	"OLBA": 6050,
+	// Kola towers (Operation WHITE NIGHT, own range 6051-6054). Only the field in
+	// play is started -- see start_towers_kola.bat.
+	"ENBO": 6051,
+	"ENDU": 6052,
+	"ENNA": 6053,
+	"EFRO": 6054,
 }
 
 // fetchTowerRunway returns the active runway reported by the tower /status
@@ -596,6 +602,10 @@ func atisSecondLangForMap(m string) (string, bool) {
 		// so there is no single local language and every Syria station sets its
 		// own Lang. Arabic here only covers a station added without one.
 		return "Arabic", true
+	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
+		// FALLBACK ONLY. The fields are in Norway and Finland, so every Kola station
+		// sets its own Lang. Norwegian here only covers a station added without one.
+		return "Norwegian", true
 	default: // Persian Gulf
 		return "Arabic", true
 	}
@@ -718,6 +728,31 @@ func atisStationsForMap(m string) []*atisStation {
 				Lang: "Arabic", // Lebanon
 				TACAN: "VOR DME 112.60. NDB 351.",
 				ILS: "ILS 110.10 runway 16. ILS 109.50 runway 17. ILS 110.70 runway 03.", Advisory: advisory},
+		}
+	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
+		// Operation WHITE NIGHT. English plus the field's own language (operator
+		// 2026-10-09): Norwegian at the three Norwegian fields, Finnish at Rovaniemi.
+		// ATIS frequencies are ASSIGNED BY US (tower minus two MHz) -- the squadron Kola
+		// card has none. ILS and navaids are read from the DCS Kola beacons.lua; each
+		// localizer was matched to its runway by direction against the runway course.
+		// start_atis_kola.bat narrows this to the field in play with --atis-stations.
+		return []*atisStation{
+			{Name: "Bodo ATIS", FreqMHz: 249.150, Voice: "nova", ICAO: "ENBO",
+				Style: styleATISAccent("Norwegian"),
+				Lang:  "Norwegian", // Norway
+				TACAN: "TACAN 45X. VOR DME 117.55.", ILS: "ILS 108.70 runway 07. ILS 110.30 runway 25.", Advisory: advisory},
+			{Name: "Bardufoss ATIS", FreqMHz: 248.650, Voice: "shimmer", ICAO: "ENDU",
+				Style: styleATISAccent("Norwegian"),
+				Lang:  "Norwegian", // Norway
+				TACAN: "VOR DME 114.20.", ILS: "ILS 108.70 runway 10.", Advisory: advisory},
+			{Name: "Banak ATIS", FreqMHz: 248.550, Voice: "alloy", ICAO: "ENNA",
+				Style: styleATISAccent("Norwegian"),
+				Lang:  "Norwegian", // Norway
+				TACAN: "TACAN 47X. VOR DME 114.40.", ILS: "ILS 108.30 runway 16.", Advisory: advisory},
+			{Name: "Rovaniemi ATIS", FreqMHz: 248.950, Voice: "echo", ICAO: "EFRO",
+				Style: styleATISAccent("Finnish"),
+				Lang:  "Finnish", // Finland
+				TACAN: "VOR DME 117.70.", ILS: "ILS 111.70 runway 03.", Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{
