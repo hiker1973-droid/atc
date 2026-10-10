@@ -213,7 +213,7 @@ Hatay / Gaziantep / Akrotiri ATIS (249.300 / 249.400 / 249.500) are **assigned b
 
 LSO 128.100 is on the card but `atc.exe` has no LSO role; handoff is verbal.
 
-## Kola — Operation WHITE NIGHT (added 2026-10-09 on feat/kola-map, NOT deployed, NOT flown)
+## Kola — Operation WHITE NIGHT (on main since b019258, 2026-10-09; built on DCSServer only, NOT flown)
 
 Theatre `--map kola`, bats `start_*_kola.bat`, ports 6051-6054. Four fields are defined
 (ENBO Bodo, ENDU Bardufoss, ENNA Banak, EFRO Rovaniemi) but **only the field in play is

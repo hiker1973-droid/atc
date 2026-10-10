@@ -1,6 +1,8 @@
 # Kola theatre — Operation WHITE NIGHT
 
-Added 2026-10-09 on `feat/kola-map`. **Not deployed, not flown.**
+Added 2026-10-09, on `main` since `b019258`. **Not flown.** Binaries were built on DCSServer
+(192.168.1.231) only; Training 1, Night and Foothold were running other theatres and still need
+`git pull origin main` + `build.bat` on the rig before Kola exists there.
 
 The squadron's monthly mission moves from the Persian Gulf to Kola with a ten-mission
 F-16C / FA-18C campaign (WHITE NIGHT). Hornets fly from CVN-72; the land fields are the
@@ -40,7 +42,9 @@ until their expectations are updated too — that is deliberate.
   (each a neighbouring field's frequency). The WHITE NIGHT missions bake the map's values
   into the jets' presets and DTC, so SkyEye transmits on those.
 - **ATIS**: ASSIGNED BY US, tower minus two MHz. The squadron card has no ATIS frequency
-  and **no jet has it on a preset yet** — pilots must dial it, or a preset slot must be given up.
+  and **no jet has it on a preset** — pilots dial it. Bodo's 249.150 is printed on card 4 of
+  both WHITE NIGHT kneeboard decks since mission build v0.5, and that build asserts the card
+  against `pkg/airfield/enbo.go`, so changing it here without rebuilding the deck fails the build.
 - **ILS / TACAN / VOR**: DCS `Mods\terrains\Kola\beacons.lua`. Each localizer was matched to
   its runway by direction. Bodo's 07 localizer (108.70) sits ~10° off the runway course in the
   file — read as an offset approach, not verified in the sim.
@@ -50,7 +54,9 @@ until their expectations are updated too — that is deliberate.
 
 CVN-72 is in the Vestfjord. `start_marshal_kola.bat` runs Marshal on **306.300** and
 `start_deckboss_kola.bat` runs Deckboss on **128.600**, applying the standing rulings
-(2026-09-20 and 2026-09-15) by analogy. **Not ratified for Kola.** The Kola Hornet card
+(2026-09-20 and 2026-09-15) by analogy. **Not ratified for Kola.** ⚠ The WHITE NIGHT
+kneeboard (card 4, Hornet) prints Marshal as 306.100, the card's LIVE MARSHALL preset — it
+disagrees with this script until one of them is changed. The Kola Hornet card
 prints 306.300 as "CVN-72 AI AIRBOSS", 306.100 as "CVN-72 LIVE MARSHALL" and Deckboss on
 COMM2 CH1 306.200. Both scripts pass `--airfield ENBO` for the BRC magvar.
 
