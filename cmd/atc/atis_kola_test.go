@@ -56,3 +56,20 @@ func TestKolaATISFilterMatchesLiveTowers(t *testing.T) {
 		}
 	}
 }
+
+// beacons.lua gives a localizer's direction as the RECIPROCAL of the landing course. The
+// first cut read it as the landing course and announced every Kola ILS on the wrong end
+// of its runway. Pin the runway each one serves.
+func TestKolaILSRunways(t *testing.T) {
+	want := map[string]string{
+		"ENBO": "ILS 110.30 runway 07. ILS 108.70 runway 25.",
+		"ENDU": "ILS 108.70 runway 28.",
+		"ENNA": "ILS 108.30 runway 34.",
+		"EFRO": "ILS 111.70 runway 21.",
+	}
+	for _, st := range atisStationsForMap("kola") {
+		if st.ILS != want[st.ICAO] {
+			t.Errorf("%s ILS = %q, want %q", st.ICAO, st.ILS, want[st.ICAO])
+		}
+	}
+}

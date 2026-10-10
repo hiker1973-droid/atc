@@ -733,26 +733,29 @@ func atisStationsForMap(m string) []*atisStation {
 		// Operation WHITE NIGHT. English plus the field's own language (operator
 		// 2026-10-09): Norwegian at the three Norwegian fields, Finnish at Rovaniemi.
 		// ATIS frequencies are ASSIGNED BY US (tower minus two MHz) -- the squadron Kola
-		// card has none. ILS and navaids are read from the DCS Kola beacons.lua; each
-		// localizer was matched to its runway by direction against the runway course.
+		// card has none. ILS and navaids are read from the DCS Kola beacons.lua.
+		// ⚠ A localizer's `direction` in beacons.lua is the RECIPROCAL of the landing
+		// course: Batumi's reads -54 (306) and serves runway 13, Senaki's -85 (275) and
+		// serves 09. The first cut of this table read it as the landing course and put
+		// every Kola ILS on the wrong end of its runway (fixed 2026-10-09, same day).
 		// start_atis_kola.bat narrows this to the field in play with --atis-stations.
 		return []*atisStation{
 			{Name: "Bodo ATIS", FreqMHz: 249.150, Voice: "nova", ICAO: "ENBO",
 				Style: styleATISAccent("Norwegian"),
 				Lang:  "Norwegian", // Norway
-				TACAN: "TACAN 45X. VOR DME 117.55.", ILS: "ILS 108.70 runway 07. ILS 110.30 runway 25.", Advisory: advisory},
+				TACAN: "TACAN 45X. VOR DME 117.55.", ILS: "ILS 110.30 runway 07. ILS 108.70 runway 25.", Advisory: advisory},
 			{Name: "Bardufoss ATIS", FreqMHz: 248.650, Voice: "shimmer", ICAO: "ENDU",
 				Style: styleATISAccent("Norwegian"),
 				Lang:  "Norwegian", // Norway
-				TACAN: "VOR DME 114.20.", ILS: "ILS 108.70 runway 10.", Advisory: advisory},
+				TACAN: "VOR DME 114.20.", ILS: "ILS 108.70 runway 28.", Advisory: advisory},
 			{Name: "Banak ATIS", FreqMHz: 248.550, Voice: "alloy", ICAO: "ENNA",
 				Style: styleATISAccent("Norwegian"),
 				Lang:  "Norwegian", // Norway
-				TACAN: "TACAN 47X. VOR DME 114.40.", ILS: "ILS 108.30 runway 16.", Advisory: advisory},
+				TACAN: "TACAN 47X. VOR DME 114.40.", ILS: "ILS 108.30 runway 34.", Advisory: advisory},
 			{Name: "Rovaniemi ATIS", FreqMHz: 248.950, Voice: "echo", ICAO: "EFRO",
 				Style: styleATISAccent("Finnish"),
 				Lang:  "Finnish", // Finland
-				TACAN: "VOR DME 117.70.", ILS: "ILS 111.70 runway 03.", Advisory: advisory},
+				TACAN: "VOR DME 117.70.", ILS: "ILS 111.70 runway 21.", Advisory: advisory},
 		}
 	default: // Persian Gulf
 		return []*atisStation{
