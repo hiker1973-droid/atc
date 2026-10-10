@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"sync"
 	"syscall"
@@ -2188,14 +2189,26 @@ func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
 	// like crackle rather than like a driven radio. The limiter catches those
 	// peaks and gives the hard-driven UHF character the compressor alone
 	// doesn't.
+	//
+	// The leading volume= levels the voice before anything else touches it.
+	// gpt-4o-mini-tts does not return every voice at the same level: measured
+	// 2026-10-10, sage (Command, Syria Marshal) came back at about -34 dB mean
+	// against -20 dB for alloy/nova/shimmer. Nothing downstream makes that up —
+	// a -34 dB voice sits under the compressor's threshold and the noise is
+	// mixed in at a fixed amplitude, so Command went out 14 dB down and buried
+	// in its own hiss while the towers sounded fine.
+	gainDB := 0.0
+	if mean, ok := measureMeanVolumeDB(tmpIn.Name(), ffmpegPath); ok {
+		gainDB = levelGainDB(mean)
+	}
 	filter := fmt.Sprintf(
-		"[0:a]highpass=f=%d,lowpass=f=%d,"+
+		"[0:a]volume=%.1fdB,highpass=f=%d,lowpass=f=%d,"+
 			"acompressor=threshold=-24dB:ratio=8:attack=5:release=60,"+
 			"volume=1.15[voice];"+
 			"anoisesrc=color=pink:amplitude=%.3f:duration=0[noise];"+
 			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0,"+
 			"alimiter=limit=0.95:attack=1:release=40[out]",
-		hpf, lpf, noiseAmp,
+		gainDB, hpf, lpf, noiseAmp,
 	)
 
 	cmd := exec.Command(ffmpegPath,
@@ -2217,6 +2230,47 @@ func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
 		return mp3
 	}
 	return processed
+}
+
+// voiceTargetMeanDB is the mean level every TTS voice is brought to ahead of
+// the radio effect. It is where the tower voices already land on their own, so
+// levelling leaves them as they were and only lifts the quiet ones.
+const voiceTargetMeanDB = -20.0
+
+// levelGainDB returns the gain that takes a clip measured at meanDB to
+// voiceTargetMeanDB. Clamped so a near-silent or mis-measured clip can't be
+// driven into the limiter, and so a hot one is never pulled down far.
+func levelGainDB(meanDB float64) float64 {
+	return math.Max(-6, math.Min(24, voiceTargetMeanDB-meanDB))
+}
+
+var meanVolumeRe = regexp.MustCompile(`mean_volume:\s*(-?[0-9.]+) dB`)
+
+// measureMeanVolumeDB reads a clip's mean level with ffmpeg's volumedetect.
+// ok is false on any failure, and the caller then applies no gain.
+func measureMeanVolumeDB(path, ffmpegPath string) (float64, bool) {
+	out, err := exec.Command(ffmpegPath,
+		"-hide_banner", "-nostats",
+		"-i", path,
+		"-af", "volumedetect",
+		"-f", "null", "-",
+	).CombinedOutput()
+	if err != nil {
+		return 0, false
+	}
+	return parseMeanVolumeDB(string(out))
+}
+
+func parseMeanVolumeDB(ffmpegOutput string) (float64, bool) {
+	m := meanVolumeRe.FindStringSubmatch(ffmpegOutput)
+	if m == nil {
+		return 0, false
+	}
+	mean, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0, false
+	}
+	return mean, true
 }
 
 // addMicClicks splices a synthetic PTT key-up click (~70ms white-noise

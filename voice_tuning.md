@@ -74,6 +74,15 @@ push past full scale, and digital clipping sounds like crackle rather than like
 a driven radio; the limiter catches those peaks and adds the hard-driven UHF
 character compression alone doesn't give.
 
+The chain opens by **levelling the voice** to −20 dB mean (`voiceTargetMeanDB`),
+measured per clip with `volumedetect`. gpt-4o-mini-tts does not return every
+voice at the same level — on 2026-10-10 `sage` measured −34 dB mean against
+−20 dB for `alloy`/`nova`/`shimmer` and −25 dB for `onyx` — and nothing after it
+makes the difference up, so Command (and Syria Marshal, also `sage`) went out
+about 14 dB under the towers and buried in their own hiss. −20 dB is where the
+tower voices already sit, so they are unchanged. Levelling lives inside the
+radio effect, so `--radio-effect=false` skips it.
+
 Intensity is per role: `--radio-effect-intensity` (default `medium`),
 `--tower-radio-intensity` (`heavy`), `--atis-radio-intensity` (`light`).
 
