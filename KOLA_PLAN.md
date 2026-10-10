@@ -45,9 +45,13 @@ until their expectations are updated too — that is deliberate.
   and **no jet has it on a preset** — pilots dial it. Bodo's 249.150 is printed on card 4 of
   both WHITE NIGHT kneeboard decks since mission build v0.5, and that build asserts the card
   against `pkg/airfield/enbo.go`, so changing it here without rebuilding the deck fails the build.
-- **ILS / TACAN / VOR**: DCS `Mods\terrains\Kola\beacons.lua`. Each localizer was matched to
-  its runway by direction. Bodo's 07 localizer (108.70) sits ~10° off the runway course in the
-  file — read as an offset approach, not verified in the sim.
+- **ILS / TACAN / VOR**: DCS `Mods\terrains\Kola\beacons.lua`. ⚠ A localizer's `direction` there
+  is the RECIPROCAL of the landing course (checked against Batumi 13 and Senaki 09 on Caucasus).
+  The first cut read it the other way and announced every ILS on the wrong runway end; corrected
+  the same day in `ff90e69`. ILS: Bodo 07 110.30 / 25 108.70, Bardufoss 28 108.70, Banak 34
+  108.30, Rovaniemi 21 111.70. Bodo's 25 localizer sits ~10° off the runway course in the file —
+  read as an offset approach, not verified in the sim. TACAN mode (X) is assumed; the file gives
+  only the channel.
 - **Map clock**: the Kola map runs on UTC+3 everywhere, Norway included.
 
 ## 3. Carrier roles
