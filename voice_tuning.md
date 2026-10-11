@@ -68,20 +68,38 @@ voice keeps changing. Rotation left on behaves exactly as before.
 
 ## Radio effect
 
-`applyRadioEffect` (bandpass → compressor → gain → pink-noise mix) now ends in
-`alimiter`. `volume=1.15` on top of an 8:1 compressor and then summing noise can
-push past full scale, and digital clipping sounds like crackle rather than like
-a driven radio; the limiter catches those peaks and adds the hard-driven UHF
-character compression alone doesn't give.
+Every TX is prepared by `prepareTX` in two ffmpeg runs: one `volumedetect`
+measurement, then one pass through `radioFilter` that does everything else —
+level → bandpass → compressor → pink-noise mix → output gain → `alimiter` → PTT
+key-up click and squelch tail spliced on. (Until 2026-10-10 the effect and the
+clicks were separate passes, `applyRadioEffect` and `addMicClicks`.)
 
-The chain opens by **levelling the voice** to −20 dB mean (`voiceTargetMeanDB`),
-measured per clip with `volumedetect`. gpt-4o-mini-tts does not return every
-voice at the same level — on 2026-10-10 `sage` measured −34 dB mean against
-−20 dB for `alloy`/`nova`/`shimmer` and −25 dB for `onyx` — and nothing after it
-makes the difference up, so Command (and Syria Marshal, also `sage`) went out
-about 14 dB under the towers and buried in their own hiss. −20 dB is where the
-tower voices already sit, so they are unchanged. Levelling lives inside the
-radio effect, so `--radio-effect=false` skips it.
+**Levelling.** The chain opens by bringing the voice to −20 dB mean
+(`voiceTargetMeanDB`). gpt-4o-mini-tts does not return every voice at the same
+level — on 2026-10-10 `sage` measured −34 dB mean against −20 dB for
+`alloy`/`nova`/`shimmer` and −25 dB for `onyx` — and nothing after it makes the
+difference up, so Command (and Syria Marshal, also `sage`) went out about 14 dB
+under the towers and buried in their own hiss. −20 dB is where the tower voices
+already sit, so they are unchanged. With `--radio-effect=false` the voice is
+still levelled, just not put through the radio chain.
+
+Each TX logs `voice levelled` with the callsign, measured `meanDB` and applied
+`gainDB` — at info when the correction is 6 dB or more, debug otherwise. A role
+that shows up at info on every TX is on a voice that comes back quiet (or hot);
+that is the line to look for the next time one role is reported quieter than
+the rest.
+
+**Output gain.** `--output-gain-db` (default `14`) is applied after the noise
+mix, so it raises voice and hiss together and leaves each tier's character
+alone. Before it, the compressor (no makeup gain) and `amix` (which halves both
+inputs) left every role peaking near −20 dB and averaging −34 dB — 11 dB under
+the key-up click in front of it, with the limiter never engaging. At 14 the
+voice peaks around −6 dB and averages −21 dB, level with the click.
+`--output-gain-db=0` is the old level and needs no rebuild.
+
+`alimiter` stays last in the voice path: digital clipping sounds like crackle
+rather than like a driven radio, and the limiter adds the hard-driven UHF
+character compression alone doesn't give.
 
 Intensity is per role: `--radio-effect-intensity` (default `medium`),
 `--tower-radio-intensity` (`heavy`), `--atis-radio-intensity` (`light`).
@@ -101,8 +119,8 @@ narrowing the passband changes the voice's character instead. If it now reads as
 too hot, step the tier down (`--tower-radio-intensity=medium`) before editing the
 constants, since the flags need no rebuild.
 
-PTT key-up click and squelch tail are already applied by `addMicClicks`, which
-runs after the radio effect on every TX.
+The PTT key-up click and squelch tail are part of the same pass and are not
+affected by the tier or by `--output-gain-db`.
 
 ## Cache note
 

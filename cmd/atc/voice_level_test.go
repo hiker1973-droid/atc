@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // The levels are the ones measured off gpt-4o-mini-tts on 2026-10-10, when
 // Command (sage) was reported far quieter than the towers.
@@ -34,5 +37,36 @@ func TestParseMeanVolume(t *testing.T) {
 	}
 	if _, ok := parseMeanVolumeDB("Invalid data found when processing input"); ok {
 		t.Error("output without a mean_volume line must not parse")
+	}
+}
+
+// The radio graph must level first and raise the output after the mix: gain
+// ahead of amix would lift the voice out of its tier's hiss, and gain after
+// the limiter would clip.
+func TestRadioFilterOrdersLevelGainAndLimiter(t *testing.T) {
+	f := radioFilter("heavy", 14.5, 14)
+	for _, want := range []string{
+		"[0:a]volume=14.5dB,highpass=f=500,lowpass=f=2700,",
+		"amplitude=0.128:",
+		"amix=inputs=2:duration=first:dropout_transition=0,volume=14.0dB,alimiter=",
+		"[click_up][body][click_dn]concat=n=3:v=0:a=1[out]",
+	} {
+		if !strings.Contains(f, want) {
+			t.Errorf("radio filter is missing %q:\n%s", want, f)
+		}
+	}
+}
+
+func TestTxIntensityByCallsign(t *testing.T) {
+	flagRadioIntensity, flagTowerRadioIntensity, flagATISRadioIntensity = "medium", "heavy", "light"
+	for callsign, want := range map[string]string{
+		"UGKS-ATC":       "heavy",
+		"Senaki ATIS":    "light",
+		"vSFG-7-Command": "medium",
+		"OMDM-MSH":       "medium",
+	} {
+		if got := txIntensity(callsign); got != want {
+			t.Errorf("txIntensity(%q) = %q, want %q", callsign, got, want)
+		}
 	}
 }

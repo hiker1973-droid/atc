@@ -102,6 +102,7 @@ var (
 	flagMarshalVoice    string
 	flagRadioEffect          bool
 	flagRadioIntensity       string
+	flagOutputGainDB         float64
 	flagTowerRadioIntensity  string
 	flagATISRadioIntensity   string
 	flagTTSSpeed             float64
@@ -239,6 +240,8 @@ func main() {
 		"Radio effect intensity for tower TX: light, medium, heavy, extreme")
 	f.StringVar(&flagATISRadioIntensity, "atis-radio-intensity", "light",
 		"Radio effect intensity for ATIS TX (kept clean since it's a recorded loop): light, medium, heavy, extreme")
+	f.Float64Var(&flagOutputGainDB, "output-gain-db", 14,
+		"Gain in dB applied to every radio-effect TX after the noise mix — raises voice and hiss together (0 = the level before 2026-10-10)")
 	f.Float64Var(&flagTTSSpeed, "tts-speed", speedDeckboss,
 		"TTS playback speed for tower/command — defaults to the Deckboss rate, which every other role also runs at")
 	f.BoolVar(&flagScudwatchOnly, "scudwatch-only", false,
@@ -2148,94 +2151,109 @@ func whisperTranscribe(ctx context.Context, apiKey string, audio []byte, filenam
 }
 
 
-// applyRadioEffect runs the TTS MP3 through ffmpeg to add the tinny, staticky
-// feel of an AM comms radio. Clean voice is bandpass-limited to ~radio
-// bandwidth, lightly compressed, then mixed with low-level pink noise so the
-// carrier hiss is audible under the speech. Returns the original bytes on any
-// ffmpeg failure so broadcasts never drop to silence.
-func applyRadioEffect(mp3 []byte, ffmpegPath, intensity string) []byte {
+// radioTier returns the noise amplitude and bandpass corners for a radio
+// effect intensity.
+func radioTier(intensity string) (noiseAmp float64, hpf, lpf int) {
 	// Noise amplitudes were raised ~60% on 2026-08-16 (operator preference:
 	// more carrier hiss for the radio feel). Ratios between the tiers are
 	// unchanged, so "heavy" still sits the same distance above "medium".
-	var noiseAmp float64
-	var hpf, lpf int
 	switch strings.ToLower(intensity) {
 	case "light":
-		noiseAmp, hpf, lpf = 0.032, 350, 3200
+		return 0.032, 350, 3200
 	case "heavy":
-		noiseAmp, hpf, lpf = 0.128, 500, 2700
+		return 0.128, 500, 2700
 	case "extreme":
-		noiseAmp, hpf, lpf = 0.208, 600, 2400
+		return 0.208, 600, 2400
 	default: // medium
-		noiseAmp, hpf, lpf = 0.064, 400, 3000
+		return 0.064, 400, 3000
 	}
+}
 
-	tmpIn, err := os.CreateTemp("", "atc-radio-in-*.mp3")
-	if err != nil {
-		return mp3
-	}
-	defer os.Remove(tmpIn.Name())
-	if _, err := tmpIn.Write(mp3); err != nil {
-		tmpIn.Close()
-		return mp3
-	}
-	tmpIn.Close()
-
-	tmpOut := tmpIn.Name() + ".out.mp3"
-	defer os.Remove(tmpOut)
-
-	// alimiter after the mix: volume=1.15 on top of an 8:1 compressor and then
-	// summing pink noise can push past full scale, and digital clipping sounds
-	// like crackle rather than like a driven radio. The limiter catches those
-	// peaks and gives the hard-driven UHF character the compressor alone
-	// doesn't.
-	//
-	// The leading volume= levels the voice before anything else touches it.
-	// gpt-4o-mini-tts does not return every voice at the same level: measured
-	// 2026-10-10, sage (Command, Syria Marshal) came back at about -34 dB mean
-	// against -20 dB for alloy/nova/shimmer. Nothing downstream makes that up —
-	// a -34 dB voice sits under the compressor's threshold and the noise is
-	// mixed in at a fixed amplitude, so Command went out 14 dB down and buried
-	// in its own hiss while the towers sounded fine.
-	gainDB := 0.0
-	if mean, ok := measureMeanVolumeDB(tmpIn.Name(), ffmpegPath); ok {
-		gainDB = levelGainDB(mean)
-	}
-	filter := fmt.Sprintf(
+// radioFilter builds the ffmpeg graph that turns clean TTS into a radio
+// transmission in one pass: level the voice, bandpass it to ~radio bandwidth,
+// compress it, mix in pink-noise carrier hiss, bring the result up to
+// transmission level, then splice a PTT key-up click (~70ms white noise,
+// 1500–4500 Hz) onto the front and a squelch tail (~180ms pink noise, faded)
+// onto the back. The clicks come from anoisesrc, so no audio assets are
+// bundled.
+//
+// levelDB levels the voice before anything else touches it. gpt-4o-mini-tts
+// does not return every voice at the same level: measured 2026-10-10, sage
+// (Command, Syria Marshal) came back at about -34 dB mean against -20 dB for
+// alloy/nova/shimmer. Nothing downstream makes that up — a -34 dB voice sits
+// under the compressor's threshold and the noise is mixed in at a fixed
+// amplitude, so Command went out 14 dB down and buried in its own hiss while
+// the towers sounded fine.
+//
+// outGainDB is applied after the mix, so it raises voice and hiss together
+// and leaves the character of each tier alone. Without it the compressor (no
+// makeup gain) and amix (which halves both inputs) leave the voice peaking
+// near -20 dB — 11 dB under the key-up click in front of it, and well short
+// of what the limiter was put there to catch.
+//
+// alimiter stays last in the voice path: digital clipping sounds like crackle
+// rather than like a driven radio, and the limiter gives the hard-driven UHF
+// character the compressor alone doesn't.
+func radioFilter(intensity string, levelDB, outGainDB float64) string {
+	noiseAmp, hpf, lpf := radioTier(intensity)
+	return fmt.Sprintf(
 		"[0:a]volume=%.1fdB,highpass=f=%d,lowpass=f=%d,"+
 			"acompressor=threshold=-24dB:ratio=8:attack=5:release=60,"+
 			"volume=1.15[voice];"+
 			"anoisesrc=color=pink:amplitude=%.3f:duration=0[noise];"+
 			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0,"+
-			"alimiter=limit=0.95:attack=1:release=40[out]",
-		gainDB, hpf, lpf, noiseAmp,
+			"volume=%.1fdB,"+
+			"alimiter=limit=0.95:attack=1:release=40,"+
+			// 44100/mono so concat can match the synthetic clicks.
+			"aresample=44100,aformat=channel_layouts=mono[body];"+
+			"anoisesrc=color=white:amplitude=0.55:duration=0.07:sample_rate=44100,"+
+			"highpass=f=1500,lowpass=f=4500,"+
+			"afade=t=in:st=0:d=0.005,afade=t=out:st=0.05:d=0.02[click_up];"+
+			"anoisesrc=color=pink:amplitude=0.4:duration=0.18:sample_rate=44100,"+
+			"highpass=f=300,lowpass=f=4000,"+
+			"afade=t=out:st=0.02:d=0.16[click_dn];"+
+			"[click_up][body][click_dn]concat=n=3:v=0:a=1[out]",
+		levelDB, hpf, lpf, noiseAmp, outGainDB,
 	)
+}
 
+// levelFilter is the whole graph when the radio effect is off: the voice is
+// still levelled, so a quiet voice is not quiet just because it is clean.
+func levelFilter(levelDB float64) string {
+	return fmt.Sprintf("[0:a]volume=%.1fdB,alimiter=limit=0.95:attack=1:release=40[out]", levelDB)
+}
+
+// runAudioFilter renders inPath through an ffmpeg filter graph ending in
+// [out] to an MP3 at outPath, at the rate ExternalAudio wants.
+func runAudioFilter(ffmpegPath, inPath, outPath, filter string) error {
 	cmd := exec.Command(ffmpegPath,
 		"-y",
-		"-i", tmpIn.Name(),
+		"-i", inPath,
 		"-filter_complex", filter,
 		"-map", "[out]",
 		"-c:a", "libmp3lame",
 		"-ar", strconv.Itoa(srsAudioRateHz),
 		"-b:a", "64k",
-		tmpOut,
+		outPath,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Warn().Err(err).Str("output", string(out)).Msg("radio effect ffmpeg failed — using clean audio")
-		return mp3
+		return fmt.Errorf("ffmpeg: %w: %s", err, string(out))
 	}
-	processed, err := os.ReadFile(tmpOut)
-	if err != nil || len(processed) == 0 {
-		return mp3
+	if fi, err := os.Stat(outPath); err != nil || fi.Size() == 0 {
+		return fmt.Errorf("ffmpeg produced empty output")
 	}
-	return processed
+	return nil
 }
 
 // voiceTargetMeanDB is the mean level every TTS voice is brought to ahead of
 // the radio effect. It is where the tower voices already land on their own, so
 // levelling leaves them as they were and only lifts the quiet ones.
 const voiceTargetMeanDB = -20.0
+
+// levelGainNotableDB is the correction past which a transmission's levelling
+// is logged at info rather than debug: a voice that far off the others is the
+// "why is Command so quiet" report waiting to happen.
+const levelGainNotableDB = 6.0
 
 // levelGainDB returns the gain that takes a clip measured at meanDB to
 // voiceTargetMeanDB. Clamped so a near-silent or mis-measured clip can't be
@@ -2273,57 +2291,60 @@ func parseMeanVolumeDB(ffmpegOutput string) (float64, bool) {
 	return mean, true
 }
 
-// addMicClicks splices a synthetic PTT key-up click (~70ms white-noise
-// transient bandpassed to 1500–4500 Hz) onto the start of the voice and a
-// squelch-tail noise burst (~180ms pink noise with fade-out) onto the end.
-// Both clicks are generated entirely by ffmpeg's anoisesrc so no audio assets
-// need bundling. Returns the original bytes on any ffmpeg failure so live
-// broadcasts never drop to silence.
-func addMicClicks(mp3 []byte, ffmpegPath string) []byte {
-	tmpIn, err := os.CreateTemp("", "atc-clicks-in-*.mp3")
-	if err != nil {
-		return mp3
+// txIntensity picks the radio effect tier for a transmitting callsign:
+//   - Tower callsigns end in "-ATC" (e.g. OMAM-ATC) → heavier static for that
+//     punchy ATC sound.
+//   - ATIS station callsigns end with " ATIS" (e.g. "Liwa ATIS", "Kish ATIS")
+//     → kept clean since it's a recorded loop.
+//   - Everything else (OMDM-MSH, OMDM-DKB, vSFG-7-Command) gets the general
+//     operational intensity.
+func txIntensity(callsign string) string {
+	switch {
+	case strings.HasSuffix(callsign, "-ATC"):
+		return flagTowerRadioIntensity
+	case strings.HasSuffix(callsign, " ATIS"):
+		return flagATISRadioIntensity
 	}
-	defer os.Remove(tmpIn.Name())
-	if _, err := tmpIn.Write(mp3); err != nil {
-		tmpIn.Close()
-		return mp3
-	}
-	tmpIn.Close()
+	return flagRadioIntensity
+}
 
-	tmpOut := tmpIn.Name() + ".out.mp3"
-	defer os.Remove(tmpOut)
-
-	// Normalize voice to 44100/mono so concat can match the synthetic clicks.
-	filter :=
-		"[0:a]aresample=44100,aformat=channel_layouts=mono[voice];" +
-			"anoisesrc=color=white:amplitude=0.55:duration=0.07:sample_rate=44100," +
-			"highpass=f=1500,lowpass=f=4500," +
-			"afade=t=in:st=0:d=0.005,afade=t=out:st=0.05:d=0.02[click_up];" +
-			"anoisesrc=color=pink:amplitude=0.4:duration=0.18:sample_rate=44100," +
-			"highpass=f=300,lowpass=f=4000," +
-			"afade=t=out:st=0.02:d=0.16[click_dn];" +
-			"[click_up][voice][click_dn]concat=n=3:v=0:a=1[out]"
-
-	cmd := exec.Command(ffmpegPath,
-		"-y",
-		"-i", tmpIn.Name(),
-		"-filter_complex", filter,
-		"-map", "[out]",
-		"-c:a", "libmp3lame",
-		"-ar", strconv.Itoa(srsAudioRateHz),
-		"-b:a", "64k",
-		tmpOut,
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Warn().Err(err).Str("output", string(out)).Msg("mic-click splice ffmpeg failed — using clean audio")
-		return mp3
+// prepareTX levels the clean TTS clip at inPath and, with the radio effect on,
+// runs it through the radio chain. It returns the path to transmit and a
+// cleanup func. On any ffmpeg failure it returns inPath untouched, so a
+// broadcast never drops to silence.
+func prepareTX(inPath, callsign string) (string, func()) {
+	levelDB := 0.0
+	mean, ok := measureMeanVolumeDB(inPath, flagFFmpeg)
+	if !ok {
+		log.Warn().Str("callsign", callsign).Msg("voice level measurement failed — transmitting unlevelled")
+	} else {
+		levelDB = levelGainDB(mean)
+		ev := log.Debug()
+		if math.Abs(levelDB) >= levelGainNotableDB {
+			ev = log.Info()
+		}
+		ev.Str("callsign", callsign).
+			Float64("meanDB", mean).
+			Float64("gainDB", math.Round(levelDB*10)/10).
+			Msg("voice levelled")
 	}
-	processed, err := os.ReadFile(tmpOut)
-	if err != nil || len(processed) == 0 {
-		return mp3
+
+	var filter string
+	switch {
+	case flagRadioEffect:
+		filter = radioFilter(txIntensity(callsign), levelDB, flagOutputGainDB)
+	case math.Abs(levelDB) >= 0.5:
+		filter = levelFilter(levelDB)
+	default:
+		return inPath, func() {}
 	}
-	return processed
+	outPath := inPath + ".tx.mp3"
+	if err := runAudioFilter(flagFFmpeg, inPath, outPath, filter); err != nil {
+		os.Remove(outPath)
+		log.Warn().Err(err).Str("callsign", callsign).Msg("TX audio processing failed — using clean audio")
+		return inPath, func() {}
+	}
+	return outPath, func() { os.Remove(outPath) }
 }
 
 // concatMP3WithSilence re-encodes two MP3 byte slices into a single MP3 with
@@ -2425,23 +2446,6 @@ func concatMP3WithSilence(en, ar []byte, ffmpegPath string, silenceSec float64) 
 // transmitExternalAudioFile injects a pre-generated MP3 file via ExternalAudio.
 // ctx bounds the subprocess so a hung ExternalAudio.exe can't stall the TX queue.
 func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
-	if flagRadioEffect {
-		// Per-role intensity:
-		// - Tower callsigns end in "-ATC" (e.g. OMAM-ATC) → heavier static
-		//   for that punchy ATC sound.
-		// - ATIS station callsigns end with " ATIS" (e.g. "Liwa ATIS",
-		//   "Kish ATIS") → kept clean since it's a recorded loop.
-		// - Everything else (OMDM-MSH, OMDM-DKB, vSFG-7-Command) gets the
-		//   general operational intensity.
-		intensity := flagRadioIntensity
-		if strings.HasSuffix(callsign, "-ATC") {
-			intensity = flagTowerRadioIntensity
-		} else if strings.HasSuffix(callsign, " ATIS") {
-			intensity = flagATISRadioIntensity
-		}
-		mp3 = applyRadioEffect(mp3, flagFFmpeg, intensity)
-		mp3 = addMicClicks(mp3, flagFFmpeg)
-	}
 	// Write MP3 to temp file
 	tmp, err := os.CreateTemp("", "atc-tts-*.mp3")
 	if err != nil {
@@ -2457,9 +2461,12 @@ func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64,
 	}
 	tmp.Close()
 
+	txPath, cleanup := prepareTX(tmpPath, callsign)
+	defer cleanup()
+
 	safeName := strings.ReplaceAll(callsign, " ", "-")
 	args := []string{
-		"--file", tmpPath,
+		"--file", txPath,
 		"--freqs", fmt.Sprintf("%.3f", freqMHz),
 		"--modulations", "AM",
 		"-c", "2",
