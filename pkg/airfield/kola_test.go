@@ -31,7 +31,8 @@ func TestKolaLiveFields(t *testing.T) {
 
 // All four definitions, parked or not. Headings are magnetic and must be a reciprocal
 // pair that agrees with the runway number; magvar is per field because it runs from
-// 8°E at Bodo to 15°E at Banak, and one map-wide value would put a heading 7° out.
+// 5°E at Bodo to 12°E at Banak (2015, the WHITE NIGHT year; DCS dates its magvar by the
+// mission), and one map-wide value would put a heading 7° out.
 func TestKolaFieldData(t *testing.T) {
 	cases := []struct {
 		af     *Airfield
@@ -42,10 +43,10 @@ func TestKolaFieldData(t *testing.T) {
 		b      string
 		hdgB   float64
 	}{
-		{ENBO, 33, 8.0, "07", 70, "25", 250},
-		{ENDU, 234, 10.8, "28", 278, "10", 98},
-		{ENNA, 17, 14.8, "34", 341, "16", 161},
-		{EFRO, 636, 13.6, "21", 204, "03", 24},
+		{ENBO, 33, 5.3, "07", 72, "25", 252},
+		{ENDU, 234, 8.0, "28", 281, "10", 101},
+		{ENNA, 17, 11.9, "34", 344, "16", 164},
+		{EFRO, 636, 11.1, "21", 206, "03", 26},
 	}
 	for _, c := range cases {
 		if ByICAO(c.af.ICAO) != c.af {

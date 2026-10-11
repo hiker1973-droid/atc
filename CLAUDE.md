@@ -224,7 +224,9 @@ assigned ATIS frequencies nobody has on a preset) are in `KOLA_PLAN.md`.
 
 - ATIS is English + the field's own language: Norwegian in Norway, Finnish at Rovaniemi
   (per-station `Lang`, same mechanism as Syria).
-- Magvar is per field here (8°E to 15°E across the map), and runway headings are computed
+- Magvar is per field here (5°E to 12°E across the map) and is **dated 2015**, the WHITE
+  NIGHT year — DCS takes magvar from the mission date, 2026 reads about 3° more (see
+  `KOLA_PLAN.md` §2). Runway headings are computed
   from TRUE bearings — the Mission Editor's `course_deg` is a grid bearing, 6-9° off.
 
 ## ExternalAudio crashes mid-transmission — read before debugging "SRS not transmitting"

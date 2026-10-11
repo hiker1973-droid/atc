@@ -35,7 +35,7 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 ::
 :: --airfield ENBO (Bodo): Marshal is carrier-only and registers no tower, so this
 :: sets the weather/divert context and the magnetic variation BRC is spoken with
-:: (+8.0 E at Bodo; the Vestfjord is 7.7 E).
+:: (+5.3 E at Bodo; the Vestfjord is 4.9 E -- both for 2015, the WHITE NIGHT year).
 ::
 :: Voice coral and dashboard 6004 are shared with the other theatres' Marshals by
 :: design: only one map runs at a time.

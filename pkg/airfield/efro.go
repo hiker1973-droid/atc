@@ -3,9 +3,10 @@ package airfield
 import "github.com/paulmach/orb"
 
 // EFRO is Rovaniemi, Finland — Kola theatre (Operation WHITE NIGHT).
-// Added 2026-10. Centre, elevation, magvar and runway ends are from the DCS
+// Added 2026-10. Centre, elevation and runway ends are from the DCS
 // Mission Editor (dcs-sms me airbase get / coords to-geo / coords magvar,
-// 2026-10-09): the thresholds are real DCS runway edges, and the headings are the
+// 2026-10-09; MagVar was re-dated to the mission year on 2026-10-11, see KOLA_PLAN.md):
+// the thresholds are real DCS runway edges, and the headings are the
 // TRUE bearing between them minus the field's magvar — NOT the ME's grid course,
 // which is 5° off true at this latitude.
 // Tower 250.950 is the DCS map's own UHF tower; ATIS 248.950 is ASSIGNED BY US
@@ -16,7 +17,7 @@ var EFRO = &Airfield{
 	DCSName:         "Rovaniemi",
 	Center:          orb.Point{25.8305, 66.5648}, // [lon, lat] — DCS airbase reference point
 	ElevationFt:     636,
-	MagVar:          13.6, // DCS 13.55°E at the field — magvar runs 8°E to 15°E across this map, so it is per-field
+	MagVar:          11.1, // DCS 11.09°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
 	PatternAltFt:    1500, // AGL, as the other fields
 	TowerFreqMHz:    250.950,
 	ApproachFreqMHz: 250.950,
@@ -33,8 +34,8 @@ var EFRO = &Airfield{
 	RunwayPairs: []RunwayPair{
 		{
 			// 9,040 ft between the DCS runway edges; true 217.4 / 37.4.
-			Primary:    Runway{Designator: "21", MagneticHeading: 204.0, ThresholdLatLon: orb.Point{25.8494, 66.5747}},
-			Reciprocal: Runway{Designator: "03", MagneticHeading: 24.0, ThresholdLatLon: orb.Point{25.8116, 66.5550}},
+			Primary:    Runway{Designator: "21", MagneticHeading: 206.0, ThresholdLatLon: orb.Point{25.8494, 66.5747}},
+			Reciprocal: Runway{Designator: "03", MagneticHeading: 26.0, ThresholdLatLon: orb.Point{25.8116, 66.5550}},
 		},
 	},
 }
