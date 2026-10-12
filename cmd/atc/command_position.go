@@ -45,9 +45,13 @@ func isTankerRequest(lower string) bool {
 }
 
 // commandReply is the full Command answer to a transcript: the Tacview-backed
-// bullseye / tanker replies first, then the text-only intents.
+// bullseye / tanker replies first, then the tasking exchange, then the
+// text-only intents.
 func commandReply(text, callsign, channelName string, store *tacviewPositions) string {
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
+		return resp
+	}
+	if resp := commandTaskingBoard().Response(text, callsign, channelName); resp != "" {
 		return resp
 	}
 	return commandResponse(text, callsign, channelName)

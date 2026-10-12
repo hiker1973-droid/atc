@@ -107,6 +107,7 @@ Mission-wide ops channel. Six intents, each with three randomised responses.
 | Fuel state | `"...state 5.2"`, `"state 1 point 8"` | Copies state; below 2.0 you're told you're bingo. Also works tacked onto fence in / fence out |
 | Bullseye | `"...say bullseye"`, `"request bullseye"` | Your position from your coalition's bullseye, magnetic bearing and range. Needs the Tacview feed |
 | Tanker | `"...request tanker"`, `"where's the tanker"`, `"say texaco"` | Magnetic bearing, range and angels to the nearest tanker on your side. Needs the Tacview feed |
+| Tasking | `"...request tasking"`, then `"...copy"` | Sends you to the IP for one of the five 9-line targets (Caucasus training), then clears you hot on your readback. Ask again after the readback for another, drawn at random |
 
 If your transmission doesn't hit one of these, Command stays silent (logged as "Command intent miss"). The fence-out match is checked **before** fence-in, so "fence out" never gets misclassified.
 
@@ -114,6 +115,11 @@ If your transmission doesn't hit one of these, Command stays silent (logged as "
 
 > Pilot: *"Command, Raider 1-1, fence in."*
 > Command: *"Raider 1-1, Command, copy fence in, you are cleared hot."*
+
+> Pilot: *"Command, Raider 1-1, request tasking."*
+> Command: *"Raider 1-1, Command, proceed to IP Anvil, target 1, Enguri Bridge."*
+> Pilot: *"Command, Raider 1-1, copy."*
+> Command: *"Raider 1-1, Command, you are cleared hot."*
 
 ---
 

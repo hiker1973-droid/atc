@@ -1089,6 +1089,7 @@ func trimCallsignAtVerb(s string) string {
 		" pushing", " switching", " marking", " commencing", " state",
 		" current", " say", " what", " comm", " radio", " on station",
 		" under", " tension", " shooter",
+		" copy", " copies", " wilco", " roger", " proceeding",
 	}
 	lower := strings.ToLower(s)
 	cut := len(s)

@@ -280,7 +280,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 						delete(transmissions, origin)
 						log.Info().Str("origin", origin).Int("frames", len(frames)).Str("channel", channelName).Msg("Command: flushing transmission to Whisper")
 						go func(f [][]byte) {
-							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, "Command, Raider, Venom")
+							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, "Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle")
 							if err != nil || text == "" {
 								log.Info().Err(err).Str("channel", channelName).Msg("Command: empty/error transcription")
 								return

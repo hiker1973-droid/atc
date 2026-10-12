@@ -117,6 +117,8 @@ Don't call `initial` in Case 3 — call `platform` instead.
 | `state [N.N]` (alone or with fence in/out) | copy state; below 2.0 = bingo, expedite recovery |
 | `say bullseye` | your bullseye bearing/range |
 | `request tanker` / `where's the tanker` | bearing, range, angels to nearest tanker |
+| `request tasking` | proceed to IP [name], target [N] (Caucasus training 9-lines) |
+| `copy` (after a tasking) | cleared hot |
 | `radio check` | loud and clear |
 
 ---
