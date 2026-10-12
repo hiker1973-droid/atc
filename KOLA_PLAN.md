@@ -36,14 +36,16 @@ until their expectations are updated too — that is deliberate.
   real DCS runway edges.
 - **Runway headings**: TRUE bearing between the two thresholds minus the field's magvar.
   ⚠ The ME's `course_deg` is a GRID bearing and is 6-9° off true up here — do not use it.
-- **Magvar is per field, and it is dated 2015**: 5.3°E Bodo, 8.0°E Bardufoss, 11.1°E Rovaniemi,
-  11.9°E Banak (12 Nov 2015). ⚠ DCS takes magnetic variation from the MISSION DATE, and
+- **Magvar is per field, and it is dated 2015**: 5.0°E Bodo, 7.7°E Bardufoss, 10.8°E Rovaniemi,
+  11.6°E Banak (12 Nov 2015). ⚠ DCS takes magnetic variation from the MISSION DATE, and
   SkyEye carries one constant per field. WHITE NIGHT moved from 2026 to 2015 on 2026-10-11,
   which is about 3° on this map (2026 values: 8.0 / 10.8 / 13.6 / 14.8). The 2015 values are
   computed from DCS's own WMM files (`Data\MagVar\COF`) by `dcs_magvar.py` in the campaign's
-  `_BUILD` folder — it reproduces the Mission Editor's 2026 readings within 0.05° — and
-  applied by `skyeye_kola_magvar.py` there, which also re-derives the runway headings
-  (Bodo 072/252, Bardufoss 281/101, Banak 344/164, Rovaniemi 206/026). Runway NAMES do not
+  `_BUILD` folder and applied by `skyeye_kola_magvar.py` there, which also re-derives the
+  runway headings (Bodo 073/253, Bardufoss 281/101, Banak 344/164, Rovaniemi 207/027).
+  Corrected 2026-10-12: the first re-date used the 2015 model file and was 0.3° high; the
+  Mission Editor, with the 2015 mission open, reads 5.00°E at Bodo, which is DCS's 2010 model
+  carried forward. `dcs_magvar.py` now reproduces that reading and the 2026 ones. Runway NAMES do not
   change. A Kola mission dated 2026 flown against this build would hear magnetic wind and
   BRC about 3° high.
 - **Tower**: the DCS map's own UHF tower frequency. ⚠ The squadron's

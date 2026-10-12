@@ -17,7 +17,7 @@ var EFRO = &Airfield{
 	DCSName:         "Rovaniemi",
 	Center:          orb.Point{25.8305, 66.5648}, // [lon, lat] — DCS airbase reference point
 	ElevationFt:     636,
-	MagVar:          11.1, // DCS 11.09°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
+	MagVar:          10.8, // DCS 10.82°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
 	PatternAltFt:    1500, // AGL, as the other fields
 	TowerFreqMHz:    250.950,
 	ApproachFreqMHz: 250.950,
@@ -34,8 +34,8 @@ var EFRO = &Airfield{
 	RunwayPairs: []RunwayPair{
 		{
 			// 9,040 ft between the DCS runway edges; true 217.4 / 37.4.
-			Primary:    Runway{Designator: "21", MagneticHeading: 206.0, ThresholdLatLon: orb.Point{25.8494, 66.5747}},
-			Reciprocal: Runway{Designator: "03", MagneticHeading: 26.0, ThresholdLatLon: orb.Point{25.8116, 66.5550}},
+			Primary:    Runway{Designator: "21", MagneticHeading: 207.0, ThresholdLatLon: orb.Point{25.8494, 66.5747}},
+			Reciprocal: Runway{Designator: "03", MagneticHeading: 27.0, ThresholdLatLon: orb.Point{25.8116, 66.5550}},
 		},
 	},
 }

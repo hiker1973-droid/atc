@@ -17,7 +17,7 @@ var ENNA = &Airfield{
 	DCSName:         "Banak",
 	Center:          orb.Point{24.9735, 70.0688}, // [lon, lat] — DCS airbase reference point
 	ElevationFt:     17,
-	MagVar:          11.9, // DCS 11.93°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
+	MagVar:          11.6, // DCS 11.62°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
 	PatternAltFt:    1500, // AGL, as the other fields
 	TowerFreqMHz:    250.550,
 	ApproachFreqMHz: 250.550,

@@ -17,7 +17,7 @@ var ENDU = &Airfield{
 	DCSName:         "Bardufoss",
 	Center:          orb.Point{18.5435, 69.0553}, // [lon, lat] — DCS airbase reference point
 	ElevationFt:     234,
-	MagVar:          8.0,  // DCS 7.95°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
+	MagVar:          7.7, // DCS 7.66°E at the field on 12 Nov 2015, the WHITE NIGHT date — DCS takes magvar from the MISSION DATE (2026 gives about 3° more); per-field, it differs by 7° across this map
 	PatternAltFt:    1500, // AGL, as the other fields
 	TowerFreqMHz:    250.650,
 	ApproachFreqMHz: 250.650,
