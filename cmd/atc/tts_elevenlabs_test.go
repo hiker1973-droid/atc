@@ -92,3 +92,22 @@ func TestMarshalOnFlash(t *testing.T) {
 		t.Error("two models share a cache key")
 	}
 }
+
+// A bad key backs ElevenLabs off like a quota error; a per-voice 400 does not.
+func TestElevenBackOff(t *testing.T) {
+	for _, c := range []struct {
+		code int
+		body string
+		want bool
+	}{
+		{401, "", true}, {402, "", true}, {429, "", true},
+		{400, `{"detail":{"status":"api_key_id_used_as_api_key"}}`, true},
+		{400, `{"detail":{"status":"invalid_api_key"}}`, true},
+		{400, `{"detail":{"status":"voice_not_found"}}`, false},
+		{500, "", false},
+	} {
+		if got := (&elevenStatusError{c.code, c.body}).backOff(); got != c.want {
+			t.Errorf("backOff(%d, %s) = %v, want %v", c.code, c.body, got, c.want)
+		}
+	}
+}

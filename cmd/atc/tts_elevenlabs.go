@@ -121,6 +121,22 @@ type elevenStatusError struct {
 	body string
 }
 
+// backOff reports whether the failure is the account's rather than this
+// line's: no credits (402), rate limit (429), or a bad key - 401, and the 400s
+// ElevenLabs gives a malformed key, e.g. "api_key_id_used_as_api_key" when the
+// key's 64-hex ID was set instead of the sk_ key (seen on DCS3 2026-10-14).
+// Without it a bad key made every transmission try ElevenLabs first. Other
+// 400s (one voice withdrawn, a bad setting) stay per-call.
+func (e *elevenStatusError) backOff() bool {
+	switch e.code {
+	case 401, 402, 429:
+		return true
+	case 400, 403:
+		return strings.Contains(strings.ToLower(e.body), "api_key")
+	}
+	return false
+}
+
 func (e *elevenStatusError) Error() string {
 	return fmt.Sprintf("ElevenLabs TTS error %d: %s", e.code, e.body)
 }
@@ -180,7 +196,7 @@ func speakElevenLabs(ctx context.Context, text string, v voiceProfile) ([]byte, 
 	start := time.Now()
 	mp3, err := synthesizeElevenLabs(elCtx, key, text, v.eleven)
 	if err != nil {
-		if se, ok := err.(*elevenStatusError); ok && (se.code == 401 || se.code == 402 || se.code == 429) {
+		if se, ok := err.(*elevenStatusError); ok && se.backOff() {
 			elevenBackOff(se.Error())
 		}
 		log.Warn().Err(err).Str("voice", v.eleven.Name).Msg("ElevenLabs TTS failed - falling back to OpenAI")
