@@ -350,7 +350,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 				Str("secondLang", langField).
 				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio")
 
-			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, atisEnglishVoice(station))
+			enMP3, err := atisSynthesize(ctx, apiKey, enText, atisEnglishVoice(station), station.Name, "English")
 			if err != nil {
 				log.Error().Err(err).Str("station", station.Name).Msg("ATIS English TTS failed")
 				state.mu.Unlock()
@@ -361,9 +361,9 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 			// degrade gracefully to English-only — no broadcast disruption.
 			var l2MP3 []byte
 			if wantSecond {
-				if l2Text, terr := translateATIS(ctx, apiKey, enText, secondLang); terr != nil {
+				if l2Text, terr := atisTranslate(ctx, apiKey, enText, secondLang, station.Name); terr != nil {
 					log.Warn().Err(terr).Str("station", station.Name).Str("lang", secondLang).Msg("ATIS local-language translate failed — broadcasting English only")
-				} else if mp3, mErr := synthesizeSpeechAPI(ctx, apiKey, l2Text, atisVoiceFor(station)); mErr != nil {
+				} else if mp3, mErr := atisSynthesize(ctx, apiKey, l2Text, atisVoiceFor(station), station.Name, secondLang); mErr != nil {
 					log.Warn().Err(mErr).Str("station", station.Name).Str("lang", secondLang).Msg("ATIS local-language TTS failed — broadcasting English only")
 				} else {
 					l2MP3 = mp3
