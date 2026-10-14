@@ -131,7 +131,10 @@ func isTaskingRequest(lower string) bool {
 	return containsAny(lower, "request tasking", "requesting tasking", "request task", "requesting task",
 		"request a task", "ready for tasking", "request target", "requesting target", "request a target",
 		"request new tasking", "request new target", "request next tasking", "request next target",
-		"say tasking", "any tasking")
+		"say tasking", "any tasking",
+		// Whisper heard "request tasking" as "request taxiing" on Hitman's net
+		// (DCS3 2026-10-14). Nobody taxis on Command or the JTAC net.
+		"request taxiing", "requesting taxiing", "request taxing", "requesting taxing")
 }
 
 func isTaskingAck(lower string) bool {

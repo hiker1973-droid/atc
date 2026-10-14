@@ -22,12 +22,18 @@ func commandPick(opts [3]string) string {
 	return opts[rand.Intn(3)]
 }
 
+// radioCheckPhrases are the radio-check calls Command and Hitman answer. The
+// towers already took "com check" / "comcheck" / "comp check"; Command and
+// Hitman missed them on DCS3 2026-10-14 (Raider 302).
+var radioCheckPhrases = []string{"radio check", "comm check", "comms check", "com check", "coms check",
+	"comcheck", "commcheck", "comp check", "how copy"}
+
 // commandResponse generates an ATC response for a command channel intent.
 func commandResponse(text, callsign, channelName string) string {
 	lower := strings.ToLower(text)
 
 	// Radio check / comm check
-	if containsAny(lower, "radio check", "comm check", "comms check", "how copy") {
+	if containsAny(lower, radioCheckPhrases...) {
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, loud and clear.", callsign, channelName),
 			fmt.Sprintf("%s, %s, five by five.", callsign, channelName),

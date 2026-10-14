@@ -64,7 +64,7 @@ const (
 	jtacWatchStopNm   = 1.5  // inside this the run is over either way
 	jtacReleaseRadius = 1.5  // a weapon first seen this close to the jet is its release
 	jtacContactMaxAge = 30 * time.Second
-	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, ready for 9-line, copy, IP inbound, in from the north, in heading, off, abort, request BDA, Anvil, Brick, Cobra, Dagger, Eagle"
+	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, off, abort, request BDA, Anvil, Brick, Cobra, Dagger, Eagle"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -171,7 +171,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 	now := b.now()
 	cur := b.flights[key]
 
-	if containsAny(lower, "radio check", "comm check", "comms check", "how copy") {
+	if containsAny(lower, radioCheckPhrases...) {
 		return say("loud and clear.")
 	}
 	if len(b.targets) == 0 {

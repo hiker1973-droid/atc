@@ -10,7 +10,10 @@ import "strings"
 //   - Bassel Al-Assad (OSLK): the longest word, "al-assad", becomes the
 //     primary key, so the first word needs listing; DCS names the field Latakia.
 //   - Beirut (OLBA): the airport's own name is Rafic Hariri.
+//   - Tbilisi (UGTB): Whisper wrote "Double-Ace" and "To Velocity" on DCS3
+//     2026-10-14 and the calls were dropped; DCS names the field Lochini.
 var fieldSpokenAliases = map[string][]string{
+	"tbilisi tower":         {"tbilissi", "tiblisi", "tibilisi", "t bilisi", "lochini", "double ace", "double-ace", "to velocity"},
 	"mafraq tower":          {"king hussein", "hussein"},
 	"h4 tower":              {"h 4", "h-4", "h four"},
 	"bassel al-assad tower": {"bassel", "basel", "basil", "bassil", "latakia", "lattakia"},
