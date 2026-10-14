@@ -294,6 +294,12 @@ Reproducible across three restart patterns including a clean full restart with 4
     - All 10 processes are re-registered with no warnings.
     - **Rollback copies were refreshed at this deploy and now hold the 11:57 build** (short Hitman brief, Eric on Deckboss).
     - Hank is not yet heard on the air.
+    - The 12:04 restart's ATIS regeneration hit four more OpenAI stalls: Batumi EN, Kutaisi EN, Kobuleti RU twice. All five stations recovered to full length (50-55 s) by 12:07. That makes three restarts today where gpt-4o-mini-tts stalled; treat the `ATIS TTS attempt failed` warns as normal on a restart, and only worry if a station gives up.
+  - **13:21:** `9ad336d`, Command → **Spartan** (American baritone, operator: "need american"), with its own steadier `elCommand` settings and an American OpenAI fallback. Hitman is unchanged.
+    - All 10 processes are re-registered with no warnings.
+    - Rollback copies now hold the 12:04 build (Gideon on Command, Hank on Deckboss).
+    - Spartan is not yet heard on the air.
+  - **`f5a062f` (light-wind runway rotation: below `--runway-calm-kts` 5 kt the runway changes every 4 h slot) landed from another session at 13:24 and is NOT deployed on DCS3.**
 - **First live pilot traffic on the new build (Raider 302, 10:59-11:48).** Senaki, Kobuleti, Tbilisi, Deckboss, Command and Hitman all answered comm checks. Hitman briefed a 9-line on 61.0 FM. No ElevenLabs fallbacks. Three recognition gaps were found and **held by operator ruling ("Hitman brief only")**:
   1. Hitman and Command lack `comp check` / `com check` / `comcheck`. The towers have them. `jtac.go:158`, `command.go:30`.
   2. Tbilisi has no entry in `towerKeywordAliases` (`pkg/controller/controller.go:1148`), so Whisper's "Double-Ace" and "To Velocity" were dropped silently. Only the exact word "tbilisi" matches.
