@@ -119,6 +119,7 @@ func commandResponse(text, callsign, channelName string) string {
 // tracker may be nil; when set, every successfully-transcribed pilot callsign
 // is recorded so the Tacview-driven handoff watcher knows who to monitor.
 func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath string, tracker *pilotTracker, store *tacviewPositions) {
+	footholdTaskingBoard() // on Syria: log now whether the Foothold save file is readable
 	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, commandVoice(voice), externalAudioPath,
 		"Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle",
 		func(text string) (string, string) {
