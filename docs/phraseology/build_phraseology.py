@@ -104,8 +104,8 @@ COMMAND = [
     ("Tasking", "request tasking", "Black Sea: contact Hitman 1-1 on 61.0", "tasking"),
 ]
 JTAC = [
-    ("Check in", "checking in  /  request tasking", "9-line target N, as fragged, read back", "check_in"),
-    ("Readback", "copy", "Good readback, report IP inbound", "copy"),
+    ("Check in", "checking in  /  request tasking", "target N, <name>, IP <IP>, read back", "check_in"),
+    ("Readback", "target N, <IP>  /  copy", "Good readback, report IP inbound", "copy"),
     ("IP inbound", "IP inbound", "Continue (or where the IP is)", "ip_inbound"),
     ("In", "in from the south  /  in heading 330", "Cleared hot  -  or abort, abort, abort", "in"),
     ("Off", "off  /  off safe", "Egress per line 9", "off"),
@@ -458,9 +458,8 @@ def build():
     d.table(("Intent", "Say something like", "Response"),
             table_rows("jtac", JTAC, "Hitman"), (0.18, 0.4, 0.42))
     d.dialogue([("Pilot", "Hitman 1-1, Raider 1-1, checking in."),
-                ("Hitman", "Raider 1-1, Hitman one one, type 2 control, 9-line target 3, Fuel Depot, as fragged. "
-                           "Elevation 25, final attack heading two-five-niner to two-niner-niner, egress back to Cobra, angels 14. Read back."),
-                ("Pilot", "Hitman, Raider 1-1, copy."),
+                ("Hitman", "Raider 1-1, Hitman one one, target 3, Fuel Depot, IP Cobra. Read back."),
+                ("Pilot", "Hitman, Raider 1-1, target 3, Cobra."),
                 ("Hitman", "Raider 1-1, Hitman one one, good readback. Report IP inbound."),
                 ("Pilot", "Hitman, Raider 1-1, IP inbound."),
                 ("Hitman", "Raider 1-1, Hitman one one, continue."),

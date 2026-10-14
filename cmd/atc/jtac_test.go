@@ -69,7 +69,7 @@ func TestJTACCommandHandsOff(t *testing.T) {
 	if got := b.Response("Command, Raider 11, copy", "Raider 11", "Command"); got != "" {
 		t.Errorf("second copy = %q, want silence", got)
 	}
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "9-line target 1, Enguri Bridge") {
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 1, Enguri Bridge") {
 		t.Fatalf("first check-in = %q", got)
 	}
 	// Re-checking in mid-run repeats the same card.
@@ -77,7 +77,7 @@ func TestJTACCommandHandsOff(t *testing.T) {
 		t.Errorf("repeat check-in = %q, want the same target", got)
 	}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "9-line target 2, Rioni Rail Bridge") {
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 2, Rioni Rail Bridge") {
 		t.Errorf("check-in after a new Command request = %q, want the next target", got)
 	}
 }
@@ -104,17 +104,16 @@ func TestJTACFullRun(t *testing.T) {
 
 	pic.place(tgt.IPPos, 0, 1, 90) // at Anvil
 	got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	for _, want := range []string{"Raider 11, Hitman one one, type 2 control, 9-line target 1, Enguri Bridge, as fragged.",
-		"Elevation 445", "final attack heading three-zero-niner to three-four-niner", "egress back to Anvil, angels 15", "Read back."} {
-		if !strings.Contains(got, want) {
-			t.Errorf("check-in = %q, missing %q", got, want)
-		}
-	}
-	if strings.Contains(got, "bears") {
-		t.Errorf("check-in at the IP should not give the IP's bearing: %q", got)
+	if want := "Raider 11, Hitman one one, target 1, Enguri Bridge, IP Anvil. Read back."; got != want {
+		t.Errorf("check-in = %q, want %q", got, want)
 	}
 
-	if got := b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, good readback. Report IP inbound." {
+	// Our own brief heard back must not pass as the readback.
+	if got := b.JTACResponse("Raider 11, Hitman 1-1, target 1, Enguri Bridge, IP Anvil, read back.", "Raider 11", hitman, pic); got != "" {
+		t.Errorf("echoed brief = %q, want no reply", got)
+	}
+
+	if got := b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, good readback. Report IP inbound." {
 		t.Errorf("readback = %q", got)
 	}
 

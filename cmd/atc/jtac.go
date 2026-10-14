@@ -6,6 +6,7 @@ import (
 	"math"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,6 +130,21 @@ func isJTACCheckIn(lower string) bool {
 		"send the 9", "send the nine", "ready to copy", "send it")
 }
 
+// isTargetReadback: the pilot reads back the target or the IP ("target 3",
+// "Fuel Depot", "Cobra").
+func isTargetReadback(lower string, t taskingTarget) bool {
+	if strings.Contains(lower, "target "+strconv.Itoa(t.Number)) {
+		return true
+	}
+	if w, ok := targetWords[t.Number]; ok && strings.Contains(lower, "target "+w) {
+		return true
+	}
+	return containsAny(lower, strings.ToLower(t.IP), strings.ToLower(t.Name))
+}
+
+// targetWords spells the card numbers the way Whisper sometimes writes them.
+var targetWords = map[int]string{1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+
 func isJTACInbound(lower string) bool {
 	if !strings.Contains(lower, "inbound") && !containsAny(lower, "leaving the ip", "departing the ip", "leaving ip", "departing ip") {
 		return false
@@ -178,8 +194,11 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		cur.redraw = false
 		cur.issued, cur.awaiting, cur.stage = now, false, jtacBriefed
 		t := b.targets[cur.target]
-		resp := say("%s control, 9-line target %d, %s, as fragged. Elevation %d, final attack heading %s to %s, egress back to %s, %s.",
-			t.Control, t.Number, t.Name, t.ElevFt, spokenBearing(float64(t.FAHLow)), spokenBearing(float64(t.FAHHigh)), t.IP, t.Egress)
+		// Target and IP only (operator 2026-10-14: "Hitman just needs to read
+		// the target not the whole 9 line ( we can do that later)"). The rest of
+		// the card - control, elevation, attack headings, egress - is on the
+		// pilot's kneeboard and still checked against the Tacview picture.
+		resp := say("target %d, %s, IP %s.", t.Number, t.Name, t.IP)
 		if pos, _, ok := pic.Contact(callsign); ok {
 			if brg, nm := bearingRangeFromRef(pos, t.IPPos[0], t.IPPos[1]); nm > jtacIPNearNm {
 				resp += fmt.Sprintf(" %s bears %s for %d.", t.IP, spokenBearing(toMagnetic(brg, t.MagVar)), int(nm+0.5))
@@ -260,8 +279,17 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		b.clear(cur, now)
 		return say("cleared hot.")
 
-	case isTaskingAck(lower) || strings.Contains(lower, fmt.Sprint(t.ElevFt)):
+	case isTaskingAck(lower) || isTargetReadback(lower, t):
 		if cur.stage != jtacBriefed {
+			return ""
+		}
+		// Our own brief heard back carries the target and the IP too. It leads
+		// with the callsign and names Hitman mid-string ("Raider 302, Hitman
+		// 1-1, target 3, ..."); a pilot leads with Hitman or leaves it out.
+		// Seen live 2026-10-14 11:48:39: an unknown SRS origin returned the
+		// brief word for word and was taken as a good readback.
+		if i := strings.Index(lower, "hitman"); i > 0 {
+			log.Info().Str("callsign", callsign).Str("text", text).Msg("JTAC: readback names Hitman mid-call, treated as our own echo")
 			return ""
 		}
 		cur.stage = jtacReady
