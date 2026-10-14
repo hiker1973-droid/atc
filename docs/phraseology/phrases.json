@@ -1,0 +1,488 @@
+[
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, request taxi.",
+  "tower": "Batumi Tower",
+  "want": "taxi"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, ready to taxi.",
+  "tower": "Batumi Tower",
+  "want": "taxi"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, holding short.",
+  "tower": "Batumi Tower",
+  "want": "holding_short"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, at the hold.",
+  "tower": "Batumi Tower",
+  "want": "holding_short"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, ready for takeoff.",
+  "tower": "Batumi Tower",
+  "want": "takeoff"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, request takeoff.",
+  "tower": "Batumi Tower",
+  "want": "takeoff"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, airborne.",
+  "tower": "Batumi Tower",
+  "want": "airborne"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, departing.",
+  "tower": "Batumi Tower",
+  "want": "airborne"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, rolling runway 13.",
+  "tower": "Batumi Tower",
+  "want": "rolling"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, seven DME.",
+  "tower": "Batumi Tower",
+  "want": "dme"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, seven miles.",
+  "tower": "Batumi Tower",
+  "want": "dme"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, pushing command.",
+  "tower": "Batumi Tower",
+  "want": "pushing_command"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, request startup.",
+  "tower": "Batumi Tower",
+  "want": "startup"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, 10 mile initial.",
+  "tower": "Batumi Tower",
+  "want": "inbound"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, 10 miles inbound.",
+  "tower": "Batumi Tower",
+  "want": "inbound"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, 3 mile initial.",
+  "tower": "Batumi Tower",
+  "want": "overhead"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, overhead.",
+  "tower": "Batumi Tower",
+  "want": "overhead"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, break.",
+  "tower": "Batumi Tower",
+  "want": "break"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, downwind.",
+  "tower": "Batumi Tower",
+  "want": "downwind"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, base, gear down.",
+  "tower": "Batumi Tower",
+  "want": "base"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, on final.",
+  "tower": "Batumi Tower",
+  "want": "final"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, 5 mile final.",
+  "tower": "Batumi Tower",
+  "want": "final"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, request straight in.",
+  "tower": "Batumi Tower",
+  "want": "straight_in"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, ILS approach.",
+  "tower": "Batumi Tower",
+  "want": "straight_in"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, on final, touch and go.",
+  "tower": "Batumi Tower",
+  "want": "final"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, going around.",
+  "tower": "Batumi Tower",
+  "want": "go_around"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, runway vacated.",
+  "tower": "Batumi Tower",
+  "want": "vacated"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, clear of the active.",
+  "tower": "Batumi Tower",
+  "want": "vacated"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, say again.",
+  "tower": "Batumi Tower",
+  "want": "say_again"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, wind check.",
+  "tower": "Batumi Tower",
+  "want": "wind_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, say altimeter.",
+  "tower": "Batumi Tower",
+  "want": "wind_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, radar check.",
+  "tower": "Batumi Tower",
+  "want": "radar_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, radio check.",
+  "tower": "Batumi Tower",
+  "want": "radio_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, hung ordnance.",
+  "tower": "Batumi Tower",
+  "want": "hung"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, mayday mayday mayday.",
+  "tower": "Batumi Tower",
+  "want": "emergency"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, pan pan.",
+  "tower": "Batumi Tower",
+  "want": "emergency"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, radio check.",
+  "tower": "",
+  "want": "radio_check"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, how copy.",
+  "tower": "",
+  "want": "radio_check"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, checking in.",
+  "tower": "",
+  "want": "check_in"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, fence in, state 6.2.",
+  "tower": "",
+  "want": "fence_in"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, on station.",
+  "tower": "",
+  "want": "on_station"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, off station.",
+  "tower": "",
+  "want": "off_station"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, fence out.",
+  "tower": "",
+  "want": "fence_out"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, RTB.",
+  "tower": "",
+  "want": "rtb"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, request recovery.",
+  "tower": "",
+  "want": "rtb"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, state 5.2.",
+  "tower": "",
+  "want": "state"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, say bullseye.",
+  "tower": "",
+  "want": "bullseye"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, request tanker.",
+  "tower": "",
+  "want": "tanker"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, request tasking.",
+  "tower": "",
+  "want": "tasking"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, checking in.",
+  "tower": "",
+  "want": "check_in"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, request tasking.",
+  "tower": "",
+  "want": "check_in"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, copy.",
+  "tower": "",
+  "want": "copy"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, IP inbound.",
+  "tower": "",
+  "want": "ip_inbound"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, in from the south.",
+  "tower": "",
+  "want": "in"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, in heading 330.",
+  "tower": "",
+  "want": "in"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, off.",
+  "tower": "",
+  "want": "off"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, off safe.",
+  "tower": "",
+  "want": "off"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, request BDA.",
+  "tower": "",
+  "want": "bda"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, abort.",
+  "tower": "",
+  "want": "abort"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, radio check.",
+  "tower": "",
+  "want": "radio_check"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, request taxi.",
+  "tower": "",
+  "want": "taxi"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, green jet.",
+  "tower": "",
+  "want": "taxi"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, ready cat 2.",
+  "tower": "",
+  "want": "tension"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, shoot.",
+  "tower": "",
+  "want": "tension"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, airborne.",
+  "tower": "",
+  "want": "airborne"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, say BRC.",
+  "tower": "",
+  "want": "brc"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, pushing Marshal.",
+  "tower": "",
+  "want": "push"
+ },
+ {
+  "role": "deckboss",
+  "say": "Deckboss, Raider 1-1, radio check.",
+  "tower": "",
+  "want": "radio_check"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, checking in.",
+  "tower": "",
+  "want": "check_in"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, marking moms, angels 12, state 6.5.",
+  "tower": "",
+  "want": "marking_moms"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, say BRC.",
+  "tower": "",
+  "want": "brc"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, 20 DME.",
+  "tower": "",
+  "want": "dme"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, see you at ten.",
+  "tower": "",
+  "want": "see_you_at_ten"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, state 5.2.",
+  "tower": "",
+  "want": "state"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, established angels 2.",
+  "tower": "",
+  "want": "established"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, commencing.",
+  "tower": "",
+  "want": "commencing"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, platform.",
+  "tower": "",
+  "want": "platform"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, initial.",
+  "tower": "",
+  "want": "initial"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, clear seven miles.",
+  "tower": "",
+  "want": "clear"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, radar check.",
+  "tower": "",
+  "want": "radar_check"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, radio check.",
+  "tower": "",
+  "want": "radio_check"
+ }
+]

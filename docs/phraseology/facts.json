@@ -1,0 +1,335 @@
+[
+ {
+  "key": "pg",
+  "title": "Persian Gulf",
+  "command": 282,
+  "deckboss": 128.6,
+  "marshal": 306.3,
+  "towers": [
+   {
+    "name": "Al Ain Tower",
+    "icao": "OMAL",
+    "freq": 250.7
+   },
+   {
+    "name": "Al Dhafra Tower",
+    "icao": "OMAM",
+    "freq": 251.1
+   },
+   {
+    "name": "Al Minhad Tower",
+    "icao": "OMDM",
+    "freq": 250.1
+   }
+  ],
+  "atis": [
+   {
+    "name": "Al Ain ATIS",
+    "icao": "OMAL",
+    "freq": 248.85
+   },
+   {
+    "name": "Al Dhafra ATIS",
+    "icao": "OMAM",
+    "freq": 248.2
+   },
+   {
+    "name": "Al Minhad ATIS",
+    "icao": "OMDM",
+    "freq": 248.3
+   },
+   {
+    "name": "Kish ATIS",
+    "icao": "OIBK",
+    "freq": 248.5
+   },
+   {
+    "name": "Liwa ATIS",
+    "icao": "OMAB",
+    "freq": 248.55
+   }
+  ]
+ },
+ {
+  "key": "caucasus",
+  "title": "Black Sea (Caucasus)",
+  "command": 282,
+  "jtac": 61,
+  "deckboss": 128.6,
+  "marshal": 306.3,
+  "towers": [
+   {
+    "name": "Batumi Tower",
+    "icao": "UGSB",
+    "freq": 260
+   },
+   {
+    "name": "Kobuleti Tower",
+    "icao": "UG5X",
+    "freq": 262
+   },
+   {
+    "name": "Kutaisi Tower",
+    "icao": "UGKO",
+    "freq": 263
+   },
+   {
+    "name": "Senaki Tower",
+    "icao": "UGKS",
+    "freq": 261
+   },
+   {
+    "name": "Tbilisi Tower",
+    "icao": "UGTB",
+    "freq": 267
+   }
+  ],
+  "atis": [
+   {
+    "name": "Batumi ATIS",
+    "icao": "UGSB",
+    "freq": 230
+   },
+   {
+    "name": "Kobuleti ATIS",
+    "icao": "UG5X",
+    "freq": 232
+   },
+   {
+    "name": "Kutaisi ATIS",
+    "icao": "UGKO",
+    "freq": 233
+   },
+   {
+    "name": "Senaki ATIS",
+    "icao": "UGKS",
+    "freq": 234
+   },
+   {
+    "name": "Tbilisi ATIS",
+    "icao": "UGTB",
+    "freq": 237
+   }
+  ]
+ },
+ {
+  "key": "syria",
+  "title": "Syria (Eastern Med)",
+  "command": 282,
+  "deckboss": 128.6,
+  "marshal": 306.3,
+  "towers": [
+   {
+    "name": "Akrotiri Tower",
+    "icao": "LCRA",
+    "freq": 252
+   },
+   {
+    "name": "Bassel Al-Assad Tower",
+    "icao": "OSLK",
+    "freq": 250.6
+   },
+   {
+    "name": "Beirut Tower",
+    "icao": "OLBA",
+    "freq": 250.65
+   },
+   {
+    "name": "Incirlik Tower",
+    "icao": "LTAG",
+    "freq": 360.1
+   },
+   {
+    "name": "Ramat David Tower",
+    "icao": "LLRD",
+    "freq": 251.3
+   }
+  ],
+  "atis": [
+   {
+    "name": "Akrotiri ATIS",
+    "icao": "LCRA",
+    "freq": 249.5
+   },
+   {
+    "name": "Bassel Al-Assad ATIS",
+    "icao": "OSLK",
+    "freq": 249.6
+   },
+   {
+    "name": "Beirut ATIS",
+    "icao": "OLBA",
+    "freq": 249.7
+   },
+   {
+    "name": "Incirlik ATIS",
+    "icao": "LTAG",
+    "freq": 360.2
+   },
+   {
+    "name": "Ramat David ATIS",
+    "icao": "LLRD",
+    "freq": 256.15
+   }
+  ]
+ },
+ {
+  "key": "germany",
+  "title": "Cold War Germany",
+  "command": 282,
+  "towers": [
+   {
+    "name": "Cologne Tower",
+    "icao": "EDDK",
+    "freq": 119.7
+   },
+   {
+    "name": "Dusseldorf Tower",
+    "icao": "EDDL",
+    "freq": 118.3
+   },
+   {
+    "name": "Frankfurt Tower",
+    "icao": "EDDF",
+    "freq": 127.3
+   },
+   {
+    "name": "Hahn Tower",
+    "icao": "EDFH",
+    "freq": 119.5
+   },
+   {
+    "name": "Hamburg Tower",
+    "icao": "EDDH",
+    "freq": 126.85
+   },
+   {
+    "name": "Hannover Tower",
+    "icao": "EDDV",
+    "freq": 120.2
+   },
+   {
+    "name": "Ramstein Tower",
+    "icao": "ETAR",
+    "freq": 133.2
+   },
+   {
+    "name": "Spangdahlem Tower",
+    "icao": "ETAD",
+    "freq": 122.2
+   }
+  ],
+  "atis": [
+   {
+    "name": "Cologne ATIS",
+    "icao": "EDDK",
+    "freq": 248.65
+   },
+   {
+    "name": "Dusseldorf ATIS",
+    "icao": "EDDL",
+    "freq": 248.7
+   },
+   {
+    "name": "Frankfurt ATIS",
+    "icao": "EDDF",
+    "freq": 248.6
+   },
+   {
+    "name": "Hahn ATIS",
+    "icao": "EDFH",
+    "freq": 248.15
+   },
+   {
+    "name": "Hamburg ATIS",
+    "icao": "EDDH",
+    "freq": 248.8
+   },
+   {
+    "name": "Hannover ATIS",
+    "icao": "EDDV",
+    "freq": 248.85
+   },
+   {
+    "name": "Ramstein ATIS",
+    "icao": "ETAR",
+    "freq": 248
+   },
+   {
+    "name": "Spangdahlem ATIS",
+    "icao": "ETAD",
+    "freq": 248.05
+   }
+  ]
+ },
+ {
+  "key": "iraq",
+  "title": "Iraq",
+  "command": 282,
+  "towers": [
+   {
+    "name": "Al Asad Tower",
+    "icao": "ORAA",
+    "freq": 363.7
+   },
+   {
+    "name": "Al Sahra Tower",
+    "icao": "ORSH",
+    "freq": 250.15
+   },
+   {
+    "name": "Al Salam Tower",
+    "icao": "ORBR",
+    "freq": 250.25
+   },
+   {
+    "name": "Balad Tower",
+    "icao": "ORBD",
+    "freq": 250.55
+   }
+  ],
+  "atis": [
+   {
+    "name": "Al Asad ATIS",
+    "icao": "ORAA",
+    "freq": 230.1
+   },
+   {
+    "name": "Al Sahra ATIS",
+    "icao": "ORSH",
+    "freq": 230.2
+   },
+   {
+    "name": "Al Salam ATIS",
+    "icao": "ORBR",
+    "freq": 230.3
+   },
+   {
+    "name": "Balad ATIS",
+    "icao": "ORBD",
+    "freq": 230.7
+   }
+  ]
+ },
+ {
+  "key": "kola",
+  "title": "Kola",
+  "command": 282,
+  "deckboss": 128.6,
+  "marshal": 306.3,
+  "towers": [
+   {
+    "name": "Bodo Tower",
+    "icao": "ENBO",
+    "freq": 251.15
+   }
+  ],
+  "atis": [
+   {
+    "name": "Bodo ATIS",
+    "icao": "ENBO",
+    "freq": 249.15
+   }
+  ]
+ }
+]

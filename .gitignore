@@ -26,3 +26,9 @@ global.cfg
 # Squadron kneeboard reference images (large binaries — keep local)
 CA KNEEBOARD/
 PG KNEEBOARD/
+
+# Documentation build renders (docs/README.md) — the PDFs are committed, the cards are not
+docs/phraseology/_cards/
+docs/comms-packet/_tools/_cache/
+docs/comms-packet/Old/
+__pycache__/
