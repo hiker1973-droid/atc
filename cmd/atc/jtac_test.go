@@ -41,16 +41,43 @@ func newJTACBoard(t *testing.T) (*taskingBoard, *time.Time) {
 	return b, clock
 }
 
-// Command sends the flight to the IP and hands it to Hitman instead of
-// clearing it hot.
+// With a JTAC, Command names no target: it hands the flight to Hitman, who
+// draws one at check-in. Coming back to Command for more gets a new target.
 func TestJTACCommandHandsOff(t *testing.T) {
 	b, _ := newJTACBoard(t)
-	want := "Raider 11, Command, proceed to IP Anvil, target 1, Enguri Bridge. Contact Hitman one one on six one point zero zero zero."
+	pic := &fakePicture{}
+	want := "Raider 11, Command, contact Hitman one one on six one point zero zero zero for tasking."
 	if got := b.Response("Command, Raider 11, request tasking", "Raider 11", "Command"); got != want {
-		t.Errorf("request = %q\nwant      %q", got, want)
+		t.Errorf("request = %q, want %q", got, want)
 	}
-	if got := b.Response("Command, Raider 11, copy", "Raider 11", "Command"); strings.Contains(got, "cleared hot") {
-		t.Errorf("Command readback = %q, must not clear hot with a JTAC", got)
+	if got := b.Response("Command, Raider 11, copy", "Raider 11", "Command"); got != "Raider 11, Command, switch Hitman one one, good hunting." {
+		t.Errorf("Command readback = %q", got)
+	}
+	if got := b.Response("Command, Raider 11, copy", "Raider 11", "Command"); got != "" {
+		t.Errorf("second copy = %q, want silence", got)
+	}
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "9-line target 1, Enguri Bridge") {
+		t.Fatalf("first check-in = %q", got)
+	}
+	// Re-checking in mid-run repeats the same card.
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 1,") {
+		t.Errorf("repeat check-in = %q, want the same target", got)
+	}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "9-line target 2, Rioni Rail Bridge") {
+		t.Errorf("check-in after a new Command request = %q, want the next target", got)
+	}
+}
+
+// Asking Hitman directly for more after a run also draws a new target.
+func TestJTACRequestTaskingAfterRun(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, in from the south", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, off", "Raider 11", hitman, pic)
+	if got := b.JTACResponse("Hitman, Raider 11, request tasking", "Raider 11", hitman, pic); !strings.Contains(got, "target 2,") {
+		t.Errorf("request after run = %q, want target 2", got)
 	}
 }
 

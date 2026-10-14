@@ -13,8 +13,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// JTAC: Hitman 1-1 on 61.000 FM. Command sends a flight to the IP of a 9-line
-// card (command_tasking.go) and hands it over; the JTAC passes the card, hears
+// JTAC: Hitman 1-1 on 61.000 FM. Command hands a flight asking for tasking to
+// the JTAC (command_tasking.go); the JTAC draws one of the 9-line cards at
+// random, passes it (IP included, as in the real flow), hears
 // the run called and clears it hot - or waves it off - from the Tacview
 // picture against the card's geometry:
 //
@@ -35,7 +36,7 @@ import (
 type jtacStage int
 
 const (
-	jtacAssigned jtacStage = iota // Command gave the IP; not checked in
+	jtacAssigned jtacStage = iota // no 9-line passed yet
 	jtacBriefed                   // 9-line passed, readback not heard
 	jtacReady                     // readback heard, waiting for IP inbound
 	jtacInbound                   // IP inbound, waiting for the in call
@@ -150,10 +151,14 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 	// Check-in: pass the 9-line. A flight that skipped Command gets a target
 	// here; one that finished its target and asks again gets the next one.
 	if isJTACCheckIn(lower) {
-		if cur == nil || cur.stage == jtacOff && isTaskingRequest(lower) {
+		switch {
+		case cur == nil:
 			cur = &taskingAssignment{target: b.pick(key, now)}
 			b.flights[key] = cur
+		case cur.redraw || cur.stage >= jtacCleared && isTaskingRequest(lower):
+			cur.target = b.pick(key, now)
 		}
+		cur.redraw = false
 		cur.issued, cur.awaiting, cur.stage = now, false, jtacBriefed
 		t := b.targets[cur.target]
 		resp := say("%s control, 9-line target %d, %s, as fragged. Elevation %d, final attack heading %s to %s, egress back to %s, %s.",

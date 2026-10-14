@@ -107,7 +107,7 @@ Mission-wide ops channel. Six intents, each with three randomised responses.
 | Fuel state | `"...state 5.2"`, `"state 1 point 8"` | Copies state; below 2.0 you're told you're bingo. Also works tacked onto fence in / fence out |
 | Bullseye | `"...say bullseye"`, `"request bullseye"` | Your position from your coalition's bullseye, magnetic bearing and range. Needs the Tacview feed |
 | Tanker | `"...request tanker"`, `"where's the tanker"`, `"say texaco"` | Magnetic bearing, range and angels to the nearest tanker on your side. Needs the Tacview feed |
-| Tasking | `"...request tasking"`, then `"...copy"` | Sends you to the IP for one of the five 9-line targets (Caucasus training), drawn at random, and hands you to **Hitman 1-1 on 61.000 FM**, who clears you hot (see JTAC below). Where Command runs without the JTAC (`--jtac-freq` unset), Command clears you hot on your readback itself. Ask again after the run for another |
+| Tasking | `"...request tasking"`, then `"...copy"` | Hands you to **Hitman 1-1 on 61.000 FM** (Caucasus training), who picks one of the five 9-line targets at random and clears you hot (see JTAC below). Command names no target. Ask Command again, or ask Hitman, after a run for another. Where Command runs without the JTAC (`--jtac-freq` unset), Command itself sends you to an IP and clears you hot on your readback |
 
 If your transmission doesn't hit one of these, Command stays silent (logged as "Command intent miss"). The fence-out match is checked **before** fence-in, so "fence out" never gets misclassified.
 
@@ -117,16 +117,17 @@ If your transmission doesn't hit one of these, Command stays silent (logged as "
 > Command: *"Raider 1-1, Command, copy fence in, you are cleared hot."*
 
 > Pilot: *"Command, Raider 1-1, request tasking."*
-> Command: *"Raider 1-1, Command, proceed to IP Anvil, target 1, Enguri Bridge. Contact Hitman one one on six one point zero zero zero."*
+> Command: *"Raider 1-1, Command, contact Hitman one one on six one point zero zero zero for tasking."*
 > Pilot: *"Command, Raider 1-1, copy."*
 > Command: *"Raider 1-1, Command, switch Hitman one one, good hunting."*
 
 ## JTAC — Hitman 1-1 (61.000 FM) — Caucasus training 9-lines
 
 Hornet COMM2 CH12, Viper COMM2 CH8. Runs inside the Caucasus Command process
-(`--jtac-freq 61.0`) so it works the same tasking board: the target Command gave
-you is the one Hitman briefs. You can also check in with Hitman directly and get
-a target from it. Lead every call with `Hitman, ...`.
+(`--jtac-freq 61.0`). Hitman picks the target, as a real JTAC does: one of the
+five cards at random, not one another flight is working, not the one you just
+did. You can check in with Hitman without going through Command. Lead every call
+with `Hitman, ...`.
 
 Hitman checks the run against your 9-line card with the Tacview picture. With no
 picture of you (Tacview down, or your callsign not matched) the checks are skipped
@@ -134,7 +135,7 @@ and the exchange still ends in "cleared hot".
 
 | Intent | Say | What happens |
 |---|---|---|
-| Check in | `"...checking in"`, `"ready for 9-line"`, `"request tasking"` | The 9-line by reference to your card: control type, target, elevation, final attack heading, egress. If you are more than 5 nm from the IP, where the IP is |
+| Check in | `"...checking in"`, `"ready for 9-line"`, `"request tasking"` | Hitman picks your target and passes the 9-line by reference to that card: control type, target, elevation, final attack heading, egress. If you are more than 5 nm from the IP, where the IP is |
 | Readback | `"...copy"` | "Good readback, report IP inbound" |
 | IP inbound | `"...IP inbound"` | "Continue" if you are within 5 nm of the IP. Further away: refused, with the IP's bearing and range. Nose more than 30° off the target: "check heading, target bears ..." |
 | In | `"...in from the north"`, `"in heading 330"`, `"...in"` | **Cleared hot** when your magnetic heading is inside the card's final attack heading and you are 0.5–15 nm from the target. Otherwise **abort, abort, abort** with the reason; go round from the IP |

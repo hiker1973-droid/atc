@@ -82,6 +82,7 @@ type taskingAssignment struct {
 
 	// JTAC side (jtac.go). Only used when the board has a JTAC.
 	stage     jtacStage
+	redraw    bool      // asked Command for more: draw a new target at check-in
 	clearedAt time.Time // when "cleared hot" went out; the watch runs from here
 	offAxis   int       // consecutive watch samples outside the attack window
 }
@@ -97,7 +98,8 @@ type taskingBoard struct {
 	// jtac, when set, is the JTAC Command hands the flight to. Command then
 	// only sends the flight to the IP; the JTAC passes the 9-line and clears
 	// it hot (jtac.go). Unset, Command clears hot on the readback itself.
-	jtac *jtacNet
+	jtac     *jtacNet
+	handoffs map[string]time.Time // flights Command sent to the JTAC, for the readback
 }
 
 // jtacNet is the JTAC as Command names it on the radio.
@@ -107,7 +109,7 @@ type jtacNet struct {
 }
 
 func newTaskingBoard(targets []taskingTarget) *taskingBoard {
-	return &taskingBoard{targets: targets, flights: make(map[string]*taskingAssignment), now: time.Now, intn: rand.Intn}
+	return &taskingBoard{targets: targets, flights: make(map[string]*taskingAssignment), handoffs: make(map[string]time.Time), now: time.Now, intn: rand.Intn}
 }
 
 // commandTasking is the board for the running theatre, built on first use
@@ -154,6 +156,18 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 		if len(b.targets) == 0 {
 			return fmt.Sprintf("%s, %s, negative tasking at this time.", callsign, channelName)
 		}
+		// With a JTAC, Command only hands the flight over: the JTAC picks the
+		// target and passes the 9-line, IP included (operator, 2026-10-14 -
+		// the real flow). A flight coming back for more gets a fresh draw
+		// at its next check-in.
+		if b.jtac != nil {
+			if cur != nil {
+				cur.redraw = true
+			}
+			b.handoffs[key] = now
+			return fmt.Sprintf("%s, %s, contact %s on %s for tasking.", callsign, channelName,
+				b.jtac.Spoken, formatFreqMHz(b.jtac.FreqMHz))
+		}
 		// Asking again before the readback repeats the same tasking; asking
 		// after it means the flight is done and wants the next target.
 		if cur == nil || !cur.awaiting {
@@ -161,23 +175,22 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 			b.flights[key] = cur
 		}
 		cur.issued, cur.awaiting = now, true
-		cur.stage = jtacAssigned
 		t := b.targets[cur.target]
-		if b.jtac != nil {
-			return fmt.Sprintf("%s, %s, proceed to IP %s, target %d, %s. Contact %s on %s.", callsign, channelName,
-				t.IP, t.Number, t.Name, b.jtac.Spoken, formatFreqMHz(b.jtac.FreqMHz))
-		}
 		return fmt.Sprintf("%s, %s, proceed to IP %s, target %d, %s.", callsign, channelName, t.IP, t.Number, t.Name)
 	}
 
+	if b.jtac != nil {
+		if at, ok := b.handoffs[key]; ok && now.Sub(at) <= taskingAckWindow && isTaskingAck(lower) {
+			delete(b.handoffs, key)
+			return fmt.Sprintf("%s, %s, switch %s, good hunting.", callsign, channelName, b.jtac.Spoken)
+		}
+		return ""
+	}
 	if cur == nil || !cur.awaiting || now.Sub(cur.issued) > taskingAckWindow {
 		return ""
 	}
 	if isTaskingAck(lower) || strings.Contains(lower, strings.ToLower(b.targets[cur.target].IP)) {
 		cur.awaiting = false
-		if b.jtac != nil {
-			return fmt.Sprintf("%s, %s, switch %s, good hunting.", callsign, channelName, b.jtac.Spoken)
-		}
 		return fmt.Sprintf("%s, %s, you are cleared hot.", callsign, channelName)
 	}
 	return ""
