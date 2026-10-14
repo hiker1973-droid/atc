@@ -259,8 +259,8 @@ func main() {
 		"OpenAI TTS voice (female slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
 	f.StringVar(&flagTTSVoiceMale, "tts-voice-male", "onyx",
 		"OpenAI TTS voice (male slot): alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer")
-	f.IntVar(&flagVoiceRotateHrs, "voice-rotate-hours", 4,
-		"Hours between female/male voice rotation on the tower channel (0=disabled)")
+	f.IntVar(&flagVoiceRotateHrs, "voice-rotate-hours", 0,
+		"Hours between female/male voice rotation on the tower channel (0=disabled: the field keeps its --tts-voice)")
 	f.StringVar(&flagFFmpeg, "ffmpeg",
 		`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`,
 		"Path to ffmpeg.exe for audio conversion")
@@ -1715,23 +1715,14 @@ func (c *ttsCache) stats() (hits, misses int64) {
 // implementation flagged and never did. Recover the phrase list from git history
 // if that gets built.
 
-// currentTowerVoice picks the tower TTS voice based on a fixed time bucket so
-// pilots hear an alternating female/male controller without operator action.
-// Bucket length is flagVoiceRotateHrs; 0 pins the voice to the airfield instead
-// (see below).
+// currentTowerVoice is the tower TTS voice: the one the start script gives the
+// field (--tts-voice). Each field's voice picks its ElevenLabs cast (Senaki
+// alloy -> Lisa, Tbilisi onyx -> George), so it must not change under the
+// pilot. --voice-rotate-hours > 0 brings back the old female/male swap on a
+// wall-clock bucket; it was on by default (4h) until 2026-10-14, when it
+// turned Senaki male mid-session ("Senaki changed to a male voice").
 func currentTowerVoice() string {
-	if flagVoiceRotateHrs <= 0 {
-		// Rotation off — pin the voice to the airfield instead of always
-		// using the female slot. Each field then has a stable controller
-		// identity across the whole session, which reads as several distinct
-		// people rather than one whose voice keeps changing. Rotation on a
-		// wall-clock bucket can also flip mid-pattern: a pilot hears one
-		// controller on downwind and another on final.
-		if flagTTSVoiceMale != "" && flagTTSVoiceMale != flagTTSVoice {
-			if icaoVoiceBucket(flagAirfield)%2 == 1 {
-				return flagTTSVoiceMale
-			}
-		}
+	if flagVoiceRotateHrs <= 0 || flagTTSVoiceMale == "" {
 		return flagTTSVoice
 	}
 	bucket := time.Now().Unix() / int64(flagVoiceRotateHrs*3600)
@@ -1739,16 +1730,6 @@ func currentTowerVoice() string {
 		return flagTTSVoice
 	}
 	return flagTTSVoiceMale
-}
-
-// icaoVoiceBucket hashes an ICAO to a stable small integer so a given field
-// always lands on the same voice slot, run after run.
-func icaoVoiceBucket(icao string) int {
-	sum := 0
-	for _, r := range strings.ToUpper(icao) {
-		sum += int(r)
-	}
-	return sum
 }
 
 // estimateTTSDuration approximates how long OpenAI TTS will play `text`, used to

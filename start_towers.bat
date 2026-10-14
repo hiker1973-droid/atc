@@ -31,8 +31,8 @@ echo [vSFG-7] Starting ATC system...
 ::
 :: Voice: shimmer (2026-08-13, operator preference — was nova). Same voice as
 :: Deckboss, and it now runs at the Deckboss rate too (--tts-speed default is
-:: speedDeckboss in main.go). Both slots are set to shimmer on purpose: the
-:: tower voice rotates female/male every --voice-rotate-hours (default 4), so
+:: speedDeckboss in main.go). Both slots are set to shimmer on purpose: if
+:: --voice-rotate-hours is ever turned on (default 0 = off since 2026-10-14),
 :: leaving --tts-voice-male at onyx would flip Minhad off shimmer half the day.
 ::
 :: This deliberately doubles shimmer up with Deckboss (128.6) and Al Dhafra
