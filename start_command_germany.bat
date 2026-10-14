@@ -26,4 +26,4 @@ set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: Command freq 282.0 is shared across theatres (COMM1 P1 on the Germany card);
 :: --map germany makes the proactive handoff scan the 8 German recovery bases.
-start "vSFG-7 Command (Germany)" cmd /c "%~dp0atc.exe --command-only --map germany --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
+start "vSFG-7 Command (Germany)" cmd /c "%~dp0atc.exe --command-only --map germany --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"

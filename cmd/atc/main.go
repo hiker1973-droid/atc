@@ -695,7 +695,7 @@ func run(cmd *cobra.Command, args []string) error {
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voiceProfile{voice, flagTTSSpeed, flagVoiceStyleTower})
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voiceProfile{voice, flagTTSSpeed, towerStyleFor(flagAirfield, voice)})
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -1771,13 +1771,17 @@ const (
 	styleDeckboss = "Speak as a US Navy carrier flight deck boss on the deck-edge handset, " +
 		"raising your voice over jet noise. Loud, urgent, punchy, commanding. Very short clauses."
 
-	styleCommand = "Speak as a military strike command controller on a tactical net. " +
-		"Steady, businesslike, confident. Slight urgency, no emotion."
+	// Operator 2026-10-14: "Command need to be stern English male voice".
+	styleCommand = "Speak as a Royal Air Force strike command controller on a tactical net: " +
+		"a man with a crisp southern British (Received Pronunciation) accent. " +
+		"Stern, firm and authoritative. Clipped, steady, businesslike. No warmth, no emotion."
 
 	// styleJTAC: Hitman 1-1 is a ground party near the target on a manpack
 	// radio, not a controller at a console (operator 2026-10-14: "realistic
 	// ... radio static type feel since it is a JTAC from ground").
-	styleJTAC = "Speak as a JTAC on the ground, talking on a manpack radio from a covered position near the target. " +
+	// Australian man, operator 2026-10-14.
+	styleJTAC = "Speak as a JTAC on the ground, an Australian man with a clear, natural Australian accent, " +
+		"talking on a manpack radio from a covered position near the target. " +
 		"Low, calm, clipped and deliberate, slightly hushed as if keeping your voice down. Crisp on every number. No emotion."
 
 	styleATIS = "Read as a recorded automated terminal information broadcast. " +
@@ -1848,7 +1852,8 @@ const (
 // profile for each role from the flags. Kept as functions rather than vars so
 // they pick up the rotating tower voice at call time.
 func towerVoice() voiceProfile {
-	return voiceProfile{currentTowerVoice(), flagTTSSpeed, flagVoiceStyleTower}
+	v := currentTowerVoice()
+	return voiceProfile{v, flagTTSSpeed, towerStyleFor(flagAirfield, v)}
 }
 
 func marshalVoice(v string) voiceProfile {

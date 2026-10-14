@@ -350,7 +350,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 				Str("secondLang", langField).
 				Bool("weatherChanged", weatherChanged).Msg("ATIS generating new audio")
 
-			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, atisVoiceFor(station))
+			enMP3, err := synthesizeSpeechAPI(ctx, apiKey, enText, atisEnglishVoice(station))
 			if err != nil {
 				log.Error().Err(err).Str("station", station.Name).Msg("ATIS English TTS failed")
 				state.mu.Unlock()

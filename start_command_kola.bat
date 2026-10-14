@@ -29,4 +29,4 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: --handoff-marshal-freq 306.3: our Marshal (start_marshal_kola.bat). Without the
 :: flag the default happens to be 306.3 too, but Syria shipped relying on a default
 :: and handed pilots to the wrong Marshal -- so it is stated here.
-start "vSFG-7 Command (Kola)" cmd /c "%~dp0atc.exe --command-only --map kola --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
+start "vSFG-7 Command (Kola)" cmd /c "%~dp0atc.exe --command-only --map kola --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"

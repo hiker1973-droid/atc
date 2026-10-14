@@ -26,4 +26,4 @@ set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: Command freq 282.0 is shared across theatres (COMM1 P4 on the Iraq card);
 :: --map iraq makes the proactive handoff scan the 9 Iraq recovery bases.
-start "vSFG-7 Command (Iraq)" cmd /c "%~dp0atc.exe --command-only --map iraq --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7771 --log-level %LOG%"
+start "vSFG-7 Command (Iraq)" cmd /c "%~dp0atc.exe --command-only --map iraq --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7771 --log-level %LOG%"
