@@ -104,6 +104,11 @@ var (
 	flagJTACVoice       string
 	flagVoiceStyleJTAC  string
 	flagJTACRadioIntensity string
+	flagElevenLabs         bool
+	flagElevenLabsKey      string
+	flagElevenLabsModel    string
+	flagElevenCommandVoice string
+	flagElevenJTACVoice    string
 	flagDeckbossVoice   string
 	flagMarshalVoice    string
 	flagRadioEffect          bool
@@ -177,6 +182,12 @@ func main() {
 	f.StringVar(&flagJTACSpoken, "jtac-spoken", "Hitman one one", "JTAC callsign as spoken on the radio")
 	f.StringVar(&flagJTACVoice, "jtac-voice", "ash", "OpenAI TTS voice for the JTAC")
 	f.StringVar(&flagVoiceStyleJTAC, "voice-style-jtac", styleJTAC, "TTS delivery instructions for the JTAC (empty=none)")
+	f.BoolVar(&flagElevenLabs, "elevenlabs", true,
+		"Speak Command, Hitman and the towers with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS, Marshal and Deckboss stay on OpenAI.")
+	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
+	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDaniel, "ElevenLabs voice ID for Command (default Daniel)")
+	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elCharlie, "ElevenLabs voice ID for Hitman (default Charlie)")
 	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
 		"Radio effect for the JTAC: light, medium, heavy, extreme, or field (a manpack FM set on the ground: narrow band, heavy hiss)")
 	f.BoolVar(&flagATISBroadcast, "atis-broadcast", false,
@@ -695,7 +706,7 @@ func run(cmd *cobra.Command, args []string) error {
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, voiceProfile{voice, flagTTSSpeed, towerStyleFor(flagAirfield, voice)})
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, towerProfile(voice))
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -1640,7 +1651,7 @@ var globalTTSCache = &ttsCache{items: make(map[string][]byte)}
 // speed but sound different, so leaving instructions out of the key would let
 // one role serve the other a cached MP3 in the wrong style.
 func ttsKey(v voiceProfile, text string) string {
-	return fmt.Sprintf("%s:%.2f:%s:%s", v.voice, v.speed, v.instructions, text)
+	return fmt.Sprintf("%s:%.2f:%s:%s:%s", v.voice, v.speed, v.instructions, v.eleven.ID, text)
 }
 
 func (c *ttsCache) get(v voiceProfile, text string) ([]byte, bool) {
@@ -1754,6 +1765,9 @@ type voiceProfile struct {
 	voice        string
 	speed        float64
 	instructions string
+	// eleven, when set and the rig has an ElevenLabs key, speaks the line
+	// instead; the OpenAI voice above is the fallback (tts_elevenlabs.go).
+	eleven elevenVoice
 }
 
 // Delivery briefs per role. A tower controller, a marshal controller, and a
@@ -1852,24 +1866,24 @@ const (
 // profile for each role from the flags. Kept as functions rather than vars so
 // they pick up the rotating tower voice at call time.
 func towerVoice() voiceProfile {
-	v := currentTowerVoice()
-	return voiceProfile{v, flagTTSSpeed, towerStyleFor(flagAirfield, v)}
+	return towerProfile(currentTowerVoice())
 }
 
 func marshalVoice(v string) voiceProfile {
-	return voiceProfile{v, speedMarshal, flagVoiceStyleMarshal}
+	return voiceProfile{voice: v, speed: speedMarshal, instructions: flagVoiceStyleMarshal}
 }
 
 func deckbossVoice(v string) voiceProfile {
-	return voiceProfile{v, speedDeckboss, flagVoiceStyleDeckboss}
+	return voiceProfile{voice: v, speed: speedDeckboss, instructions: flagVoiceStyleDeckboss}
 }
 
 func commandVoice(v string) voiceProfile {
-	return voiceProfile{v, flagTTSSpeed, flagVoiceStyleCommand}
+	return voiceProfile{voice: v, speed: flagTTSSpeed, instructions: flagVoiceStyleCommand,
+		eleven: elHard(flagElevenCommandVoice, "Command", 1.05)}
 }
 
 func atisVoice(v string) voiceProfile {
-	return voiceProfile{v, speedATIS, flagVoiceStyleATIS}
+	return voiceProfile{voice: v, speed: speedATIS, instructions: flagVoiceStyleATIS}
 }
 
 // atisVoiceFor is atisVoice with the station's own Style, when it has one.
@@ -1885,6 +1899,17 @@ func atisVoiceFor(st *atisStation) voiceProfile {
 func synthesizeSpeech(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
 	if mp3, ok := globalTTSCache.get(v, text); ok {
 		log.Debug().Str("text", text).Msg("TTS cache hit")
+		return mp3, nil
+	}
+	if mp3, ok := speakElevenLabs(ctx, text, v); ok {
+		globalTTSCache.set(v, text, mp3)
+		return mp3, nil
+	}
+	// OpenAI: no ElevenLabs voice for this role, or it failed. Cached under
+	// the profile without the ElevenLabs voice, so a recovered ElevenLabs is
+	// not shadowed by the fallback clip.
+	v.eleven = elevenVoice{}
+	if mp3, ok := globalTTSCache.get(v, text); ok {
 		return mp3, nil
 	}
 	mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, v)
@@ -2210,22 +2235,24 @@ func whisperTranscribe(ctx context.Context, apiKey string, audio []byte, filenam
 // radioTier returns the noise amplitude and bandpass corners for a radio
 // effect intensity.
 func radioTier(intensity string) (noiseAmp float64, hpf, lpf int) {
-	// Noise amplitudes were raised ~60% on 2026-08-16 (operator preference:
-	// more carrier hiss for the radio feel). Ratios between the tiers are
-	// unchanged, so "heavy" still sits the same distance above "medium".
+	// Retuned 2026-10-14 (operator, on the ElevenLabs A/B clips: "lessen the
+	// radio harshness ... voice seem low volume but loud on static, need more
+	// bass"): roughly half the hiss of the 2026-08-16 values, and the low cut
+	// moved from 350-600 Hz down to 150-300 Hz so the voice keeps its chest.
+	// The tiers keep their order, light to extreme.
 	switch strings.ToLower(intensity) {
 	case "light":
-		return 0.032, 350, 3200
+		return 0.016, 150, 3600
 	case "heavy":
-		return 0.128, 500, 2700
+		return 0.060, 220, 3200
 	case "extreme":
-		return 0.208, 600, 2400
+		return 0.100, 300, 2800
 	case "field":
 		// The JTAC's manpack FM set: narrower than a console's radio and
 		// noisier than "heavy", short of "extreme" so numbers stay clear.
-		return 0.160, 550, 2500
+		return 0.075, 250, 3000
 	default: // medium
-		return 0.064, 400, 3000
+		return 0.030, 180, 3400
 	}
 }
 
@@ -2257,11 +2284,15 @@ func radioTier(intensity string) (noiseAmp float64, hpf, lpf int) {
 func radioFilter(intensity string, levelDB, outGainDB float64) string {
 	noiseAmp, hpf, lpf := radioTier(intensity)
 	return fmt.Sprintf(
+		// bass: +5 dB shelf at 150 Hz puts back the body the radio band cuts.
+		// Compression 4:1 (was 8:1) keeps the voice punchy without the squash.
+		// amix weights 1:0.5 sit the hiss under the voice instead of level with it.
 		"[0:a]volume=%.1fdB,highpass=f=%d,lowpass=f=%d,"+
-			"acompressor=threshold=-24dB:ratio=8:attack=5:release=60,"+
+			"bass=g=5:f=150:w=0.7,"+
+			"acompressor=threshold=-22dB:ratio=4:attack=8:release=80,"+
 			"volume=1.15[voice];"+
 			"anoisesrc=color=pink:amplitude=%.3f:duration=0[noise];"+
-			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0,"+
+			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0:weights=1 0.5,"+
 			"volume=%.1fdB,"+
 			"alimiter=limit=0.95:attack=1:release=40,"+
 			// 44100/mono so concat can match the synthetic clicks.

@@ -78,3 +78,31 @@ func atisEnglishVoice(st *atisStation) voiceProfile {
 	}
 	return p
 }
+
+// elevenTowerVoice is the ElevenLabs voice for a field's accent and gender.
+// Operator 2026-10-14: Charlie is Hitman's alone ("Hitman is most important
+// for voice"), so no tower uses him, and every field gets ElevenLabs (Senaki
+// "is a primary base"). The stock voices have one Australian (Charlie) and no
+// Australian woman, so the Australian fields borrow the British voices: women
+// Lily, men George. British women are Alice, British men George.
+func elevenTowerVoice(accent string, male bool) elevenVoice {
+	switch {
+	case male:
+		return elTower(elGeorge, "George")
+	case accent == accentAustralian:
+		return elTower(elLily, "Lily")
+	}
+	return elTower(elAlice, "Alice")
+}
+
+// towerProfile is the tower's full voice: OpenAI voice + accent instructions,
+// and the matching ElevenLabs voice. A start script's own tower style (Akrotiri
+// raf-british) reads as British.
+func towerProfile(voice string) voiceProfile {
+	accent := fieldAccent(flagAirfield)
+	if flagVoiceStyleTower != styleTower {
+		accent = accentBritish
+	}
+	return voiceProfile{voice: voice, speed: flagTTSSpeed, instructions: towerStyleFor(flagAirfield, voice),
+		eleven: elevenTowerVoice(accent, voiceIsMale(voice))}
+}

@@ -46,9 +46,9 @@ func TestParseMeanVolume(t *testing.T) {
 func TestRadioFilterOrdersLevelGainAndLimiter(t *testing.T) {
 	f := radioFilter("heavy", 14.5, 14)
 	for _, want := range []string{
-		"[0:a]volume=14.5dB,highpass=f=500,lowpass=f=2700,",
-		"amplitude=0.128:",
-		"amix=inputs=2:duration=first:dropout_transition=0,volume=14.0dB,alimiter=",
+		"[0:a]volume=14.5dB,highpass=f=220,lowpass=f=3200,bass=g=5",
+		"amplitude=0.060:",
+		"amix=inputs=2:duration=first:dropout_transition=0:weights=1 0.5,volume=14.0dB,alimiter=",
 		"[click_up][body][click_dn]concat=n=3:v=0:a=1[out]",
 	} {
 		if !strings.Contains(f, want) {

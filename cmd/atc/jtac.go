@@ -442,5 +442,6 @@ func (b *taskingBoard) bdaDue(key string, cur *taskingAssignment, name string, p
 // jtacVoice is Hitman's TTS voice: his own delivery (a ground party on a
 // manpack, not a controller at a console) at the common speed.
 func jtacVoice() voiceProfile {
-	return voiceProfile{flagJTACVoice, flagTTSSpeed, flagVoiceStyleJTAC}
+	return voiceProfile{voice: flagJTACVoice, speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC,
+		eleven: elHard(flagElevenJTACVoice, "Hitman", 1.0)}
 }
