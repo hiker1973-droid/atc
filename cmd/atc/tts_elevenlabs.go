@@ -20,7 +20,7 @@ import (
 // that. Keep ATIS the way it is." Command = Gideon (Daniel at first), Hitman = Scotty (Charlie at first), towers by
 // the field's accent and gender (voice_accents.go). ATIS stays on OpenAI.
 // Marshal (Adam) and Deckboss (Eric in the Caucasus, Brian elsewhere) joined
-// the same day.
+// the same day; Deckboss became Hank Harvey everywhere after round 9.
 //
 // ElevenLabs is used only when ELEVENLABS_API_KEY (or --elevenlabs-key) is set
 // on the rig. Any failure falls back to the role's OpenAI voice inside the same
@@ -45,8 +45,8 @@ const (
 	elLily    = "pFZP5JQG7iQjIQuC4Bku" // British woman, confident
 	elCharlie = "IKne3meq5aSn9XLyUdCD" // Australian man
 	elAdam    = "pNInz6obpgDQGcFmaJgB" // American man, dominant, firm (Marshal)
-	elBrian   = "nPczCjzI2devNBz1zQrb" // American man, deep (Deckboss)
-	elEric    = "cjVigY5qzO86Huf0OWal" // American man, smooth (Caucasus Deckboss)
+	elBrian   = "nPczCjzI2devNBz1zQrb" // American man, deep (Deckboss until round 9)
+	elEric    = "cjVigY5qzO86Huf0OWal" // American man, smooth (Caucasus Deckboss until round 9)
 )
 
 // Library voices (shared by other ElevenLabs users; need a paid plan - the
@@ -56,6 +56,7 @@ const (
 	elScotty = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
 	elLisa   = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
 	elGideon = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command)
+	elHank   = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss)
 )
 
 // elFlash is ElevenLabs' cheaper model, about half the credits a character.

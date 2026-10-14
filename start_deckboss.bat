@@ -25,7 +25,7 @@ set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
-:: 2026-10-14: Deckboss is a man now -- ElevenLabs Brian, OpenAI fallback verse (operator). The notes below are history.
+:: 2026-10-14: Deckboss is a man now -- ElevenLabs Hank Harvey (round 9; was Brian), OpenAI fallback verse (operator). The notes below are history.
 :: Voice: shimmer (female, 2026-08-06 — was ash, which is male). Bright and
 :: cutting, which suits a deck boss shouting over jet noise on a handset;
 :: fable was rejected earlier for being soft and storyteller-ish.

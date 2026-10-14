@@ -191,8 +191,8 @@ func main() {
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elGideon, "ElevenLabs voice ID for Command (default Gideon, library)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elAdam, "ElevenLabs voice ID for Marshal (default Adam)")
-	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elBrian,
-		"ElevenLabs voice ID for Deckboss (default Brian; start_deckboss_caucasus.bat passes Eric)")
+	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elHank,
+		"ElevenLabs voice ID for Deckboss (default Hank Harvey, library; every theatre)")
 	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
 		"Radio effect for the JTAC: light, medium, heavy, extreme, or field (a manpack FM set on the ground: narrow band, heavy hiss)")
 	f.BoolVar(&flagATISBroadcast, "atis-broadcast", false,

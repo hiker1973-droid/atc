@@ -37,5 +37,5 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: set the log slug, so Deckboss events land in atc-enbo.log alongside Bodo Tower --
 :: filter on Deckboss/128.6 when monitoring.
 ::
-:: Voice verse (OpenAI fallback; ElevenLabs Brian -- operator 2026-10-14; was shimmer) and dashboard 6005, same as the other theatres: only one map runs at a time.
+:: Voice verse (OpenAI fallback; ElevenLabs Hank Harvey -- operator 2026-10-14 round 9, was Brian; was shimmer) and dashboard 6005, same as the other theatres: only one map runs at a time.
 start "Deckboss (Kola)" cmd /c "%~dp0atc.exe --airfield ENBO --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice verse --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
