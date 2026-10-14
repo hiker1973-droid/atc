@@ -1923,7 +1923,7 @@ func translateATIS(ctx context.Context, apiKey, text, language string) (string, 
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := openAIClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -1947,6 +1947,13 @@ func translateATIS(ctx context.Context, apiKey, text, language string) (string, 
 	}
 	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
+
+// openAIClient bounds every OpenAI call. http.DefaultClient has no timeout and
+// the callers pass the process-lifetime ctx, so one stalled request blocked its
+// caller for good: on 2026-10-14 Kobuleti and then Batumi ATIS each hung in TTS
+// for minutes while holding the station lock, silent on air and in the log.
+// A timeout errors out instead, and the ATIS loop retries on its next tick.
+var openAIClient = &http.Client{Timeout: 60 * time.Second}
 
 func synthesizeSpeechAPI(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
 	speed := v.speed
@@ -1972,7 +1979,7 @@ func synthesizeSpeechAPI(ctx context.Context, apiKey, text string, v voiceProfil
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := openAIClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -2132,7 +2139,7 @@ func whisperTranscribeWithPrompt(ctx context.Context, apiKey string, audio []byt
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", w.FormDataContentType())
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := openAIClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -2174,7 +2181,7 @@ func whisperTranscribe(ctx context.Context, apiKey string, audio []byte, filenam
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := openAIClient.Do(req)
 	if err != nil {
 		return "", err
 	}
