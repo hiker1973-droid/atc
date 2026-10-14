@@ -289,8 +289,11 @@ Reproducible across three restart patterns including a clean full restart with 4
     - All five reports came back at full length, 44-56 s.
     - `ffprobe` is not installed on this box; measure with `C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe -i <file>`.
   - **11:57:** `6dd6b0a`, the short Hitman brief (operator request): **"target N, <name>, IP <IP>. Read back."** The pilot reads back "target N, <IP>" or "copy". A readback that names Hitman *mid-call* is dropped as our own echo.
-  - **Rollback copies are still the 10:42 build**; neither 11:19 nor 11:57 refreshed them.
-  - **`310444c` (Deckboss voice → Hank Harvey) landed from another session at 12:00 and is NOT deployed here yet.**
+  - The 11:19 and 11:57 deploys did not refresh the rollback copies; 12:04 did (below).
+  - **12:04:** `310444c`, Deckboss → **Hank Harvey**, landed from another session at 12:00. `start_deckboss_caucasus.bat` no longer passes `--elevenlabs-deckboss-voice`, so the code default is the voice. The OpenAI fallback stays `verse`.
+    - All 10 processes are re-registered with no warnings.
+    - **Rollback copies were refreshed at this deploy and now hold the 11:57 build** (short Hitman brief, Eric on Deckboss).
+    - Hank is not yet heard on the air.
 - **First live pilot traffic on the new build (Raider 302, 10:59-11:48).** Senaki, Kobuleti, Tbilisi, Deckboss, Command and Hitman all answered comm checks. Hitman briefed a 9-line on 61.0 FM. No ElevenLabs fallbacks. Three recognition gaps were found and **held by operator ruling ("Hitman brief only")**:
   1. Hitman and Command lack `comp check` / `com check` / `comcheck`. The towers have them. `jtac.go:158`, `command.go:30`.
   2. Tbilisi has no entry in `towerKeywordAliases` (`pkg/controller/controller.go:1148`), so Whisper's "Double-Ace" and "To Velocity" were dropped silently. Only the exact word "tbilisi" matches.
