@@ -24,6 +24,11 @@ import (
 // trigger a false position-report.
 var dmeDistanceRe = regexp.MustCompile(`\b(\d{1,3})[\s\-]+(?:dme|miles?(?:\s+dme)?)\b`)
 
+// rangeDistanceRe matches "range 25" — the pilot's answer to the see-you-at-ten
+// reply "report your altitude and range" ("angels 9, range 25", DCS3
+// 2026-10-14). Without it Marshal asked for a report it could not hear.
+var rangeDistanceRe = regexp.MustCompile(`\brange[\s,]+(\d{1,3})\b`)
+
 var dmeWordNums = map[string]int{
 	"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
 	"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
@@ -34,10 +39,12 @@ var dmeWordNums = map[string]int{
 // or word forms like "seven miles". Returns 0 when no recognizable distance
 // is present.
 func extractDMEDistance(lower string) int {
-	if m := dmeDistanceRe.FindStringSubmatch(lower); m != nil {
-		var v int
-		fmt.Sscanf(m[1], "%d", &v)
-		return v
+	for _, re := range []*regexp.Regexp{dmeDistanceRe, rangeDistanceRe} {
+		if m := re.FindStringSubmatch(lower); m != nil {
+			var v int
+			fmt.Sscanf(m[1], "%d", &v)
+			return v
+		}
 	}
 	for word, val := range dmeWordNums {
 		if strings.Contains(lower, word+" dme") || strings.Contains(lower, word+" mile") {
@@ -156,8 +163,11 @@ const (
 )
 
 // establishedRe covers "established angels 2" and Whisper's flown variants
-// "establish angels 2" and "established, angels two".
-var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b`)
+// "establish angels 2" and "established, angels two", plus "entering stack
+// position 3, angels 2" (flown on DCS3 2026-10-14, missed twice). Our own ack
+// "<callsign>, Union Marshal, entering stack at angels ..." leads with the
+// callsign, so the address guard still drops it as an echo.
+var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b|\bentering (?:the )?stack\b`)
 
 // brcWordRe catches a BRC question however it's phrased: "BRC", "B R C",
 // "B.R.C.", and Whisper's "VRC".
@@ -183,7 +193,7 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		return marshalSeeYouAtTen
 	case isDepartureClearCall(lower):
 		return marshalDepartureClear
-	case containsAny(lower, " dme", " mile"):
+	case containsAny(lower, " dme", " mile") || rangeDistanceRe.MatchString(lower):
 		return marshalDME
 	case containsAny(lower, "state") && fuelState > 0:
 		return marshalState

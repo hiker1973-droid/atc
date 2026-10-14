@@ -70,7 +70,7 @@ Same composer method as the towers (`RadioCheck`) — composer is constructed wi
 
 ## 1b. DME position report
 
-**Triggers:** `N DME` · `N mile` · `N miles` · `N mile DME` (where `N` is a spelled or digit number — e.g. `7 DME`, `seven DME`, `7 mile`, `seven mile DME`)
+**Triggers:** `N DME` · `N mile` · `N miles` · `N mile DME` (where `N` is a spelled or digit number — e.g. `7 DME`, `seven DME`, `7 mile`, `seven mile DME`) · `range N` (the answer to the see-you-at-ten "report your altitude and range", e.g. `angels 9, range 25`)
 
 Pilot reports current distance from mother on inbound. Typically called between `marking moms` and `see you at ten` (e.g. at 20 / 15 / 7 DME). Pure ack — no new clearance, just confirmation Marshal sees the call. If Tacview has the caller, the response includes a brief radar confirm (`radar contact` / `paint you`).
 
@@ -146,7 +146,7 @@ The zone name is derived from `marshalCallsign` ("Union Marshal" → "Union"), s
 
 ## 4. Established in stack
 
-**Triggers:** `established angels` · `established at angels`
+**Triggers:** `established angels` · `established at angels` · `entering stack` · `entering the stack` (e.g. `entering stack position 3, angels 2`)
 
 **If deck is clear → Signal Charlie (cleared to commence):**
 1. `{CALLSIGN}, Marshal, signal Charlie.`

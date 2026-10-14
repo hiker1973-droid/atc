@@ -151,3 +151,39 @@ func TestCarrierPromptEchoIsHallucination(t *testing.T) {
 		}
 	}
 }
+
+// Raider 302 on the Caucasus Marshal (DCS3, 306.3), 2026-10-14. All three got
+// "intent miss" and silence; the first two answered Marshal's own "report your
+// altitude and range".
+func TestMarshalCallsFlown20261014(t *testing.T) {
+	cases := []struct {
+		text   string
+		intent marshalIntent
+		dist   int
+	}{
+		{"Union Marshal Raider 302, Angels 9, Range 25.", marshalDME, 25},
+		{"Union Marshal Raider 302, angels 8.5, range 23.", marshalDME, 23},
+		{"Union Marshal Raider 302 entering stack position 3, angels 2.", marshalEstablished, 0},
+		{"Union Marshall Raider 302 entering the stack, angels 2.", marshalEstablished, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.text, func(t *testing.T) {
+			if cs := marshalCallsignFromText(tc.text); cs != "Raider 302" {
+				t.Errorf("callsign = %q, want Raider 302", cs)
+			}
+			lower := strings.ToLower(tc.text)
+			if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != tc.intent {
+				t.Errorf("intent = %d, want %d", got, tc.intent)
+			}
+			if tc.dist > 0 {
+				if d := extractDMEDistance(lower); d != tc.dist {
+					t.Errorf("distance = %d, want %d", d, tc.dist)
+				}
+			}
+		})
+	}
+	// Our own established ack says "entering stack" — it must stay an echo.
+	if _, ok := splitMarshalAddress("Raider 302, Union Marshal, entering stack at angels 2, position 3, hold for Charlie."); ok {
+		t.Error("Marshal's own entering-stack ack read as a pilot call")
+	}
+}
