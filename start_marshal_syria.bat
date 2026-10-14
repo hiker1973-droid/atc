@@ -36,8 +36,8 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: is the nearest major divert to an Eastern Med CVN. Log goes to atc-marshal.log
 :: regardless -- --marshal-only wins the log-slug switch in cmd/atc/main.go.
 ::
-:: Voice coral, same as PG Marshal: only one map runs at a time, so there is no
+:: Voice echo (OpenAI fallback; ElevenLabs Adam -- operator 2026-10-14; was coral), same as PG Marshal: only one map runs at a time, so there is no
 :: collision. Dashboard 6004 is likewise shared with PG Marshal by design.
-:: 306.3 + stern female voice (operator ruling 2026-09-19): Hornet COMM1 CH3
+:: 306.3 (the 2026-09-19 stern female voice was replaced by a man, ElevenLabs Adam, 2026-10-14): Hornet COMM1 CH3
 :: "CVN-72 AI MARSHALL". Was 306.1 (card CH2 "LIVE MARSHALL", now unused).
-start "Marshal (Syria)" cmd /c "%~dp0atc.exe --marshal-only --airfield LCRA --marshal-freq 306.3 --marshal-voice sage --voice-style-marshal marshal-stern --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"
+start "Marshal (Syria)" cmd /c "%~dp0atc.exe --marshal-only --airfield LCRA --marshal-freq 306.3 --marshal-voice echo --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"

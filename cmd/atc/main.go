@@ -109,6 +109,8 @@ var (
 	flagElevenLabsModel    string
 	flagElevenCommandVoice string
 	flagElevenJTACVoice    string
+	flagElevenMarshalVoice string
+	flagElevenDeckbossVoice string
 	flagDeckbossVoice   string
 	flagMarshalVoice    string
 	flagRadioEffect          bool
@@ -183,11 +185,14 @@ func main() {
 	f.StringVar(&flagJTACVoice, "jtac-voice", "ash", "OpenAI TTS voice for the JTAC")
 	f.StringVar(&flagVoiceStyleJTAC, "voice-style-jtac", styleJTAC, "TTS delivery instructions for the JTAC (empty=none)")
 	f.BoolVar(&flagElevenLabs, "elevenlabs", true,
-		"Speak Command, Hitman and the towers with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS, Marshal and Deckboss stay on OpenAI.")
+		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDaniel, "ElevenLabs voice ID for Command (default Daniel)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elCharlie, "ElevenLabs voice ID for Hitman (default Charlie)")
+	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elAdam, "ElevenLabs voice ID for Marshal (default Adam)")
+	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elBrian,
+		"ElevenLabs voice ID for Deckboss (default Brian; start_deckboss_caucasus.bat passes Eric)")
 	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
 		"Radio effect for the JTAC: light, medium, heavy, extreme, or field (a manpack FM set on the ground: narrow band, heavy hiss)")
 	f.BoolVar(&flagATISBroadcast, "atis-broadcast", false,
@@ -1870,11 +1875,13 @@ func towerVoice() voiceProfile {
 }
 
 func marshalVoice(v string) voiceProfile {
-	return voiceProfile{voice: v, speed: speedMarshal, instructions: flagVoiceStyleMarshal}
+	return voiceProfile{voice: v, speed: speedMarshal, instructions: flagVoiceStyleMarshal,
+		eleven: elMarshal(flagElevenMarshalVoice)}
 }
 
 func deckbossVoice(v string) voiceProfile {
-	return voiceProfile{voice: v, speed: speedDeckboss, instructions: flagVoiceStyleDeckboss}
+	return voiceProfile{voice: v, speed: speedDeckboss, instructions: flagVoiceStyleDeckboss,
+		eleven: elDeckboss(flagElevenDeckbossVoice)}
 }
 
 func commandVoice(v string) voiceProfile {

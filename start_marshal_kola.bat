@@ -37,6 +37,6 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: sets the weather/divert context and the magnetic variation BRC is spoken with
 :: (+5.3 E at Bodo; the Vestfjord is 4.9 E -- both for 2015, the WHITE NIGHT year).
 ::
-:: Voice coral and dashboard 6004 are shared with the other theatres' Marshals by
+:: Voice echo (OpenAI fallback; ElevenLabs Adam -- operator 2026-10-14; was coral) and dashboard 6004 are shared with the other theatres' Marshals by
 :: design: only one map runs at a time.
-start "Marshal (Kola)" cmd /c "%~dp0atc.exe --marshal-only --airfield ENBO --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"
+start "Marshal (Kola)" cmd /c "%~dp0atc.exe --marshal-only --airfield ENBO --marshal-freq 306.3 --marshal-voice echo --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"

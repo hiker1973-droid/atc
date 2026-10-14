@@ -25,6 +25,7 @@ set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
+:: 2026-10-14: Deckboss is a man now -- ElevenLabs Brian, OpenAI fallback verse (operator). The notes below are history.
 :: Voice: shimmer (female, 2026-08-06 — was ash, which is male). Bright and
 :: cutting, which suits a deck boss shouting over jet noise on a handset;
 :: fable was rejected earlier for being soft and storyteller-ish.
@@ -38,4 +39,4 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 ::
 :: Delivery style and rate come from --voice-style-deckboss and speedDeckboss
 :: in main.go — both gender-neutral, so no change needed there.
-start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+start "Deckboss" cmd /c "%~dp0atc.exe --airfield OMDM --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice verse --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"

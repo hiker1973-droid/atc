@@ -24,4 +24,4 @@ set GOGC=50
 set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
-start "Marshal" cmd /c "%~dp0atc.exe --marshal-only --airfield OMDM --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"
+start "Marshal" cmd /c "%~dp0atc.exe --marshal-only --airfield OMDM --marshal-freq 306.3 --marshal-voice echo --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"

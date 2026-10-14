@@ -18,8 +18,9 @@ import (
 // ElevenLabs voices for the live controllers, operator 2026-10-14 after an A/B
 // over SRS-processed clips: "I like the eleven labs all the best. lets roll with
 // that. Keep ATIS the way it is." Command = Daniel, Hitman = Charlie, towers by
-// the field's accent and gender (voice_accents.go). ATIS, Marshal and Deckboss
-// stay on OpenAI.
+// the field's accent and gender (voice_accents.go). ATIS stays on OpenAI.
+// Marshal (Adam) and Deckboss (Eric in the Caucasus, Brian elsewhere) joined
+// the same day.
 //
 // ElevenLabs is used only when ELEVENLABS_API_KEY (or --elevenlabs-key) is set
 // on the rig. Any failure falls back to the role's OpenAI voice inside the same
@@ -42,6 +43,9 @@ const (
 	elAlice   = "Xb7hH8MSUJpSbSDYk0k2" // British woman, clear
 	elLily    = "pFZP5JQG7iQjIQuC4Bku" // British woman, confident
 	elCharlie = "IKne3meq5aSn9XLyUdCD" // Australian man
+	elAdam    = "pNInz6obpgDQGcFmaJgB" // American man, dominant, firm (Marshal)
+	elBrian   = "nPczCjzI2devNBz1zQrb" // American man, deep (Deckboss)
+	elEric    = "cjVigY5qzO86Huf0OWal" // American man, smooth (Caucasus Deckboss)
 )
 
 // The two deliveries the operator picked: the towers as heard in round 1, and
@@ -50,6 +54,12 @@ func elTower(id, name string) elevenVoice { return elevenVoice{id, name, 0.6, 0.
 func elHard(id, name string, speed float64) elevenVoice {
 	return elevenVoice{id, name, 0.25, 0.75, speed}
 }
+
+// The carrier roles as heard in round 6 (operator 2026-10-14: "Eric and Brian
+// for deckboss and Adam for Marshall"; male is fine for both): Marshal calm and
+// measured, Deckboss quicker and punchier.
+func elMarshal(id string) elevenVoice  { return elevenVoice{id, "Marshal", 0.6, 0.2, 1.05} }
+func elDeckboss(id string) elevenVoice { return elevenVoice{id, "Deckboss", 0.35, 0.5, 1.1} }
 
 const (
 	elevenBudget  = 6 * time.Second  // leaves room for the OpenAI fallback inside a 10 s tower ceiling

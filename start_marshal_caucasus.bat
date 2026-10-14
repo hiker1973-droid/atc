@@ -42,6 +42,6 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: spoken with (+7.5 E, DimOn 2020s value, 2026-09-19). Log goes to atc-marshal.log -- --marshal-only wins the
 :: log-slug switch in cmd/atc/main.go.
 ::
-:: Voice coral and dashboard 6004 are shared with the PG and Syria Marshals by
+:: Voice echo (OpenAI fallback; ElevenLabs Adam -- operator 2026-10-14; was coral) and dashboard 6004 are shared with the PG and Syria Marshals by
 :: design: only one map runs at a time.
-start "Marshal (Caucasus)" cmd /c "%~dp0atc.exe --marshal-only --airfield UGSB --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"
+start "Marshal (Caucasus)" cmd /c "%~dp0atc.exe --marshal-only --airfield UGSB --marshal-freq 306.3 --marshal-voice echo --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%"

@@ -52,3 +52,23 @@ func TestTTSKeySeparatesElevenLabs(t *testing.T) {
 		t.Error("ElevenLabs and OpenAI clips share a cache key")
 	}
 }
+
+// Marshal and Deckboss speak ElevenLabs too (Adam; Brian, or Eric in the
+// Caucasus via its start script); ATIS does not.
+func TestCarrierRolesUseElevenLabs(t *testing.T) {
+	saveM, saveD := flagElevenMarshalVoice, flagElevenDeckbossVoice
+	defer func() { flagElevenMarshalVoice, flagElevenDeckbossVoice = saveM, saveD }()
+	flagElevenMarshalVoice, flagElevenDeckbossVoice = elAdam, elBrian
+	if got := marshalVoice("echo").eleven.ID; got != elAdam {
+		t.Errorf("Marshal ElevenLabs voice = %q, want Adam", got)
+	}
+	if got := deckbossVoice("verse").eleven.ID; got != elBrian {
+		t.Errorf("Deckboss ElevenLabs voice = %q, want Brian", got)
+	}
+	if got := atisVoice("nova").eleven.ID; got != "" {
+		t.Errorf("ATIS got an ElevenLabs voice %q, it stays on OpenAI", got)
+	}
+	if !voiceIsMale("echo") || !voiceIsMale("verse") {
+		t.Error("the carrier fallbacks must be male voices")
+	}
+}

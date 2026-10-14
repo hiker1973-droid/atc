@@ -49,5 +49,5 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: --handoff-marshal-freq 306.3: the airborne ack pushes departures to Marshal
 :: (Hornet COMM1 CH3, operator ruling 2026-09-19; was 306.1).
 ::
-:: Voice shimmer, same as PG Deckboss: only one map runs at a time.
-start "Deckboss (Syria)" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+:: Voice verse (OpenAI fallback; ElevenLabs Brian -- operator 2026-10-14; was shimmer), same as PG Deckboss: only one map runs at a time.
+start "Deckboss (Syria)" cmd /c "%~dp0atc.exe --airfield LCRA --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice verse --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"

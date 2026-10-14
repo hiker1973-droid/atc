@@ -43,6 +43,6 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: variation BRC is spoken with, so Deckboss events land in atc-ugsb.log
 :: alongside Batumi Tower -- filter on Deckboss/128.6 when monitoring.
 ::
-:: Voice shimmer and dashboard 6005, same as PG and Syria Deckboss: only one map
+:: Voice verse (OpenAI fallback; ElevenLabs Eric here, Brian elsewhere -- operator 2026-10-14; was shimmer) and dashboard 6005, same as PG and Syria Deckboss: only one map
 :: runs at a time.
-start "Deckboss (Caucasus)" cmd /c "%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
+start "Deckboss (Caucasus)" cmd /c "%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --deckboss-freq 128.6 --deckboss-voice verse --elevenlabs-deckboss-voice cjVigY5qzO86Huf0OWal --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 %MIZ_FLAG% --log-level %LOG%"
