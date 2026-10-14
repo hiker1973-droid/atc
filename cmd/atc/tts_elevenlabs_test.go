@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// The towers' ElevenLabs cast: British woman Alice, Australian woman Lily, men
-// George. Charlie is kept for Hitman and never used by a tower.
+// The towers' ElevenLabs cast: British woman Alice, Australian woman Lisa, men
+// George. Hitman's voice is never used by a tower.
 func TestElevenTowerVoice(t *testing.T) {
 	cases := []struct {
 		accent string
@@ -14,13 +14,13 @@ func TestElevenTowerVoice(t *testing.T) {
 		want   string
 	}{
 		{accentBritish, false, elAlice}, {accentBritish, true, elGeorge},
-		{accentAustralian, true, elGeorge}, {accentAustralian, false, elLily},
+		{accentAustralian, true, elGeorge}, {accentAustralian, false, elLisa},
 	}
 	for _, c := range cases {
 		if got := elevenTowerVoice(c.accent, c.male).ID; got != c.want {
 			t.Errorf("elevenTowerVoice(%s, male=%v) = %q, want %q", c.accent, c.male, got, c.want)
 		}
-		if elevenTowerVoice(c.accent, c.male).ID == elCharlie {
+		if id := elevenTowerVoice(c.accent, c.male).ID; id == elScotty || id == elCharlie {
 			t.Errorf("a tower uses Charlie, Hitman's voice")
 		}
 	}
@@ -70,5 +70,25 @@ func TestCarrierRolesUseElevenLabs(t *testing.T) {
 	}
 	if !voiceIsMale("echo") || !voiceIsMale("verse") {
 		t.Error("the carrier fallbacks must be male voices")
+	}
+}
+
+// Marshal reads its long replies on the cheaper Flash model; the others use
+// the default model unless set.
+func TestMarshalOnFlash(t *testing.T) {
+	if got := marshalVoice("echo").eleven.model(); got != elFlash {
+		t.Errorf("Marshal model = %q, want %q", got, elFlash)
+	}
+	save := flagElevenLabsModel
+	defer func() { flagElevenLabsModel = save }()
+	flagElevenLabsModel = "eleven_multilingual_v2"
+	if got := deckbossVoice("verse").eleven.model(); got != "eleven_multilingual_v2" {
+		t.Errorf("Deckboss model = %q, want the default", got)
+	}
+	el := voiceProfile{voice: "echo", eleven: elMarshal(elAdam)}
+	other := el
+	other.eleven.Model = "eleven_multilingual_v2"
+	if ttsKey(el, "x") == ttsKey(other, "x") {
+		t.Error("two models share a cache key")
 	}
 }

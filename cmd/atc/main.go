@@ -188,8 +188,8 @@ func main() {
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDaniel, "ElevenLabs voice ID for Command (default Daniel)")
-	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elCharlie, "ElevenLabs voice ID for Hitman (default Charlie)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elGideon, "ElevenLabs voice ID for Command (default Gideon, library)")
+	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elAdam, "ElevenLabs voice ID for Marshal (default Adam)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elBrian,
 		"ElevenLabs voice ID for Deckboss (default Brian; start_deckboss_caucasus.bat passes Eric)")
@@ -1656,7 +1656,7 @@ var globalTTSCache = &ttsCache{items: make(map[string][]byte)}
 // speed but sound different, so leaving instructions out of the key would let
 // one role serve the other a cached MP3 in the wrong style.
 func ttsKey(v voiceProfile, text string) string {
-	return fmt.Sprintf("%s:%.2f:%s:%s:%s", v.voice, v.speed, v.instructions, v.eleven.ID, text)
+	return fmt.Sprintf("%s:%.2f:%s:%s:%s:%s", v.voice, v.speed, v.instructions, v.eleven.ID, v.eleven.model(), text)
 }
 
 func (c *ttsCache) get(v voiceProfile, text string) ([]byte, bool) {

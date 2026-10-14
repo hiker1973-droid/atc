@@ -80,17 +80,16 @@ func atisEnglishVoice(st *atisStation) voiceProfile {
 }
 
 // elevenTowerVoice is the ElevenLabs voice for a field's accent and gender.
-// Operator 2026-10-14: Charlie is Hitman's alone ("Hitman is most important
-// for voice"), so no tower uses him, and every field gets ElevenLabs (Senaki
-// "is a primary base"). The stock voices have one Australian (Charlie) and no
-// Australian woman, so the Australian fields borrow the British voices: women
-// Lily, men George. British women are Alice, British men George.
+// Operator 2026-10-14: Hitman's voice is his alone ("Hitman is most important
+// for voice"), and every field gets ElevenLabs (Senaki "is a primary base").
+// Australian women are Lisa (library voice, picked for Senaki on the Creator
+// plan), British women Alice, men George. No tower uses Hitman's voice.
 func elevenTowerVoice(accent string, male bool) elevenVoice {
 	switch {
 	case male:
 		return elTower(elGeorge, "George")
 	case accent == accentAustralian:
-		return elTower(elLily, "Lily")
+		return elTower(elLisa, "Lisa")
 	}
 	return elTower(elAlice, "Alice")
 }

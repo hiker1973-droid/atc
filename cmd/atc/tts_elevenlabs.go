@@ -17,7 +17,7 @@ import (
 
 // ElevenLabs voices for the live controllers, operator 2026-10-14 after an A/B
 // over SRS-processed clips: "I like the eleven labs all the best. lets roll with
-// that. Keep ATIS the way it is." Command = Daniel, Hitman = Charlie, towers by
+// that. Keep ATIS the way it is." Command = Gideon (Daniel at first), Hitman = Scotty (Charlie at first), towers by
 // the field's accent and gender (voice_accents.go). ATIS stays on OpenAI.
 // Marshal (Adam) and Deckboss (Eric in the Caucasus, Brian elsewhere) joined
 // the same day.
@@ -34,6 +34,7 @@ type elevenVoice struct {
 	Stability float64
 	Style     float64
 	Speed     float64
+	Model     string // "" = --elevenlabs-model
 }
 
 // Stock ElevenLabs voices (present on every account, free tier included).
@@ -48,18 +49,37 @@ const (
 	elEric    = "cjVigY5qzO86Huf0OWal" // American man, smooth (Caucasus Deckboss)
 )
 
+// Library voices (shared by other ElevenLabs users; need a paid plan - the
+// squadron is on Creator since 2026-10-14). An owner can withdraw a voice; the
+// OpenAI fallback then answers until another is picked.
+const (
+	elScotty = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
+	elLisa   = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
+	elGideon = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command)
+)
+
+// elFlash is ElevenLabs' cheaper model, about half the credits a character.
+// Operator 2026-10-14: "Marshal flash is fine" (Marshal has the longest replies).
+const elFlash = "eleven_flash_v2_5"
+
 // The two deliveries the operator picked: the towers as heard in round 1, and
 // the harder read used for Command and Hitman in rounds 2-3.
-func elTower(id, name string) elevenVoice { return elevenVoice{id, name, 0.6, 0.2, 1.1} }
+func elTower(id, name string) elevenVoice {
+	return elevenVoice{ID: id, Name: name, Stability: 0.6, Style: 0.2, Speed: 1.1}
+}
 func elHard(id, name string, speed float64) elevenVoice {
-	return elevenVoice{id, name, 0.25, 0.75, speed}
+	return elevenVoice{ID: id, Name: name, Stability: 0.25, Style: 0.75, Speed: speed}
 }
 
 // The carrier roles as heard in round 6 (operator 2026-10-14: "Eric and Brian
 // for deckboss and Adam for Marshall"; male is fine for both): Marshal calm and
 // measured, Deckboss quicker and punchier.
-func elMarshal(id string) elevenVoice  { return elevenVoice{id, "Marshal", 0.6, 0.2, 1.05} }
-func elDeckboss(id string) elevenVoice { return elevenVoice{id, "Deckboss", 0.35, 0.5, 1.1} }
+func elMarshal(id string) elevenVoice {
+	return elevenVoice{ID: id, Name: "Marshal", Stability: 0.6, Style: 0.2, Speed: 1.05, Model: elFlash}
+}
+func elDeckboss(id string) elevenVoice {
+	return elevenVoice{ID: id, Name: "Deckboss", Stability: 0.35, Style: 0.5, Speed: 1.1}
+}
 
 const (
 	elevenBudget  = 6 * time.Second  // leaves room for the OpenAI fallback inside a 10 s tower ceiling
@@ -105,11 +125,18 @@ func (e *elevenStatusError) Error() string {
 	return fmt.Sprintf("ElevenLabs TTS error %d: %s", e.code, e.body)
 }
 
+func (ev elevenVoice) model() string {
+	if ev.Model != "" {
+		return ev.Model
+	}
+	return flagElevenLabsModel
+}
+
 // synthesizeElevenLabs returns MP3 for text in voice ev.
 func synthesizeElevenLabs(ctx context.Context, key, text string, ev elevenVoice) ([]byte, error) {
 	body := map[string]interface{}{
 		"text":     text,
-		"model_id": flagElevenLabsModel,
+		"model_id": ev.model(),
 		"voice_settings": map[string]interface{}{
 			"stability": ev.Stability, "similarity_boost": 0.85, "style": ev.Style, "speed": ev.Speed,
 		},
