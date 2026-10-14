@@ -188,7 +188,7 @@ func main() {
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elGideon, "ElevenLabs voice ID for Command (default Gideon, library)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elSpartan, "ElevenLabs voice ID for Command (default Spartan, library)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elAdam, "ElevenLabs voice ID for Marshal (default Adam)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elHank,
@@ -1790,9 +1790,10 @@ const (
 	styleDeckboss = "Speak as a US Navy carrier flight deck boss on the deck-edge handset, " +
 		"raising your voice over jet noise. Loud, urgent, punchy, commanding. Very short clauses."
 
-	// Operator 2026-10-14: "Command need to be stern English male voice".
-	styleCommand = "Speak as a Royal Air Force strike command controller on a tactical net: " +
-		"a man with a crisp southern British (Received Pronunciation) accent. " +
+	// Operator 2026-10-14: "Command need to be stern English male voice", then
+	// the same day "The command voice is not good" / "need american".
+	styleCommand = "Speak as a US military strike command controller on a tactical net: " +
+		"a man with a General American accent and a low, grounded voice. " +
 		"Stern, firm and authoritative. Clipped, steady, businesslike. No warmth, no emotion."
 
 	// styleJTAC: Hitman 1-1 is a ground party near the target on a manpack
@@ -1886,7 +1887,7 @@ func deckbossVoice(v string) voiceProfile {
 
 func commandVoice(v string) voiceProfile {
 	return voiceProfile{voice: v, speed: flagTTSSpeed, instructions: flagVoiceStyleCommand,
-		eleven: elHard(flagElevenCommandVoice, "Command", 1.05)}
+		eleven: elCommand(flagElevenCommandVoice)}
 }
 
 func atisVoice(v string) voiceProfile {

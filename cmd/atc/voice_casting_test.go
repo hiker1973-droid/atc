@@ -65,8 +65,8 @@ func TestTowerAccentCasting(t *testing.T) {
 	if got := towerStyleFor("LCRA", "nova"); got != styleTowerBritish {
 		t.Errorf("explicit style overridden: %q", got)
 	}
-	if !strings.Contains(styleCommand, "a man with a crisp southern British") || !strings.Contains(styleCommand, "Stern") {
-		t.Errorf("Command is not a stern English man: %q", styleCommand)
+	if !strings.Contains(styleCommand, "a man with a General American accent") || !strings.Contains(styleCommand, "Stern") {
+		t.Errorf("Command is not a stern American man: %q", styleCommand)
 	}
 	if !strings.Contains(styleJTAC, "Australian man") {
 		t.Errorf("Hitman is not Australian: %q", styleJTAC)

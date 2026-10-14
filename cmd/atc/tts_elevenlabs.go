@@ -17,7 +17,7 @@ import (
 
 // ElevenLabs voices for the live controllers, operator 2026-10-14 after an A/B
 // over SRS-processed clips: "I like the eleven labs all the best. lets roll with
-// that. Keep ATIS the way it is." Command = Gideon (Daniel at first), Hitman = Scotty (Charlie at first), towers by
+// that. Keep ATIS the way it is." Command = Spartan (Daniel, then Gideon, at first), Hitman = Scotty (Charlie at first), towers by
 // the field's accent and gender (voice_accents.go). ATIS stays on OpenAI.
 // Marshal (Adam) and Deckboss (Eric in the Caucasus, Brian elsewhere) joined
 // the same day; Deckboss became Hank Harvey everywhere after round 9.
@@ -53,10 +53,11 @@ const (
 // squadron is on Creator since 2026-10-14). An owner can withdraw a voice; the
 // OpenAI fallback then answers until another is picked.
 const (
-	elScotty = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
-	elLisa   = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
-	elGideon = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command)
-	elHank   = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss)
+	elScotty  = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
+	elLisa    = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
+	elGideon  = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command until round 10)
+	elSpartan = "S75jVZ0i3J6Xa5BbK8CE" // American man, calm, grounded baritone (Command)
+	elHank    = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss)
 )
 
 // elFlash is ElevenLabs' cheaper model, about half the credits a character.
@@ -70,6 +71,13 @@ func elTower(id, name string) elevenVoice {
 }
 func elHard(id, name string, speed float64) elevenVoice {
 	return elevenVoice{ID: id, Name: name, Stability: 0.25, Style: 0.75, Speed: speed}
+}
+
+// elCommand is Command's read since round 10 (operator 2026-10-14: "The command
+// voice is not good" / "need american"): steadier than elHard, which made
+// Gideon's gravel muddy on the radio.
+func elCommand(id string) elevenVoice {
+	return elevenVoice{ID: id, Name: "Command", Stability: 0.45, Style: 0.4, Speed: 1.05}
 }
 
 // The carrier roles as heard in round 6 (operator 2026-10-14: "Eric and Brian
