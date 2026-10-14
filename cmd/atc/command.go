@@ -119,6 +119,22 @@ func commandResponse(text, callsign, channelName string) string {
 // tracker may be nil; when set, every successfully-transcribed pilot callsign
 // is recorded so the Tacview-driven handoff watcher knows who to monitor.
 func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath string, tracker *pilotTracker, store *tacviewPositions) {
+	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, voice, externalAudioPath,
+		"Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle",
+		func(text string) (string, string) {
+			cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
+			if tracker != nil {
+				tracker.Note(cs)
+			}
+			return cs, commandReply(text, cs, channelName, store)
+		})
+}
+
+// voiceNetLoop is one controller on one SRS frequency: it hears each pilot
+// transmission, has Whisper transcribe it with prompt, and speaks whatever
+// handle answers (callsign, reply; "" reply = stay silent). Command and the
+// JTAC both run on it.
+func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath, prompt string, handle func(text string) (string, string)) {
 	guidLen := 22
 	var txCooldown int64
 	for {
@@ -280,7 +296,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 						delete(transmissions, origin)
 						log.Info().Str("origin", origin).Int("frames", len(frames)).Str("channel", channelName).Msg("Command: flushing transmission to Whisper")
 						go func(f [][]byte) {
-							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, "Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle")
+							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, prompt)
 							if err != nil || text == "" {
 								log.Info().Err(err).Str("channel", channelName).Msg("Command: empty/error transcription")
 								return
@@ -290,11 +306,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 								return
 							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
-							cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
-							if tracker != nil {
-								tracker.Note(cs)
-							}
-							resp := commandReply(text, cs, channelName, store)
+							cs, resp := handle(text)
 							if resp == "" {
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command intent miss")
 								return

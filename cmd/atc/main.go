@@ -98,6 +98,10 @@ var (
 	flagCommandFreq     string
 	flagCommandName     string
 	flagCommandVoice    string
+	flagJTACFreq        float64
+	flagJTACName        string
+	flagJTACSpoken      string
+	flagJTACVoice       string
 	flagDeckbossVoice   string
 	flagMarshalVoice    string
 	flagRadioEffect          bool
@@ -165,6 +169,11 @@ func main() {
 		"Run as command channel only — no tower, no ATIS, no marshal")
 	f.StringVar(&flagCommandVoice, "command-voice", "onyx",
 		"OpenAI TTS voice for command channel: onyx recommended for male controller")
+	f.Float64Var(&flagJTACFreq, "jtac-freq", 0,
+		"With --command-only: run the JTAC (jtac.go) on this frequency in MHz, e.g. 61.0 (30-88 MHz is FM). Command then hands tasked flights to it instead of clearing them hot. 0=disabled")
+	f.StringVar(&flagJTACName, "jtac-name", "Hitman-1-1", "JTAC SRS client name (no spaces)")
+	f.StringVar(&flagJTACSpoken, "jtac-spoken", "Hitman one one", "JTAC callsign as spoken on the radio")
+	f.StringVar(&flagJTACVoice, "jtac-voice", "ash", "OpenAI TTS voice for the JTAC")
 	f.BoolVar(&flagATISBroadcast, "atis-broadcast", false,
 		"Broadcast ATIS on airfield ATIS frequency (replaces MOOSE ATIS)")
 	f.StringVar(&flagATISFreq, "atis-freq", "0",
@@ -641,6 +650,10 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 			go runCommandHandoffWatch(ctx, tracker, store, handoffTX)
 			log.Info().Str("tacview", flagTacviewAddr).Msg("Command: tower-handoff watcher armed")
+		}
+
+		if flagJTACFreq > 0 {
+			startJTAC(ctx, apiKey, store)
 		}
 
 		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio, tracker, store)
@@ -1446,6 +1459,25 @@ func unitIdForCallsign(callsign string) int64 {
 	return 100000000 + int64(h.Sum32()%1000000)
 }
 
+// srsModulation is the SRS modulation code for a frequency: 1 (FM) in the
+// 30-88 MHz military VHF-FM band, where the Hornet's ARC-210 and the Viper's
+// ARC-222 only do FM, else 0 (AM). SRS routes voice by frequency AND
+// modulation, so a 61.000 net registered as AM hears nobody.
+func srsModulation(freqMHz float64) int {
+	if freqMHz >= 30 && freqMHz < 88 {
+		return 1
+	}
+	return 0
+}
+
+// srsModulationName is srsModulation as ExternalAudio's --modulations takes it.
+func srsModulationName(freqMHz float64) string {
+	if srsModulation(freqMHz) == 1 {
+		return "FM"
+	}
+	return "AM"
+}
+
 func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 	msg := map[string]interface{}{
 		"Version": "2.1.0.2",
@@ -1461,7 +1493,7 @@ func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 				"radios": []map[string]interface{}{
 					{
 						"freq":       freqHz,
-						"modulation": 0,
+						"modulation": srsModulation(freqHz / 1e6),
 						"enc":        false,
 						"encKey":     0,
 						"secFreq":    0.0,
@@ -1508,7 +1540,7 @@ func buildSync(guid, callsign string, freqHz float64) []byte {
 				"radios": []map[string]interface{}{
 					{
 						"freq":       freqHz,
-						"modulation": 0,
+						"modulation": srsModulation(freqHz / 1e6),
 						"enc":        false,
 						"encKey":     0,
 						"secFreq":    0.0,
@@ -2469,7 +2501,7 @@ func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64,
 	args := []string{
 		"--file", txPath,
 		"--freqs", fmt.Sprintf("%.3f", freqMHz),
-		"--modulations", "AM",
+		"--modulations", srsModulationName(freqMHz),
 		"-c", "2",
 		"-n", safeName,
 		"-p", srsPort,
@@ -2498,7 +2530,7 @@ func transmitExternalAudio(text string, freqMHz float64, callsign, srsHost, srsP
 	args := []string{
 		"--text", text,
 		"--freqs", fmt.Sprintf("%.3f", freqMHz),
-		"--modulations", "AM",
+		"--modulations", srsModulationName(freqMHz),
 		"-c", "2",
 		"-n", safeName,
 		"-p", srsPort,

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/paulmach/orb"
 )
 
 // Command tasking: a pilot asks for a target, Command sends them to the IP on
@@ -13,23 +15,45 @@ import (
 // Unlike the other Command intents this is a two-step exchange, so it keeps
 // state per callsign. Kept apart from commandResponse, which is pure text.
 
-// taskingTarget is one 9-line page: the IP the flight holds at and the target
-// it runs in on.
+// taskingTarget is one 9-line page: the IP the flight holds at, the target it
+// runs in on, and the geometry the JTAC checks the run against.
 type taskingTarget struct {
-	IP     string
-	Number int
-	Name   string
+	IP      string
+	Number  int
+	Name    string
+	Control string // "type 1" / "type 2", as the card prints it
+	IPPos   orb.Point // lon, lat
+	TgtPos  orb.Point // lon, lat
+	MagVar  float64   // east, degrees, at the target
+	RunIn   int       // line 2, magnetic
+	FAHLow  int       // final attack heading window, magnetic, clockwise low to high
+	FAHHigh int
+	ElevFt  int    // line 4
+	Egress  string // line 9 altitude, e.g. "angels 15"
 }
 
 // caucasusTaskingTargets mirrors the 9-line pages of the vSFG-7 Caucasus
 // Training kneeboard (V1.22, pages 19-23). The IP names are what the pilot
-// reads back, so they must stay in step with the kneeboard.
+// reads back, so they must stay in step with the kneeboard. Positions, run-in,
+// final attack headings, elevation and egress are build_ag.SITES /
+// nine_line() in the AG Range builder (Saved Games, Missions/Caucasus/
+// Training/AG Range/_BUILD/build_ag.py), which draws the cards.
 var caucasusTaskingTargets = []taskingTarget{
-	{"Anvil", 1, "Enguri Bridge"},
-	{"Brick", 2, "Rioni Rail Bridge"},
-	{"Cobra", 3, "Fuel Depot"},
-	{"Dagger", 4, "Command Post"},
-	{"Eagle", 5, "Artillery Park"},
+	{IP: "Anvil", Number: 1, Name: "Enguri Bridge", Control: "type 2",
+		IPPos: orb.Point{41.942121, 42.431496}, TgtPos: orb.Point{41.851168, 42.582912}, MagVar: 7.21,
+		RunIn: 329, FAHLow: 309, FAHHigh: 349, ElevFt: 445, Egress: "angels 15"},
+	{IP: "Brick", Number: 2, Name: "Rioni Rail Bridge", Control: "type 1",
+		IPPos: orb.Point{42.314535, 42.284035}, TgtPos: orb.Point{42.328935, 42.118794}, MagVar: 7.08,
+		RunIn: 169, FAHLow: 149, FAHHigh: 189, ElevFt: 135, Egress: "angels 12"},
+	{IP: "Cobra", Number: 3, Name: "Fuel Depot", Control: "type 2",
+		IPPos: orb.Point{42.020965, 42.318974}, TgtPos: orb.Point{41.806303, 42.364730}, MagVar: 7.14,
+		RunIn: 279, FAHLow: 259, FAHHigh: 299, ElevFt: 25, Egress: "angels 14"},
+	{IP: "Dagger", Number: 4, Name: "Command Post", Control: "type 2",
+		IPPos: orb.Point{41.939278, 42.130233}, TgtPos: orb.Point{42.155376, 42.170030}, MagVar: 7.09,
+		RunIn: 69, FAHLow: 49, FAHHigh: 89, ElevFt: 50, Egress: "angels 13"},
+	{IP: "Eagle", Number: 5, Name: "Artillery Park", Control: "type 1",
+		IPPos: orb.Point{41.889289, 42.172673}, TgtPos: orb.Point{41.729363, 42.057419}, MagVar: 7.05,
+		RunIn: 219, FAHLow: 199, FAHHigh: 239, ElevFt: 15, Egress: "angels 12"},
 }
 
 // taskingTargetsForMap returns the tasking set for a theatre, nil where the
@@ -55,6 +79,11 @@ type taskingAssignment struct {
 	target   int // index into the board's targets
 	issued   time.Time
 	awaiting bool // tasking passed, readback not yet heard
+
+	// JTAC side (jtac.go). Only used when the board has a JTAC.
+	stage     jtacStage
+	clearedAt time.Time // when "cleared hot" went out; the watch runs from here
+	offAxis   int       // consecutive watch samples outside the attack window
 }
 
 // taskingBoard tracks which flight holds which target.
@@ -64,6 +93,17 @@ type taskingBoard struct {
 	flights map[string]*taskingAssignment
 	now     func() time.Time
 	intn    func(int) int
+
+	// jtac, when set, is the JTAC Command hands the flight to. Command then
+	// only sends the flight to the IP; the JTAC passes the 9-line and clears
+	// it hot (jtac.go). Unset, Command clears hot on the readback itself.
+	jtac *jtacNet
+}
+
+// jtacNet is the JTAC as Command names it on the radio.
+type jtacNet struct {
+	Spoken  string  // "Hitman one one"
+	FreqMHz float64 // 61.000
 }
 
 func newTaskingBoard(targets []taskingTarget) *taskingBoard {
@@ -121,7 +161,12 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 			b.flights[key] = cur
 		}
 		cur.issued, cur.awaiting = now, true
+		cur.stage = jtacAssigned
 		t := b.targets[cur.target]
+		if b.jtac != nil {
+			return fmt.Sprintf("%s, %s, proceed to IP %s, target %d, %s. Contact %s on %s.", callsign, channelName,
+				t.IP, t.Number, t.Name, b.jtac.Spoken, formatFreqMHz(b.jtac.FreqMHz))
+		}
 		return fmt.Sprintf("%s, %s, proceed to IP %s, target %d, %s.", callsign, channelName, t.IP, t.Number, t.Name)
 	}
 
@@ -130,6 +175,9 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 	}
 	if isTaskingAck(lower) || strings.Contains(lower, strings.ToLower(b.targets[cur.target].IP)) {
 		cur.awaiting = false
+		if b.jtac != nil {
+			return fmt.Sprintf("%s, %s, switch %s, good hunting.", callsign, channelName, b.jtac.Spoken)
+		}
 		return fmt.Sprintf("%s, %s, you are cleared hot.", callsign, channelName)
 	}
 	return ""

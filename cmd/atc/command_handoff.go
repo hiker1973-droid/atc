@@ -69,9 +69,19 @@ func (t *pilotTracker) Note(callsign string) {
 // tacviewContactInfo is what Command keeps per callsign beyond position:
 // enough to pick out a tanker and to match a pilot to their side's bullseye.
 type tacviewContactInfo struct {
-	AltFt     float64
-	Name      string // ACMI Name= — the aircraft model, e.g. "KC135MPRS"
-	Coalition string // ACMI Coalition=, e.g. "Allies"
+	AltFt      float64
+	Name       string // ACMI Name= — the aircraft model, e.g. "KC135MPRS"
+	Coalition  string // ACMI Coalition=, e.g. "Allies"
+	HeadingDeg float64 // true; valid only when HasHeading
+	HasHeading bool
+	UpdatedAt  time.Time
+}
+
+// tacviewWeapon is a weapon object's first sighting — where a bomb or missile
+// came off the jet. The JTAC uses it to tell a release from a wrong run-in.
+type tacviewWeapon struct {
+	Pos  orb.Point
+	Seen time.Time
 }
 
 type tacviewPositions struct {
@@ -79,6 +89,36 @@ type tacviewPositions struct {
 	pos      map[string]orb.Point
 	info     map[string]tacviewContactInfo
 	bullseye map[string]orb.Point // coalition → bullseye (Navaid+Static+Bullseye objects)
+	weapons  []tacviewWeapon      // recent releases, oldest first
+}
+
+// weaponMemory is how long a release stays on the list.
+const weaponMemory = 5 * time.Minute
+
+// NoteWeapon records a weapon's first position.
+func (t *tacviewPositions) NoteWeapon(p orb.Point, now time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	keep := t.weapons[:0]
+	for _, w := range t.weapons {
+		if now.Sub(w.Seen) < weaponMemory {
+			keep = append(keep, w)
+		}
+	}
+	t.weapons = append(keep, tacviewWeapon{Pos: p, Seen: now})
+}
+
+// WeaponReleasedNear reports whether a weapon first appeared within radiusNm
+// of pos at or after since.
+func (t *tacviewPositions) WeaponReleasedNear(pos orb.Point, radiusNm float64, since time.Time) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for _, w := range t.weapons {
+		if !w.Seen.Before(since) && haversineNm(pos, w.Pos) <= radiusNm {
+			return true
+		}
+	}
+	return false
 }
 
 func newTacviewPositions() *tacviewPositions {
@@ -239,7 +279,10 @@ func (t *tacviewPositions) Carrier() (orb.Point, bool) {
 type miniObject struct {
 	lon, lat, altFt      float64
 	hasLon, hasLat       bool
+	hdg                  float64
+	hasHdg               bool
 	pilot, name, typ, co string
+	weaponNoted          bool
 }
 
 // miniTacviewParser turns ACMI lines into store updates. Split out of
@@ -250,6 +293,14 @@ type miniTacviewParser struct {
 	objs           map[string]*miniObject
 	refLat, refLon float64
 	refSet         bool
+	now            func() time.Time // nil = time.Now; tests pin it
+}
+
+func (p *miniTacviewParser) clock() time.Time {
+	if p.now != nil {
+		return p.now()
+	}
+	return time.Now()
 }
 
 func newMiniTacviewParser(store *tacviewPositions) *miniTacviewParser {
@@ -325,6 +376,20 @@ func (p *miniTacviewParser) handleLine(line string) {
 					o.altFt = f * 3.28084
 				}
 			}
+			// lon|lat|alt|roll|pitch|yaw|u|v|heading for aircraft; the
+			// 6-field form carries yaw only.
+			hi := -1
+			switch len(coords) {
+			case 9:
+				hi = 8
+			case 6:
+				hi = 5
+			}
+			if hi > 0 && coords[hi] != "" {
+				if f, err := strconv.ParseFloat(coords[hi], 64); err == nil {
+					o.hdg, o.hasHdg = math.Mod(f+360, 360), true
+				}
+			}
 		case "Pilot":
 			o.pilot = v
 		case "Name":
@@ -346,6 +411,14 @@ func (p *miniTacviewParser) handleLine(line string) {
 		p.store.SetBullseye(o.co, pt)
 		return
 	}
+	// Bombs and missiles: only where they first appear matters.
+	if strings.Contains(o.typ, "Weapon") {
+		if !o.weaponNoted {
+			o.weaponNoted = true
+			p.store.NoteWeapon(pt, p.clock())
+		}
+		return
+	}
 	// Pilot field uses "Raider 032 |Jedi" — keep the callsign half only.
 	key := o.pilot
 	if key == "" {
@@ -359,7 +432,8 @@ func (p *miniTacviewParser) handleLine(line string) {
 	}
 	p.keys[id] = key
 	p.store.Set(key, pt)
-	p.store.SetInfo(key, tacviewContactInfo{AltFt: o.altFt, Name: o.name, Coalition: o.co})
+	p.store.SetInfo(key, tacviewContactInfo{AltFt: o.altFt, Name: o.name, Coalition: o.co,
+		HeadingDeg: o.hdg, HasHeading: o.hasHdg, UpdatedAt: p.clock()})
 }
 
 // runMiniTacview is a stripped-down Tacview consumer for Command. It keeps a

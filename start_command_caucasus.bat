@@ -29,4 +29,7 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: --handoff-marshal-freq 306.3: our Marshal (start_marshal_caucasus.bat), Hornet
 :: COMM1 CH3 "CVN-72 AI MARSHALL". Operator ruling 2026-09-20 -- 306.200 is kept
 :: clear for a live human Marshal, so never hand off there.
-start "vSFG-7 Command (Caucasus)" cmd /c "%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
+:: --jtac-freq 61.0: Hitman 1-1, the 9-line JTAC (jtac.go), 61.000 FM = Hornet
+:: COMM2 CH12, Viper COMM2 CH8 (operator ruling 2026-10-14). Runs in this process
+:: so Command's tasking and the JTAC share one board. 60.000 is the LIVE JTAC.
+start "vSFG-7 Command (Caucasus)" cmd /c "%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --jtac-freq 61.0 --jtac-voice ash --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
