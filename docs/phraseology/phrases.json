@@ -1,6 +1,30 @@
 [
  {
   "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, radio check.",
+  "tower": "Batumi Tower",
+  "want": "radio_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, comm check.",
+  "tower": "Batumi Tower",
+  "want": "radio_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, how copy.",
+  "tower": "Batumi Tower",
+  "want": "radio_check"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, request startup.",
+  "tower": "Batumi Tower",
+  "want": "startup"
+ },
+ {
+  "role": "tower",
   "say": "Batumi Tower, Raider 1-1, request taxi.",
   "tower": "Batumi Tower",
   "want": "taxi"
@@ -73,12 +97,6 @@
  },
  {
   "role": "tower",
-  "say": "Batumi Tower, Raider 1-1, request startup.",
-  "tower": "Batumi Tower",
-  "want": "startup"
- },
- {
-  "role": "tower",
   "say": "Batumi Tower, Raider 1-1, 10 mile initial.",
   "tower": "Batumi Tower",
   "want": "inbound"
@@ -133,6 +151,12 @@
  },
  {
   "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, on final, touch and go.",
+  "tower": "Batumi Tower",
+  "want": "final"
+ },
+ {
+  "role": "tower",
   "say": "Batumi Tower, Raider 1-1, request straight in.",
   "tower": "Batumi Tower",
   "want": "straight_in"
@@ -142,12 +166,6 @@
   "say": "Batumi Tower, Raider 1-1, ILS approach.",
   "tower": "Batumi Tower",
   "want": "straight_in"
- },
- {
-  "role": "tower",
-  "say": "Batumi Tower, Raider 1-1, on final, touch and go.",
-  "tower": "Batumi Tower",
-  "want": "final"
  },
  {
   "role": "tower",
@@ -190,12 +208,6 @@
   "say": "Batumi Tower, Raider 1-1, radar check.",
   "tower": "Batumi Tower",
   "want": "radar_check"
- },
- {
-  "role": "tower",
-  "say": "Batumi Tower, Raider 1-1, radio check.",
-  "tower": "Batumi Tower",
-  "want": "radio_check"
  },
  {
   "role": "tower",

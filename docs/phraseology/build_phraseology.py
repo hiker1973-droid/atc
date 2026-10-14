@@ -1,45 +1,40 @@
 # -*- coding: utf-8 -*-
-"""vSFG-7 ATC PHRASEOLOGY REFERENCE - builder.
+"""vSFG-7 AI ATC PHRASEOLOGY REFERENCE - builder.
 
-Replaces the April 2026 one-off (Persian Gulf only, ReportLab, no source kept). Operator
-2026-10-14: "Lets do a builder ... so we can update those versions. Make sure we push
-documentation to git." This file, its inputs and the PDF live in the SkyeyeATC repo.
+Replaces the April 2026 one-off (Persian Gulf only, ReportLab, no source kept) and keeps its
+format, on the operator's ask (2026-10-14, "make the document like the old one format
+wise"): US Letter, white pages under a navy header strip, numbered sections, three-column
+tables (Intent / Say something like / Response) with zebra rows, dark example-exchange
+boxes in a monospace face, gold callout boxes, a navy cover with the group patch. Drawn
+straight with PyMuPDF; Arial and Consolas from C:\\Windows\\Fonts.
 
 What keeps it true:
   facts.json    frequencies, read out of the start_*.bat files and SkyEye's tables by
                 cmd/atc/docs_test.go (TestDocFacts fails when they drift).
-  phrases.json  every pilot call printed here, written by this builder; TestDocPhrases
-                runs each through the real SkyEye parser and fails if one no longer
-                triggers what this document says.
-Replies are SkyEye's first wording (pkg/composer, cmd/atc); a live reply may use another of
-its two to four wordings with the same facts.
+  phrases.json  every pilot call printed in a table here, written by this builder;
+                TestDocPhrases runs each through the real SkyEye parser and fails if one no
+                longer triggers what this document says.
+A live reply may use another of SkyEye's two to four wordings with the same facts.
 
-Pages are portrait kneeboard cards (the squadron's missioncard renderer, so they drop into
-a kneeboard as they are), assembled into one PDF with PyMuPDF.
-
-Update:  see README.md beside this file.
+Update:  see ../README.md.
 Run:     python -I docs/phraseology/build_phraseology.py      (from the repo root)
 """
-import datetime
 import json
 import os
 import shutil
 import subprocess
-import sys
+
+import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-MISSIONS = r"C:\Users\afhin\Saved Games\DCS\Missions"
-sys.path.insert(0, os.path.join(MISSIONS, "_MISSION_TOOLKIT", "briefing"))
-import missioncard as MC  # noqa: E402
-import pymupdf  # noqa: E402
-
 VER = "v2.0"
 DATE = "14 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
-LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")
-CARDS = os.path.join(HERE, "_cards")      # renders, not committed
+LOGO = r"C:\Users\afhin\Saved Games\DCS\Missions\New Pilot packs\VMFA225_patch.png"
+FONTS = {"reg": r"C:\Windows\Fonts\arial.ttf", "bold": r"C:\Windows\Fonts\arialbd.ttf",
+         "mono": r"C:\Windows\Fonts\consola.ttf"}
 
 FACTS = json.load(open(os.path.join(HERE, "facts.json"), encoding="utf-8"))
 TH = {t["key"]: t for t in FACTS}
@@ -48,7 +43,7 @@ TH = {t["key"]: t for t in FACTS}
 def git_head():
     try:
         return subprocess.run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"],
-                              capture_output=True, text=True).stdout.strip()
+                              capture_output=True, text=True).stdout.strip() or "?"
     except OSError:
         return "?"
 
@@ -62,368 +57,484 @@ def f3(x):
     return "%.3f" % x
 
 
-# --------------------------------------------------------------------------- calls
-# One row = what the pilot says (alternatives split by "  /  "), what comes back, and for
-# the test: role, the intent it must trigger, and the address it is said with.
-def calls(role, rows, address, tower=""):
-    """rows: (say, reply, want). Records every alternative for the test; returns kv rows."""
+# =========================================================================== content
+# Table rows: (intent, what the pilot says - alternatives split by "  /  ", the response,
+# the intent the test checks). Each alternative is said as "<address>, Raider 1-1, <alt>."
+TOWER_GROUND = [
+    ("Comm / Radio check", "radio check  /  comm check  /  how copy", "Loud and clear", "radio_check"),
+    ("Request startup", "request startup", "Startup approved", "startup"),
+    ("Request taxi", "request taxi  /  ready to taxi", "Taxi to RWY XX, hold short", "taxi"),
+    ("Holding short", "holding short  /  at the hold", "Line up and wait, then cleared for takeoff", "holding_short"),
+    ("Takeoff", "ready for takeoff  /  request takeoff", "Cleared for takeoff", "takeoff"),
+    ("Airborne", "airborne  /  departing", "Climb angels N, contact tower at 7 DME", "airborne"),
+    ("Rolling (CTAF)", "rolling runway NN", "Same as airborne", "rolling"),
+    ("7 DME / Freq change", "seven DME  /  seven miles", "Contact Command 282.0", "dme"),
+    ("Pushing Command", "pushing command", "Good day", "pushing_command"),
+]
+TOWER_ARRIVAL = [
+    ("Inbound (initial call)", "N mile initial  /  N miles inbound", "Runway, wind, altimeter, report initial", "inbound"),
+    ("Overhead", "3 mile initial  /  overhead", "Break approved, number N, report base", "overhead"),
+    ("Break", "break", "Report downwind", "break"),
+    ("Downwind", "downwind", "Number N, report base", "downwind"),
+    ("Base", "base, gear down", "Cleared to land / affirmative", "base"),
+    ("On final", "on final  /  5 mile final", "Cleared to land, RWY XX", "final"),
+    ("Touch and go", "on final, touch and go", "Cleared touch and go", "final"),
+    ("Straight-in", "request straight in  /  ILS approach", "Straight-in approved, report final", "straight_in"),
+    ("Going around", "going around", "Climb runway heading, report downwind", "go_around"),
+    ("Runway vacated", "runway vacated  /  clear of the active", "Taxi to parking", "vacated"),
+]
+TOWER_ANYTIME = [
+    ("Say again", "say again", "Repeats your last call (2 min)", "say_again"),
+    ("Wind / altimeter", "wind check  /  say altimeter", "Wind and altimeter", "wind_check"),
+    ("Radar check", "radar check", "Angels, range, bearing", "radar_check"),
+    ("Hung ordnance", "hung ordnance", "Straight in, dearm at the end", "hung"),
+    ("Emergency", "mayday mayday mayday  /  pan pan", "The runway is yours", "emergency"),
+]
+COMMAND = [
+    ("Radio check", "radio check  /  how copy", "Loud and clear", "radio_check"),
+    ("Check in", "checking in", "Loud and clear, proceed mission", "check_in"),
+    ("Fence in", "fence in, state 6.2", "Copy fence in, cleared hot", "fence_in"),
+    ("On station", "on station", "Copy on station, good hunting", "on_station"),
+    ("Off station", "off station", "Proceed to assigned pattern", "off_station"),
+    ("Fence out", "fence out", "Copy fence out, safe passage", "fence_out"),
+    ("RTB", "RTB  /  request recovery", "Expect handoff at 30 nm", "rtb"),
+    ("State", "state 5.2", "Copy state; under 2.0 bingo", "state"),
+    ("Bullseye", "say bullseye", "Bullseye NNN for NN", "bullseye"),
+    ("Tanker", "request tanker", "Bearing, range, angels", "tanker"),
+    ("Tasking", "request tasking", "Black Sea: contact Hitman 1-1 on 61.0", "tasking"),
+]
+JTAC = [
+    ("Check in", "checking in  /  request tasking", "9-line target N, as fragged, read back", "check_in"),
+    ("Readback", "copy", "Good readback, report IP inbound", "copy"),
+    ("IP inbound", "IP inbound", "Continue (or where the IP is)", "ip_inbound"),
+    ("In", "in from the south  /  in heading 330", "Cleared hot  -  or abort, abort, abort", "in"),
+    ("Off", "off  /  off safe", "Egress per line 9", "off"),
+    ("BDA", "request BDA", "Impacts, then kills", "bda"),
+    ("Abort", "abort", "Copy abort, re-attack from the IP", "abort"),
+    ("Radio check", "radio check", "Loud and clear", "radio_check"),
+]
+DECKBOSS = [
+    ("Check in for launch", "request taxi  /  green jet", "Cleared to cat N, or the conga line", "taxi"),
+    ("Ready on cat", "ready cat N  /  shoot", "Under tension, spin it up", "tension"),
+    ("Airborne", "airborne", "Push Marshal 306.3", "airborne"),
+    ("BRC", "say BRC", "Mother's BRC, magnetic", "brc"),
+    ("Pushing Marshal", "pushing Marshal", "Short ack", "push"),
+    ("Radio check", "radio check", "Loud and clear", "radio_check"),
+]
+MARSHAL = [
+    ("Check in", "checking in", "Range and bearing, say marking moms", "check_in"),
+    ("Marking moms", "marking moms, angels 12, state 6.5", "Weather, case, BRC, Marshal at angels N", "marking_moms"),
+    ("BRC", "say BRC", "Mother's BRC, magnetic", "brc"),
+    ("DME report", "20 DME", "Radar contact, continue", "dme"),
+    ("Inbound 10 nm", "see you at ten", "Visual at ten, report altitude and range", "see_you_at_ten"),
+    ("Fuel state", "state 5.2", "Copy state; under 2.0 expedite", "state"),
+    ("Established", "established angels 2", "Signal Charlie, or hold", "established"),
+    ("Commencing", "commencing", "Check in three mile initial", "commencing"),
+    ("Platform (Case III)", "platform", "Final bearing NNN", "platform"),
+    ("Initial", "initial", "Contact paddles, good luck", "initial"),
+    ("Clear (departure)", "clear seven miles", "Push Command 282.0", "clear"),
+    ("Radar check", "radar check", "Angels, range, bearing from mother", "radar_check"),
+    ("Radio check", "radio check", "Loud and clear", "radio_check"),
+]
+
+
+def table_rows(role, rows, address, tower=""):
+    """Records every alternative for the test; returns printable rows."""
     out = []
-    for say, reply, want in rows:
-        if want:
-            for alt in say.split("  /  "):
-                spoken = alt.replace("N mile", "10 mile").replace("NN", "13").replace("cat N", "cat 2")
-                PHRASES.append({"role": role, "say": "%s, %s, %s." % (address, CS, spoken),
-                                "tower": tower, "want": want})
-        out.append((say, reply))
+    for intent, say, reply, want in rows:
+        for alt in say.split("  /  "):
+            spoken = alt.replace("N mile", "10 mile").replace("NN", "13").replace("cat N", "cat 2")
+            PHRASES.append({"role": role, "say": "%s, %s, %s." % (address, CS, spoken),
+                            "tower": tower, "want": want})
+        quoted = " ".join('"...%s"' % a for a in say.split("  /  "))
+        out.append((intent, quoted, reply))
     return out
 
 
-TOWER_GROUND = [
-    ("request taxi  /  ready to taxi", "taxi to runway NN, hold short", "taxi"),
-    ("holding short  /  at the hold", "line up and wait, then cleared", "holding_short"),
-    ("ready for takeoff  /  request takeoff", "cleared for takeoff", "takeoff"),
-    ("airborne  /  departing", "angels N, call seven DME", "airborne"),
-    ("rolling runway NN", "same as airborne (CTAF)", "rolling"),
-    ("seven DME  /  seven miles", "contact Command 282.0", "dme"),
-    ("pushing command", "good day", "pushing_command"),
-    ("request startup", "startup approved", "startup"),
-]
-TOWER_ARRIVAL = [
-    ("N mile initial  /  N miles inbound", "runway, wind, altimeter, pattern", "inbound"),
-    ("3 mile initial  /  overhead", "break approved, report base", "overhead"),
-    ("break", "report downwind", "break"),
-    ("downwind", "number N, report base", "downwind"),
-    ("base, gear down", "cleared to land, or affirmative", "base"),
-    ("on final  /  5 mile final", "runway, wind, cleared to land", "final"),
-    ("request straight in  /  ILS approach", "straight-in approved, report final", "straight_in"),
-    ("on final, touch and go", "cleared touch and go", "final"),
-    ("going around", "climb runway heading, report downwind", "go_around"),
-    ("runway vacated  /  clear of the active", "taxi to parking", "vacated"),
-]
-TOWER_ANYTIME = [
-    ("say again", "your last call, within 2 min", "say_again"),
-    ("wind check  /  say altimeter", "wind and altimeter", "wind_check"),
-    ("radar check", "angels, range, bearing", "radar_check"),
-    ("radio check", "loud and clear", "radio_check"),
-    ("hung ordnance", "straight in, dearm at the end", "hung"),
-    ("mayday mayday mayday  /  pan pan", "the runway is yours", "emergency"),
-]
-COMMAND = [
-    ("radio check  /  how copy", "loud and clear", "radio_check"),
-    ("checking in", "proceed mission", "check_in"),
-    ("fence in, state 6.2", "copy fence in, cleared hot", "fence_in"),
-    ("on station", "good hunting", "on_station"),
-    ("off station", "proceed to assigned pattern", "off_station"),
-    ("fence out", "safe passage", "fence_out"),
-    ("RTB  /  request recovery", "expect handoff at 30 nm", "rtb"),
-    ("state 5.2", "copy state; under 2.0 bingo", "state"),
-    ("say bullseye", "bullseye NNN for NN", "bullseye"),
-    ("request tanker", "bearing, range, angels", "tanker"),
-    ("request tasking", "Black Sea: contact Hitman 1-1", "tasking"),
-]
-JTAC = [
-    ("checking in  /  request tasking", "9-line target N, as fragged", "check_in"),
-    ("copy", "good readback, report IP inbound", "copy"),
-    ("IP inbound", "continue", "ip_inbound"),
-    ("in from the south  /  in heading 330", "cleared hot, or abort", "in"),
-    ("off  /  off safe", "egress per line 9", "off"),
-    ("request BDA", "impacts, then kills", "bda"),
-    ("abort", "copy abort, re-attack from the IP", "abort"),
-    ("radio check", "loud and clear", "radio_check"),
-]
-MARSHAL = [
-    ("checking in", "range and bearing, marking moms please", "check_in"),
-    ("marking moms, angels 12, state 6.5", "case, BRC, Marshal at angels N", "marking_moms"),
-    ("say BRC", "mother's BRC, magnetic", "brc"),
-    ("20 DME", "radar contact, continue", "dme"),
-    ("see you at ten", "report altitude and range", "see_you_at_ten"),
-    ("state 5.2", "copy state; under 2.0 expedite", "state"),
-    ("established angels 2", "signal Charlie, or hold", "established"),
-    ("commencing", "check in three mile initial", "commencing"),
-    ("platform", "final bearing NNN (Case III)", "platform"),
-    ("initial", "contact paddles", "initial"),
-    ("clear seven miles", "push Command 282.0", "clear"),
-    ("radar check", "radar contact, angels, range", "radar_check"),
-    ("radio check", "loud and clear", "radio_check"),
-]
-DECKBOSS = [
-    ("request taxi  /  green jet", "cleared to cat N, or the conga line", "taxi"),
-    ("ready cat N  /  shoot", "under tension, spin it up", "tension"),
-    ("airborne", "push Marshal 306.3", "airborne"),
-    ("say BRC", "mother's BRC, magnetic", "brc"),
-    ("pushing Marshal", "short ack", "push"),
-    ("radio check", "loud and clear", "radio_check"),
-]
+# =========================================================================== layout
+W, H = 612.0, 792.0
+M = 40.0                                   # side margin
+TOP, BOTTOM = 62.0, H - 46.0
+NAVY = (0.075, 0.125, 0.215)
+NAVY2 = (0.10, 0.16, 0.27)
+GOLD = (0.88, 0.66, 0.18)
+INK = (0.10, 0.12, 0.16)
+MUTE = (0.45, 0.48, 0.53)
+ZEBRA = (0.91, 0.93, 0.96)
+CALLOUT = (0.98, 0.93, 0.80)
+WHITE = (1, 1, 1)
+FONT = {k: pymupdf.Font(fontfile=v) for k, v in FONTS.items()}
 
 
-# --------------------------------------------------------------------------- cards
-EYE = "vSFG-7  ·  AI ATC PHRASEOLOGY"
-PAGES = []
+def wrap(text, font, size, width):
+    words, lines, cur = text.split(" "), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if FONT[font].text_length(t, size) <= width or not cur:
+            cur = t
+        else:
+            lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [""]
 
 
-def card(title_plain, title_gold, sublines):
-    c = MC.Card(EYE, title_plain, title_gold, sublines)
-    c._n = len(PAGES) + 1
-    PAGES.append(c)
-    return c
+class Doc:
+    def __init__(self):
+        self.pdf = pymupdf.open()
+        self.page = None
+        self.y = TOP
+        self.n = 0
+
+    # -- primitives
+    def text(self, x, y, s, font="reg", size=9.5, color=INK, align="l"):
+        f = FONT[font]
+        if align == "c":
+            x -= f.text_length(s, size) / 2
+        elif align == "r":
+            x -= f.text_length(s, size)
+        tw = pymupdf.TextWriter(self.page.rect)
+        tw.append((x, y), s, font=f, fontsize=size)
+        tw.write_text(self.page, color=color)
+
+    def rect(self, r, fill, width=0, stroke=None):
+        self.page.draw_rect(pymupdf.Rect(*r), color=stroke, fill=fill, width=width)
+
+    # -- pages
+    def new_page(self, chrome=True):
+        self.page = self.pdf.new_page(width=W, height=H)
+        self.n += 1
+        self.y = TOP
+        if chrome:
+            self.rect((M, 26, W - M, 44), NAVY)
+            self.text(M + 8, 38.5, "vSFG-7", "bold", 9, GOLD)
+            self.text(M + 48, 38.5, "AI ATC Pilot Phraseology Reference", "reg", 8.5, WHITE)
+            self.text(W - M - 8, 38.5, "All theatres  ·  %s" % VER, "reg", 8.5, (0.7, 0.75, 0.82), "r")
+        self.text(W / 2, H - 24, "vSFG-7 Virtual Strike Fighter Group Seven    ·    Page %d" % self.n,
+                  "reg", 7.5, MUTE, "c")
+
+    def need(self, h):
+        if self.y + h > BOTTOM:
+            self.new_page()
+
+    # -- blocks
+    def h1(self, s):
+        self.need(70)
+        if self.y > TOP + 1:
+            self.y += 10
+        self.y += 20
+        self.text(M, self.y, s, "bold", 17, INK)
+        self.y += 6
+        self.page.draw_line((M, self.y), (W - M, self.y), color=GOLD, width=1.2)
+        self.y += 16
+
+    def h2(self, s):
+        self.need(50)
+        self.y += 6
+        self.text(M, self.y + 10, s, "bold", 11.5, INK)
+        self.y += 20
+
+    def para(self, s, size=9.5, color=INK, font="reg"):
+        lines = wrap(s, font, size, W - 2 * M)
+        self.need(len(lines) * (size + 3.5) + 4)
+        for ln in lines:
+            self.y += size + 3.5
+            self.text(M, self.y, ln, font, size, color)
+        self.y += 6
+
+    def table(self, headers, rows, cols):
+        """cols: column widths as fractions of the text width."""
+        tw = W - 2 * M
+        xs, x = [], M
+        for c in cols:
+            xs.append(x)
+            x += c * tw
+        pad, size, lead = 7.0, 8.6, 11.2
+
+        def header():
+            self.rect((M, self.y, W - M, self.y + 20), NAVY)
+            for i, h in enumerate(headers):
+                self.text(xs[i] + pad, self.y + 13.5, h, "bold", 8.8, WHITE)
+            self.y += 20
+
+        self.need(20 + 24)
+        header()
+        for ri, row in enumerate(rows):
+            cells = [wrap(str(v), "reg", size, cols[i] * tw - 2 * pad) for i, v in enumerate(row)]
+            h = max(len(c) for c in cells) * lead + 10
+            if self.y + h > BOTTOM:
+                self.new_page()
+                header()
+            if ri % 2 == 1:
+                self.rect((M, self.y, W - M, self.y + h), ZEBRA)
+            for i, c in enumerate(cells):
+                for li, ln in enumerate(c):
+                    self.text(xs[i] + pad, self.y + 14 + li * lead, ln, "reg", size, INK)
+            self.y += h
+        self.y += 12
+
+    def dialogue(self, lines):
+        """lines: (speaker, text). Dark box, monospace, like the April example blocks."""
+        size, lead, who_w = 8.2, 11.0, 58.0
+        body = [(w, wrap('"%s"' % t, "mono", size, W - 2 * M - who_w - 24)) for w, t in lines]
+        h = sum(len(b) for _, b in body) * lead + (len(body) - 1) * 4 + 18
+        self.need(h + 10)
+        self.rect((M, self.y, W - M, self.y + h), NAVY2)
+        y = self.y + 9 + size
+        for who, b in body:
+            self.text(M + 10, y, who + ":", "mono", size, GOLD)
+            for ln in b:
+                self.text(M + 10 + who_w, y, ln, "mono", size, (0.86, 0.89, 0.93))
+                y += lead
+            y += 4
+        self.y += h + 14
+
+    def callout(self, title, lines):
+        size, lead = 8.8, 11.6
+        body = [wrap(s, "reg", size, W - 2 * M - 30) for s in lines]
+        h = 26 + sum(len(b) for b in body) * lead + 8
+        self.need(h + 8)
+        self.rect((M, self.y, W - M, self.y + h), CALLOUT)
+        self.rect((M, self.y, M + 3.5, self.y + h), GOLD)
+        self.text(M + 14, self.y + 17, title, "bold", 9.3, INK)
+        y = self.y + 17 + lead + 2
+        for b in body:
+            for ln in b:
+                self.text(M + 14, y, ln, "reg", size, INK)
+                y += lead
+        self.y += h + 14
+
+    def tips(self, items):
+        size, lead = 9.0, 12.0
+        for bold, rest in items:
+            lines = wrap(bold + " " + rest, "reg", size, W - 2 * M - 16)
+            self.need(len(lines) * lead + 8)
+            self.y += lead
+            self.page.draw_rect(pymupdf.Rect(M + 2, self.y - 6.5, M + 7, self.y - 1.5), color=GOLD, fill=GOLD)
+            # bold lead-in on the first line, the rest regular
+            first, x = lines[0], M + 16
+            if first.startswith(bold):
+                self.text(x, self.y, bold, "bold", size, INK)
+                self.text(x + FONT["bold"].text_length(bold + " ", size), self.y, first[len(bold):].strip(), "reg", size, INK)
+            else:
+                self.text(x, self.y, first, "reg", size, INK)
+            for ln in lines[1:]:
+                self.y += lead
+                self.text(x, self.y, ln, "reg", size, INK)
+            self.y += 5
+        self.y += 8
+
+    # -- cover
+    def cover(self):
+        self.new_page(chrome=False)
+        top, bot = 70.0, 430.0
+        self.rect((M, top, W - M, bot), NAVY)
+        self.page.draw_line((M + 4, top + 16), (W / 2 + 20, top + 16), color=GOLD, width=2, dashes="[2 1] 0")
+        self.text(W / 2, top + 72, "vSFG-7", "bold", 40, GOLD, "c")
+        self.text(W / 2, top + 88, "VIRTUAL STRIKE FIGHTER GROUP SEVEN", "bold", 8.5, (0.62, 0.68, 0.76), "c")
+        if os.path.exists(LOGO):
+            s = 150.0
+            pix = pymupdf.Pixmap(LOGO)
+            while pix.width > 600:          # the patch is print-size; 600 px is plenty at 150 pt
+                pix.shrink(1)
+            self.page.insert_image(pymupdf.Rect(W / 2 - s / 2, top + 100, W / 2 + s / 2, top + 100 + s),
+                                   stream=pix.tobytes("png"))
+        self.text(W / 2, top + 284, "AI ATC PHRASEOLOGY REFERENCE", "bold", 20, WHITE, "c")
+        self.text(W / 2, top + 303, "SkyEye on SRS  ·  every theatre", "reg", 10, (0.62, 0.68, 0.76), "c")
+        self.page.draw_line((W / 2 - 110, top + 316), (W / 2 + 110, top + 316), color=GOLD, width=1)
+        self.text(W / 2, top + 334, "VMFA-225 Vikings  ·  421st FS Black Widows", "bold", 9.5, GOLD, "c")
+        self.text(W / 2, top + 349, "F/A-18C Hornet  ·  F-16C Viper", "reg", 9, (0.62, 0.68, 0.76), "c")
+        self.text(W / 2, bot + 30, "%s  ·  %s" % (VER, DATE), "bold", 11, INK, "c")
+        self.text(W / 2, bot + 46, "Built from SkyeyeATC %s. Frequencies are read from the start scripts; every call in "
+                  "the tables is tested against SkyEye." % HEAD, "reg", 8, MUTE, "c")
 
 
-def bul(*items):
-    return [[(a, True), (b, False)] for a, b in items]
+# =========================================================================== document
+def build():
+    d = Doc()
+    d.cover()
+    d.new_page()
 
-
-def p01_how():
-    c = card("ATC ", "PHRASEOLOGY", ["SkyEye AI controllers on SRS  ·  every theatre",
-                                     "Built from SkyeyeATC %s  ·  %s  ·  %s" % (HEAD, VER, DATE)])
-    c.band("THE CONTROLLERS", "who answers")
-    c.kv([("TOWER  -  one per airfield, ATIS beside it", "page 2 - 3"),
-          ("COMMAND  -  squadron net", "%s AM" % f3(TH["pg"]["command"])),
-          ("HITMAN 1-1  -  JTAC, Black Sea training", "%s FM" % f3(TH["caucasus"]["jtac"])),
-          ("DECKBOSS  -  carrier deck", "%s AM" % f3(TH["pg"]["deckboss"])),
-          ("MARSHAL  -  carrier stack", "%s AM" % f3(TH["pg"]["marshal"]))])
-    c.band("HOW TO BE HEARD", "every call")
-    c.bullets(bul(
-        ("Address first, then your full callsign.", "\"Batumi Tower, Raider 1-1, request taxi.\" "
-         "No address, no answer - most silences are a misheard field name."),
-        ("Use the words on these pages.", "SkyEye listens for key words, not exact sentences; "
-         "these are the ones it matches."),
-        ("Pause half a second after keying,", "then speak. Keep it under 20 seconds - two short "
-         "calls beat one long one."),
-        ("Wait 2 - 3 seconds for the answer.", "Recognition, reply and voice take that long. "
-         "Do not re-key over it."),
-        ("Radios AM, encryption off.", "Hitman 1-1 is FM (61.000)."),
-    ))
-    c.band("SPEECH FIXES", "SkyEye corrects these")
-    c.bullets(bul(
-        ("Callsigns:", "reader / radar / rater -> Raider; vino / venue / demon -> Venom."),
-        ("Field names:", "a letter or two off still counts (helmand -> Minhad, delta for -> Dhafra)."),
-    ))
-    c.subtle("ATIS is listen-only. There is no SkyEye LSO - paddles never answers.")
-    return c
-
-
-def freq_card(keys, n):
-    c = card("FREQUEN", "CIES %d" % n, ["What SkyEye listens on  ·  read from the start scripts",
-                                         "Tower + ATIS per field  ·  AM unless marked"])
-    for k in keys:
-        t = TH[k]
-        roles = ["Command %s" % f3(t["command"])]
-        if t.get("jtac"):
-            roles.append("Hitman %s FM" % f3(t["jtac"]))
-        if t.get("deckboss"):
-            roles.append("Deckboss %s" % f3(t["deckboss"]))
-        if t.get("marshal"):
-            roles.append("Marshal %s" % f3(t["marshal"]))
-        c.band(t["title"].upper())
-        c.subtle("  ·  ".join(roles), size=15)
-        atis = {a["icao"]: a for a in t["atis"]}
+    # 1. Frequency map
+    d.h1("1. Frequency Map")
+    d.para("Where SkyEye listens, read from the start scripts. All AM, except Hitman 1-1 (FM). "
+           "Mission preset channels differ - check the frequency, not only the channel.", 9, MUTE)
+    for t in FACTS:
+        d.h2(t["title"])
         rows = []
         for tw in t["towers"]:
-            a = atis.pop(tw["icao"], None)
-            rows.append((tw["name"].upper(), "%s   ATIS %s" % (f3(tw["freq"]), f3(a["freq"]) if a else "  -  ")))
-        for a in atis.values():
-            rows.append((a["name"].upper() + "  (no tower)", f3(a["freq"])))
-        c.kv(rows)
-    c.subtle("Presets differ per mission - check the frequency, not only the channel number.")
-    return c
+            rows.append((tw["name"], f3(tw["freq"]), "Two-way", "Callsign: %s" % tw["name"]))
+        rows.append(("Command", f3(t["command"]), "Two-way", "Callsign: vSFG-7-Command"))
+        if t.get("jtac"):
+            rows.append(("Hitman 1-1  -  JTAC", f3(t["jtac"]) + " FM", "Two-way", "9-line training targets"))
+        if t.get("deckboss"):
+            rows.append(("Deckboss  -  Carrier", f3(t["deckboss"]), "Two-way", "CVN-72 launch ops"))
+        if t.get("marshal"):
+            rows.append(("Marshal  -  Carrier", f3(t["marshal"]), "Two-way", "Recovery stack"))
+        for a in t["atis"]:
+            rows.append(("ATIS  -  " + a["name"].replace(" ATIS", ""), f3(a["freq"]), "Listen only", "Updates with the weather"))
+        d.table(("Channel", "Freq (MHz)", "Type", "Notes"), rows, (0.34, 0.17, 0.15, 0.34))
+    d.callout("Carrier presets", [
+        "Marshal 306.300 is Hornet COMM 1 CH 3 \"CVN-72 AI MARSHALL\" - that is SkyEye. "
+        "306.200 \"CVN-72 MARSHAL\" is kept for a live human Marshal.",
+        "Deckboss 128.600 is shared with the DCS AI carrier controller - you may hear both."])
 
+    # 2. Addressing
+    d.new_page()
+    d.h1("2. Addressing the Tower")
+    d.para("The tower only responds when addressed. Any of these forms work:")
+    d.table(("Format", "Example"), [
+        ("Field name + Tower", "\"Batumi Tower, Raider 1-1, ...\""),
+        ("Field name alone", "\"Batumi, Raider 1-1, ...\""),
+        ("Field name + Traffic (CTAF)", "\"Senaki Traffic, Raider 1-1, rolling runway 09\""),
+        ("Bare - Tower", "\"Tower, Raider 1-1, ...\""),
+    ], (0.36, 0.64))
+    d.callout("Whisper mishear auto-corrections", [
+        "Field names: a letter or two off still counts - helmand, el minhad -> Minhad; ldaf, delta for -> Dhafra; "
+        "alan, el ain -> Al Ain. Mafraq also answers to King Hussein.",
+        "Callsigns: Reader / Radar / Rater -> Raider  ·  Vino / Venue / Demon -> Venom."])
 
-def p_tower_departure():
-    c = card("DEPAR", "TURE", ["Parking to Command  ·  same calls at every field",
-                                      "Lead with the field name: \"Batumi Tower, Raider 1-1, ...\""])
-    c.band("YOU SAY", "tower replies")
-    c.kv(calls("tower", TOWER_GROUND, "Batumi Tower", "Batumi Tower"))
-    c.band("EXAMPLE", "Batumi, runway 13")
-    c.steps([
-        ("PILOT", "Batumi Tower, Raider 1-1, request taxi."),
-        ("TOWER", "Raider 1-1, Batumi Tower, taxi to runway one three, hold short."),
-        ("PILOT", "Batumi Tower, Raider 1-1, holding short."),
-        ("TOWER", "Raider 1-1, runway one three, line up and wait."),
-        ("TOWER", "Raider 1-1, wind ..., runway one three, cleared for takeoff."),
-        ("PILOT", "Batumi Tower, Raider 1-1, airborne."),
-        ("TOWER", "Raider 1-1, climb angels four, contact tower at seven DME."),
-        ("PILOT", "Batumi Tower, Raider 1-1, seven DME."),
-        ("TOWER", "Raider 1-1, contact Command, two eight two point zero."),
-    ], split=150)
-    c.band("IF YOU ARE HELD")
-    c.bullets(bul(
-        ("Traffic inside 20 nm or 60 s spacing holds you.", "Stay put - the tower clears you when it "
-         "is clear. You do not need to call again."),
-        ("\"ready for takeoff\" skips line up and wait", "when there is no traffic."),
-        ("\"seven miles\" alone is the departure call.", "Inbound, say \"inbound\" or \"initial\" with it."),
-    ))
-    return c
+    # 3. Tower
+    d.h1("3. Tower - Request Phraseology")
+    d.h2("3.1 Ground & Departure")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("tower", TOWER_GROUND, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))
+    d.dialogue([("Pilot", "Batumi Tower, Raider 1-1, request taxi."),
+                ("Tower", "Raider 1-1, Batumi Tower, taxi to runway one three, altimeter two niner niner two, hold short."),
+                ("Pilot", "Batumi Tower, Raider 1-1, holding short."),
+                ("Tower", "Raider 1-1, runway one three, line up and wait."),
+                ("Tower", "Raider 1-1, wind one two zero at eight, runway one three, cleared for takeoff."),
+                ("Pilot", "Batumi Tower, Raider 1-1, airborne."),
+                ("Tower", "Raider 1-1, climb angels four, contact tower at seven DME."),
+                ("Pilot", "Batumi Tower, Raider 1-1, seven DME."),
+                ("Tower", "Raider 1-1, contact Command, two eight two point zero. Good day.")])
+    d.callout("If you are held", [
+        "Traffic inside 20 nm, or less than 60 s since the last departure, holds you. Stay put - the tower "
+        "clears you when it is clear; you do not need to call again.",
+        "\"seven miles\" on its own is the departure call. Inbound, always say \"inbound\" or \"initial\" with a distance."])
+    d.h2("3.2 Arrival & Pattern")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("tower", TOWER_ARRIVAL, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))
+    d.dialogue([("Pilot", "Batumi Tower, Raider 1-1, 10 mile initial."),
+                ("Tower", "Raider 1-1, Batumi Tower, runway one three, wind one two zero at eight, report initial."),
+                ("Pilot", "Batumi Tower, Raider 1-1, 3 mile initial."),
+                ("Tower", "Raider 1-1, left break runway one three, number one, report base."),
+                ("Pilot", "Batumi Tower, Raider 1-1, base, gear down."),
+                ("Tower", "Raider 1-1, runway one three, cleared to land."),
+                ("Pilot", "Batumi Tower, Raider 1-1, clear of the active."),
+                ("Tower", "Raider 1-1, taxi to parking.")])
+    d.callout("Good to know", [
+        "Past 15 nm you hear \"continue inbound, report N miles\".",
+        "Say \"gear down\" in your base or final call, or the tower adds \"check wheels down\".",
+        "IMC (ceiling under 1,500 ft or visibility under 3 nm): no overhead - straight in only."])
+    d.h2("3.3 Any Time")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("tower", TOWER_ANYTIME, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))
+    d.table(("The tower calls you when", "Call"), [
+        ("Over 350 kt inside 10 nm", "Speed check"),
+        ("Inside 5 nm while a jet is rolling", "Go around"),
+        ("A wind shift changes the runway", "Runway in use is now NN"),
+        ("You were held and the traffic has cleared", "Cleared for takeoff")], (0.6, 0.4))
 
+    # 4. Command
+    d.h1("4. Command Channel - %s MHz" % f3(TH["pg"]["command"]))
+    d.para("The squadron net in every theatre. Lead with \"Command\" and your callsign.")
+    d.table(("Intent", "Say something like", "Example Response"),
+            table_rows("command", COMMAND, "Command"), (0.2, 0.4, 0.4))
+    d.dialogue([("Pilot", "Command, Raider 1-1, fence in, state 6.2."),
+                ("Cmd", "Raider 1-1, Command, copy fence in, you are cleared hot."),
+                ("Pilot", "Command, Raider 1-1, request tasking."),
+                ("Cmd", "Raider 1-1, Command, contact Hitman one one on six one point zero zero zero for tasking.")])
+    d.callout("The automatic handoff", [
+        "Once you have talked to Command it watches you on Tacview. Inside 30 nm of your recovery - a field, or the "
+        "carrier if you launched from it - it calls you once with the tower or Marshal frequency.",
+        "Bullseye and tanker need the radar picture; without it you hear \"unable\". Tasking is Black Sea training only."])
 
-def p_tower_arrival():
-    c = card("ARRI", "VAL", ["Overhead or straight in  ·  one call per leg",
-                                    "Give your distance with inbound, initial or final."])
-    c.band("YOU SAY", "tower replies")
-    c.kv(calls("tower", TOWER_ARRIVAL, "Batumi Tower", "Batumi Tower"))
-    c.band("EXAMPLE", "the overhead")
-    c.steps([
-        ("PILOT", "Batumi Tower, Raider 1-1, 10 mile initial."),
-        ("TOWER", "Raider 1-1, runway one three, wind ..., altimeter ..., report initial."),
-        ("PILOT", "Batumi Tower, Raider 1-1, 3 mile initial."),
-        ("TOWER", "Raider 1-1, left break runway one three, number one, report base."),
-        ("PILOT", "Batumi Tower, Raider 1-1, base, gear down."),
-        ("TOWER", "Raider 1-1, runway one three, cleared to land."),
-        ("PILOT", "Batumi Tower, Raider 1-1, clear of the active."),
-        ("TOWER", "Raider 1-1, taxi to parking."),
-    ], split=150)
-    c.bullets(bul(
-        ("Past 15 nm:", "\"continue inbound, report N miles\"."),
-        ("Say \"gear down\" in your base or final call,", "or the tower adds \"check wheels down\"."),
-        ("IMC (ceiling under 1,500 ft or vis under 3 nm):", "no overhead - straight in only."),
-    ))
-    return c
+    # 5. Hitman
+    d.h1("5. Hitman 1-1 - %s FM (JTAC)" % f3(TH["caucasus"]["jtac"]))
+    d.para("Black Sea training 9-lines. Hornet COMM 2 CH 12, Viper COMM 2 CH 8. Command hands you over; Hitman "
+           "picks the target from the five 9-line cards in your kneeboard. Lead with \"Hitman\".")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("jtac", JTAC, "Hitman"), (0.18, 0.4, 0.42))
+    d.dialogue([("Pilot", "Hitman 1-1, Raider 1-1, checking in."),
+                ("Hitman", "Raider 1-1, Hitman one one, type 2 control, 9-line target 3, Fuel Depot, as fragged. "
+                           "Elevation 25, final attack heading two-five-niner to two-niner-niner, egress back to Cobra, angels 14. Read back."),
+                ("Pilot", "Hitman, Raider 1-1, copy."),
+                ("Hitman", "Raider 1-1, Hitman one one, good readback. Report IP inbound."),
+                ("Pilot", "Hitman, Raider 1-1, IP inbound."),
+                ("Hitman", "Raider 1-1, Hitman one one, continue."),
+                ("Pilot", "Hitman, Raider 1-1, in from the east."),
+                ("Hitman", "Raider 1-1, Hitman one one, cleared hot."),
+                ("Hitman", "Raider 1-1, Hitman one one, BDA. Impact on the aim point. Large tanks, 2 of 4 destroyed. "
+                           "3 of 14 on target destroyed.")])
+    d.callout("What Hitman checks (Tacview, against your 9-line card)", [
+        "IP inbound: within 5 nm of the IP, nose on the target.",
+        "In call: inside the card's final attack heading and 0.5 - 15 nm from the target - otherwise abort, abort, abort.",
+        "After cleared hot: a run that swings 10 deg outside the window before release is aborted.",
+        "BDA about 15 s after impact. The bridges cannot be assessed - impacts only.",
+        "No radar picture of you: no checks, and you are still cleared hot. JTAC LIVE 60.000 is a human JTAC."])
 
+    # 6. Deckboss
+    d.h1("6. Deckboss - %s MHz (Carrier Launch)" % f3(TH["pg"]["deckboss"]))
+    d.para("Manages cats 1-4 on CVN-72. If all cats are taken you join the conga line (six). Lead with \"Deckboss\"; "
+           "the airborne call needs no address.")
+    d.table(("Intent", "Say something like", "What Happens"),
+            table_rows("deckboss", DECKBOSS, "Deckboss"), (0.22, 0.4, 0.38))
+    d.dialogue([("Pilot", "Deckboss, Raider 1-1, request taxi."),
+                ("Deck", "Raider 1-1, Deckboss, cleared to cat two."),
+                ("Pilot", "Deckboss, Raider 1-1, ready cat two."),
+                ("Deck", "Raider 1-1, Deckboss, under tension cat two, spin it up, shooter's discretion."),
+                ("Pilot", "Raider 1-1, airborne."),
+                ("Deck", "Raider 1-1, Deckboss, copy airborne, push Marshal, three zero six point three.")])
 
-def p_tower_anytime():
-    c = card("TOWER ", "CALLS", ["Calls that work in any phase", "and the calls the tower makes to you"])
-    c.band("YOU SAY", "tower replies")
-    c.kv(calls("tower", TOWER_ANYTIME, "Batumi Tower", "Batumi Tower"))
-    c.band("THE TOWER CALLS YOU", "no request needed - needs the rig's Tacview")
-    c.kv([("Over 350 kt inside 10 nm", "speed check"),
-          ("Inside 5 nm while a jet is rolling", "go around"),
-          ("Wind shift changes the runway", "runway in use is now NN"),
-          ("Held short, and the traffic has cleared", "cleared for takeoff")])
-    c.band("SILENT BY DESIGN")
-    c.bullets(bul(("tally  /  no joy  /  roger  /  wilco", "are heard and logged, no reply."),
-                  ("Anything else", "gets \"say again your request\".")))
-    return c
+    # 7. Marshal
+    d.h1("7. Marshal - %s MHz (Carrier Recovery)" % f3(TH["pg"]["marshal"]))
+    d.para("Manages the recovery stack. Marshal ignores a call that does not start with \"Marshal\" or has no number "
+           "in your callsign. The case (I, II or III) is set from time and weather.")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("marshal", MARSHAL, "Marshal"), (0.2, 0.4, 0.4))
+    d.dialogue([("Pilot", "Marshal, Raider 1-1, marking moms 340 for 30, angels 12, state 6.5."),
+                ("Marshal", "Raider 1-1, Union Marshal, radar contact, angels 12, range 30 miles, bearing three four zero "
+                            "from mother, expect Case One recovery, BRC 275, altimeter two niner niner two, Marshal at angels two, "
+                            "report see me at ten."),
+                ("Pilot", "Marshal, Raider 1-1, established angels two."),
+                ("Marshal", "Raider 1-1, Union Marshal, signal Charlie.")])
+    d.callout("Case III (night, or ceiling under 1,500 ft / visibility under 3 nm)", [
+        "Marking moms gets a holding radial and a push time: hold on the radial NNN at angels N, commence at MM.",
+        "Commencing: descend to platform 5,000, final bearing NNN. Call \"platform\" passing 5,000 ft - your last call.",
+        "Radial = BRC + 180. Final bearing = BRC - 9. All magnetic."])
 
-
-def p_command():
-    c = card("COMM", "AND", ["%s AM  ·  the squadron net, every theatre" % f3(TH["pg"]["command"]),
-                             "Stern English voice  ·  lead with \"Command,\""])
-    c.band("YOU SAY", "Command replies")
-    c.kv(calls("command", COMMAND, "Command"))
-    c.band("THE AUTOMATIC HANDOFF", "you do not ask for it")
-    c.bullets(bul(
-        ("Once you have talked to Command it watches you on Tacview.", "Inside 30 nm of your recovery "
-         "- a field, or the carrier if you launched from it - it calls you once with the tower or Marshal."),
-        ("Bullseye and tanker need the radar picture.", "No picture: \"unable\" or \"negative tanker on scope\"."),
-        ("Tasking is Black Sea training only.", "Elsewhere: \"negative tasking at this time\"."),
-    ))
-    return c
-
-
-def p_jtac():
-    j = TH["caucasus"]["jtac"]
-    c = card("HITMAN ", "1-1", ["JTAC  ·  %s FM  ·  Hornet COMM 2 CH 12  ·  Viper COMM 2 CH 8" % f3(j),
-                               "Black Sea training 9-lines  ·  lead with \"Hitman,\""])
-    c.band("YOU SAY", "Hitman replies")
-    c.kv(calls("jtac", JTAC, "Hitman"))
-    c.band("WHAT HITMAN CHECKS", "from Tacview, against your 9-line card")
-    c.bullets(bul(
-        ("He picks the target.", "One of the five cards at random - find it in your kneeboard."),
-        ("IP inbound:", "within 5 nm of the IP, nose on the target."),
-        ("In call:", "inside the card's final attack heading and 0.5 - 15 nm out, or abort, abort, abort."),
-        ("After cleared hot", "he aborts a run that swings 10 deg outside the window before release."),
-        ("BDA about 15 s after impact:", "impacts against the aim point, then kills, priority targets "
-         "first. Bridges cannot be assessed."),
-        ("No picture of you:", "no checks - you are still cleared hot."),
-    ))
-    c.subtle("JTAC LIVE 60.000 is for a human JTAC. Hitman never answers there.")
-    return c
-
-
-def p_deckboss():
-    c = card("DECK", "BOSS", ["Carrier deck  ·  %s AM  ·  lead with \"Deckboss,\"" % f3(TH["pg"]["deckboss"]),
-                             "Shares 128.600 with the DCS AI carrier controller."])
-    c.band("YOU SAY", "Deckboss replies")
-    c.kv(calls("deckboss", DECKBOSS, "Deckboss"))
-    c.band("THE RULES")
-    c.bullets(bul(
-        ("Nobody calls the shot.", "Run up on \"spin it up\" - the shooter fires you."),
-        ("Four cats, then the conga line (six).", "Full: \"deck is full, hold clear\"."),
-        ("The airborne call needs no address:", "\"Raider 1-1, airborne\"."),
-    ))
-    return c
-
-
-def p_marshal():
-    c = card("MAR", "SHAL", ["Carrier stack  ·  %s AM  ·  lead with \"Marshal,\"" % f3(TH["pg"]["marshal"]),
-                            "Marshal ignores a call without its name or your callsign's number."])
-    c.band("YOU SAY", "Marshal replies")
-    c.kv(calls("marshal", MARSHAL, "Marshal"))
-    c.band("CASE III", "night, or ceiling under 1,500 ft / vis under 3 nm")
-    c.bullets(bul(
-        ("Marking moms gets a holding radial and a push time:", "hold on the radial NNN at angels N, "
-         "commence at MM."),
-        ("Commencing:", "descend to platform 5,000, final bearing NNN. Call \"platform\" passing 5,000 ft "
-         "- that is your last call."),
-        ("Radial = BRC + 180.  Final bearing = BRC - 9.", "All magnetic."),
-    ))
-    return c
-
-
-def p_trouble():
-    c = card("NO ", "ANSWER?", ["Work down the list", "Tell the operator what you said, word for word."])
-    c.band("CHECK", "in order")
-    c.steps([("1", "Waited 2 - 3 seconds?"),
-             ("2", "Led with the field or role name?"),
-             ("3", "Said your full callsign, with its number?"),
-             ("4", "Used a call from these pages?"),
-             ("5", "Half-second pause after keying - not clipped?"),
-             ("6", "Right frequency (page 2 - 3)? AM - or FM for Hitman?"),
-             ("7", "SRS shows your TX light? Encryption off?")], split=90)
-    c.band("KNOWN QUIRKS")
-    c.bullets(bul(
-        ("The same call can get a different reply.", "Each answer has two to four wordings."),
-        ("Position calls need Tacview.", "Radar check, bullseye, Hitman's checks and the 30 nm handoff "
-         "go quiet or say \"unable\" without it."),
-        ("ATIS letter only changes with the weather.", "Alpha three times running is normal."),
-    ))
-    return c
-
-
-def build():
-    MC.set_logo(LOGO, "circle")
-    os.makedirs(CARDS, exist_ok=True)
-    for f in os.listdir(CARDS):
-        os.remove(os.path.join(CARDS, f))
-    p01_how()
-    freq_card(["pg", "caucasus", "syria"], 1)
-    freq_card(["germany", "iraq", "kola"], 2)
-    p_tower_departure()
-    p_tower_arrival()
-    p_tower_anytime()
-    p_command()
-    p_jtac()
-    p_deckboss()
-    p_marshal()
-    p_trouble()
-    total = len(PAGES)
-    bad = [(c._n, c.overflows) for c in PAGES if c.overflows]
-    if bad:
-        sys.exit("text overflows (page, rows): %r" % bad)
-    paths = []
-    for c in PAGES:
-        c.footer("vSFG-7  ·  ATC PHRASEOLOGY  ·  %s  ·  %s  ·  %s" % (VER, DATE, HEAD), "PAGE %d / %d" % (c._n, total))
-        p = os.path.join(CARDS, "%02d.png" % c._n)
-        c.save(p)
-        paths.append(p)
+    # 8. Tips
+    d.h1("8. General Tips")
+    d.tips([
+        ("Always say your callsign.", "Address first, then your full callsign with its number. Raider and Venom are "
+         "auto-corrected from common mishearings."),
+        ("Keep transmissions under 20 seconds.", "Long calls are cut off. Two short calls beat one long one."),
+        ("Pause half a second after keying,", "then speak; wait 2 - 3 seconds for the answer and do not re-key over it."),
+        ("CTAF style works.", "\"[Field] traffic, [callsign], [intent]\" is recognised like a direct tower call."),
+        ("Emergencies bypass sequencing.", "\"mayday\", \"pan pan\" or \"declaring emergency\" puts you at the top of the queue."),
+        ("ATIS letters only advance on a weather change.", "Information Alpha three broadcasts running is expected."),
+        ("Position calls need Tacview.", "Radar check, bullseye, Hitman's checks and the 30 nm handoff need the rig's Tacview feed."),
+    ])
+    d.callout("If the ATC doesn't respond", [
+        "1.  Addressed the right controller - field name, Command, Hitman, Deckboss or Marshal?",
+        "2.  Included your full callsign with its number?",
+        "3.  Used a call from the tables in this reference?",
+        "4.  Right frequency (section 1), AM - or FM for Hitman? Encryption off?",
+        "5.  SRS volume and mic - an open mic blocks reception. Still nothing: post the exact words you said."])
 
     json.dump(PHRASES, open(os.path.join(HERE, "phrases.json"), "w", encoding="utf-8", newline="\n"), indent=1)
     out = os.path.join(HERE, OUT_NAME)
-    doc = pymupdf.open()
-    for p in paths:
-        img = pymupdf.open(p)
-        r = img[0].rect
-        w = 612.0
-        page = doc.new_page(width=w, height=w * r.height / r.width)
-        page.insert_image(page.rect, filename=p)
-    doc.set_metadata({"title": "vSFG-7 AI ATC Phraseology Reference %s" % VER, "author": "vSFG-7",
-                      "subject": "SkyEye ATC pilot calls, built from SkyeyeATC %s" % HEAD})
+    d.pdf.set_metadata({"title": "vSFG-7 AI ATC Phraseology Reference %s" % VER, "author": "vSFG-7",
+                        "subject": "SkyEye ATC pilot calls, built from SkyeyeATC %s" % HEAD})
     for f in os.listdir(HERE):
         if f.startswith("vSFG7_ATC_Phraseology_") and f.endswith(".pdf") and f != OUT_NAME:
             os.remove(os.path.join(HERE, f))       # older versions live in git history
-    doc.save(out, deflate=True, garbage=3)
+    d.pdf.save(out, deflate=True, garbage=3)
     if os.path.isdir(DESKTOP_COPY):
         shutil.copy2(out, os.path.join(DESKTOP_COPY, OUT_NAME))
-    print("PDF %d pages, %d phrases -> %s (%.1f MB)" % (total, len(PHRASES), out, os.path.getsize(out) / 1e6))
+    print("PDF %d pages, %d phrases -> %s (%.1f MB)" % (d.n, len(PHRASES), out, os.path.getsize(out) / 1e6))
 
 
 if __name__ == "__main__":
