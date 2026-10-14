@@ -51,6 +51,11 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
 	}
+	if fb := footholdTaskingBoard(); fb != nil {
+		if resp := fb.Response(text, callsign, channelName, store); resp != "" {
+			return resp
+		}
+	}
 	if resp := commandTaskingBoard().Response(text, callsign, channelName); resp != "" {
 		return resp
 	}

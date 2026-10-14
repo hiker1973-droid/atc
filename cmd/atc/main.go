@@ -91,6 +91,8 @@ var (
 	flagMizPath         string
 	flagMizDir          string
 	flagMizWatchFile    string
+	flagFootholdSave    string
+	flagFootholdTasking bool
 	flagTacviewAddr     string
 	flagATISFreq        string
 	flagATISStations    string
@@ -171,6 +173,10 @@ func main() {
 	f.Float64Var(&flagStaticAltInHg, "static-alt-inhg", 29.92, "Static altimeter inHg (Training VM)")
 	f.Float64Var(&flagStaticTempC,   "static-temp-c",   15, "Static temperature Celsius (Training VM)")
 	f.BoolVar(&flagStaticNight,      "static-night",    false, "Treat mission as night (sets IsNight + 'VFR Night' mode). Real-world server clock is unrelated to DCS mission time, so this must be set explicitly.")
+	f.BoolVar(&flagFootholdTasking, "foothold-tasking", true,
+		"Command on --map syria tasks flights against enemy zones read from the Foothold campaign save file")
+	f.StringVar(&flagFootholdSave, "foothold-save", "",
+		"Foothold save file (default: the path in Missions/Saves/foothold.status, else the newest Saves/foothold*.lua, under the mission folders SkyEye knows)")
 	f.StringVar(&flagMizPath, "miz-path", "", "Path to a specific .miz to read weather from at boot (overrides --miz-dir)")
 	f.StringVar(&flagMizWatchFile, "miz-watch-file", `C:\SkyeyeATC\current_mission.txt`,
 		"File the DCS server hook (tools/dcs-hooks/vsfg7-current-mission.lua) writes the loaded mission's path to; polled every 30s and the new mission's weather applied live. Empty disables. Missing file = keep boot weather.")
