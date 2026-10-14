@@ -129,6 +129,7 @@ var (
 	flagPprofPort           int
 	flagRunwayRotation      bool
 	flagRunwaySlot          time.Duration
+	flagRunwayCalmKts       float64
 	flagPositionCheck       bool
 	flagDeckPositionCheck   bool
 	flagUnknownTraffic      bool
@@ -294,6 +295,8 @@ func main() {
 		"Rotate active runway every 4h instead of selecting by wind. Disable with --runway-rotation=false to fall back to wind-driven selection.")
 	f.DurationVar(&flagRunwaySlot, "runway-slot", 4*time.Hour,
 		"Length of one runway-rotation slot. Default 4h matches production cadence; shorten (e.g. 60s) for live verification of slot rolls.")
+	f.Float64Var(&flagRunwayCalmKts, "runway-calm-kts", 5,
+		"With --runway-rotation=false: below this wind (kts) the runway rotates by wall clock, one per --runway-slot, instead of following the wind. 0 = always by wind.")
 	f.BoolVar(&flagPositionCheck, "position-check", false,
 		"Validate via Tacview that a pilot calling 'holding short' is actually within HoldShortValidationNm of the runway threshold. Off by default — enable for a session to observe before relying on it.")
 	f.BoolVar(&flagDeckPositionCheck, "deck-position-check", false,
@@ -442,6 +445,9 @@ func run(cmd *cobra.Command, args []string) error {
 	atcCtrl := controller.NewATCController(callsign, af)
 	if !flagRunwayRotation {
 		atcCtrl.DisableRunwayRotation()
+		if flagRunwayCalmKts > 0 {
+			atcCtrl.SetCalmRotation(flagRunwayCalmKts)
+		}
 	}
 	if flagPositionCheck {
 		atcCtrl.SetPositionCheck(true)
@@ -814,7 +820,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// is shorter) whether the slot has rolled and updates the active runway.
 	// UpdateWeather also reads rotation but Tacview weather updates can be
 	// sparse in stable conditions, so the ticker is the reliable trigger.
-	if flagRunwayRotation {
+	if flagRunwayRotation || flagRunwayCalmKts > 0 {
 		tickInterval := 60 * time.Second
 		if airfield.RotationSlotDuration < 2*tickInterval {
 			tickInterval = airfield.RotationSlotDuration / 2
@@ -841,7 +847,8 @@ func run(cmd *cobra.Command, args []string) error {
 			Str("startRunway", atcCtrl.GetActiveRunway()).
 			Dur("slot", airfield.RotationSlotDuration).
 			Dur("tick", tickInterval).
-			Msg("runway rotation enabled — slot-based, ignores wind")
+			Bool("calmOnly", !flagRunwayRotation).
+			Msg("runway rotation enabled — slot-based (calmOnly: only below --runway-calm-kts)")
 	}
 
 	// Start ATIS broadcast loop — OMDM tower only, not deckboss instance.

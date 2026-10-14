@@ -212,6 +212,13 @@ type AirfieldState struct {
 	RotationEnabled bool      // when true, runway selection is time-driven, not wind-driven
 	RotationAnchor  time.Time // start of slot 0; slots advance every airfield.RotationSlotDuration
 
+	// CalmRotationKts: with time rotation off, a wind below this many knots is
+	// too light to pick a runway, so the wall-clock CalmRunway is used instead.
+	// 0 = always by wind. calmSlot is the slot last applied (-1 = none yet), so
+	// a dashboard pick holds until the next slot rather than the next tick.
+	CalmRotationKts float64
+	calmSlot        int64
+
 	tracked map[string]*AircraftState
 }
 
@@ -225,6 +232,7 @@ func NewAirfieldState(af *airfield.Airfield) *AirfieldState {
 		VisibilityNm:    10,
 		RotationEnabled: true,
 		RotationAnchor:  now,
+		calmSlot:        -1,
 		tracked:         make(map[string]*AircraftState),
 	}
 	s.ActiveRunway = af.RotationRunway(now, s.RotationAnchor).Designator
@@ -237,8 +245,34 @@ func (s *AirfieldState) DisableRunwayRotation() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.RotationEnabled = false
-	rwy := s.Airfield.ActiveRunway(s.WindFromMag, s.WindKts)
-	s.ActiveRunway = rwy.Designator
+	s.ActiveRunway = s.windRunway(time.Now(), s.WindFromMag, s.WindKts).Designator
+}
+
+// SetCalmRotation turns on light-wind rotation below kts (0 = off) and
+// re-picks the runway. Used by --runway-calm-kts with --runway-rotation=false.
+func (s *AirfieldState) SetCalmRotation(kts float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.CalmRotationKts = kts
+	if !s.RotationEnabled {
+		s.ActiveRunway = s.windRunway(time.Now(), s.WindFromMag, s.WindKts).Designator
+	}
+}
+
+// calm reports whether light-wind rotation picks the runway. Caller holds s.mu.
+func (s *AirfieldState) calm(windKts float64) bool {
+	return !s.RotationEnabled && s.CalmRotationKts > 0 && windKts < s.CalmRotationKts
+}
+
+// windRunway is the runway with time rotation off: into wind, or the
+// wall-clock CalmRunway when the wind is light. Caller holds s.mu.
+func (s *AirfieldState) windRunway(now time.Time, windFromMag, windKts float64) airfield.Runway {
+	if s.calm(windKts) {
+		s.calmSlot = airfield.CalmSlot(now)
+		return s.Airfield.CalmRunway(now)
+	}
+	s.calmSlot = -1
+	return s.Airfield.ActiveRunway(windFromMag, windKts)
 }
 
 // RotateRunwayIfDue recomputes the rotation-driven active runway and updates
@@ -248,6 +282,16 @@ func (s *AirfieldState) DisableRunwayRotation() {
 func (s *AirfieldState) RotateRunwayIfDue() (from, to string, changed bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.calm(s.WindKts) {
+		// Only on a slot roll, so a dashboard pick holds until then.
+		now := time.Now()
+		if airfield.CalmSlot(now) == s.calmSlot {
+			return s.ActiveRunway, s.ActiveRunway, false
+		}
+		from = s.ActiveRunway
+		s.ActiveRunway = s.windRunway(now, s.WindFromMag, s.WindKts).Designator
+		return from, s.ActiveRunway, from != s.ActiveRunway
+	}
 	if !s.RotationEnabled {
 		return s.ActiveRunway, s.ActiveRunway, false
 	}
@@ -278,7 +322,7 @@ func (s *AirfieldState) UpdateWeather(windFromTrue, windKts, altimeterInHg, visN
 	if s.RotationEnabled {
 		activeRwy = s.Airfield.RotationRunway(s.WeatherUpdatedAt, s.RotationAnchor)
 	} else {
-		activeRwy = s.Airfield.ActiveRunway(windFromMag, windKts)
+		activeRwy = s.windRunway(s.WeatherUpdatedAt, windFromMag, windKts)
 	}
 	if activeRwy.Designator != s.ActiveRunway {
 		s.ActiveRunway = activeRwy.Designator

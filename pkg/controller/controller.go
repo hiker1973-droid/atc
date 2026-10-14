@@ -353,6 +353,17 @@ func (c *ATCController) DisableRunwayRotation() {
 		Msg("runway rotation disabled — reverting to wind-driven selection")
 }
 
+// SetCalmRotation picks the runway by wall-clock rotation instead of wind
+// whenever the wind is below kts (0 = off). See state.SetCalmRotation.
+func (c *ATCController) SetCalmRotation(kts float64) {
+	c.airfieldState.SetCalmRotation(kts)
+	log.Info().
+		Str("airfield", c.airfieldState.Airfield.ICAO).
+		Float64("belowKts", kts).
+		Str("runway", c.airfieldState.ActiveRunway).
+		Msg("light-wind runway rotation on")
+}
+
 // RotateRunwayIfDue advances the rotation-driven active runway when its 4h
 // slot has rolled. Logs the transition. No-op when rotation is disabled or
 // the slot hasn't changed.

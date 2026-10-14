@@ -3,6 +3,8 @@
 package airfield
 
 import (
+	"hash/fnv"
+	"strconv"
 	"time"
 
 	"github.com/paulmach/orb"
@@ -126,6 +128,37 @@ func (a *Airfield) RotationRunway(now, startTime time.Time) Runway {
 		return Runway{}
 	}
 	return cycle[slot%len(cycle)]
+}
+
+// CalmRunway is the runway for light-wind days (--runway-calm-kts): when the
+// wind is too light to matter, the field still changes runways, one per
+// RotationSlotDuration of wall-clock time. The slot is counted from the Unix
+// epoch, not process start, so a restart keeps the runway and the tower and
+// ATIS agree. The runway end for a slot is a hash of the field and the slot
+// number: a plain cycle would put the same runway at the same time of day
+// every day (six 4h slots, two ends), so an evening session would never see
+// the other end. Operator 2026-10-14 ("do 4").
+func (a *Airfield) CalmRunway(now time.Time) Runway {
+	cycle := make([]Runway, 0, len(a.RunwayPairs)*2)
+	for _, pair := range a.RunwayPairs {
+		cycle = append(cycle, pair.Primary, pair.Reciprocal)
+	}
+	if len(cycle) == 0 {
+		return Runway{}
+	}
+	return cycle[CalmSlotIndex(a.ICAO, CalmSlot(now), len(cycle))]
+}
+
+// CalmSlot is the wall-clock rotation slot now falls in.
+func CalmSlot(now time.Time) int64 {
+	return now.Unix() / int64(RotationSlotDuration/time.Second)
+}
+
+// CalmSlotIndex picks one of n runway ends for a field's slot.
+func CalmSlotIndex(icao string, slot int64, n int) int {
+	h := fnv.New32a()
+	h.Write([]byte(icao + "|" + strconv.FormatInt(slot, 10)))
+	return int(h.Sum32() % uint32(n))
 }
 
 // headingDiff returns the absolute angular difference between two headings (0–180).
