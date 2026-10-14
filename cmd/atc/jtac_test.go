@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -15,11 +16,23 @@ type fakePicture struct {
 	hdgTrue  float64
 	have     bool
 	released bool
+	ground   []tacviewGround
+	impacts  []tacviewImpact
 }
 
 func (f *fakePicture) Contact(string) (orb.Point, float64, bool) { return f.pos, f.hdgTrue, f.have }
 func (f *fakePicture) WeaponReleasedNear(orb.Point, float64, time.Time) bool {
 	return f.released
+}
+func (f *fakePicture) GroundObjects() []tacviewGround { return f.ground }
+func (f *fakePicture) Impacts(since time.Time) []tacviewImpact {
+	var out []tacviewImpact
+	for _, i := range f.impacts {
+		if !i.At.Before(since) {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 // place puts the jet nm miles from ref on magnetic bearing brgMag (from ref),
@@ -298,5 +311,148 @@ func TestSRSModulation(t *testing.T) {
 		if got := srsModulationName(f); got != want {
 			t.Errorf("srsModulationName(%v) = %s, want %s", f, got, want)
 		}
+	}
+}
+
+// ── BDA ──────────────────────────────────────────────────────────────────────
+
+// offset moves p n metres north and e metres east.
+func offset(p orb.Point, n, e float64) orb.Point {
+	return orb.Point{p[0] + e/(111320*math.Cos(p[1]*math.Pi/180)), p[1] + n/111320}
+}
+
+// groundAt puts every placed object of a target in the picture, alive, a few
+// metres off where the builder put it.
+func groundAt(num int) []tacviewGround {
+	var g []tacviewGround
+	for i, o := range caucasusBDA[num].Objects {
+		g = append(g, tacviewGround{ID: fmt.Sprint(100 + i), Pos: offset(o.Pos, 4, -3), Alive: true})
+	}
+	return g
+}
+
+// A clean pass on the fuel depot: Hitman waits for the bombs to settle, then
+// gives impacts and the kill count, priority objects first, once.
+func TestJTACBDAAfterPass(t *testing.T) {
+	b, clock := newJTACBoard(t)
+	b.intn = func(n int) int { return 2 } // third free target = 3, Fuel Depot
+	tgt := caucasusTaskingTargets[2]
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic) // no picture: cleared hot unchecked
+	if got := b.JTACResponse("Hitman, Raider 11, in from the east", "Raider 11", hitman, pic); !strings.Contains(got, "cleared hot") {
+		t.Fatalf("in call = %q", got)
+	}
+	pic.ground = groundAt(3)
+	pic.ground[0].Alive, pic.ground[1].Alive, pic.ground[8].Alive = false, false, false // two large tanks, a fuel truck
+	*clock = clock.Add(20 * time.Second)
+	pic.impacts = []tacviewImpact{
+		{Pos: offset(tgt.TgtPos, 30, 0), At: *clock, Shooter: "Raider 11"},
+		{Pos: offset(tgt.TgtPos, 0, 200), At: *clock, Shooter: "Raider 11"},
+		{Pos: offset(tgt.TgtPos, 0, 0), At: *clock, Shooter: "Venom 21"}, // someone else's
+	}
+	if out := b.jtacWatch(hitman, pic); len(out) != 0 {
+		t.Fatalf("BDA before the bombs settled: %v", out)
+	}
+	*clock = clock.Add(bdaSettle)
+	out := b.jtacWatch(hitman, pic)
+	want := "Raider 11, Hitman one one, BDA. 2 impacts, closest 30 metres north of the aim point. Large tanks, 2 of 4 destroyed. 3 of 14 on target destroyed."
+	if len(out) != 1 || out[0] != want {
+		t.Fatalf("BDA = %v\nwant %q", out, want)
+	}
+	if out := b.jtacWatch(hitman, pic); len(out) != 0 {
+		t.Errorf("BDA repeated: %v", out)
+	}
+	// Asked for again, it is given again.
+	if got := b.JTACResponse("Hitman, Raider 11, request BDA", "Raider 11", hitman, pic); got != want {
+		t.Errorf("request BDA = %q", got)
+	}
+}
+
+func TestBDAText(t *testing.T) {
+	t1, t2, t4 := caucasusTaskingTargets[0], caucasusTaskingTargets[1], caucasusTaskingTargets[3]
+	now := time.Now()
+	hit := func(p orb.Point) []tacviewImpact { return []tacviewImpact{{Pos: p, At: now}} }
+
+	// Bridge: no damage picture, the checkpoint is counted.
+	g := groundAt(1)
+	g[0].Alive = false
+	got := bdaFor("Raider 11", hitman, t1, g, hit(t1.TgtPos))
+	if want := "Raider 11, Hitman one one, BDA. Impact on the aim point. Unable to assess the bridge. Checkpoint, 1 of 4 destroyed."; got != want {
+		t.Errorf("Enguri = %q", got)
+	}
+	// Rioni: an impact on the road bridge is called out.
+	got = bdaFor("Raider 11", hitman, t2, nil, hit(rioniRoadBridge))
+	if !strings.Contains(got, "Impact on the no-strike road bridge.") || !strings.Contains(got, "Unable to assess the bridge.") {
+		t.Errorf("Rioni = %q", got)
+	}
+	// Command post with nothing in the picture: impacts only.
+	got = bdaFor("Raider 11", hitman, t4, nil, hit(offset(t4.TgtPos, -150, 0)))
+	if want := "Raider 11, Hitman one one, BDA. Impact 150 metres south of the aim point. Unable to assess damage."; got != want {
+		t.Errorf("no picture = %q", got)
+	}
+	// Single primary object, then everything down.
+	g = groundAt(4)
+	g[0].Alive = false
+	if got := bdaKillText(caucasusBDA[4], g); got != "Command building destroyed. 1 of 14 on target destroyed." {
+		t.Errorf("command building = %q", got)
+	}
+	for i := range g {
+		g[i].Alive = false
+	}
+	if got := bdaKillText(caucasusBDA[4], g); got != "Target destroyed. Good work." {
+		t.Errorf("all down = %q", got)
+	}
+}
+
+// Every way a kill can show up in the stream is taken, and a new mission
+// clears the picture.
+func TestMiniTacviewGroundKillsAndImpacts(t *testing.T) {
+	store := newTacviewPositions()
+	p := newMiniTacviewParser(store)
+	p.handleLine("0,ReferenceTime=2026-10-14T10:00:00Z")
+	p.handleLine("0,ReferenceLongitude=41,ReferenceLatitude=42")
+	p.handleLine("a1,T=0.80|0.36|3000|0|0|300|1|2|300,Type=Air+FixedWing,Pilot=Raider 11,Name=FA-18C_hornet")
+	p.handleLine("g1,T=0.806|0.365|10,Type=Ground+Static+Building,Name=Tank")
+	p.handleLine("g2,T=0.807|0.365|10,Type=Ground+Static+Building,Name=Tank")
+	p.handleLine("g3,T=0.808|0.365|10,Type=Ground+Heavy+Armor+Vehicle,Name=ATZ-10")
+	p.handleLine("g4,T=0.809|0.365|10,Type=Ground+Static+Building,Name=Tank")
+	if n := len(store.GroundObjects()); n != 4 {
+		t.Fatalf("ground objects = %d, want 4", n)
+	}
+	p.handleLine("-g1")                   // removed
+	p.handleLine("0,Event=Destroyed|g2|") // event
+	p.handleLine("g3,Name=ATZ-10 wreck")  // turned into a wreck (no position change)
+	p.handleLine("g3,T=0.808|0.365|10")
+	alive := map[string]bool{}
+	for _, g := range store.GroundObjects() {
+		alive[g.ID] = g.Alive
+	}
+	if alive["g1"] || alive["g2"] || alive["g3"] || !alive["g4"] {
+		t.Errorf("alive = %v, want only g4", alive)
+	}
+	// A bomb with a Parent, and one without (named by proximity).
+	p.handleLine("w1,T=0.80|0.36|2900,Type=Weapon+Bomb,Name=GBU-31,Parent=a1")
+	p.handleLine("w1,T=0.806|0.365|20")
+	p.handleLine("-w1")
+	p.handleLine("w2,T=0.801|0.361|2900,Type=Weapon+Bomb,Name=Mk-84")
+	p.handleLine("w2,T=0.807|0.364|15")
+	p.handleLine("0,Event=Destroyed|w2|")
+	p.handleLine("-w2") // second report of the same end: ignored
+	imps := store.Impacts(time.Time{})
+	if len(imps) != 2 || imps[0].Shooter != "Raider 11" || imps[1].Shooter != "Raider 11" {
+		t.Fatalf("impacts = %+v", imps)
+	}
+	if d := metresBetween(imps[0].Pos, orb.Point{41.806, 42.365}); d > 1 {
+		t.Errorf("impact %f m from its last position", d)
+	}
+	// Same mission resent (reconnect): kills stay. New mission: cleared.
+	p.handleLine("0,ReferenceTime=2026-10-14T10:00:00Z")
+	if len(store.Impacts(time.Time{})) != 2 {
+		t.Error("reconnect cleared the impacts")
+	}
+	p.handleLine("0,ReferenceTime=2026-10-14T12:00:00Z")
+	if len(store.GroundObjects()) != 0 || len(store.Impacts(time.Time{})) != 0 {
+		t.Error("new mission kept the old picture")
 	}
 }

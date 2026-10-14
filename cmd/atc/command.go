@@ -119,7 +119,7 @@ func commandResponse(text, callsign, channelName string) string {
 // tracker may be nil; when set, every successfully-transcribed pilot callsign
 // is recorded so the Tacview-driven handoff watcher knows who to monitor.
 func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath string, tracker *pilotTracker, store *tacviewPositions) {
-	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, voice, externalAudioPath,
+	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, commandVoice(voice), externalAudioPath,
 		"Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle",
 		func(text string) (string, string) {
 			cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
@@ -134,7 +134,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 // transmission, has Whisper transcribe it with prompt, and speaks whatever
 // handle answers (callsign, reply; "" reply = stay silent). Command and the
 // JTAC both run on it.
-func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath, prompt string, handle func(text string) (string, string)) {
+func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword string, vp voiceProfile, externalAudioPath, prompt string, handle func(text string) (string, string)) {
 	guidLen := 22
 	var txCooldown int64
 	for {
@@ -208,7 +208,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							continue
 						}
 						atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration("command test")).UnixNano())
-						mp3, err := synthesizeSpeech(ctx, apiKey, "command test", commandVoice(voice))
+						mp3, err := synthesizeSpeech(ctx, apiKey, "command test", vp)
 						if err != nil {
 							log.Error().Err(err).Msg("Command test TTS failed")
 							continue
@@ -313,7 +313,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							}
 							log.Info().Str("text", text).Str("callsign", cs).Str("channel", channelName).Msg("Command transcribed")
 							broadcastLog("tx", fmt.Sprintf("CMD TX → %q", resp))
-							mp3, err := synthesizeSpeech(ctx, apiKey, resp, commandVoice(voice))
+							mp3, err := synthesizeSpeech(ctx, apiKey, resp, vp)
 							if err != nil {
 								log.Error().Err(err).Msg("Command TTS failed")
 								return

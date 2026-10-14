@@ -102,6 +102,8 @@ var (
 	flagJTACName        string
 	flagJTACSpoken      string
 	flagJTACVoice       string
+	flagVoiceStyleJTAC  string
+	flagJTACRadioIntensity string
 	flagDeckbossVoice   string
 	flagMarshalVoice    string
 	flagRadioEffect          bool
@@ -174,6 +176,9 @@ func main() {
 	f.StringVar(&flagJTACName, "jtac-name", "Hitman-1-1", "JTAC SRS client name (no spaces)")
 	f.StringVar(&flagJTACSpoken, "jtac-spoken", "Hitman one one", "JTAC callsign as spoken on the radio")
 	f.StringVar(&flagJTACVoice, "jtac-voice", "ash", "OpenAI TTS voice for the JTAC")
+	f.StringVar(&flagVoiceStyleJTAC, "voice-style-jtac", styleJTAC, "TTS delivery instructions for the JTAC (empty=none)")
+	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
+		"Radio effect for the JTAC: light, medium, heavy, extreme, or field (a manpack FM set on the ground: narrow band, heavy hiss)")
 	f.BoolVar(&flagATISBroadcast, "atis-broadcast", false,
 		"Broadcast ATIS on airfield ATIS frequency (replaces MOOSE ATIS)")
 	f.StringVar(&flagATISFreq, "atis-freq", "0",
@@ -1769,6 +1774,12 @@ const (
 	styleCommand = "Speak as a military strike command controller on a tactical net. " +
 		"Steady, businesslike, confident. Slight urgency, no emotion."
 
+	// styleJTAC: Hitman 1-1 is a ground party near the target on a manpack
+	// radio, not a controller at a console (operator 2026-10-14: "realistic
+	// ... radio static type feel since it is a JTAC from ground").
+	styleJTAC = "Speak as a JTAC on the ground, talking on a manpack radio from a covered position near the target. " +
+		"Low, calm, clipped and deliberate, slightly hushed as if keeping your voice down. Crisp on every number. No emotion."
+
 	styleATIS = "Read as a recorded automated terminal information broadcast. " +
 		"Even, neutral, unhurried, identical inflection on every phrase. No emphasis anywhere."
 
@@ -1802,7 +1813,7 @@ var stylePresets = map[string]string{
 
 func resolveStylePresets() {
 	for _, p := range []*string{&flagVoiceStyleTower, &flagVoiceStyleMarshal,
-		&flagVoiceStyleDeckboss, &flagVoiceStyleCommand, &flagVoiceStyleATIS} {
+		&flagVoiceStyleDeckboss, &flagVoiceStyleCommand, &flagVoiceStyleATIS, &flagVoiceStyleJTAC} {
 		if full, ok := stylePresets[*p]; ok {
 			*p = full
 		}
@@ -2197,6 +2208,10 @@ func radioTier(intensity string) (noiseAmp float64, hpf, lpf int) {
 		return 0.128, 500, 2700
 	case "extreme":
 		return 0.208, 600, 2400
+	case "field":
+		// The JTAC's manpack FM set: narrower than a console's radio and
+		// noisier than "heavy", short of "extreme" so numbers stay clear.
+		return 0.160, 550, 2500
 	default: // medium
 		return 0.064, 400, 3000
 	}
@@ -2337,6 +2352,8 @@ func txIntensity(callsign string) string {
 		return flagTowerRadioIntensity
 	case strings.HasSuffix(callsign, " ATIS"):
 		return flagATISRadioIntensity
+	case flagJTACName != "" && callsign == flagJTACName:
+		return flagJTACRadioIntensity
 	}
 	return flagRadioIntensity
 }

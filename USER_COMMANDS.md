@@ -141,8 +141,20 @@ and the exchange still ends in "cleared hot".
 | In | `"...in from the north"`, `"in heading 330"`, `"...in"` | **Cleared hot** when your magnetic heading is inside the card's final attack heading and you are 0.5–15 nm from the target. Otherwise **abort, abort, abort** with the reason; go round from the IP |
 | (no call) | — | After cleared hot, Hitman watches the run. If you swing more than 10° outside the final attack heading while still pointed at the target, before a weapon comes off, it calls the abort. Pulling off (target well off the nose), a release, or reaching 1.5 nm ends the watch |
 | Off | `"...off"`, `"off safe"` | Egress per line 9; report IP inbound for a re-attack |
+| (no call) BDA | — | About 15 s after your weapons land, Hitman gives the BDA once per pass: where your impacts were against the aim point ("on the aim point" inside 20 m, else metres and direction), then the kills against what the mission placed, priority objects first ("Large tanks, 2 of 4 destroyed. 3 of 14 on target destroyed."), or "Target destroyed. Good work." |
+| BDA | `"...request BDA"`, `"say BDA"`, `"battle damage"` | The same report on demand |
 | Abort | `"...abort"` | Copies; re-attack from the IP |
 | Radio check | `"...radio check"` | Loud and clear |
+
+**BDA limits.** The bridges (targets 1 and 2) are map objects that Tacview does
+not carry: Hitman says "unable to assess the bridge" and gives impacts, plus the
+Enguri checkpoint vehicles and a call-out for any impact on the Rioni no-strike
+road bridge. A target whose objects are not in the Tacview stream at all gets
+impacts and "unable to assess damage". Kills last until the mission restarts.
+
+**Voice.** `ash` with a ground-JTAC delivery (`--voice-style-jtac`) and the
+`field` radio effect (`--jtac-radio-intensity`): narrower band and more hiss than
+Command, as a manpack FM set on the ground.
 
 > Pilot: *"Hitman 1-1, Raider 1-1, checking in."*
 > Hitman: *"Raider 1-1, Hitman one one, type 2 control, 9-line target 1, Enguri Bridge, as fragged. Elevation 445, final attack heading three-zero-niner to three-four-niner, egress back to Anvil, angels 15. Read back."*

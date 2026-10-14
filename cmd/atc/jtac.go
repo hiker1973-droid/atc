@@ -63,7 +63,7 @@ const (
 	jtacWatchStopNm   = 1.5  // inside this the run is over either way
 	jtacReleaseRadius = 1.5  // a weapon first seen this close to the jet is its release
 	jtacContactMaxAge = 30 * time.Second
-	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, ready for 9-line, copy, IP inbound, in from the north, in heading, off, abort, Anvil, Brick, Cobra, Dagger, Eagle"
+	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, ready for 9-line, copy, IP inbound, in from the north, in heading, off, abort, request BDA, Anvil, Brick, Cobra, Dagger, Eagle"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -72,6 +72,9 @@ type jtacPicture interface {
 	// Contact returns the caller's position and true heading when fresh.
 	Contact(callsign string) (pos orb.Point, hdgTrue float64, ok bool)
 	WeaponReleasedNear(pos orb.Point, radiusNm float64, since time.Time) bool
+	// For the BDA (jtac_bda.go).
+	GroundObjects() []tacviewGround
+	Impacts(since time.Time) []tacviewImpact
 }
 
 // tacviewJTAC adapts the Command Tacview store. A nil store is no picture.
@@ -94,6 +97,20 @@ func (t tacviewJTAC) Contact(cs string) (orb.Point, float64, bool) {
 
 func (t tacviewJTAC) WeaponReleasedNear(pos orb.Point, radiusNm float64, since time.Time) bool {
 	return t.store != nil && t.store.WeaponReleasedNear(pos, radiusNm, since)
+}
+
+func (t tacviewJTAC) GroundObjects() []tacviewGround {
+	if t.store == nil {
+		return nil
+	}
+	return t.store.GroundObjects()
+}
+
+func (t tacviewJTAC) Impacts(since time.Time) []tacviewImpact {
+	if t.store == nil {
+		return nil
+	}
+	return t.store.Impacts(since)
 }
 
 // ── Call recognition ─────────────────────────────────────────────────────────
@@ -181,6 +198,13 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 	t := b.targets[cur.target]
 
 	switch {
+	case isBDARequest(lower):
+		if cur.clearedAt.IsZero() {
+			return say("negative BDA, no attack yet.")
+		}
+		cur.bdaDone = true
+		return bdaFor(callsign, name, t, pic.GroundObjects(), flightImpacts(pic.Impacts(cur.clearedAt), callsign, t))
+
 	case jtacAbortRe.MatchString(lower):
 		cur.stage = jtacReady
 		return say("copy abort. Report IP inbound from %s for re-attack.", t.IP)
@@ -247,7 +271,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 }
 
 func (b *taskingBoard) clear(cur *taskingAssignment, now time.Time) {
-	cur.stage, cur.clearedAt, cur.offAxis = jtacCleared, now, 0
+	cur.stage, cur.clearedAt, cur.offAxis, cur.bdaDone = jtacCleared, now, 0, false
 }
 
 // jtacWatch runs once per tick: any flight cleared hot that swings outside the
@@ -259,6 +283,9 @@ func (b *taskingBoard) jtacWatch(name string, pic jtacPicture) []string {
 	now := b.now()
 	var out []string
 	for key, cur := range b.flights {
+		if text := b.bdaDue(key, cur, name, pic, now); text != "" {
+			out = append(out, text)
+		}
 		if cur.stage != jtacCleared {
 			continue
 		}
@@ -369,7 +396,7 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions) {
 	pic := tacviewJTAC{store: store}
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 	tx := func(text string) {
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, commandVoice(flagJTACVoice))
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, jtacVoice())
 		if err != nil {
 			log.Error().Err(err).Msg("JTAC TTS failed")
 			return
@@ -377,11 +404,43 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions) {
 		broadcastLog("tx", fmt.Sprintf("JTAC TX → %q", text))
 		transmitExternalAudioFile(ctx, mp3, flagJTACFreq, flagJTACName, srsHost, srsPort, flagExternalAudio)
 	}
-	go voiceNetLoop(ctx, flagSRSAddr, flagJTACFreq, flagJTACName, apiKey, flagEAMPassword, flagJTACVoice, flagExternalAudio,
+	go voiceNetLoop(ctx, flagSRSAddr, flagJTACFreq, flagJTACName, apiKey, flagEAMPassword, jtacVoice(), flagExternalAudio,
 		jtacWhisperPrompt, func(text string) (string, string) {
 			cs := jtacCallsign(text)
 			return cs, board.JTACResponse(text, cs, flagJTACSpoken, pic)
 		})
 	go runJTACWatch(ctx, board, flagJTACSpoken, pic, tx)
 	log.Info().Float64("freq", flagJTACFreq).Str("name", flagJTACName).Bool("tacview", store != nil).Msg("JTAC net starting")
+}
+
+// bdaDue returns the flight's BDA once its weapons are down and have settled,
+// once per pass. Caller holds b.mu.
+func (b *taskingBoard) bdaDue(key string, cur *taskingAssignment, name string, pic jtacPicture, now time.Time) string {
+	if cur.bdaDone || cur.clearedAt.IsZero() || now.Sub(cur.clearedAt) > bdaWindow {
+		return ""
+	}
+	t := b.targets[cur.target]
+	cs := displayCallsign(key)
+	imps := flightImpacts(pic.Impacts(cur.clearedAt), cs, t)
+	if len(imps) == 0 {
+		return ""
+	}
+	last := imps[0].At
+	for _, i := range imps[1:] {
+		if i.At.After(last) {
+			last = i.At
+		}
+	}
+	if now.Sub(last) < bdaSettle {
+		return ""
+	}
+	cur.bdaDone = true
+	log.Info().Str("callsign", cs).Int("impacts", len(imps)).Int("target", t.Number).Msg("JTAC: BDA")
+	return bdaFor(cs, name, t, pic.GroundObjects(), imps)
+}
+
+// jtacVoice is Hitman's TTS voice: his own delivery (a ground party on a
+// manpack, not a controller at a console) at the common speed.
+func jtacVoice() voiceProfile {
+	return voiceProfile{flagJTACVoice, flagTTSSpeed, flagVoiceStyleJTAC}
 }

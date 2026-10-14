@@ -120,6 +120,7 @@ Don't call `initial` in Case 3 — call `platform` instead.
 | `request tasking` | contact Hitman 1-1 on 61.000 FM; Hitman picks the 9-line target (Caucasus training) |
 | `copy` (after a tasking) | switch Hitman 1-1 |
 | **Hitman 1-1 (61.000 FM):** `checking in` (Hitman picks the target) → `copy` → `IP inbound` → `in from the [dir]` → `off` | 9-line → report IP inbound → continue → cleared hot / abort (checked against the card) → egress |
+| `request BDA` (to Hitman) | impacts vs the aim point + kills; also given unasked ~15 s after your bombs land |
 | `radio check` | loud and clear |
 
 ---

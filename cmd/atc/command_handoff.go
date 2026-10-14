@@ -90,6 +90,11 @@ type tacviewPositions struct {
 	info     map[string]tacviewContactInfo
 	bullseye map[string]orb.Point // coalition → bullseye (Navaid+Static+Bullseye objects)
 	weapons  []tacviewWeapon      // recent releases, oldest first
+
+	// tacview_ground.go
+	ground     map[string]*tacviewGround // object id → ground object
+	impacts    []tacviewImpact
+	missionRef string // ReferenceTime of the mission the ground picture is from
 }
 
 // weaponMemory is how long a release stays on the list.
@@ -283,6 +288,10 @@ type miniObject struct {
 	hasHdg               bool
 	pilot, name, typ, co string
 	weaponNoted          bool
+	parent               string    // ACMI Parent= (a weapon's launcher), object id
+	shooter              string    // store key of the jet a weapon came off
+	last                 orb.Point // a weapon's last position = its impact
+	impactNoted          bool
 }
 
 // miniTacviewParser turns ACMI lines into store updates. Split out of
@@ -294,6 +303,23 @@ type miniTacviewParser struct {
 	refLat, refLon float64
 	refSet         bool
 	now            func() time.Time // nil = time.Now; tests pin it
+}
+
+// died handles an object leaving the picture or reported destroyed: a ground
+// object is a kill, a weapon is an impact. Either can arrive twice (event,
+// then removal); the second is ignored.
+func (p *miniTacviewParser) died(id string) {
+	o := p.objs[id]
+	if o == nil {
+		return
+	}
+	switch {
+	case o.weaponNoted && !o.impactNoted:
+		o.impactNoted = true
+		p.store.AddImpact(tacviewImpact{Pos: o.last, At: p.clock(), Shooter: o.shooter})
+	case isGroundType(o.typ):
+		p.store.GroundDead(id)
+	}
 }
 
 func (p *miniTacviewParser) clock() time.Time {
@@ -319,6 +345,7 @@ func (p *miniTacviewParser) handleLine(line string) {
 	if strings.HasPrefix(line, "-") {
 		// Object destroyed — remove from the store if we keyed it.
 		id := strings.TrimPrefix(line, "-")
+		p.died(id)
 		if key, ok := p.keys[id]; ok {
 			p.store.Remove(key)
 		}
@@ -342,6 +369,14 @@ func (p *miniTacviewParser) handleLine(line string) {
 			case "ReferenceLongitude":
 				p.refLon, _ = strconv.ParseFloat(v, 64)
 				p.refSet = true
+			case "ReferenceTime":
+				p.store.NewMission(v)
+			case "Event":
+				// "Destroyed|<id>|..." — the object may stay in the stream.
+				if ev, rest, ok := strings.Cut(v, "|"); ok && ev == "Destroyed" {
+					target, _, _ := strings.Cut(rest, "|")
+					p.died(target)
+				}
 			}
 		}
 		return
@@ -398,6 +433,8 @@ func (p *miniTacviewParser) handleLine(line string) {
 			o.typ = v
 		case "Coalition":
 			o.co = v
+		case "Parent":
+			o.parent = v
 		}
 	}
 	if !o.hasLon || !o.hasLat {
@@ -411,12 +448,23 @@ func (p *miniTacviewParser) handleLine(line string) {
 		p.store.SetBullseye(o.co, pt)
 		return
 	}
-	// Bombs and missiles: only where they first appear matters.
+	// Bombs and missiles: where they first appear (the release) and where
+	// they end (the impact, recorded by died).
 	if strings.Contains(o.typ, "Weapon") {
 		if !o.weaponNoted {
 			o.weaponNoted = true
 			p.store.NoteWeapon(pt, p.clock())
+			if key, ok := p.keys[o.parent]; ok && o.parent != "" {
+				o.shooter = key
+			} else {
+				o.shooter = p.store.NearestPilot(pt, jtacReleaseRadius)
+			}
 		}
+		o.last = pt
+		return
+	}
+	if isGroundType(o.typ) {
+		p.store.SetGround(id, pt, o.name)
 		return
 	}
 	// Pilot field uses "Raider 032 |Jedi" — keep the callsign half only.

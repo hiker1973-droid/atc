@@ -85,6 +85,7 @@ type taskingAssignment struct {
 	redraw    bool      // asked Command for more: draw a new target at check-in
 	clearedAt time.Time // when "cleared hot" went out; the watch runs from here
 	offAxis   int       // consecutive watch samples outside the attack window
+	bdaDone   bool      // this pass's BDA has gone out
 }
 
 // taskingBoard tracks which flight holds which target.
