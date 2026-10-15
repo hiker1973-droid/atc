@@ -2606,26 +2606,136 @@ func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64,
 	defer cleanup()
 
 	safeName := strings.ReplaceAll(callsign, " ", "-")
-	args := []string{
-		"--file", txPath,
-		"--freqs", fmt.Sprintf("%.3f", freqMHz),
-		"--modulations", srsModulationName(freqMHz),
-		"-c", "2",
-		"-n", safeName,
-		"-p", srsPort,
-		"-v", "1",
-	}
-	log.Debug().Strs("args", args).Msg("ExternalAudio file TX")
-	out, err := exec.CommandContext(ctx, exePath, args...).CombinedOutput()
-	if err != nil {
+	file := txPath
+	for resume := 0; ; resume++ {
+		args := []string{
+			"--file", file,
+			"--freqs", fmt.Sprintf("%.3f", freqMHz),
+			"--modulations", srsModulationName(freqMHz),
+			"-c", "2",
+			"-n", safeName,
+			"-p", srsPort,
+			"-v", "1",
+		}
+		log.Debug().Strs("args", args).Msg("ExternalAudio file TX")
+		out, err := runExternalAudio(ctx, exePath, args)
+		if err == nil {
+			log.Debug().Int("resumes", resume).Msg("ExternalAudio file TX ok")
+			return
+		}
 		if ctx.Err() != nil {
 			log.Warn().Err(ctx.Err()).Msg("ExternalAudio file TX timed out — killed")
-		} else {
-			log.Error().Err(err).Str("output", string(out)).Msg("ExternalAudio file error")
+			return
 		}
-	} else {
-		log.Debug().Msg("ExternalAudio file TX ok")
+		sentMs, midPlay := externalAudioProgress(string(out))
+		if !midPlay && externalAudioGCOn.Load() && resume == 0 {
+			// Failed before sending a sample: rule out the GC setting (it is
+			// untested against every ExternalAudio build) by trying once
+			// without it; if that works it stays off for this process.
+			if out2, err2 := runExternalAudioPlain(ctx, exePath, args); err2 == nil {
+				externalAudioGCOn.Store(false)
+				log.Warn().Str("output", string(out)).Msg("ExternalAudio failed with the GC setting and worked without it - GC setting off for this session")
+				return
+			} else {
+				out, err = out2, err2
+				sentMs, midPlay = externalAudioProgress(string(out))
+			}
+		}
+		if !midPlay || resume == externalAudioResumes {
+			log.Error().Err(err).Int("resumes", resume).Str("output", string(out)).Msg("ExternalAudio file error")
+			return
+		}
+		rest, rerr := cutMP3From(flagFFmpeg, file, sentMs)
+		if rerr != nil {
+			log.Error().Err(err).AnErr("cutErr", rerr).Str("output", string(out)).Msg("ExternalAudio file error — could not resend the rest")
+			return
+		}
+		if rest == "" {
+			log.Info().Str("callsign", callsign).Int("sentMs", sentMs).Msg("ExternalAudio crashed at the very end - nothing left to resend")
+			return
+		}
+		defer os.Remove(rest)
+		log.Warn().Err(err).Str("callsign", callsign).Float64("freq", freqMHz).Int("sentMs", sentMs).Int("resume", resume+1).
+			Msg("ExternalAudio crashed mid-transmission - resending the rest")
+		file = rest
 	}
+}
+
+// ExternalAudio (SRS's .NET sender) dies mid-play with "A callback was made on
+// a garbage collected delegate of type ...MMTimerProc::Invoke": its playback
+// timer's callback is collected by a GC while the clip is still playing. The
+// longer the clip the likelier a GC lands in it - ATIS (~50 s, EN + local)
+// was cut off 6-14 times a morning on every rig (2026-10-15), anywhere 2-40 s
+// in; tower calls (3-10 s) almost never. Two layers:
+//   - a gen0 budget large enough that a broadcast never triggers a GC, so the
+//     timer callback is never collected (both env spellings: .NET Framework
+//     reads COMPlus_, .NET 5+ reads DOTNET_ too);
+//   - if it dies anyway, the rest of the clip is resent from the point its
+//     own log says it had reached ("sent 14000ms"), up to externalAudioResumes
+//     times. Progress is logged every 2 s, so the resend repeats up to 2 s
+//     rather than skipping any.
+
+const externalAudioResumes = 3
+
+var externalAudioEnv = []string{"DOTNET_GCgen0size=0x20000000", "COMPlus_GCgen0size=0x20000000"}
+
+// externalAudioGCOn turns the GC setting off for the session if ExternalAudio
+// is seen to fail with it and work without it.
+var externalAudioGCOn atomic.Bool
+
+func init() { externalAudioGCOn.Store(true) }
+
+func runExternalAudio(ctx context.Context, exePath string, args []string) ([]byte, error) {
+	if !externalAudioGCOn.Load() {
+		return runExternalAudioPlain(ctx, exePath, args)
+	}
+	cmd := exec.CommandContext(ctx, exePath, args...)
+	cmd.Env = append(os.Environ(), externalAudioEnv...)
+	return cmd.CombinedOutput()
+}
+
+func runExternalAudioPlain(ctx context.Context, exePath string, args []string) ([]byte, error) {
+	return exec.CommandContext(ctx, exePath, args...).CombinedOutput()
+}
+
+var externalAudioSentRe = regexp.MustCompile(`sent (\d+)ms`)
+
+// externalAudioProgress reads a failed ExternalAudio run's output: whether it
+// had started sending audio (a crash mid-play, worth resending the rest) and
+// how many ms it reported sent. A failure before "Sending Audio" (no SRS, bad
+// file) is not resent.
+func externalAudioProgress(out string) (sentMs int, midPlay bool) {
+	if !strings.Contains(out, "Sending Audio") {
+		return 0, false
+	}
+	if m := externalAudioSentRe.FindAllStringSubmatch(out, -1); len(m) > 0 {
+		sentMs, _ = strconv.Atoi(m[len(m)-1][1])
+	}
+	return sentMs, true
+}
+
+// cutMP3From writes the part of the MP3 at path from fromMs on to a new temp
+// file. "" and no error when less than half a second is left.
+func cutMP3From(ffmpegPath, path string, fromMs int) (string, error) {
+	tmp, err := os.CreateTemp("", "atc-tx-rest-*.mp3")
+	if err != nil {
+		return "", err
+	}
+	tmp.Close()
+	out := tmp.Name()
+	cmd := exec.Command(ffmpegPath, "-y", "-ss", fmt.Sprintf("%.3f", float64(fromMs)/1000), "-i", path,
+		"-c:a", "libmp3lame", "-ar", strconv.Itoa(srsAudioRateHz), "-b:a", "64k", out)
+	if o, err := cmd.CombinedOutput(); err != nil {
+		os.Remove(out)
+		return "", fmt.Errorf("ffmpeg: %w: %s", err, string(o))
+	}
+	if b, err := os.ReadFile(out); err == nil {
+		if d, err := mp3DurationSec(ffmpegPath, b); err == nil && d < 0.5 {
+			os.Remove(out)
+			return "", nil
+		}
+	}
+	return out, nil
 }
 
 // transmitExternalAudio calls DCS-SR-ExternalAudio.exe to transmit text on SRS.
