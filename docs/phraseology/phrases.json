@@ -319,6 +319,12 @@
  },
  {
   "role": "jtac",
+  "say": "Hitman, Raider 1-1, target 3, Cobra.",
+  "tower": "",
+  "want": "copy"
+ },
+ {
+  "role": "jtac",
   "say": "Hitman, Raider 1-1, copy.",
   "tower": "",
   "want": "copy"

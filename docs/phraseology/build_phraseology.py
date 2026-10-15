@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.0"
-DATE = "14 OCT 2026"          # change together with VER
+VER = "v2.1"
+DATE = "15 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 LOGO = r"C:\Users\afhin\Saved Games\DCS\Missions\New Pilot packs\VMFA225_patch.png"
@@ -66,9 +66,9 @@ TOWER_GROUND = [
     ("Request taxi", "request taxi  /  ready to taxi", "Taxi to RWY XX, hold short", "taxi"),
     ("Holding short", "holding short  /  at the hold", "Line up and wait, then cleared for takeoff", "holding_short"),
     ("Takeoff", "ready for takeoff  /  request takeoff", "Cleared for takeoff", "takeoff"),
-    ("Airborne", "airborne  /  departing", "Climb angels N, contact tower at 7 DME", "airborne"),
+    ("Airborne", "airborne  /  departing", "Climb angels N, expect handoff at 7 DME", "airborne"),
     ("Rolling (CTAF)", "rolling runway NN", "Same as airborne", "rolling"),
-    ("7 DME / Freq change", "seven DME  /  seven miles", "Contact Command 282.0", "dme"),
+    ("7 DME (optional)", "seven DME  /  seven miles", "Copy - the tower already handed you off", "dme"),
     ("Pushing Command", "pushing command", "Good day", "pushing_command"),
 ]
 TOWER_ARRIVAL = [
@@ -144,6 +144,8 @@ def table_rows(role, rows, address, tower=""):
     for intent, say, reply, want in rows:
         for alt in say.split("  /  "):
             spoken = alt.replace("N mile", "10 mile").replace("NN", "13").replace("cat N", "cat 2")
+            # Hitman readback: a real card target (command_tasking.go target 3, IP Cobra).
+            spoken = spoken.replace("target N", "target 3").replace("<IP>", "Cobra")
             PHRASES.append({"role": role, "say": "%s, %s, %s." % (address, CS, spoken),
                             "tower": tower, "want": want})
         quoted = " ".join('"...%s"' % a for a in say.split("  /  "))
@@ -406,13 +408,17 @@ def build():
                 ("Tower", "Raider 1-1, runway one three, line up and wait."),
                 ("Tower", "Raider 1-1, wind one two zero at eight, runway one three, cleared for takeoff."),
                 ("Pilot", "Batumi Tower, Raider 1-1, airborne."),
-                ("Tower", "Raider 1-1, climb angels four, contact tower at seven DME."),
-                ("Pilot", "Batumi Tower, Raider 1-1, seven DME."),
-                ("Tower", "Raider 1-1, contact Command, two eight two point zero. Good day.")])
+                ("Tower", "Raider 1-1, Batumi Tower, proceed to angels four, expect handoff at seven DME."),
+                ("Tower", "Raider 1-1, Batumi Departure, seven miles, angels four, leaving my airspace. "
+                          "Contact command, two eight two point zero, channel one. Safe skies, good day.")])
     d.callout("If you are held", [
         "Traffic inside 20 nm, or less than 60 s since the last departure, holds you. Stay put - the tower "
         "clears you when it is clear; you do not need to call again.",
         "\"seven miles\" on its own is the departure call. Inbound, always say \"inbound\" or \"initial\" with a distance."])
+    d.callout("The 7-mile handoff", [
+        "At 7 miles the tower calls you from Tacview - \"<field> Departure ... leaving my airspace, contact command\". "
+        "You do not need to call 7 DME; if you do, the tower answers \"copy\". Call before 7 miles and you get the handoff then.",
+        "After takeoff \"clear the active\" counts as your airborne call. Fields with an Australian controller sign off \"g'day\"."])
     d.h2("3.2 Arrival & Pattern")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("tower", TOWER_ARRIVAL, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))

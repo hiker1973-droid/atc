@@ -63,8 +63,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.22"
-DATE = "14 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.23"
+DATE = "15 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -156,7 +156,7 @@ def c02_freqs():
         [("LIVE LSO 128.100 (COMM 2 CH 2) is silent.", True),
          ("SkyEye has no LSO - fly the ball yourself.", False)],
     ])
-    NK.subtle(c, "Voices: Command onyx (stern English)  ·  Deckboss shimmer  ·  Marshal coral (Syria sage).")
+    NK.subtle(c, "Voices: towers British or Australian  ·  Command, Marshal, Deckboss American  ·  Hitman Australian.")
     return save(c, "02_freqs.jpg")
 
 
@@ -653,7 +653,7 @@ def c14_tower_radios():
         ("SENAKI TOWER  261.000  ·  ATIS 234.000", "CH 14  /  CH 16"),
         ("TBILISI TOWER  267.000  ·  ATIS 237.000", "CH 18  /  CH 10"),
     ])
-    NK.band(c, "THE 7 DME HANDOFF NAMES A CHANNEL", "check it")
+    NK.band(c, "THE 7-MILE HANDOFF NAMES A CHANNEL", "check it")
     c.bullets([
         [("Towers send you to Command on 282.000 and add a channel.", True),
          ("Gulf towers say \"channel four\"; Black Sea towers say \"channel one\".", False)],
@@ -687,7 +687,7 @@ def c15_syria_towers():
          ("(Akrotiri English only).", False)],
         [("The DCS F-menu tower is somewhere else.", True),
          ("Except at Incirlik, DCS's own controller is not on SkyEye's frequency.", False)],
-        [("The 7 DME handoff says \"channel four\"", True), ("- Hornet Command, 282.000.", False)],
+        [("The 7-mile handoff says \"channel four\"", True), ("- Hornet Command, 282.000.", False)],
     ])
     return save(c, "15_syria_towers.jpg")
 
@@ -703,9 +703,9 @@ def c16_tower_departure():
         ("", "Reply: line up and wait."),
         ("+ 5 s", "Reply: wind, runway, cleared for takeoff."),
         ("AIRBORNE", "Minhad Tower, Raider 1, airborne."),
-        ("", "Reply: angels N, contact tower at seven DME."),
-        ("7 DME", "Minhad Tower, Raider 1, seven DME."),
-        ("", "Reply: contact command, 282.0, channel N."),
+        ("", "Reply: angels N, expect handoff at seven DME."),
+        ("7 MILES", "The tower calls you - you say nothing."),
+        ("", "Tower: leaving my airspace, contact command."),
         ("COMMAND", "Command, Raider 1, checking in."),
     ], split=270)
     NK.band(c, "IF YOU ARE HELD")
@@ -722,10 +722,10 @@ def c16_tower_departure():
     c.bullets([
         [("\"ready for takeoff\" skips line up and wait:", True),
          ("with no traffic you are cleared at once.", False)],
-        [("\"rolling runway NN\" (CTAF) or \"departing\"", True),
-         ("gets the same reply as airborne.", False)],
-        [("Angels 3 - 6, picked at random.", True),
-         ("\"seven miles\" works as the 7 DME call too.", False)],
+        [("\"rolling runway NN\" (CTAF), \"departing\" or \"clear the active\"", True),
+         ("after takeoff gets the same reply as airborne.", False)],
+        [("No 7 DME call needed.", True),
+         ("The tower calls you at 7 miles (Tacview). Call it anyway and the reply is \"copy\".", False)],
         [("Optional:", True),
          ("\"pushing command\" gets a short good day; \"request startup\" gets Ground's "
           "startup approval.", False)],
@@ -789,8 +789,9 @@ def c18_tower_calls():
         ("request taxi  /  ready to taxi", "taxi, hold short"),
         ("holding short  /  at the hold", "line up and wait"),
         ("ready for takeoff  /  request takeoff", "cleared for takeoff"),
-        ("airborne  /  departing  /  rolling", "angels, call 7 DME"),
-        ("seven DME  /  seven miles", "contact Command"),
+        ("airborne  /  departing  /  rolling", "angels, expect handoff"),
+        ("(at 7 miles the tower calls you)", "contact Command"),
+        ("seven DME  /  seven miles", "copy (optional)"),
         ("pushing command", "good day"),
     ])
     NK.band(c, "ARRIVAL AND LANDING")
@@ -844,7 +845,7 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main b20f6b2, 15 SEP 2026; Hitman 47c9898, 14 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 404e399, 15 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 

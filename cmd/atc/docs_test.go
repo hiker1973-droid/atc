@@ -226,11 +226,15 @@ func jtacKind(lower string) string {
 		return "ip_inbound"
 	case jtacInRe.MatchString(lower):
 		return "in"
-	case isTaskingAck(lower):
+	case isTaskingAck(lower) || isTargetReadback(lower, docReadbackTarget):
 		return "copy"
 	}
 	return ""
 }
+
+// docReadbackTarget is the card target the Phraseology Reference's Hitman
+// readback example names ("target 3, Cobra").
+var docReadbackTarget = taskingTarget{IP: "Cobra", Number: 3, Name: "Fuel Depot"}
 
 func TestDocPhrases(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(docsDir, "phrases.json"))

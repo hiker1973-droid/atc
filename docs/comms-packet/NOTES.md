@@ -1,11 +1,27 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 14 OCT 2026.  v1.22.  Product = one full-screen 16:9 PDF, 22 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.22.pdf` — cover + 21 cards: How it works · Frequencies ·
+**Built 15 OCT 2026.  v1.23.  Product = one full-screen 16:9 PDF, 22 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.23.pdf` — cover + 21 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · **Marshal calls 1 · 2 · 3** ·
 Off the boat · Command · **Hitman 1-1 · Cleared hot?** ·
 A full sortie · **Airfield ATC · Tower radios · Syria towers · Departure · Arrival ·
 Tower calls** · No answer?
+
+## v1.23 (15 OCT 2026) — the tower's 7-mile departure call, from origin/main `404e399`
+
+Operator asked 2026-10-15 for the tower to call departures at 7 miles (`dd764a0`) and for the
+release to say "expect handoff at seven" (`404e399`), then "update docs".
+- **Card 18 Departure:** AIRBORNE reply "angels N, expect handoff at seven DME"; the 7 DME pilot
+  step is now **7 MILES — the tower calls you** ("leaving my airspace, contact command"). Good to
+  know: no 7 DME call needed (a late one gets "copy"); "clear the active" after takeoff = airborne.
+- **Card 20 Tower calls:** airborne row "angels, expect handoff"; new row "(at 7 miles the tower
+  calls you) → contact Command"; "seven DME / seven miles → copy (optional)".
+- Cards 16 / 17: "7 DME handoff" → "7-mile handoff". Card 2 voices line = the current
+  ElevenLabs cast by accent (no voice names - they change).
+- Build stamp (card 21) is now origin/main 404e399. Phraseology Reference v2.1 carries the same
+  change (table, dialogue, "The 7-mile handoff" callout) and fixes the Hitman readback example
+  (`target 3, Cobra`, checked by `TestDocPhrases`).
+- Not deployed at build time: post only after the rigs run `404e399`.
 
 ## Moved into git, 14 OCT 2026
 
