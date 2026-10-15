@@ -555,6 +555,18 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 
 	case RequestRunwayVacated:
+		// "Clear the active (09)" is also what some pilots say once airborne
+		// (operator 2026-10-15, last night's logs). From a departure it is the
+		// airborne call and gets the departure release, not "roger, clear".
+		if c.isDepartureCall(ac) {
+			s.Remove(req.Callsign)
+			response = c.composer.DepartureRelease(
+				req.Callsign,
+				s.Airfield.DepartureDistNm,
+				s.Airfield.DepartureAngels,
+			)
+			break
+		}
 		s.Remove(req.Callsign)
 		response = c.composer.RunwayVacated(req.Callsign, s.ActiveRunway)
 
@@ -1985,6 +1997,33 @@ func (c *ATCController) GetPatternAircraft() []*state.AircraftState {
 // head-of-slice first (slot 1 = next to depart).
 func (c *ATCController) GetDepartureQueue() []*state.AircraftState {
 	return c.airfieldState.GetDepartureQueueSnapshot()
+}
+
+// isDepartureCall decides whether a "clear of the runway" call comes from a
+// departure (meaning airborne) or an arrival (meaning vacated). The tower's own
+// state decides first: taxi / hold-short / takeoff clearance = departure, any
+// arrival phase = vacated. A flight the tower has no phase for (Whisper spelt
+// the callsign differently, or it never called for taxi) is a departure when
+// Tacview has it flying: 300 ft above the field and over 80 kt. An arrival
+// calling clear is on the ground and slow.
+func (c *ATCController) isDepartureCall(ac *state.AircraftState) bool {
+	switch ac.Phase {
+	case state.PhaseDeparting, state.PhaseHoldingShort, state.PhaseClearedTakeoff, state.PhaseAirborne:
+		return true
+	case state.PhaseInbound, state.PhaseSequenced, state.PhaseClearedLand, state.PhaseLanding,
+		state.PhaseTaxiIn, state.PhaseGoAround, state.PhaseHolding:
+		return false
+	}
+	if ac.TakeoffCleared {
+		return true
+	}
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	contact := c.lookupContact(ac.Callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
+		return false
+	}
+	return contact.AltFt > float64(c.airfieldState.Airfield.ElevationFt)+300 && contact.SpeedKts > 80
 }
 
 // IsAircraftAirborne returns true if Tacview shows the aircraft above 500ft AGL and climbing.
