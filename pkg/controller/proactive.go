@@ -224,6 +224,15 @@ func (c *ATCController) SetDepartureCalls(enabled bool, signOff string) {
 	c.composer.SetExpectHandoff(enabled)
 }
 
+// SetDepartureTransmitFn wires the Departure voice: the 7-mile call and its
+// "copy" are spoken by a different controller from the tower (operator
+// 2026-10-15: "maybe have departure a different voice").
+func (c *ATCController) SetDepartureTransmitFn(fn func(ctx context.Context, text string)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.departureTransmitFn = fn
+}
+
 // watchDeparture starts watching callsign for the departure call. Caller holds c.mu.
 func (c *ATCController) watchDeparture(callsign string) {
 	if !c.departureCalls {
@@ -298,7 +307,7 @@ func (c *ATCController) checkDepartures(ctx context.Context) {
 		}
 		log.Info().Str("callsign", w.callsign).Float64("distNm", math.Round(dist*10)/10).Int("angels", angels).
 			Msg("departure leaving the airspace — tower hands off to Command")
-		c.transmitTo(ctx, w.callsign, c.composer.DepartureLeavingAirspace(w.callsign, distLimit, angels,
+		c.transmitDepartureTo(ctx, w.callsign, c.composer.DepartureLeavingAirspace(w.callsign, distLimit, angels,
 			s.Airfield.HandoffCallsign, s.Airfield.HandoffFreqMHz, s.Airfield.HandoffPreset, c.departureSignOff))
 		return // one call per tick keeps the frequency usable
 	}

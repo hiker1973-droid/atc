@@ -213,6 +213,9 @@ type ATCController struct {
 	departureSignOff string
 	departWatch      map[string]departWatch
 	departHandedOff  map[string]time.Time
+	// departureTransmitFn speaks as "<field> Departure" in its own voice;
+	// nil = the tower's transmitFn.
+	departureTransmitFn func(ctx context.Context, text string)
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -596,8 +599,8 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		// or just "copy" when the tower already called it (proactive.go).
 		s.Remove(req.Callsign)
 		if c.departureAlreadyHandedOff(req.Callsign) {
-			response = c.composer.DepartureCopy(req.Callsign)
-			break
+			c.transmitDepartureTo(ctx, req.Callsign, c.composer.DepartureCopy(req.Callsign))
+			return
 		}
 		response = c.composer.HandoffToCommand(
 			req.Callsign,

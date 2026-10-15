@@ -133,3 +133,24 @@ func TestDepartureCallAfterTakeoffClearance(t *testing.T) {
 	}
 	t.Logf("sample: %s", (*sent)[len(*sent)-1])
 }
+
+// The 7-mile call and its "copy" go out on the Departure voice; ordinary
+// tower replies stay on the tower's (operator 2026-10-15).
+func TestDepartureCallUsesDepartureVoice(t *testing.T) {
+	c, towerSent, handle := departureController(t)
+	var depSent []string
+	c.SetDepartureTransmitFn(func(_ context.Context, text string) { depSent = append(depSent, text) })
+	handle("Test Tower, Raider 302, airborne")
+	if len(*towerSent) != 1 || len(depSent) != 0 {
+		t.Fatalf("release should be the tower's: tower %q, departure %q", *towerSent, depSent)
+	}
+	putContact(c, "Raider 302", airplane, 7.5, testFieldElevFt+5000)
+	tick(c)
+	handle("Test Tower, Raider 302, seven DME")
+	if len(depSent) != 2 || len(*towerSent) != 1 {
+		t.Fatalf("departure call + copy should be Departure's: tower %q, departure %q", *towerSent, depSent)
+	}
+	if !strings.Contains(depSent[0], "Test Departure") || !strings.HasSuffix(depSent[1], "copy.") {
+		t.Errorf("departure transmissions %q", depSent)
+	}
+}

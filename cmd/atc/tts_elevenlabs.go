@@ -67,7 +67,11 @@ const (
 	// elDeckboss11 is voice 5 of the same round, picked for Deckboss the same
 	// day ("command_5_ljX1ZrXuDIIRVcmiVSyR"); name likewise unreadable.
 	elDeckboss11 = "ljX1ZrXuDIIRVcmiVSyR" // Deckboss
-	elHank       = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
+	// elDeparture11 is voice 4 of round 11, picked for the tower's "Departure"
+	// 7-mile call (operator 2026-10-15: "use this for departure call
+	// command_4_FF59babHL8N8gfTgtBMT").
+	elDeparture11 = "FF59babHL8N8gfTgtBMT" // Departure
+	elHank        = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
 )
 
 // elFlash is ElevenLabs' cheaper model, about half the credits a character.

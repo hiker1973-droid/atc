@@ -30,6 +30,21 @@ func (c *ATCController) transmitTo(ctx context.Context, callsign, text string) {
 	c.transmit(ctx, text)
 }
 
+// transmitDepartureTo is transmitTo in the Departure voice (SetDepartureTransmitFn).
+func (c *ATCController) transmitDepartureTo(ctx context.Context, callsign, text string) {
+	if c.departureTransmitFn == nil {
+		c.transmitTo(ctx, callsign, text)
+		return
+	}
+	c.lastTxMu.Lock()
+	if c.lastTx == nil {
+		c.lastTx = make(map[string]lastTransmission)
+	}
+	c.lastTx[callsign] = lastTransmission{text: text, at: time.Now()}
+	c.lastTxMu.Unlock()
+	c.departureTransmitFn(ctx, text)
+}
+
 // lastTransmissionTo returns the last text sent to callsign, if it was sent
 // within SayAgainWindow.
 func (c *ATCController) lastTransmissionTo(callsign string) (string, bool) {

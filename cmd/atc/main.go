@@ -112,6 +112,7 @@ var (
 	flagElevenCommandVoice string
 	flagElevenJTACVoice    string
 	flagElevenMarshalVoice string
+	flagElevenDepartVoice  string
 	flagElevenDeckbossVoice string
 	flagDeckbossVoice   string
 	flagMarshalVoice    string
@@ -198,6 +199,8 @@ func main() {
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elCommand11, "ElevenLabs voice ID for Command (default round 11 voice 3, library)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
+	f.StringVar(&flagElevenDepartVoice, "elevenlabs-departure-voice", elDeparture11,
+		"ElevenLabs voice ID for the tower's Departure position - the 7-mile handoff call (default round 11 voice 4, library)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elSpartan, "ElevenLabs voice ID for Marshal (default Spartan, library)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elDeckboss11,
 		"ElevenLabs voice ID for Deckboss (default round 11 voice 5, library; every theatre)")
@@ -701,10 +704,17 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// ── TX: ExternalAudio ─────────────────────────────────────────────────────
-	txChan := make(chan string, 16)
+	txChan := make(chan towerTX, 16)
 	atcCtrl.SetTransmitFn(func(ctx context.Context, text string) {
 		select {
-		case txChan <- text:
+		case txChan <- towerTX{text: text}:
+		default:
+			log.Warn().Str("text", text).Msg("TX queue full")
+		}
+	})
+	atcCtrl.SetDepartureTransmitFn(func(ctx context.Context, text string) {
+		select {
+		case txChan <- towerTX{text: text, departure: true}:
 		default:
 			log.Warn().Str("text", text).Msg("TX queue full")
 		}
@@ -722,15 +732,20 @@ func run(cmd *cobra.Command, args []string) error {
 			select {
 			case <-ctx.Done():
 				return
-			case text := <-txChan:
+			case tx := <-txChan:
+				text := tx.text
 				voice := currentTowerVoice()
-				log.Info().Str("text", text).Str("voice", voice).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
+				profile := towerProfile(voice)
+				if tx.departure {
+					profile = departureProfile(voice)
+				}
+				log.Info().Str("text", text).Str("voice", voice).Bool("departure", tx.departure).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
 				// 10s ceiling on TTS: OpenAI is either fast (~2s) or hung. No
 				// SAPI fallback — operator preference is one consistent voice;
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, towerProfile(voice))
+				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, profile)
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
@@ -1892,6 +1907,22 @@ func marshalVoice(v string) voiceProfile {
 func deckbossVoice(v string) voiceProfile {
 	return voiceProfile{voice: v, speed: speedDeckboss, instructions: flagVoiceStyleDeckboss,
 		eleven: elDeckboss(flagElevenDeckbossVoice)}
+}
+
+// towerTX is one tower transmission; departure = spoken as "<field>
+// Departure" in the Departure voice (the 7-mile handoff and its "copy").
+type towerTX struct {
+	text      string
+	departure bool
+}
+
+// departureProfile is the tower's Departure position: the tower's delivery and
+// OpenAI fallback, its own ElevenLabs voice (operator 2026-10-15: "maybe have
+// departure a different voice").
+func departureProfile(towerVoice string) voiceProfile {
+	p := towerProfile(towerVoice)
+	p.eleven = elTower(flagElevenDepartVoice, "Departure")
+	return p
 }
 
 func commandVoice(v string) voiceProfile {
