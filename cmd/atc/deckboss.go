@@ -19,6 +19,14 @@ import (
 	"github.com/vsfg7/atc/pkg/state"
 )
 
+// deckbossAddrPrefixes are the Whisper renderings of "Deckboss" seen in the
+// wild. One list serves both the address-led guard and the callsign reader:
+// when they were separate, "Dark boss, Raider 308" passed one and fed "Dark
+// boss" to the other as the callsign. Add both spaced and unspaced forms.
+var deckbossAddrPrefixes = []string{"deckboss", "deck boss", "duck boss", "duckboss", "tech boss", "techboss",
+	"dec boss", "decboss", "check boss", "checkboss", "yak boss", "yakboss", "dakwas", "dak was",
+	"dark boss", "darkboss", "black boss", "blackboss"}
+
 // catNumRe captures the cat number from "cat 1" / "CAT 2" / "cat3".
 var catNumRe = regexp.MustCompile(`\bcat\s*(\d)\b`)
 
@@ -193,7 +201,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		// Deckboss TX contains "airborne" or "clear traffic").
 		// Defensive prefix list — Whisper variants of "Deck boss" we've seen
 		// in the wild: "duck boss", "tech boss", "dec boss". Add as observed.
-		addrPrefixes := []string{"deckboss", "deck boss", "duck boss", "duckboss", "tech boss", "techboss", "dec boss", "decboss", "check boss", "checkboss", "yak boss", "yakboss", "dakwas", "dak was", "dark boss", "darkboss", "black boss", "blackboss"}
+		addrPrefixes := deckbossAddrPrefixes
 		addressed := false
 		for _, p := range addrPrefixes {
 			if strings.HasPrefix(lower, p) {
@@ -526,7 +534,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 								return
 							}
 							log.Info().Str("text", text).Msg("Deckboss heard")
-							cs := extractCallsignSkippingAddress(text, "deckboss", "deck boss", "duck boss", "tech boss", "dec boss", "check boss")
+							cs := extractCallsignSkippingAddress(text, deckbossAddrPrefixes...)
 							handleDeckbossCall(text, cs)
 						}(frames)
 					}

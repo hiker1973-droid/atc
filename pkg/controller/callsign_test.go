@@ -105,3 +105,36 @@ func TestStripTrailingConnectors(t *testing.T) {
 		}
 	}
 }
+
+// Senaki, 2026-10-14. The first two became the callsign whole: a phantom
+// "Venom 203 requests taxi to the active" sat at the head of the departure
+// queue and blocked the real Venom 203's auto-release, and "Venom 201
+// reporting 9 miles" counted as a second aircraft in the landing sequence.
+func TestExtractCallsignSenaki20261014(t *testing.T) {
+	cases := []struct{ text, want string }{
+		{"Tower, Venom 203 requests taxi to the active.", "Venom 203"},
+		{"Senaki Tower, Venom 201 reporting 9 miles.", "Venom 201"},
+		{"Senaki Tower, Venom 201 reporting initial.", "Venom 201"},
+		{"Tower, Venom 201 reporting downwind.", "Venom 201"},
+		{"Tower, Venom 201, request permission to the active.", "Venom 201"},
+		{"Senaki traffic, Raider 3-0-2, request taxi.", "Raider 3-0-2"},
+		{"Senaki Tower, Raider 302 checking in.", "Raider 302"},
+		{"Tower, Venom 201 airborne.", "Venom 201"},
+	}
+	for _, tc := range cases {
+		if got := extractCallsign(tc.text, "Senaki Tower"); got != tc.want {
+			t.Errorf("extractCallsign(%q) = %q, want %q", tc.text, got, tc.want)
+		}
+	}
+}
+
+func TestPermissionToTheActiveIsTaxi(t *testing.T) {
+	for _, text := range []string{
+		"Tower, Venom 201, request permission to the active.",
+		"Tower, Venom 201, request permission to taxi to the active.",
+	} {
+		if req := ParseIntent(text, "Senaki Tower"); req == nil || req.Type != RequestTaxiClear {
+			t.Errorf("ParseIntent(%q) = %+v, want RequestTaxiClear", text, req)
+		}
+	}
+}

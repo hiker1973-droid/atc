@@ -1389,7 +1389,10 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// through to RequestUnknown, and the flight got silence on a correctly
 		// addressed call. "tower taxi" is Whisper folding the prompt's own
 		// callsign into "request taxi" -- the prompt feeds it both.
-		"ready for taxi", "ready taxi", "taxi for departure", "tower taxi"):
+		"ready for taxi", "ready taxi", "taxi for departure", "tower taxi",
+		// Senaki 2026-10-14: "Tower, Venom 201, request permission to the
+		// active" got "say again" — a taxi request with no "taxi" in it.
+		"permission to the active", "permission to active", "permission to taxi"):
 		req.Type = RequestTaxiClear
 	case containsAny(lower, "on final", "final", "request landing", "cleared to land", "full stop") ||
 		req.Option != composer.OptionNone:
@@ -1558,8 +1561,23 @@ func trimTrailingTriggers(cs string) string {
 			cut = i
 		}
 	}
-	return stripTrailingConnectors(strings.TrimSpace(strings.Trim(cs[:cut], ", .")))
+	cs = stripTrailingConnectors(strings.TrimSpace(strings.Trim(cs[:cut], ", .")))
+	// A callsign ends at its number. Whatever words follow it are the request
+	// in a phrasing the list above doesn't know — "Venom 203 requests taxi to
+	// the active", "Venom 201 reporting 9 miles" (Senaki, 2026-10-14). Those
+	// became the callsign, put a phantom aircraft at the head of the departure
+	// queue that blocked the real one's auto-release, and inflated the
+	// landing sequence. Cut after the number whenever a word follows it.
+	if m := callsignHeadRe.FindStringSubmatch(cs); m != nil {
+		cs = m[1]
+	}
+	return cs
 }
+
+// callsignHeadRe matches "<word> [<word>] <number>" followed by more words,
+// capturing the callsign part. The number may be spoken in groups ("3-0-2",
+// "2 1").
+var callsignHeadRe = regexp.MustCompile(`^([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?[\s-]*\d(?:[\s-]?\d){0,3})\s+[A-Za-z]`)
 
 // stripLeadingFiller drops common preamble phrases that pilots prepend before
 // their callsign ("this is Viper 27..."). Run before extractCallsign's tower

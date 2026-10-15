@@ -187,3 +187,21 @@ func TestMarshalCallsFlown20261014(t *testing.T) {
 		t.Error("Marshal's own entering-stack ack read as a pilot call")
 	}
 }
+
+// Raider 308 on Deckboss 128.6, 2026-10-14: Whisper split the callsign with a
+// comma and Deckboss answered "Raider, Deckboss, five by five"; "Dark boss"
+// and "Black boss" weren't known addresses at all.
+func TestDeckbossCallsignFlown20261014(t *testing.T) {
+	cases := []struct{ text, want string }{
+		{"Deck boss, Raider, 308, comm check.", "Raider 308"},
+		{"Tech boss, Raider, 308, Comcheck.", "Raider 308"},
+		{"Dark boss, Raider, 308, com check.", "Raider 308"},
+		{"Black Boss Raider 308, Kamchatka.", "Raider 308"},
+		{"Duck boss, Raider 308, green jet.", "Raider 308"},
+	}
+	for _, tc := range cases {
+		if got := extractCallsignSkippingAddress(tc.text, deckbossAddrPrefixes...); got != tc.want {
+			t.Errorf("callsign(%q) = %q, want %q", tc.text, got, tc.want)
+		}
+	}
+}

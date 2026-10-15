@@ -1086,6 +1086,10 @@ func extractCallsignSimple(text string) string {
 // "Marshall" with the extra L Whisper sometimes adds still matches "marshal").
 // If the first segment doesn't match any address, the simple first-segment
 // behavior is preserved as a fallback.
+// splitModexRe matches a callsign word split from its number by a comma at the
+// start of a segment: "Raider, 308".
+var splitModexRe = regexp.MustCompile(`^([A-Za-z][A-Za-z'-]*)\s*,\s*(\d)`)
+
 func extractCallsignSkippingAddress(text string, addresses ...string) string {
 	text = normalizeCallsignLocal(text)
 	lower := strings.ToLower(text)
@@ -1108,6 +1112,10 @@ func extractCallsignSkippingAddress(text string, addresses ...string) string {
 			continue
 		}
 		rest = strings.TrimLeft(rest, ", ")
+		// Whisper sometimes puts a comma inside the callsign ("Deck boss,
+		// Raider, 308, comcheck", DCS3 2026-10-14) — rejoin "word, digits"
+		// before the comma cut below, or the callsign comes out as "Raider".
+		rest = splitModexRe.ReplaceAllString(rest, "$1 $2")
 		// Step 2 — take everything up to the first comma (request boundary),
 		// then trim at the first intent verb. That gives just the callsign.
 		if i := strings.Index(rest, ","); i > 0 {
