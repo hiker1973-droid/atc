@@ -49,7 +49,7 @@ $TheatreSites = @{
 # in atc-omdm.log, 0 in atc-ugsb.log — so an empty grep means no pilot called
 # that field, NOT that the term is dead. It was briefly cut from this list on
 # exactly that mistaken reading.
-$KeepPattern = 'ATC request|heard"|"message":"recognized"|TX via|intent miss|auto-release|LUAW|Whisper hallu|' +
+$KeepPattern = 'ATC request|heard"|"message":"recognized"|TX via| TX"|intent miss|auto-release|LUAW|Whisper hallu|' +
                'registered on SRS|stack online|"level":"warn"|"level":"error"|ATC online|' +
                'already in progress|empty transcription|SRS disconnected|' +
                'ExternalAudio file error|ExternalAudio file TX timed out|prewarm failed|' +
