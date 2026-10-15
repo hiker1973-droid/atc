@@ -739,7 +739,7 @@ def c17_tower_arrival():
     NK.band(c, "THE OVERHEAD", "VMC")
     NK.steps(c, [
         ("INBOUND", "Minhad Tower, Raider 1, 10 mile initial."),
-        ("", "Reply: runway, wind, altimeter, pattern, report initial."),
+        ("", "Reply: runway, wind, altimeter, report initial."),
         ("INITIAL", "Minhad Tower, Raider 1, 3 mile initial."),
         ("", "Reply: left break runway NN, number N, report base."),
         ("DOWNWIND", "Optional. Reply: number N, report base."),

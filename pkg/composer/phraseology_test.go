@@ -116,24 +116,34 @@ func TestWheelsCheckAppearsOnlyWhenOwed(t *testing.T) {
 	}
 }
 
-func TestInboundAckCarriesPatternElements(t *testing.T) {
-	c := NewATCComposer("Al Minhad Tower")
-	// 7110.65 3-10-12 requires pattern altitude and direction of traffic on
-	// the arrival call, then a report at initial.
+func TestInboundAckIsShort(t *testing.T) {
+	c := NewATCComposer("Senaki Tower")
+	// Runway, wind, altimeter and the report at initial stay; the pattern
+	// elements and "No traffic ahead" went 2026-10-15 to save air time and
+	// ElevenLabs credits (the reply was 210 characters).
 	for i := 0; i < 40; i++ {
-		got := c.InboundAck("Raider 032", "27", 270, 15, 29.92, 1500, "left", 0)
-		for _, want := range []string{
-			"runway two seven",
-			"two seven zero at one five",
-			"two niner niner two",
-			"pattern altitude one thousand five hundred",
-			"left turns",
-			"Report initial.",
-		} {
+		got := c.InboundAck("Raider 302", "27", 270, 15, 29.92, 1500, "left", 0)
+		for _, want := range []string{"runway two seven", "two seven zero at one five", "two niner niner two", "Report initial."} {
 			if !strings.Contains(got, want) {
 				t.Fatalf("inbound ack missing %q: %q", want, got)
 			}
 		}
+		for _, gone := range []string{"pattern altitude", "left turns", "No traffic", "field information"} {
+			if strings.Contains(got, gone) {
+				t.Fatalf("inbound ack still says %q: %q", gone, got)
+			}
+		}
+		if len(got) > 125 {
+			t.Fatalf("inbound ack %d chars, want <= 125: %q", len(got), got)
+		}
+	}
+	if got := c.InboundAck("Raider 302", "27", 270, 15, 29.92, 1500, "left", 2); !strings.Contains(got, "two aircraft ahead of you. Report initial.") {
+		t.Errorf("traffic ahead must still be said: %q", got)
+	}
+	inboundPatternInfo = true
+	defer func() { inboundPatternInfo = false }()
+	if got := c.InboundAck("Raider 302", "27", 270, 15, 29.92, 1500, "left", 0); !strings.Contains(got, "pattern altitude one thousand five hundred, left turns") {
+		t.Errorf("inboundPatternInfo on: %q", got)
 	}
 }
 

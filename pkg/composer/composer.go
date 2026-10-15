@@ -556,26 +556,41 @@ func (c *ATCComposer) ContinueInbound(callsign, activeRunway string, distNm, seq
 //
 // patternAltFt comes from Airfield.PatternAltFt and breakDirection from
 // Airfield.BreakDirections[activeRunway]; both fall back cleanly when unset.
+//
+// Trimmed 2026-10-15 to cut ElevenLabs credits and air time (operator picked
+// "shorten the longest tower replies"): the pattern altitude and direction of
+// traffic are on the kneeboard and the break direction comes with the
+// overhead clearance, and "No traffic ahead" is only said when there is some.
+// The 210-character reply is now about 115. patternAltFt / breakDirection are
+// still accepted so the callers need not change; inboundPatternInfo puts the
+// pattern elements back.
 func (c *ATCComposer) InboundAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64, patternAltFt int, breakDirection string, trafficAhead int) string {
 	rwy := spellRunway(activeRunway)
 	wind := formatWind(windFromMag, windKts)
 	alt := formatAltimeter(altimeterInHg)
-	pattern := patternClause(patternAltFt, breakDirection)
+	pattern := ""
+	if inboundPatternInfo {
+		pattern = patternClause(patternAltFt, breakDirection)
+	}
 	traffic := ""
 	switch trafficAhead {
 	case 0:
-		traffic = "No traffic ahead."
 	case 1:
-		traffic = "One aircraft in the pattern ahead of you."
+		traffic = "One aircraft ahead of you. "
 	default:
-		traffic = fmt.Sprintf("%s aircraft ahead of you.", numberWord(trafficAhead))
+		traffic = fmt.Sprintf("%s aircraft ahead of you. ", numberWord(trafficAhead))
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s, wind %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, wind, alt, pattern, traffic),
-		fmt.Sprintf("%s, %s, altimeter %s, active runway %s, wind %s%s. %s Report initial.", callsign, c.towerCallsign, alt, rwy, wind, pattern, traffic),
-		fmt.Sprintf("%s, %s, field information: runway %s, wind %s, altimeter %s%s. %s Report initial.", callsign, c.towerCallsign, rwy, wind, alt, pattern, traffic),
+		fmt.Sprintf("%s, %s, runway %s, wind %s, altimeter %s%s. %sReport initial.", callsign, c.towerCallsign, rwy, wind, alt, pattern, traffic),
+		fmt.Sprintf("%s, %s, altimeter %s, runway %s, wind %s%s. %sReport initial.", callsign, c.towerCallsign, alt, rwy, wind, pattern, traffic),
+		fmt.Sprintf("%s, %s, runway %s, altimeter %s, wind %s%s. %sReport initial.", callsign, c.towerCallsign, rwy, alt, wind, pattern, traffic),
 	})
 }
+
+// inboundPatternInfo puts the 3-10-12 pattern altitude and direction of
+// traffic back on the arrival calls (InboundAck, SequencedInitialAck). Off
+// since 2026-10-15 - shorter replies, fewer ElevenLabs credits.
+var inboundPatternInfo = false
 
 // patternClause renders the 3-10-12 pattern-altitude and direction-of-traffic
 // elements as a clause ready to append to a field-information reply, e.g.
@@ -806,7 +821,10 @@ func (c *ATCComposer) SequencedInitialAck(callsign string, distNm int, activeRun
 	rwy := spellRunway(activeRunway)
 	seq := numberWord(seqNum)
 	lead := numberWord(leadDistNm)
-	pattern := patternClause(patternAltFt, breakDirection)
+	pattern := ""
+	if inboundPatternInfo {
+		pattern = patternClause(patternAltFt, breakDirection)
+	}
 	return pick([]string{
 		fmt.Sprintf("%s, %s, number %s, follow %s, %s miles in trail, runway %s%s, report initial.", callsign, c.towerCallsign, seq, leadCallsign, lead, rwy, pattern),
 		fmt.Sprintf("%s, %s, number %s, traffic is %s, %s miles ahead, runway %s%s, report initial.", callsign, c.towerCallsign, seq, leadCallsign, lead, rwy, pattern),
