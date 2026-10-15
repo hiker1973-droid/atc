@@ -195,9 +195,9 @@ func main() {
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elSpartan, "ElevenLabs voice ID for Command (default Spartan, library)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elCommand11, "ElevenLabs voice ID for Command (default round 11 voice 3, library)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
-	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elAdam, "ElevenLabs voice ID for Marshal (default Adam)")
+	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elSpartan, "ElevenLabs voice ID for Marshal (default Spartan, library)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elHank,
 		"ElevenLabs voice ID for Deckboss (default Hank Harvey, library; every theatre)")
 	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
