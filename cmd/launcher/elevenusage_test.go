@@ -93,6 +93,11 @@ func TestApplyAccount(t *testing.T) {
 		fu.Today != 4000 || fu.Level != "warn" || fu.ByVoice["Lisa"] != 60000 {
 		t.Errorf("applyAccount = %+v", fu)
 	}
+	// Pace: 110,000 spent + SkyEye's 900 a day (counted from Oct 14 16:31,
+	// two days) for the 29 days left - not 110,000 extrapolated.
+	if fu.Projected < 110000 || fu.Projected > 125000 {
+		t.Errorf("projected %d, want spent + the servers' rate", fu.Projected)
+	}
 	if d := sortedDays(fu.ByDay); d[0] != "2026-10-15" {
 		t.Errorf("days %v", d)
 	}

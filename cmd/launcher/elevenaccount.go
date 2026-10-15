@@ -129,8 +129,20 @@ func applyAccount(fu *FleetUsage, a *elevenAccount, now time.Time) {
 	if a.Limit > 0 {
 		fu.Percent = 100 * float64(a.Used) / float64(a.Limit)
 	}
-	if days := now.Sub(a.Start).Hours() / 24; days >= 1 {
-		fu.Projected = int(float64(a.Used) / days * a.Reset.Sub(a.Start).Hours() / 24)
+	// Pace = what is spent so far plus the servers' daily rate for the rest of
+	// the period. Extrapolating the account's own total made one day of voice
+	// auditions (9.8k credits, 2026-10-15) read as "on pace for 321,803".
+	fu.Projected = a.Used
+	if remaining := a.Reset.Sub(now).Hours() / 24; remaining > 0 && fu.SkyEyeCredits > 0 {
+		from := fu.First
+		if from.IsZero() || from.Before(a.Start) {
+			from = a.Start
+		}
+		days := now.Sub(from).Hours() / 24
+		if days < 1 {
+			days = 1
+		}
+		fu.Projected += int(float64(fu.SkyEyeCredits) / days * remaining)
 	}
 	switch {
 	case fu.Percent >= 95:
