@@ -484,6 +484,14 @@ var faultSignatures = []string{
 	"Whisper returned empty", "Dashboard server error",
 }
 
+// recoveredSignatures name a fault signature in a message that reports the
+// fault handled: ExternalAudio crashing mid-clip is resent from where it got
+// to (b26e6ad), and only a resend that fails is logged as an error - which
+// still alerts. Seen 2026-10-15: every recovered ATIS crash raised a warning.
+var recoveredSignatures = []string{
+	"resending the rest", "nothing left to resend",
+}
+
 var (
 	cachedAlerts []Alert
 	alertsMu     sync.Mutex
@@ -571,7 +579,13 @@ func scanLogAlerts() []Alert {
 				continue
 			}
 			fault := l.Level == "error"
-			if !fault {
+			recovered := false
+			for _, sig := range recoveredSignatures {
+				if strings.Contains(l.Message, sig) {
+					recovered = true
+				}
+			}
+			if !fault && !recovered {
 				for _, sig := range faultSignatures {
 					if strings.Contains(l.Message, sig) {
 						fault = true
