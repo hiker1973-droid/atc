@@ -87,6 +87,7 @@ func TestApplyAccount(t *testing.T) {
 	a := &elevenAccount{Tier: "creator", Used: 110000, Limit: 127855,
 		Reset: time.Date(2026, 11, 14, 16, 31, 0, 0, time.UTC), Start: time.Date(2026, 10, 14, 16, 31, 0, 0, time.UTC),
 		ByVoice: map[string]int{"Lisa": 60000, "Misa": 50000}, ByDay: map[string]int{"2026-10-16": 4000, "2026-10-15": 106000}}
+	fu.SkyEyeCredits = fu.Credits
 	applyAccount(&fu, a, now)
 	if fu.Source != "account" || fu.Credits != 110000 || fu.Quota != 127855 || fu.SkyEyeCredits != 900 ||
 		fu.Today != 4000 || fu.Level != "warn" || fu.ByVoice["Lisa"] != 60000 {

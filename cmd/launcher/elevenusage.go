@@ -68,11 +68,17 @@ type FleetUsage struct {
 	At          time.Time      `json:"at"`
 	// Source is "account" when the totals above are the ElevenLabs account's
 	// own (elevenaccount.go), "skyeye" when they are SkyEye's local count.
-	Source        string         `json:"source"`
-	Account       *elevenAccount `json:"account,omitempty"`
-	AccountErr    string         `json:"accountErr,omitempty"`
-	SkyEyeCredits int            `json:"skyeyeCredits"` // SkyEye's own calls, account source only
-	SkyEyeByVoice map[string]int `json:"skyeyeByVoice,omitempty"`
+	Source     string         `json:"source"`
+	Account    *elevenAccount `json:"account,omitempty"`
+	AccountErr string         `json:"accountErr,omitempty"`
+	// SkyEye's own transmissions (the servers' burn, auditions excluded) -
+	// the panel's headline (operator 2026-10-15: "We just need to look at
+	// server messages for burn"). Filled for either source.
+	SkyEyeCredits   int            `json:"skyeyeCredits"`
+	SkyEyeToday     int            `json:"skyeyeToday"`
+	SkyEyeProjected int            `json:"skyeyeProjected"`
+	SkyEyeByVoice   map[string]int `json:"skyeyeByVoice,omitempty"`
+	SkyEyeByDay     map[string]int `json:"skyeyeByDay,omitempty"`
 }
 
 // billingPeriod is the credit month containing now: from resetDay (clamped to
@@ -190,6 +196,8 @@ func fleetUsage(maxAge time.Duration) FleetUsage {
 	wg.Wait()
 	fu := sumUsage(rigs, start, end, *flagElevenMonthly, now)
 	fu.Source = "skyeye"
+	fu.SkyEyeCredits, fu.SkyEyeToday, fu.SkyEyeProjected = fu.Credits, fu.Today, fu.Projected
+	fu.SkyEyeByVoice, fu.SkyEyeByDay = fu.ByVoice, fu.ByDay
 	if a, err := fetchElevenAccount(now); err == nil {
 		applyAccount(&fu, a, now)
 	} else {

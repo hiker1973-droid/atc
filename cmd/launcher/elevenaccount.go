@@ -118,8 +118,6 @@ func shortVoiceName(s string) string {
 func applyAccount(fu *FleetUsage, a *elevenAccount, now time.Time) {
 	fu.Source = "account"
 	fu.Account = a
-	fu.SkyEyeCredits = fu.Credits
-	fu.SkyEyeByVoice = fu.ByVoice
 	fu.Credits, fu.Quota = a.Used, a.Limit
 	fu.PeriodStart, fu.PeriodEnd = a.Start, a.Reset
 	if a.ByVoice != nil {

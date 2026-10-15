@@ -1405,28 +1405,31 @@ async function refreshEleven() {
   let u;
   try { u = await fetch('/api/elevenlabs-fleet', { cache: 'no-store' }).then(r => r.json()); }
   catch (e) { $('elSub').textContent = 'unavailable'; return; }
+  // Headline = the servers' burn: SkyEye's own transmissions, auditions left
+  // out (operator 2026-10-15). The account total is the line underneath - it
+  // is what runs out, and the 80 % / 95 % alerts follow it.
+  const acct = u.source === 'account';
+  const used = u.skyeyeCredits || 0;
+  const pct = u.quota ? Math.min(100, 100 * used / u.quota) : 0;
   $('elSub').textContent = `${elDate(u.periodStart)} – ${elDate(u.periodEnd)} · resets ${elDate(u.periodEnd)}`;
-  const pct = Math.min(100, u.percent || 0);
-  const allVoices = Object.entries(u.byVoice || {}).sort((a, b) => b[1] - a[1]);
-  const voices = allVoices.slice(0, 14);
-  const moreVoices = allVoices.slice(14).reduce((s, [, c]) => s + c, 0);
+  const voices = Object.entries(u.skyeyeByVoice || {}).sort((a, b) => b[1] - a[1]);
   const rigs = (u.rigs || []).map(r => r.err
     ? `<span class="el-chip bad" title="${elEsc(r.err)}">${elEsc(r.label || r.rig)} ${/404/.test(r.err) ? 'needs a launcher update' : 'unreachable'}</span>`
     : `<span class="el-chip">${elEsc(r.label || r.rig)} <b>${elNum(r.credits)}</b></span>`).join('');
-  const pace = u.projected > u.quota
-    ? `<span style="color:var(--gold)">on pace for <b>${elNum(u.projected)}</b> by ${elDate(u.periodEnd)}</span>`
-    : `on pace for <b>${elNum(u.projected)}</b> by ${elDate(u.periodEnd)}`;
+  const days = Object.entries(u.skyeyeByDay || {}).sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 7);
+  const acctLine = acct
+    ? `Account total, auditions included: <b>${elNum(u.credits)}</b> of ${elNum(u.quota)} (<b>${(u.percent || 0).toFixed(1)}%</b>) · ${elEsc(u.account.tier || '')} plan · resets ${new Date(u.periodEnd).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    : `Account figures unavailable${u.accountErr ? ' (' + elEsc(u.accountErr.slice(0, 120)) + ')' : ''} - plan size and reset from launcher settings`;
   $('elBody').innerHTML = `
-    <div class="el-line"><b>${elNum(u.credits)}</b> of ${elNum(u.quota)} credits used (<b>${(u.percent || 0).toFixed(1)}%</b>) · today <b>${elNum(u.today)}</b> · ${pace}</div>
+    <div class="el-line">Servers: <b>${elNum(used)}</b> credits this period · today <b>${elNum(u.skyeyeToday)}</b> · on pace for <b>${elNum(u.skyeyeProjected)}</b> by ${elDate(u.periodEnd)} (${pct.toFixed(1)}% of the plan)</div>
     <div class="el-bar ${u.level}"><div style="width:${pct}%"></div></div>
-    <div class="el-line">By voice</div>
-    <div class="el-chips">${voices.length ? voices.map(([v, c]) => `<span class="el-chip">${elEsc(v || '?')} <b>${elNum(c)}</b></span>`).join('') : '<span class="el-chip">none yet</span>'}${moreVoices ? `<span class="el-chip">${allVoices.length - 14} more <b>${elNum(moreVoices)}</b></span>` : ''}</div>
-    <div class="el-line" style="margin-top:0.5rem">By rig — SkyEye's own calls${u.source === 'account' ? ` (${elNum(u.skyeyeCredits)} of the ${elNum(u.credits)})` : ''}</div>
+    <div class="el-line">By role / voice</div>
+    <div class="el-chips">${voices.length ? voices.map(([v, c]) => `<span class="el-chip">${elEsc(v || '?')} <b>${elNum(c)}</b></span>`).join('') : '<span class="el-chip">no transmissions yet</span>'}</div>
+    <div class="el-line" style="margin-top:0.5rem">By rig</div>
     <div class="el-chips">${rigs}</div>
-    ${u.source === 'account'
-      ? `<div class="el-line" style="margin-top:0.4rem;color:var(--muted)">From the ElevenLabs account (${elEsc(u.account.tier || '')} plan): everything on it, voice auditions included. Resets ${new Date(u.periodEnd).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}. At 100% every role drops to OpenAI voices.${u.account.err ? ' Breakdown unavailable: ' + elEsc(u.account.err) : ''}</div>`
-      : `<div class="el-line" style="margin-top:0.4rem;color:var(--muted)">SkyEye's own count - the account's figures are unavailable${u.accountErr ? ' (' + elEsc(u.accountErr.slice(0, 120)) + ')' : ''}.</div>`}
-    ${u.source !== 'account' && u.first ? `<div class="el-line" style="margin-top:0.4rem;color:var(--muted)">Counted by SkyEye since ${new Date(u.first).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} — earlier use and anything outside SkyEye is not included. At 100% every role drops to OpenAI voices.</div>` : ''}`;
+    ${days.length ? `<div class="el-line" style="margin-top:0.5rem">By day (UTC)</div><div class="el-chips">${days.map(([d, c]) => `<span class="el-chip">${d.slice(5)} <b>${elNum(c)}</b></span>`).join('')}</div>` : ''}
+    <div class="el-line" style="margin-top:0.5rem">${acctLine}</div>
+    <div class="el-line" style="color:var(--muted)">Servers = every SkyEye transmission since each rig ran this build. At 100% of the account every role drops to OpenAI voices.</div>`;
 }
 
 // Boot
