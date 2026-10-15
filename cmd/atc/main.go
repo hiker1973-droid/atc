@@ -122,6 +122,7 @@ var (
 	flagRadioIntensity       string
 	flagOutputGainDB         float64
 	flagTowerRadioIntensity  string
+	flagCarrierRadioIntensity string
 	flagATISRadioIntensity   string
 	flagTTSSpeed             float64
 	flagScudwatchOnly       bool
@@ -199,7 +200,7 @@ func main() {
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elCommand11, "ElevenLabs voice ID for Command (default round 11 voice 3, library)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",
 		"ElevenLabs voice ID of this tower's alternate controller; the two swap every --tower-shift once the frequency has been quiet 5 min (\"\" = one controller)")
@@ -207,7 +208,7 @@ func main() {
 		"Shift length for --elevenlabs-tower-alt-voice, counted from the Unix epoch so every rig changes together")
 	f.StringVar(&flagElevenDepartVoice, "elevenlabs-departure-voice", elDeparture11,
 		"ElevenLabs voice ID for the tower's Departure position - the 7-mile handoff call (default round 11 voice 4, library)")
-	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elSpartan, "ElevenLabs voice ID for Marshal (default Spartan, library)")
+	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elRolando, "ElevenLabs voice ID for Marshal (default Rolando, library)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elDeckboss11,
 		"ElevenLabs voice ID for Deckboss (default round 11 voice 5, library; every theatre)")
 	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
@@ -283,6 +284,8 @@ func main() {
 		"Apply radio/static effect to TTS audio before SRS injection")
 	f.StringVar(&flagRadioIntensity, "radio-effect-intensity", "medium",
 		"Radio effect intensity for command/deckboss/marshal: light, medium, heavy, extreme")
+	f.StringVar(&flagCarrierRadioIntensity, "carrier-radio-intensity", "carrier",
+		"Radio effect intensity for Marshal and Deckboss: light, medium, carrier, heavy, extreme")
 	f.StringVar(&flagTowerRadioIntensity, "tower-radio-intensity", "heavy",
 		"Radio effect intensity for tower TX: light, medium, heavy, extreme")
 	f.StringVar(&flagATISRadioIntensity, "atis-radio-intensity", "light",
@@ -1181,7 +1184,29 @@ func trimCallsignAtVerb(s string) string {
 			cut = i
 		}
 	}
-	return strings.TrimSpace(s[:cut])
+	return endAtCallsignNumber(strings.TrimSpace(s[:cut]))
+}
+
+var callsignNumberRe = regexp.MustCompile(`^\d[\d-]*$`)
+
+// endAtCallsignNumber ends a callsign at its number: "Raider 302 com" ->
+// "Raider 302". Live 2026-10-15 09:50, Day: "Command, Raider 302 com check"
+// came back "Raider 302 com, vSFG-7-Command" - the verb cut stopped at
+// "check" and kept "com". Spaced digits stay together ("Raider 3 0 2"); a
+// segment with no number, or one that starts with it, is left alone.
+func endAtCallsignNumber(s string) string {
+	f := strings.Fields(s)
+	for i := 1; i < len(f); i++ {
+		if !callsignNumberRe.MatchString(f[i]) {
+			continue
+		}
+		j := i
+		for j+1 < len(f) && callsignNumberRe.MatchString(f[j+1]) {
+			j++
+		}
+		return strings.Join(f[:j+1], " ")
+	}
+	return s
 }
 
 // transcribeFramesWithPrompt wraps Opus frames and sends to Whisper with a custom prompt.
@@ -1931,8 +1956,12 @@ func departureProfile(towerVoice string) voiceProfile {
 	return p
 }
 
+// commandSpeedUp is Command's rate over the shared --tts-speed (operator
+// 2026-10-15: "speed up command by 10%"); the ElevenLabs read is in elCommand.
+const commandSpeedUp = 1.10
+
 func commandVoice(v string) voiceProfile {
-	return voiceProfile{voice: v, speed: flagTTSSpeed, instructions: flagVoiceStyleCommand,
+	return voiceProfile{voice: v, speed: flagTTSSpeed * commandSpeedUp, instructions: flagVoiceStyleCommand,
 		eleven: elCommand(flagElevenCommandVoice)}
 }
 
@@ -2301,6 +2330,11 @@ func radioTier(intensity string) (noiseAmp float64, hpf, lpf int) {
 		return 0.060, 220, 3200
 	case "extreme":
 		return 0.100, 300, 2800
+	case "carrier":
+		// Marshal and Deckboss (operator 2026-10-15: "add a little radio hiss
+		// to deckboss and marshall"): half again medium's hiss, a shade
+		// narrower, still well short of the towers' heavy.
+		return 0.045, 200, 3300
 	case "field":
 		// The JTAC's manpack FM set: narrower than a console's radio and
 		// noisier than "heavy", short of "extreme" so numbers stay clear.
@@ -2335,8 +2369,20 @@ func radioTier(intensity string) (noiseAmp float64, hpf, lpf int) {
 // alimiter stays last in the voice path: digital clipping sounds like crackle
 // rather than like a driven radio, and the limiter gives the hard-driven UHF
 // character the compressor alone doesn't.
+// radioClicks is the PTT key-up click and the squelch tail for a tier:
+// amplitude and length of each. The carrier tier (Marshal, Deckboss) keys up
+// harder and drops a longer squelch (operator 2026-10-15: "more radio click");
+// every other tier keeps the original clicks.
+func radioClicks(intensity string) (upAmp, upSec, dnAmp, dnSec float64) {
+	if strings.ToLower(intensity) == "carrier" {
+		return 0.85, 0.10, 0.65, 0.30
+	}
+	return 0.55, 0.07, 0.4, 0.18
+}
+
 func radioFilter(intensity string, levelDB, outGainDB float64) string {
 	noiseAmp, hpf, lpf := radioTier(intensity)
+	upAmp, upSec, dnAmp, dnSec := radioClicks(intensity)
 	return fmt.Sprintf(
 		// bass: +5 dB shelf at 150 Hz puts back the body the radio band cuts.
 		// Compression 4:1 (was 8:1) keeps the voice punchy without the squash.
@@ -2351,14 +2397,15 @@ func radioFilter(intensity string, levelDB, outGainDB float64) string {
 			"alimiter=limit=0.95:attack=1:release=40,"+
 			// 44100/mono so concat can match the synthetic clicks.
 			"aresample=44100,aformat=channel_layouts=mono[body];"+
-			"anoisesrc=color=white:amplitude=0.55:duration=0.07:sample_rate=44100,"+
+			"anoisesrc=color=white:amplitude=%.2f:duration=%.2f:sample_rate=44100,"+
 			"highpass=f=1500,lowpass=f=4500,"+
-			"afade=t=in:st=0:d=0.005,afade=t=out:st=0.05:d=0.02[click_up];"+
-			"anoisesrc=color=pink:amplitude=0.4:duration=0.18:sample_rate=44100,"+
+			"afade=t=in:st=0:d=0.005,afade=t=out:st=%.3f:d=0.02[click_up];"+
+			"anoisesrc=color=pink:amplitude=%.2f:duration=%.2f:sample_rate=44100,"+
 			"highpass=f=300,lowpass=f=4000,"+
-			"afade=t=out:st=0.02:d=0.16[click_dn];"+
+			"afade=t=out:st=0.02:d=%.2f[click_dn];"+
 			"[click_up][body][click_dn]concat=n=3:v=0:a=1[out]",
 		levelDB, hpf, lpf, noiseAmp, outGainDB,
+		upAmp, upSec, upSec-0.02, dnAmp, dnSec, dnSec-0.02,
 	)
 }
 
@@ -2441,10 +2488,13 @@ func parseMeanVolumeDB(ffmpegOutput string) (float64, bool) {
 //     punchy ATC sound.
 //   - ATIS station callsigns end with " ATIS" (e.g. "Liwa ATIS", "Kish ATIS")
 //     → kept clean since it's a recorded loop.
-//   - Everything else (OMDM-MSH, OMDM-DKB, vSFG-7-Command) gets the general
-//     operational intensity.
+//   - Marshal (OMDM-MSH) and Deckboss (OMDM-DKB) → the carrier tier, a
+//     little more hiss than Command.
+//   - Everything else (vSFG-7-Command) gets the general operational intensity.
 func txIntensity(callsign string) string {
 	switch {
+	case callsign == "OMDM-MSH" || callsign == "OMDM-DKB":
+		return flagCarrierRadioIntensity
 	case strings.HasSuffix(callsign, "-ATC"):
 		return flagTowerRadioIntensity
 	case strings.HasSuffix(callsign, " ATIS"):
