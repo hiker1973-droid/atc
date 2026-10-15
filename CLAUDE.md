@@ -287,6 +287,7 @@ Reproducible across three restart patterns including a clean full restart with 4
   - Incirlik ATIS logged one `ATIS TTS attempt failed … took=45000` on regeneration. That is the normal restart stall and the retry handles it.
   - **Tacview :42676 is not listening on this box** (also the case all of 2026-10-14), so every tower logs `TACVIEW OFFLINE` with conflict detection and speed warnings off. This was already the case before the deploy; DCS real-time telemetry needs turning on.
   - Not yet heard on the air from this box: the 7-mile handoff, the Departure voice and the new Command/Deckboss voices.
+- **Redeployed `ff7639e` at 08:43** (`b26e6ad`: ATIS no longer cut off when ExternalAudio crashes mid-play; `ff7639e`: Senaki shifts, which only touches `start_towers_caucasus.bat` and so changes nothing on this box). Vet and tests passed. Same `.new` build, swap, and `start_region_syria.bat` + `start_launcher.bat` restart as before. All 10 processes were back and every SRS role was registered by 08:43:51. Incirlik and Ramat David ATIS regenerated on the first attempt. **Rollback copies now hold `b54a9a0` (= `402ed9c` code).**
 - **The auto-mode permission classifier refused the stop-and-restart** the first time, even though the request said "pull, rebuild and deploy". It ran after the operator said "go ahead and deploy". Build and test first, so a refusal leaves the rig untouched.
 
 ## Recent context (2026-10-14) — DCS3 / 192.168.1.220 (Caucasus, SRS :5008)
