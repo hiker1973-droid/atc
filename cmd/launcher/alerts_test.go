@@ -21,13 +21,15 @@ func TestRecoveredExternalAudioCrashDoesNotAlert(t *testing.T) {
 		`{"level":"error","time":"` + now + `","message":"ExternalAudio file error"}`,
 		`{"level":"warn","time":"` + now + `","message":"ExternalAudio file TX timed out — killed"}`,
 	}
+	// A normal transmission mentions ExternalAudio at info: never an alert.
+	lines = append(lines, `{"level":"info","time":"`+now+`","message":"TX via OpenAI TTS + ExternalAudio"}`)
 	os.WriteFile(filepath.Join(rootDir, "logs", "atc-atis.log"), []byte(strings.Join(lines, "\n")+"\n"), 0o644)
 	var got []string
 	for _, a := range scanLogAlerts() {
 		got = append(got, a.Message)
 	}
 	joined := strings.Join(got, " | ")
-	if strings.Contains(joined, "resend") {
+	if strings.Contains(joined, "resend") || strings.Contains(joined, "TX via") {
 		t.Errorf("recovered crash alerted: %s", joined)
 	}
 	if !strings.Contains(joined, "ExternalAudio file error") || !strings.Contains(joined, "timed out") {
