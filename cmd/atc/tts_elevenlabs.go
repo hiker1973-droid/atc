@@ -22,7 +22,8 @@ import (
 // the field's accent and gender (voice_accents.go). ATIS stays on OpenAI.
 // Marshal (Adam) and Deckboss (Eric in the Caucasus, Brian elsewhere) joined
 // the same day; Deckboss became Hank Harvey everywhere after round 9, and
-// Marshal took Spartan on 2026-10-15 ("Lets use Spartan for Marshall").
+// Marshal took Spartan on 2026-10-15 ("Lets use Spartan for Marshall"), when
+// Deckboss became round 11 voice 5.
 //
 // ElevenLabs is used only when ELEVENLABS_API_KEY (or --elevenlabs-key) is set
 // on the rig. Any failure falls back to the role's OpenAI voice inside the same
@@ -63,7 +64,10 @@ const (
 	// "command_3_XlDdozLmuTofIxK4BjPD"). Its name is not readable with the
 	// rigs' key (no voices_read).
 	elCommand11 = "XlDdozLmuTofIxK4BjPD" // Command
-	elHank      = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss)
+	// elDeckboss11 is voice 5 of the same round, picked for Deckboss the same
+	// day ("command_5_ljX1ZrXuDIIRVcmiVSyR"); name likewise unreadable.
+	elDeckboss11 = "ljX1ZrXuDIIRVcmiVSyR" // Deckboss
+	elHank       = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
 )
 
 // elFlash is ElevenLabs' cheaper model, about half the credits a character.
