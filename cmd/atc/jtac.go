@@ -225,11 +225,19 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 
 	switch {
 	case isBDARequest(lower):
-		if cur.clearedAt.IsZero() {
+		// Impacts since cleared hot, or since the brief when there was none: on
+		// 2026-10-15 Raider 302 released twice with no in call and was told
+		// "negative BDA, no attack yet" (16:10:10, 16:13:17).
+		since := cur.clearedAt
+		if since.IsZero() {
+			since = cur.issued
+		}
+		imps := flightImpacts(pic.Impacts(since), callsign, t)
+		if cur.clearedAt.IsZero() && len(imps) == 0 {
 			return say("negative BDA, no attack yet.")
 		}
 		cur.bdaDone = true
-		return bdaFor(callsign, name, t, pic.GroundObjects(), flightImpacts(pic.Impacts(cur.clearedAt), callsign, t))
+		return bdaFor(callsign, name, t, pic.GroundObjects(), imps)
 
 	case jtacAbortRe.MatchString(lower):
 		cur.stage = jtacReady
@@ -239,10 +247,20 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		// Operator 2026-10-15: "Raider 302, Hitman, copy pickle, will report
 		// BDA". Only after cleared hot; the BDA itself goes out from the watch
 		// (bdaDue) once the weapons are down.
-		if cur.clearedAt.IsZero() || cur.stage < jtacCleared {
-			return ""
+		word := jtacReleaseCallRe.FindString(lower)
+		switch {
+		case cur.stage == jtacInbound:
+			// Released off IP inbound without an in call (Raider 302 flew it
+			// that way all sortie, 2026-10-15). Take the release as the attack:
+			// acknowledge it and start the clock, so the automatic BDA comes.
+			b.clear(cur, now)
+			return say("copy %s, will report BDA.", word)
+		case cur.stage < jtacCleared:
+			// Not cleared - after an abort, or before IP inbound. Silence here
+			// left the pilot calling "pickle" into a dead net (16:12:26, 16:12:35).
+			return say("negative, you are not cleared. Re-attack from %s.", t.IP)
 		}
-		return say("copy %s, will report BDA.", jtacReleaseCallRe.FindString(lower))
+		return say("copy %s, will report BDA.", word)
 
 	case jtacOffRe.MatchString(lower):
 		if cur.stage < jtacInbound {
@@ -258,7 +276,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		cur.stage = jtacOff
 		return say("copy off. Egress back to %s, %s. Report IP inbound for re-attack.", t.IP, t.Egress)
 
-	case isJTACInbound(lower):
+	case isJTACInbound(lower) && !b.inboundIsInCall(cur, lower, callsign, t, pic):
 		pos, hdg, ok := pic.Contact(callsign)
 		if ok {
 			brgIP, nmIP := bearingRangeFromRef(pos, t.IPPos[0], t.IPPos[1])
@@ -268,6 +286,13 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 				return say("negative, you are not at %s. %s bears %s for %d. Report IP inbound from %s.",
 					t.IP, t.IP, spokenBearing(toMagnetic(brgIP, t.MagVar)), int(nmIP+0.5), t.IP)
 			}
+			// Accepted up to 20 nm out, which can be well off the run-in line:
+			// on 2026-10-15 Raider 302 ran in on 109 for Brick's 169 and was
+			// aborted at the in call. Tell him the run-in up front.
+			if magT := toMagnetic(brgT, t.MagVar); !inWindow(magT, float64(t.FAHLow), float64(t.FAHHigh), jtacWatchSlackDeg) {
+				cur.stage = jtacInbound
+				return say("continue. Run in heading %s from %s.", spokenBearing(float64(t.RunIn)), t.IP)
+			}
 			if angleDiff(hdg, brgT) > jtacInboundTolDeg {
 				cur.stage = jtacInbound
 				return say("continue. Check heading, target bears %s.", spokenBearing(toMagnetic(brgT, t.MagVar)))
@@ -276,7 +301,8 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		cur.stage = jtacInbound
 		return say("continue.")
 
-	case jtacInRe.MatchString(lower):
+	case jtacInRe.MatchString(lower) || isJTACInbound(lower):
+		// isJTACInbound only reaches here when inboundIsInCall said so.
 		pos, hdg, ok := pic.Contact(callsign)
 		if !ok {
 			log.Info().Str("callsign", callsign).Msg("JTAC: no picture of the caller, cleared hot unchecked")
@@ -319,6 +345,24 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		return say("good readback. Report IP inbound.")
 	}
 	return ""
+}
+
+// inboundIsInCall: a bare "inbound" (no "IP") from a flight that has already
+// called IP inbound is its in call. Raider 302 flew that way on 2026-10-15
+// ("Hitman 1-1, Raider 302, inbound", 16:10:31 and 16:11:38) and got
+// "continue" each time, never cleared hot. Only near the target (inside
+// jtacInMaxNm) or with no picture to check, so a repeated IP inbound from
+// the IP is still answered as one.
+func (b *taskingBoard) inboundIsInCall(cur *taskingAssignment, lower, callsign string, t taskingTarget, pic jtacPicture) bool {
+	if cur.stage != jtacInbound || jtacIPRe.MatchString(lower) {
+		return false
+	}
+	pos, _, ok := pic.Contact(callsign)
+	if !ok {
+		return true
+	}
+	_, nm := bearingRangeFromRef(pos, t.TgtPos[0], t.TgtPos[1])
+	return nm <= jtacInMaxNm
 }
 
 func (b *taskingBoard) clear(cur *taskingAssignment, now time.Time) {

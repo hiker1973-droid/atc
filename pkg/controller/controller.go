@@ -441,6 +441,14 @@ func (c *ATCController) UpdatePosition(callsign string, position orb.Point, altF
 
 // HandleRequest processes a parsed ATCRequest and transmits the appropriate response.
 func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
+	// Every reply leads with the callsign. Without one it went out as
+	// ", Senaki Tower, runway zero niner is clear, welcome back" (DCS3
+	// 2026-10-15 16:03:14), and an empty name also files the call under a
+	// blank aircraft, so a departure's "clear active" read as a landing.
+	if strings.TrimSpace(req.Callsign) == "" {
+		log.Info().Str("text", req.Raw).Int("type", int(req.Type)).Msg("no callsign in call - not answered")
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -1519,7 +1527,13 @@ func extractCallsign(text, towerCallsign string) string {
 		if len(parts) >= 2 {
 			cs := strings.TrimSpace(parts[1])
 			if cs != "" && !strings.Contains(strings.ToLower(cs), "traffic") && !strings.Contains(strings.ToLower(cs), "tower") {
-				return trimTrailingTriggers(cs)
+				// Only if it still looks like a callsign. "Senaki traffic Raider
+				// 302, clear active 09" (no comma after "traffic", DCS3
+				// 2026-10-15 16:03:14) made the second segment "clear active 09",
+				// which trimmed to nothing and went out as ", Senaki Tower, ...".
+				if t := trimTrailingTriggers(cs); hasModex(t) {
+					return t
+				}
 			}
 		}
 		// Comma-less last resort: scan for a known squadron word + modex.
@@ -1542,6 +1556,14 @@ func extractCallsign(text, towerCallsign string) string {
 	}
 	return ""
 }
+
+// hasModex reports whether cs holds a word followed by a number, the shape of
+// every squadron callsign ("Raider 302", "Venom 2-0-3").
+func hasModex(cs string) bool {
+	return modexShapeRe.MatchString(cs)
+}
+
+var modexShapeRe = regexp.MustCompile(`(?i)[a-z]{3,}[\s-]*\d`)
 
 // trimTrailingTriggers strips known intent-trigger phrases from the tail of
 // what extractCallsign returned. Pilots routinely run callsign + request
@@ -1709,7 +1731,9 @@ var numberWords = map[string]int{
 // distanceMilesRe matches "3 mile", "12 miles", "8 nm", "30 nautical" etc.
 // The digit must immediately precede a miles/nm token so unrelated numbers
 // (altitudes, channels, callsign suffixes) don't trigger a false positive.
-var distanceMilesRe = regexp.MustCompile(`\b(\d{1,3})\s*(?:miles?|nm|nautical)\b`)
+// The hyphen: Whisper writes "10-mile initial" (DCS3 2026-10-15 16:17:15),
+// which missed this and fell to the break case ("break acknowledged").
+var distanceMilesRe = regexp.MustCompile(`\b(\d{1,3})\s*-?\s*(?:miles?|nm|nautical)\b`)
 
 // containsDistanceMiles returns true if the text contains a numeric or word distance.
 func containsDistanceMiles(lower string) bool {

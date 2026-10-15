@@ -148,13 +148,93 @@ func TestJTACFullRun(t *testing.T) {
 }
 
 // A release call before cleared hot is not acknowledged.
-func TestJTACPickleBeforeClearedHotIgnored(t *testing.T) {
+// Before IP inbound, or after an abort, a release call is answered "not
+// cleared" - silence left Raider 302 calling pickle into a dead net
+// (2026-10-15 16:12:26, 16:12:35).
+func TestJTACPickleNotClearedAnswered(t *testing.T) {
 	b, _ := newJTACBoard(t)
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "" {
-		t.Errorf("pickle before cleared hot = %q, want no reply", got)
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, negative, you are not cleared. Re-attack from Anvil." {
+		t.Errorf("pickle before IP inbound = %q", got)
+	}
+}
+
+// Raider 302's 2026-10-15 16:08-16:13 pass, no picture: IP inbound, then
+// "pickle" with no in call, then "request BDA".
+func TestJTACPickleOffIPInboundIsTheAttack(t *testing.T) {
+	b, clock := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic)
+	if got := b.JTACResponse("Hitman 1-1, Raider 3-0-2, pickle times one", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy pickle, will report BDA." {
+		t.Errorf("pickle off IP inbound = %q", got)
+	}
+	*clock = clock.Add(30 * time.Second)
+	pic.impacts = []tacviewImpact{{Pos: tgt.TgtPos, At: *clock}}
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic); strings.Contains(got, "no attack yet") || !strings.Contains(got, "BDA.") {
+		t.Errorf("BDA after the release = %q", got)
+	}
+}
+
+// Released with no clearance at all (after an abort): "request BDA" still
+// counts the impacts since the brief.
+func TestJTACBDAWithoutClearedHot(t *testing.T) {
+	b, clock := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic); !strings.Contains(got, "no attack yet") {
+		t.Errorf("BDA with nothing dropped = %q", got)
+	}
+	*clock = clock.Add(time.Minute)
+	pic.impacts = []tacviewImpact{{Pos: tgt.TgtPos, At: *clock}}
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic); strings.Contains(got, "no attack yet") {
+		t.Errorf("BDA after an uncleared release = %q", got)
+	}
+}
+
+// A bare "inbound" after IP inbound, near the target, is the in call
+// (2026-10-15 16:10:31 / 16:11:38). A repeated "IP inbound" stays IP inbound.
+func TestJTACSecondInboundIsTheInCall(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	pic.place(tgt.IPPos, 0, 1, 329)
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue." {
+		t.Fatalf("IP inbound = %q", got)
+	}
+	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue." {
+		t.Errorf("repeated IP inbound = %q, want continue", got)
+	}
+	pic.place(tgt.TgtPos, 149, 5, 329) // on the run-in, 5 nm out
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, cleared hot." {
+		t.Errorf("second inbound = %q, want cleared hot", got)
+	}
+}
+
+// IP inbound accepted off the run-in line gets the run-in heading (Brick's
+// 169 with the jet on 109, 2026-10-15 16:10-16:12).
+func TestJTACIPInboundOffAxisGetsRunIn(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0] // Anvil, run-in 329, window 309-349
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	pic.place(tgt.IPPos, 0, 1, 329)
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	pic.place(tgt.TgtPos, 240, 8, 60) // west of the target: it bears ~060
+	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue. Run in heading three-two-niner from Anvil." {
+		t.Errorf("off-axis IP inbound = %q", got)
 	}
 }
 
