@@ -66,6 +66,13 @@ type FleetUsage struct {
 	Rigs        []RigUsage     `json:"rigs"`
 	First       time.Time      `json:"first,omitempty"`
 	At          time.Time      `json:"at"`
+	// Source is "account" when the totals above are the ElevenLabs account's
+	// own (elevenaccount.go), "skyeye" when they are SkyEye's local count.
+	Source        string         `json:"source"`
+	Account       *elevenAccount `json:"account,omitempty"`
+	AccountErr    string         `json:"accountErr,omitempty"`
+	SkyEyeCredits int            `json:"skyeyeCredits"` // SkyEye's own calls, account source only
+	SkyEyeByVoice map[string]int `json:"skyeyeByVoice,omitempty"`
 }
 
 // billingPeriod is the credit month containing now: from resetDay (clamped to
@@ -182,6 +189,12 @@ func fleetUsage(maxAge time.Duration) FleetUsage {
 	}
 	wg.Wait()
 	fu := sumUsage(rigs, start, end, *flagElevenMonthly, now)
+	fu.Source = "skyeye"
+	if a, err := fetchElevenAccount(now); err == nil {
+		applyAccount(&fu, a, now)
+	} else {
+		fu.AccountErr = err.Error()
+	}
 	fleetUsageCache = &fu
 	return fu
 }

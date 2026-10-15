@@ -63,3 +63,36 @@ func TestReadAndSumUsage(t *testing.T) {
 		t.Error("thousands formatting")
 	}
 }
+
+func TestShortVoiceName(t *testing.T) {
+	for in, want := range map[string]string{
+		"Lisa - Assertive Australian Woman - Calm":                "Lisa",
+		"Jerry B. - Military Commander | Gruff, Gritty Authority": "Jerry B.",
+		"Kateryna | Native Ukrainian":                             "Kateryna",
+		"Naomy- Calm and Friendly- Australian":                    "Naomy",
+		"Michael":                                                 "Michael",
+		"":                                                        "?",
+	} {
+		if got := shortVoiceName(in); got != want {
+			t.Errorf("shortVoiceName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// The account's figures replace the local total, plan and period; SkyEye's
+// own count stays alongside.
+func TestApplyAccount(t *testing.T) {
+	now := time.Date(2026, 10, 16, 16, 31, 0, 0, time.UTC)
+	fu := sumUsage([]RigUsage{{Credits: 900, ByVoice: map[string]int{"Command": 900}}}, now, now, 100000, now)
+	a := &elevenAccount{Tier: "creator", Used: 110000, Limit: 127855,
+		Reset: time.Date(2026, 11, 14, 16, 31, 0, 0, time.UTC), Start: time.Date(2026, 10, 14, 16, 31, 0, 0, time.UTC),
+		ByVoice: map[string]int{"Lisa": 60000, "Misa": 50000}, ByDay: map[string]int{"2026-10-16": 4000, "2026-10-15": 106000}}
+	applyAccount(&fu, a, now)
+	if fu.Source != "account" || fu.Credits != 110000 || fu.Quota != 127855 || fu.SkyEyeCredits != 900 ||
+		fu.Today != 4000 || fu.Level != "warn" || fu.ByVoice["Lisa"] != 60000 {
+		t.Errorf("applyAccount = %+v", fu)
+	}
+	if d := sortedDays(fu.ByDay); d[0] != "2026-10-15" {
+		t.Errorf("days %v", d)
+	}
+}
