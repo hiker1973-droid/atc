@@ -294,6 +294,45 @@ func (c *ATCComposer) HandoffToCommand(callsign, handoffCallsign string, freqMHz
 	})
 }
 
+// departureName is the tower's departure position: "Senaki Tower" -> "Senaki
+// Departure".
+func (c *ATCComposer) departureName() string {
+	if base, ok := strings.CutSuffix(c.towerCallsign, " Tower"); ok {
+		return base + " Departure"
+	}
+	return c.towerCallsign + " Departure"
+}
+
+// DepartureLeavingAirspace is the tower's own call when a departure passes
+// the departure distance (operator 2026-10-15): it replaces the pilot's
+// "seven DME" report. angels is the Tacview altitude in thousands; signOff
+// is the field's farewell ("Safe skies, g'day"), "" for "Good day".
+func (c *ATCComposer) DepartureLeavingAirspace(callsign string, distNm, angels int, handoffCallsign string, freqMHz float64, preset, signOff string) string {
+	if signOff == "" {
+		signOff = "Good day"
+	}
+	dep := c.departureName()
+	dist, ang := numberWord(distNm), numberWord(angels)
+	if handoffCallsign == "" || freqMHz <= 0 {
+		return fmt.Sprintf("%s, %s, %s miles, angels %s, leaving my airspace, frequency change approved. %s.", callsign, dep, dist, ang, signOff)
+	}
+	dest := fmt.Sprintf("%s, %s", handoffCallsign, spellFrequency(freqMHz))
+	if preset != "" {
+		dest += ", " + preset
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, %s miles, angels %s, leaving my airspace. Contact %s. %s.", callsign, dep, dist, ang, dest, signOff),
+		fmt.Sprintf("%s, %s, have you %s miles, angels %s, you are leaving my airspace. Push %s. %s.", callsign, dep, dist, ang, dest, signOff),
+		fmt.Sprintf("%s, %s, %s miles out, angels %s, leaving the zone. Contact %s. %s.", callsign, dep, dist, ang, dest, signOff),
+	})
+}
+
+// DepartureCopy answers a pilot's "seven DME" call after the tower has already
+// handed the flight off.
+func (c *ATCComposer) DepartureCopy(callsign string) string {
+	return fmt.Sprintf("%s, %s, copy.", callsign, c.departureName())
+}
+
 // Handoff is the generic radio-communications transfer used by every role.
 // FAA JO 7110.65 2-1-17 phraseology is "CONTACT (facility name or location name
 // and terminal function), (frequency)" — the receiving facility is named first

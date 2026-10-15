@@ -205,6 +205,14 @@ type ATCController struct {
 	players             map[string]bool
 	unknownPrevDistNm   map[string]float64
 	unknownWarnedAt     map[string]time.Time
+
+	// Departure handoff call (proactive.go): the tower calls a departure at
+	// the departure distance instead of waiting for its "seven DME" report.
+	// Keyed by compactCallsign; guarded by mu.
+	departureCalls   bool
+	departureSignOff string
+	departWatch      map[string]departWatch
+	departHandedOff  map[string]time.Time
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -559,6 +567,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		// (operator 2026-10-15, last night's logs). From a departure it is the
 		// airborne call and gets the departure release, not "roger, clear".
 		if c.isDepartureCall(ac) {
+			c.watchDeparture(req.Callsign)
 			s.Remove(req.Callsign)
 			response = c.composer.DepartureRelease(
 				req.Callsign,
@@ -583,8 +592,13 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		return // basic mode — not active
 
 	case RequestDistanceCheck:
-		// Pilot called their departure distance — issue handoff to command.
+		// Pilot called their departure distance — issue handoff to command,
+		// or just "copy" when the tower already called it (proactive.go).
 		s.Remove(req.Callsign)
+		if c.departureAlreadyHandedOff(req.Callsign) {
+			response = c.composer.DepartureCopy(req.Callsign)
+			break
+		}
 		response = c.composer.HandoffToCommand(
 			req.Callsign,
 			s.Airfield.HandoffCallsign,
@@ -594,6 +608,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestClearTraffic:
 		// Pilot called clear of traffic (CTAF departure) — issue departure release and remove from tracking.
+		c.watchDeparture(req.Callsign)
 		s.Remove(req.Callsign)
 		response = c.composer.DepartureRelease(
 			req.Callsign,
@@ -1113,6 +1128,9 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 	}
 	if c.runwayVacateChase {
 		c.checkRunwayVacate(ctx)
+	}
+	if c.departureCalls {
+		c.checkDepartures(ctx)
 	}
 }
 

@@ -186,3 +186,119 @@ func (c *ATCController) checkRunwayVacate(ctx context.Context) {
 		c.transmitTo(ctx, ac.Callsign, c.composer.ReportClearOfRunway(ac.Callsign))
 	}
 }
+
+// ── Departure handoff call ───────────────────────────────────────────────────
+//
+// Operator 2026-10-15: "Can we have ATC report when a pilot departing is 7
+// miles out ... This will replace pilot calling 7 miles DME (which they still
+// can do but just respond copy)". Every flight cleared for takeoff, rolling,
+// or released airborne is watched; when Tacview has it at the field's
+// departure distance and off the ground the tower calls it - distance, angels,
+// leaving the airspace, contact Command - and a later pilot report gets "copy".
+
+const (
+	// departWatchFor drops a watched departure that never reached the
+	// distance (cleared, then taxied back or left the server).
+	departWatchFor = 20 * time.Minute
+	// departCopyFor is how long after the tower's call a pilot "seven DME"
+	// report is answered with "copy" rather than a second handoff.
+	departCopyFor = 15 * time.Minute
+	// departMinAGLFt - below this the flight is not airborne yet.
+	departMinAGLFt = 300.0
+	// defaultDepartureDistNm when an airfield has none set.
+	defaultDepartureDistNm = 7
+)
+
+type departWatch struct {
+	callsign string
+	since    time.Time
+}
+
+// SetDepartureCalls enables the tower's own departure handoff call; signOff is
+// the field's farewell ("Safe skies, g'day"). Wired to --departure-handoff-call.
+func (c *ATCController) SetDepartureCalls(enabled bool, signOff string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.departureCalls = enabled
+	c.departureSignOff = signOff
+}
+
+// watchDeparture starts watching callsign for the departure call. Caller holds c.mu.
+func (c *ATCController) watchDeparture(callsign string) {
+	if !c.departureCalls {
+		return
+	}
+	key := compactCallsign(callsign)
+	if key == "" {
+		return
+	}
+	if c.departWatch == nil {
+		c.departWatch = make(map[string]departWatch)
+	}
+	if _, ok := c.departWatch[key]; !ok {
+		c.departWatch[key] = departWatch{callsign: callsign, since: time.Now()}
+	}
+}
+
+// departureAlreadyHandedOff reports whether the tower already made the
+// departure call for callsign, and ends the watch either way: a pilot's own
+// report hands the flight off. Caller holds c.mu.
+func (c *ATCController) departureAlreadyHandedOff(callsign string) bool {
+	key := compactCallsign(callsign)
+	delete(c.departWatch, key)
+	at, ok := c.departHandedOff[key]
+	if ok {
+		delete(c.departHandedOff, key)
+	}
+	return ok && time.Since(at) < departCopyFor
+}
+
+// checkDepartures makes the departure call for any watched flight Tacview has
+// past the departure distance and airborne. Caller holds c.mu.
+func (c *ATCController) checkDepartures(ctx context.Context) {
+	s := c.airfieldState
+	for _, ac := range s.ActiveDepartures() {
+		c.watchDeparture(ac.Callsign)
+	}
+	if len(c.departWatch) == 0 {
+		return
+	}
+	if c.departHandedOff == nil {
+		c.departHandedOff = make(map[string]time.Time)
+	}
+	distLimit := s.Airfield.DepartureDistNm
+	if distLimit <= 0 {
+		distLimit = defaultDepartureDistNm
+	}
+	now := time.Now()
+	for key, w := range c.departWatch {
+		if now.Sub(w.since) > departWatchFor {
+			delete(c.departWatch, key)
+			continue
+		}
+		c.allPositionsMu.RLock()
+		ct := c.lookupContact(w.callsign)
+		var dist, altFt float64
+		fresh := ct != nil && now.Sub(ct.UpdatedAt) <= contactFreshFor
+		if fresh {
+			dist = haversineNm(orb.Point{ct.Lon, ct.Lat}, s.Airfield.Center)
+			altFt = ct.AltFt
+		}
+		c.allPositionsMu.RUnlock()
+		if !fresh || dist < float64(distLimit) || altFt-float64(s.Airfield.ElevationFt) < departMinAGLFt {
+			continue
+		}
+		delete(c.departWatch, key)
+		c.departHandedOff[key] = now
+		s.Remove(w.callsign)
+		angels := int(math.Round(altFt / 1000))
+		if angels < 1 {
+			angels = 1
+		}
+		log.Info().Str("callsign", w.callsign).Float64("distNm", math.Round(dist*10)/10).Int("angels", angels).
+			Msg("departure leaving the airspace — tower hands off to Command")
+		c.transmitTo(ctx, w.callsign, c.composer.DepartureLeavingAirspace(w.callsign, distLimit, angels,
+			s.Airfield.HandoffCallsign, s.Airfield.HandoffFreqMHz, s.Airfield.HandoffPreset, c.departureSignOff))
+		return // one call per tick keeps the frequency usable
+	}
+}

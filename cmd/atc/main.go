@@ -136,6 +136,7 @@ var (
 	flagDeckPositionCheck   bool
 	flagUnknownTraffic      bool
 	flagRunwayVacateChase   bool
+	flagDepartureCall       bool
 )
 
 func main() {
@@ -311,6 +312,8 @@ func main() {
 		"Tower calls a human-flown aircraft that closes inside 8 nm / 5,000 ft above the field without having talked to it: \"say intentions\". Once per aircraft per 10 min, one call per 10 s monitor tick. Off by default — trial on the dev rig first.")
 	f.BoolVar(&flagRunwayVacateChase, "runway-vacate-chase", false,
 		"Tower asks a landed aircraft to \"report clear of the runway\" when it has sat on the field below 40 kt for 90 s after its landing clearance without calling vacated. Once per landing. Off by default.")
+	f.BoolVar(&flagDepartureCall, "departure-handoff-call", true,
+		"Tower calls a departure itself at the field's departure distance (7 nm): \"<callsign>, Senaki Departure, seven miles, angels five, leaving my airspace, contact Command ...\". A pilot \"seven DME\" report after that gets \"copy\". --departure-handoff-call=false = the pilot's report only.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -466,6 +469,10 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagRunwayVacateChase {
 		atcCtrl.SetRunwayVacateChase(true)
 		log.Info().Msg("runway-vacate chase enabled (--runway-vacate-chase)")
+	}
+	if flagDepartureCall {
+		atcCtrl.SetDepartureCalls(true, departureSignOff(flagAirfield))
+		log.Info().Msg("departure handoff call enabled - tower calls departures at the departure distance")
 	}
 	// Seed weather. Priority: explicit --miz-path > newest .miz in --miz-dir >
 	// --static-* flags. .miz wind is true degrees (controller applies MagVar
