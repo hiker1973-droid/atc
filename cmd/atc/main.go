@@ -113,6 +113,8 @@ var (
 	flagElevenJTACVoice    string
 	flagElevenMarshalVoice string
 	flagElevenDepartVoice  string
+	flagElevenTowerAltVoice string
+	flagTowerShift         time.Duration
 	flagElevenDeckbossVoice string
 	flagDeckbossVoice   string
 	flagMarshalVoice    string
@@ -199,6 +201,10 @@ func main() {
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elCommand11, "ElevenLabs voice ID for Command (default round 11 voice 3, library)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
+	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",
+		"ElevenLabs voice ID of this tower's alternate controller; the two swap every --tower-shift once the frequency has been quiet 5 min (\"\" = one controller)")
+	f.DurationVar(&flagTowerShift, "tower-shift", 2*time.Hour,
+		"Shift length for --elevenlabs-tower-alt-voice, counted from the Unix epoch so every rig changes together")
 	f.StringVar(&flagElevenDepartVoice, "elevenlabs-departure-voice", elDeparture11,
 		"ElevenLabs voice ID for the tower's Departure position - the 7-mile handoff call (default round 11 voice 4, library)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elSpartan, "ElevenLabs voice ID for Marshal (default Spartan, library)")
@@ -735,7 +741,7 @@ func run(cmd *cobra.Command, args []string) error {
 			case tx := <-txChan:
 				text := tx.text
 				voice := currentTowerVoice()
-				profile := towerProfile(voice)
+				profile := towerShiftProfile(voice, time.Now())
 				if tx.departure {
 					profile = departureProfile(voice)
 				}
