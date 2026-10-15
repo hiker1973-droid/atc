@@ -198,7 +198,11 @@ func synthesizeElevenLabs(ctx context.Context, key, text string, ev elevenVoice)
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 400))
 		return nil, &elevenStatusError{resp.StatusCode, string(b)}
 	}
-	return io.ReadAll(resp.Body)
+	mp3, err := io.ReadAll(resp.Body)
+	if err == nil {
+		recordElevenUsage(ev, text, resp.Header.Get("character-cost"))
+	}
+	return mp3, err
 }
 
 // speakElevenLabs tries the profile's ElevenLabs voice. ok=false means use

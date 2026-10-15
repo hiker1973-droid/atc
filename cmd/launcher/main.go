@@ -130,6 +130,8 @@ func main() {
 	mux.HandleFunc("/api/miz-weather", handleMizWeather)
 	mux.HandleFunc("/api/airborne", handleAirborne)
 	mux.HandleFunc("/api/log-stream", handleLogStream)
+	mux.HandleFunc("/api/elevenlabs-usage", handleElevenUsage)
+	mux.HandleFunc("/api/elevenlabs-fleet", handleElevenFleet)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(handleStart))
@@ -528,6 +530,8 @@ func updateAlerts() {
 				Message: "Tacview telemetry unreachable while roles are running", Time: time.Now()})
 		}
 	}
+
+	alerts = append(alerts, elevenUsageAlerts()...)
 
 	alertsMu.Lock()
 	cachedAlerts = alerts

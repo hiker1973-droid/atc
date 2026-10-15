@@ -154,6 +154,17 @@
 
   /* Row departures: full-width strip above row 3 */
   .row-departures { display: grid; grid-template-columns: 1fr; gap: 0.7rem; }
+  /* ElevenLabs credits (fleet-wide - every rig shares one account) */
+  .el-bar { height: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin: 0.2rem 0 0.5rem; }
+  .el-bar > div { height: 100%; background: var(--green); }
+  .el-bar.warn > div { background: var(--gold); }
+  .el-bar.error > div { background: var(--red); }
+  .el-line { color: var(--label); font-size: 0.78rem; margin: 0.15rem 0; font-variant-numeric: tabular-nums; }
+  .el-line b { color: var(--text); font-weight: 600; }
+  .el-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+  .el-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.72rem; color: var(--label); }
+  .el-chip b { color: var(--text); font-weight: 600; }
+  .el-chip.bad { border-color: var(--red); color: var(--red); }
   .pill-state { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 500; }
   .pill-state.cleared    { background: rgba(63,185,80,0.15);  color: var(--green);  border: 1px solid var(--green-dim); }
   .pill-state.luaw       { background: rgba(240,136,62,0.20); color: var(--orange); border: 1px solid var(--orange); }
@@ -311,6 +322,14 @@
 <main>
   <!-- Role cards -->
   <section class="role-row" id="roleCards"></section>
+
+  <!-- ElevenLabs credits, fleet-wide -->
+  <section class="row-departures">
+    <div class="panel">
+      <h3>ElevenLabs Credits — all rigs <span class="sub" id="elSub">—</span></h3>
+      <div id="elBody"><div class="empty">No usage recorded yet.</div></div>
+    </div>
+  </section>
 
   <!-- Row 2: Weather / Marshal Stack / Catapults -->
   <section class="row-2">
@@ -1375,7 +1394,39 @@ async function refreshAll() {
   renderCats();
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// ElevenLabs credits. Always the local launcher's /api/elevenlabs-fleet: the
+// account is shared, so it is the same number whichever rig the page drives.
+// ──────────────────────────────────────────────────────────────────────────
+const elNum = n => (n || 0).toLocaleString('en-US');
+const elDate = t => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); // reset dates are UTC midnights
+const elEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function refreshEleven() {
+  let u;
+  try { u = await fetch('/api/elevenlabs-fleet', { cache: 'no-store' }).then(r => r.json()); }
+  catch (e) { $('elSub').textContent = 'unavailable'; return; }
+  $('elSub').textContent = `${elDate(u.periodStart)} – ${elDate(u.periodEnd)} · resets ${elDate(u.periodEnd)}`;
+  const pct = Math.min(100, u.percent || 0);
+  const voices = Object.entries(u.byVoice || {}).sort((a, b) => b[1] - a[1]);
+  const rigs = (u.rigs || []).map(r => r.err
+    ? `<span class="el-chip bad" title="${elEsc(r.err)}">${elEsc(r.label || r.rig)} ${/404/.test(r.err) ? 'needs a launcher update' : 'unreachable'}</span>`
+    : `<span class="el-chip">${elEsc(r.label || r.rig)} <b>${elNum(r.credits)}</b></span>`).join('');
+  const pace = u.projected > u.quota
+    ? `<span style="color:var(--gold)">on pace for <b>${elNum(u.projected)}</b> by ${elDate(u.periodEnd)}</span>`
+    : `on pace for <b>${elNum(u.projected)}</b> by ${elDate(u.periodEnd)}`;
+  $('elBody').innerHTML = `
+    <div class="el-line"><b>${elNum(u.credits)}</b> of ${elNum(u.quota)} credits used (<b>${(u.percent || 0).toFixed(1)}%</b>) · today <b>${elNum(u.today)}</b> · ${pace}</div>
+    <div class="el-bar ${u.level}"><div style="width:${pct}%"></div></div>
+    <div class="el-line">By voice</div>
+    <div class="el-chips">${voices.length ? voices.map(([v, c]) => `<span class="el-chip">${elEsc(v || '?')} <b>${elNum(c)}</b></span>`).join('') : '<span class="el-chip">none yet</span>'}</div>
+    <div class="el-line" style="margin-top:0.5rem">By rig</div>
+    <div class="el-chips">${rigs}</div>
+    ${u.first ? `<div class="el-line" style="margin-top:0.4rem;color:var(--muted)">Counted by SkyEye since ${new Date(u.first).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} — earlier use and anything outside SkyEye is not included. At 100% every role drops to OpenAI voices.</div>` : ''}`;
+}
+
 // Boot
+refreshEleven();
+setInterval(refreshEleven, 60000);
 updateRegionButtons();
 loadIdentity();
 loadRigs().then(followRunningTheatre);   // loadRigs may reset a stale saved rig
