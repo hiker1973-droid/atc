@@ -144,7 +144,7 @@ Tower no longer parrots your phrase into its response. Old behavior:
 
 New:
 
-> Tower: "Venom 200, Al Minhad Tower, proceed to angels five, contact tower at seven DME."
+> Tower: "Venom 200, Al Minhad Tower, proceed to angels five, report seven DME."
 
 Same fix applies to "this is X declaring emergency", "is clear of the active
 runway", and a few other phrasings that used to leak into the reply.

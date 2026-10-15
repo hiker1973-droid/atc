@@ -239,8 +239,8 @@ func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) stri
 	dist := numberWord(distNm)
 	ang := numberWord(3 + rand.Intn(4))
 	return pick([]string{
-		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower at %s DME.", callsign, c.towerCallsign, ang, dist),
-		fmt.Sprintf("%s, %s, proceed to angels %s, contact tower passing %s DME.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, proceed to angels %s, report %s DME.", callsign, c.towerCallsign, ang, dist),
+		fmt.Sprintf("%s, %s, proceed to angels %s, report passing %s DME.", callsign, c.towerCallsign, ang, dist),
 		fmt.Sprintf("%s, %s, proceed to angels %s, frequency change approved at %s DME.", callsign, c.towerCallsign, ang, dist),
 	})
 }

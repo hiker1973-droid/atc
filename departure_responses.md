@@ -179,9 +179,9 @@ spacing window elapses, so the pilot does not need to re-request.
 **Extra placeholders:** `{DIST}` (word form, e.g. `seven` — pulled from airfield config, currently `7` for all towers), `{ANGELS}` (random 3/4/5/6 per call — angels 7 was too high in live ops vs UAE MOA/CAS floors, range narrowed 2026-05-27)
 
 **Responses:**
-1. `{CALLSIGN}, {TOWER}, proceed to angels {ANGELS}, contact tower at {DIST} DME.`
-2. `{CALLSIGN}, {TOWER}, climb to angels {ANGELS}, contact tower at {DIST} DME.`
-3. `{CALLSIGN}, {TOWER}, angels {ANGELS}, contact tower at {DIST} DME.`
+1. `{CALLSIGN}, {TOWER}, proceed to angels {ANGELS}, report {DIST} DME.`
+2. `{CALLSIGN}, {TOWER}, climb to angels {ANGELS}, report {DIST} DME.`
+3. `{CALLSIGN}, {TOWER}, angels {ANGELS}, report passing {DIST} DME.`
 
 ---
 
