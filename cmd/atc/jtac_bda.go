@@ -237,7 +237,7 @@ func bdaKillText(bt bdaTarget, ground []tacviewGround) string {
 		}
 	}
 	if n == len(bt.Objects) {
-		return strings.Join(append(parts, "Target destroyed. Good work."), " ")
+		return strings.Join(append(parts, bdaDestroyed), " ")
 	}
 	if pt > 0 {
 		parts = append(parts, bdaCount(bt.Spoken, pn, pt))
@@ -249,10 +249,17 @@ func bdaKillText(bt bdaTarget, ground []tacviewGround) string {
 }
 
 // bdaFor is the full BDA call for one flight's pass.
+// bdaDestroyed ends the kill text when every object on the target is down.
+const bdaDestroyed = "Target destroyed."
+
 func bdaFor(callsign, name string, t taskingTarget, ground []tacviewGround, impacts []tacviewImpact) string {
 	bt := caucasusBDA[t.Number]
 	text := fmt.Sprintf("%s, %s, BDA. %s", callsign, name, bdaImpactText(t, bt, impacts))
 	if k := bdaKillText(bt, ground); k != "" {
+		// Operator 2026-10-15: "target destroyed Raider XX thanks for the help".
+		if strings.HasSuffix(k, bdaDestroyed) {
+			k = strings.TrimSuffix(k, bdaDestroyed) + fmt.Sprintf("Target destroyed, %s. Thanks for the help.", callsign)
+		}
 		text += " " + k
 	}
 	return text

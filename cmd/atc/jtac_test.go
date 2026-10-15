@@ -128,9 +128,33 @@ func TestJTACFullRun(t *testing.T) {
 		t.Errorf("in call = %q", got)
 	}
 
+	// The release call (operator 2026-10-15).
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle times 4 on target", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy pickle, will report BDA." {
+		t.Errorf("pickle = %q", got)
+	}
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, rifle", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy rifle, will report BDA." {
+		t.Errorf("rifle = %q", got)
+	}
+
 	pic.place(tgt.TgtPos, 149, 1, 200)
 	if got := b.JTACResponse("Hitman, Raider 11, off", "Raider 11", hitman, pic); !strings.Contains(got, "copy off. Egress back to Anvil, angels 15.") {
 		t.Errorf("off = %q", got)
+	}
+	// 2026-10-15: our "copy off" heard back was answered every ~16 s. A second
+	// "off" in the same pass gets nothing.
+	if got := b.JTACResponse("Raider 11, Hitman 11, copy off. Egress back to Anvil, angels 15. Report IP inbound for re-attack.", "Raider 11", hitman, pic); got != "" {
+		t.Errorf("second off in the pass = %q, want no reply", got)
+	}
+}
+
+// A release call before cleared hot is not acknowledged.
+func TestJTACPickleBeforeClearedHotIgnored(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "" {
+		t.Errorf("pickle before cleared hot = %q, want no reply", got)
 	}
 }
 
@@ -399,8 +423,13 @@ func TestBDAText(t *testing.T) {
 	for i := range g {
 		g[i].Alive = false
 	}
-	if got := bdaKillText(caucasusBDA[4], g); got != "Target destroyed. Good work." {
+	if got := bdaKillText(caucasusBDA[4], g); got != bdaDestroyed {
 		t.Errorf("all down = %q", got)
+	}
+	// Operator 2026-10-15: "target destroyed Raider XX thanks for the help".
+	got = bdaFor("Raider 302", hitman, t4, g, hit(t4.TgtPos))
+	if !strings.HasSuffix(got, "Target destroyed, Raider 302. Thanks for the help.") {
+		t.Errorf("all down BDA = %q", got)
 	}
 }
 

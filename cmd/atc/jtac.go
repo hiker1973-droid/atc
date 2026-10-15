@@ -68,7 +68,7 @@ const (
 	jtacWatchStopNm   = 1.5  // inside this the run is over either way
 	jtacReleaseRadius = 1.5  // a weapon first seen this close to the jet is its release
 	jtacContactMaxAge = 30 * time.Second
-	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, off, abort, request BDA, Anvil, Brick, Cobra, Dagger, Eagle"
+	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, Anvil, Brick, Cobra, Dagger, Eagle"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -125,6 +125,9 @@ var (
 	jtacInRe    = regexp.MustCompile(`(?:^|[\s,])in(?:\s+(?:from|hot|heading|on|the|with)\b|[\s,.!]*$)|\brolling in\b`)
 	jtacOffRe   = regexp.MustCompile(`\boff\b`)
 	jtacAbortRe = regexp.MustCompile(`\babort`)
+	// jtacReleaseCallRe: the pilot's release call, "pickle" for bombs, "rifle"
+	// for a guided missile ("Hitman 1-1, Raider 302, pickle times 4").
+	jtacReleaseCallRe = regexp.MustCompile(`\b(pickle|rifle)\b`)
 	jtacIPRe    = regexp.MustCompile(`\b(?:ip|i\.p\.|i p|eye pee)\b`)
 )
 
@@ -232,10 +235,26 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		cur.stage = jtacReady
 		return say("copy abort. Report IP inbound from %s for re-attack.", t.IP)
 
+	case jtacReleaseCallRe.MatchString(lower):
+		// Operator 2026-10-15: "Raider 302, Hitman, copy pickle, will report
+		// BDA". Only after cleared hot; the BDA itself goes out from the watch
+		// (bdaDue) once the weapons are down.
+		if cur.clearedAt.IsZero() || cur.stage < jtacCleared {
+			return ""
+		}
+		return say("copy %s, will report BDA.", jtacReleaseCallRe.FindString(lower))
+
 	case jtacOffRe.MatchString(lower):
 		if cur.stage < jtacInbound {
 			return ""
 		}
+		// Once per pass. On 2026-10-15 Hitman's own "copy off" came back on
+		// 61.0 and was answered again every ~16 s for five minutes; own_echo.go
+		// stops that, and this makes a second "off" harmless either way.
+		if cur.offAcked {
+			return ""
+		}
+		cur.offAcked = true
 		cur.stage = jtacOff
 		return say("copy off. Egress back to %s, %s. Report IP inbound for re-attack.", t.IP, t.Egress)
 
@@ -303,7 +322,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 }
 
 func (b *taskingBoard) clear(cur *taskingAssignment, now time.Time) {
-	cur.stage, cur.clearedAt, cur.offAxis, cur.bdaDone = jtacCleared, now, 0, false
+	cur.stage, cur.clearedAt, cur.offAxis, cur.bdaDone, cur.offAcked = jtacCleared, now, 0, false, false
 }
 
 // jtacWatch runs once per tick: any flight cleared hot that swings outside the
@@ -434,6 +453,9 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions) {
 			return
 		}
 		broadcastLog("tx", fmt.Sprintf("JTAC TX → %q", text))
+		// Same message as a reply so the tail shows the watch's BDA and aborts;
+		// before 2026-10-15 they went to the dashboard only.
+		log.Info().Str("text", text).Float64("freq", flagJTACFreq).Msg("Command TX")
 		noteOwnTX(flagJTACFreq, text)
 		transmitExternalAudioFile(ctx, mp3, flagJTACFreq, flagJTACName, srsHost, srsPort, flagExternalAudio)
 	}

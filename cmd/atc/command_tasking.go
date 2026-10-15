@@ -86,6 +86,7 @@ type taskingAssignment struct {
 	clearedAt time.Time // when "cleared hot" went out; the watch runs from here
 	offAxis   int       // consecutive watch samples outside the attack window
 	bdaDone   bool      // this pass's BDA has gone out
+	offAcked  bool      // this pass's "off" has been answered
 }
 
 // taskingBoard tracks which flight holds which target.
