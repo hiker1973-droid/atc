@@ -24,7 +24,7 @@ import (
 // credits run out every role silently drops to OpenAI.
 
 var (
-	flagElevenMonthly  = flag.Int("elevenlabs-monthly-credits", 100000, "ElevenLabs plan credits per billing month (Creator: 100,000); the dashboard warns at 80 % and 95 %")
+	flagElevenMonthly  = flag.Int("elevenlabs-monthly-credits", 127500, "ElevenLabs plan credits per billing month, used only when the account cannot be read (squadron plan: 127,500 - operator 2026-10-15); the dashboard warns at 80 % and 95 %")
 	flagElevenResetDay = flag.Int("elevenlabs-reset-day", 14, "Day of the month the ElevenLabs credits reset (the subscription date; Creator from 2026-10-14)")
 )
 
