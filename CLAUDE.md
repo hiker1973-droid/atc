@@ -317,6 +317,7 @@ Reproducible across three restart patterns including a clean full restart with 4
 - **Deployed `e1de067` at 13:03, towers and launcher only.** `af27293` (shorter tower arrival reply) and `e1de067` (launcher one-click update from the fleet page). Same `.new` → rename → replay-command-line swap as at 12:40. All five towers re-registered by 13:03:28 with no warns, and the launcher answers on :7000.
   - **Mixed builds:** the towers and launcher run `e1de067`. ATIS, Command, Marshal and Deckboss run the 12:40 build (`41daa77`) from `atc.rollback-2026-10-15-1305.exe`. That build carries none of the tower or launcher changes, so their behaviour matches main.
   - Rollback for the towers and launcher: `*.rollback-2026-10-15-1305.exe` (= `41daa77`). Older: `*.rollback-2026-10-15-1238.exe` (the 11:11 build, no longer running anything).
+  - **Launcher alone redeployed at 13:06 on `0ae68da`** (`fbd08d2` Update button on the main dashboard, `0ae68da` fallback plan size). Up on :7000. Rollback: `launcher.rollback-2026-10-15-1315.exe` (= `e1de067`).
   - The 3 launcher proxy test failures are the known ones on this box (its IP is the fleet's `training1` entry). The new update test prints `[update] ... restarting the launcher`, but it does not touch the real launcher (PID unchanged).
 
 ## Recent context (2026-10-14) — DCS3 / 192.168.1.220 (Caucasus, SRS :5008)
