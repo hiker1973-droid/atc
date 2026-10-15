@@ -410,7 +410,7 @@ def build():
                 ("Pilot", "Batumi Tower, Raider 1-1, airborne."),
                 ("Tower", "Raider 1-1, Batumi Tower, proceed to angels four, expect handoff at seven DME."),
                 ("Tower", "Raider 1-1, Batumi Departure, seven miles, angels four, leaving my airspace. "
-                          "Contact command, two eight two point zero, channel one. Safe skies, good day.")])
+                          "Contact command, two eight two point zero, channel one. Good day.")])
     d.callout("If you are held", [
         "Traffic inside 20 nm, or less than 60 s since the last departure, holds you. Stay put - the tower "
         "clears you when it is clear; you do not need to call again.",

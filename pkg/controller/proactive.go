@@ -215,7 +215,7 @@ type departWatch struct {
 }
 
 // SetDepartureCalls enables the tower's own departure handoff call; signOff is
-// the field's farewell ("Safe skies, g'day"). Wired to --departure-handoff-call.
+// the field's farewell ("G'day"). Wired to --departure-handoff-call.
 func (c *ATCController) SetDepartureCalls(enabled bool, signOff string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

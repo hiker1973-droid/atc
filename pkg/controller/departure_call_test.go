@@ -11,7 +11,7 @@ const airplane = "Air+FixedWing"
 func departureController(t *testing.T) (*ATCController, *[]string, func(string)) {
 	t.Helper()
 	c, sent := proactiveController(t)
-	c.SetDepartureCalls(true, "Safe skies, g'day")
+	c.SetDepartureCalls(true, "G'day")
 	handle := func(text string) {
 		t.Helper()
 		req := ParseIntent(text, "Test Tower")
@@ -51,7 +51,7 @@ func TestDepartureCallAtSevenMiles(t *testing.T) {
 		t.Fatalf("no departure call at 7.2 nm: %q", (*sent)[n:])
 	}
 	call := (*sent)[n]
-	for _, want := range []string{"Raider 302", "Test Departure", "seven miles", "angels", "airspace", "g'day"} {
+	for _, want := range []string{"Raider 302", "Test Departure", "seven miles", "angels", "airspace", "G'day"} {
 		if !strings.Contains(call, want) && !(want == "airspace" && strings.Contains(call, "zone")) {
 			t.Errorf("departure call %q lacks %q", call, want)
 		}

@@ -10,7 +10,7 @@ Post only after the rigs run 404e399.
 **What changed on departure**
 • After takeoff the tower says: *"proceed to angels five, expect handoff at seven DME."*
 • At 7 miles the tower calls **you**:
-> "Raider 302, Senaki Departure, seven miles, angels five, leaving my airspace. Contact command, two eight two point zero, channel one. Safe skies, g'day."
+> "Raider 302, Senaki Departure, seven miles, angels five, leaving my airspace. Contact command, two eight two point zero, channel one. G'day."
 • Then switch to Command (282.0) and check in. That's it.
 
 **Do I still call 7 DME?**

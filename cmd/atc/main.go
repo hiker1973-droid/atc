@@ -199,7 +199,11 @@ func main() {
 	f.BoolVar(&flagElevenLabs, "elevenlabs", true,
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
-	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", "eleven_multilingual_v2", "ElevenLabs model")
+	// Flash for every role since 2026-10-15: half the credits a character
+	// (measured: Lisa's 194-char tower line 85 -> 43), and the operator could
+	// not hear the difference on the round 15 A/B ("Do flash I cannot tell the
+	// difference"). eleven_multilingual_v2 is the richer, 2x-cost model.
+	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",

@@ -52,12 +52,13 @@ func accentPhrase(accent string, male bool) string {
 }
 
 // departureSignOff is the tower's farewell on its departure handoff call, in
-// the field's accent (operator 2026-10-15: "safe skys, gday").
+// the field's accent (operator 2026-10-15: "safe skys, gday"; then "lose the
+// safe skys" the same day to save credits).
 func departureSignOff(icao string) string {
 	if flagVoiceStyleTower == styleTower && fieldAccent(icao) == accentAustralian {
-		return "Safe skies, g'day"
+		return "G'day"
 	}
-	return "Safe skies, good day"
+	return "Good day"
 }
 
 // towerStyleFor is the tower delivery for a field and voice.

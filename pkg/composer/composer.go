@@ -322,7 +322,7 @@ func (c *ATCComposer) departureName() string {
 // DepartureLeavingAirspace is the tower's own call when a departure passes
 // the departure distance (operator 2026-10-15): it replaces the pilot's
 // "seven DME" report. angels is the Tacview altitude in thousands; signOff
-// is the field's farewell ("Safe skies, g'day"), "" for "Good day".
+// is the field's farewell ("G'day"), "" for "Good day".
 func (c *ATCComposer) DepartureLeavingAirspace(callsign string, distNm, angels int, handoffCallsign string, freqMHz float64, preset, signOff string) string {
 	if signOff == "" {
 		signOff = "Good day"
