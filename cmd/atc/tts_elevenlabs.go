@@ -103,8 +103,13 @@ func elCommand(id string) elevenVoice {
 func elMarshal(id string) elevenVoice {
 	return elevenVoice{ID: id, Name: "Marshal", Stability: 0.6, Style: 0.2, Speed: 1.05, Model: elFlash}
 }
+// Deckboss alone is on the premium model at 1.05 since 2026-10-15 (operator:
+// "deckboss speaks very fast ... slow down like 5% or change the updated model
+// since we have overhead", picked the premium sample in round 17). Flash
+// barely honoured the slower speed; the premium read came out ~7% longer.
+// Deckboss is low traffic, so the doubled credits are tens a day.
 func elDeckboss(id string) elevenVoice {
-	return elevenVoice{ID: id, Name: "Deckboss", Stability: 0.35, Style: 0.5, Speed: 1.1}
+	return elevenVoice{ID: id, Name: "Deckboss", Stability: 0.35, Style: 0.5, Speed: 1.05, Model: "eleven_multilingual_v2"}
 }
 
 const (
