@@ -59,11 +59,13 @@ func TestRadioFilterOrdersLevelGainAndLimiter(t *testing.T) {
 
 func TestTxIntensityByCallsign(t *testing.T) {
 	flagRadioIntensity, flagTowerRadioIntensity, flagATISRadioIntensity = "medium", "heavy", "light"
+	flagCarrierRadioIntensity = "carrier"
 	for callsign, want := range map[string]string{
 		"UGKS-ATC":       "heavy",
 		"Senaki ATIS":    "light",
 		"vSFG-7-Command": "medium",
-		"OMDM-MSH":       "medium",
+		"OMDM-MSH":       "carrier", // Marshal and Deckboss: a little more hiss (2026-10-15)
+		"OMDM-DKB":       "carrier",
 	} {
 		if got := txIntensity(callsign); got != want {
 			t.Errorf("txIntensity(%q) = %q, want %q", callsign, got, want)

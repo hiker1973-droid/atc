@@ -59,18 +59,19 @@ const (
 	elScotty  = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
 	elLisa    = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
 	elGideon  = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command until round 10)
-	elSpartan = "S75jVZ0i3J6Xa5BbK8CE" // American man, calm, grounded baritone (Marshal; Command until 2026-10-15)
+	elSpartan = "S75jVZ0i3J6Xa5BbK8CE" // American man, calm, grounded baritone (Command, then Marshal, on 2026-10-15)
+	elRolando = "6PBHdlpKVQ70t6tnDUYF" // American man, crisp, military (Marshal; operator 2026-10-15: "change marshall to this command_2_Rolando-crisp-military")
 	// elCommand11 is voice 3 of round 11, the IDs the operator sent (pick 2026-10-15:
 	// "command_3_XlDdozLmuTofIxK4BjPD"). Its name is not readable with the
 	// rigs' key (no voices_read).
-	elCommand11 = "XlDdozLmuTofIxK4BjPD" // Command
+	elCommand11 = "XlDdozLmuTofIxK4BjPD" // "Misa" - Command until 2026-10-15
 	// elDeckboss11 is voice 5 of the same round, picked for Deckboss the same
 	// day ("command_5_ljX1ZrXuDIIRVcmiVSyR"); name likewise unreadable.
 	elDeckboss11 = "ljX1ZrXuDIIRVcmiVSyR" // Deckboss
 	// elDeparture11 is voice 4 of round 11, picked for the tower's "Departure"
 	// 7-mile call (operator 2026-10-15: "use this for departure call
 	// command_4_FF59babHL8N8gfTgtBMT").
-	elDeparture11 = "FF59babHL8N8gfTgtBMT" // Departure
+	elDeparture11 = "FF59babHL8N8gfTgtBMT" // "Jodi" - Departure, and Command since 2026-10-15 (operator: "use this voice for command. good speed though")
 	elHank        = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
 )
 
@@ -90,8 +91,10 @@ func elHard(id, name string, speed float64) elevenVoice {
 // elCommand is Command's read since round 10 (operator 2026-10-14: "The command
 // voice is not good" / "need american"): steadier than elHard, which made
 // Gideon's gravel muddy on the radio.
+// Speed 1.15 since 2026-10-15 (operator: "speed up command by 10%"; was 1.05,
+// ElevenLabs takes 0.7-1.2).
 func elCommand(id string) elevenVoice {
-	return elevenVoice{ID: id, Name: "Command", Stability: 0.45, Style: 0.4, Speed: 1.05}
+	return elevenVoice{ID: id, Name: "Command", Stability: 0.45, Style: 0.4, Speed: 1.15}
 }
 
 // The carrier roles as heard in round 6 (operator 2026-10-14: "Eric and Brian
