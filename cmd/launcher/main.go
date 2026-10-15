@@ -585,7 +585,10 @@ func scanLogAlerts() []Alert {
 					recovered = true
 				}
 			}
-			if !fault && !recovered {
+			// Only warn lines can match a signature: every transmission logs
+			// "TX via OpenAI TTS + ExternalAudio" at info, and each one raised
+			// an alert (Day, 2026-10-15 09:49, Raider 302's first calls).
+			if !fault && !recovered && l.Level == "warn" {
 				for _, sig := range faultSignatures {
 					if strings.Contains(l.Message, sig) {
 						fault = true
