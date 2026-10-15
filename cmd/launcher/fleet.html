@@ -62,6 +62,15 @@
   .banner { display: none; margin: 0.9rem 1.2rem -0.4rem; padding: 0.6rem 1rem; border-radius: 8px;
     background: #6e111133; border: 1px solid #da363366; color: var(--red); font-weight: 600; font-size: 0.9rem; }
   .banner.show { display: block; }
+  /* One-click update */
+  .upd-btn { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 5px;
+    padding: 0.2rem 0.6rem; font-size: 0.75rem; cursor: pointer; font-family: inherit; }
+  .upd-btn:hover { border-color: var(--green); }
+  .upd-btn:disabled { opacity: 0.5; cursor: default; }
+  .upd { margin-top: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.78rem; border: 1px solid var(--border); }
+  .upd.run { border-color: #9e6a0399; color: var(--amber); }
+  .upd.ok { border-color: #2386364d; color: var(--green); }
+  .upd.fail { border-color: #da363366; color: var(--red); white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -71,6 +80,7 @@
   <span class="title">Fleet Monitor</span>
   <span class="spacer"></span>
   <span class="updated" id="updated">—</span>
+  <button class="upd-btn" id="updAll" onclick="updateAll()" title="Update every online rig, one at a time">⟳ Update all rigs</button>
   <a class="back" href="/logs">Logs</a>
   <a class="back" href="/">← Dashboard</a>
 </header>
@@ -147,6 +157,8 @@ function rigCard(r) {
   if (r.version && r.version.time) {
     verFoot = ` · built ${new Date(r.version.time).toLocaleString()}`;
   }
+  const u = UPD[r.name];
+  if (u) body += `<div class="upd ${u.cls}">${esc(u.text)}</div>`;
   body += `<div class="foot">polled ${when}${verFoot}</div>`;
 
   const alertCls = (r.alerts && r.alerts.length) ? ' hasalert' : '';
@@ -163,6 +175,7 @@ function rigCard(r) {
       <span class="rig-name" title="rig id: ${esc(r.name)}">${esc(r.label || r.name)}</span>
       <span class="rig-host">${esc(r.host)}:${r.port}</span>
       ${verChip}
+      ${r.launcherUp ? `<button class="upd-btn" onclick="updateRig('${esc(r.name)}', ${r.self ? 'true' : 'false'})" ${UPD[r.name] && UPD[r.name].busy ? 'disabled' : ''} title="git pull, build, restart the running theatre, then the launcher">⟳ Update</button>` : ''}
       <span class="badge ${cls}">${badge}</span>
     </div>
     <div class="rig-body">${body}</div>
@@ -173,6 +186,7 @@ async function refresh() {
   try {
     const res = await fetch('/api/fleet', { cache: 'no-store' });
     const rigs = await res.json();
+    LAST_RIGS = rigs;
     document.getElementById('grid').innerHTML = rigs.map(rigCard).join('');
     // global alert banner
     let total = 0, offline = 0;
@@ -188,6 +202,74 @@ async function refresh() {
     document.getElementById('updated').textContent = 'refresh failed: ' + e.message;
   }
 }
+// ── One-click update ─────────────────────────────────────────────────────────
+// POST /api/update on the rig (through /rig/<name>/ unless it is this one),
+// then follow GET /api/update until it finishes. The launcher restarts itself
+// last, so the status calls fail for a few seconds; after that the rig's
+// /api/version should name the commit it updated to.
+const UPD = {};
+let LAST_RIGS = [];
+const rigApi = (name, self, path) => self ? path : '/rig/' + encodeURIComponent(name) + path;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function updateRig(name, self, noConfirm) {
+  if (!noConfirm && !confirm(`Update ${name}?
+
+git pull, build, then restart the running theatre (about 30 s off the air) and the launcher.`)) return false;
+  UPD[name] = { busy: true, cls: 'run', text: 'starting…' };
+  refresh();
+  try {
+    const r = await fetch(rigApi(name, self, '/api/update'), { method: 'POST' });
+    if (!r.ok) throw new Error(await r.text());
+  } catch (e) {
+    UPD[name] = { cls: 'fail', text: 'could not start: ' + e.message };
+    refresh();
+    return false;
+  }
+  let target = '', lastStep = '';
+  for (let i = 0; i < 200; i++) {            // up to ~10 minutes
+    await sleep(3000);
+    try {
+      const s = await fetch(rigApi(name, self, '/api/update'), { cache: 'no-store' }).then(r => r.json());
+      if (s.to) target = s.to;
+      lastStep = s.step || lastStep;
+      if (s.done) {
+        if (s.err) { UPD[name] = { cls: 'fail', text: 'FAILED: ' + s.err }; refresh(); return false; }
+        if (/already up to date/.test(lastStep)) { UPD[name] = { cls: 'ok', text: '✓ ' + lastStep }; refresh(); return true; }
+      }
+      UPD[name] = { busy: true, cls: 'run', text: (s.from && s.to ? `${s.from} → ${s.to}: ` : '') + lastStep };
+    } catch (e) {
+      // The launcher is restarting: wait for it to answer on the new build.
+      UPD[name] = { busy: true, cls: 'run', text: 'launcher restarting…' };
+    }
+    if (target) {
+      try {
+        const v = await fetch(rigApi(name, self, '/api/version'), { cache: 'no-store' }).then(r => r.json());
+        if (v.short === target) {
+          const s = await fetch(rigApi(name, self, '/api/update'), { cache: 'no-store' }).then(r => r.json()).catch(() => ({}));
+          if (!s.running) { UPD[name] = { cls: 'ok', text: `✓ updated to ${target} — launcher back up` }; refresh(); return true; }
+        }
+      } catch (e) { /* still restarting */ }
+    }
+    refresh();
+  }
+  UPD[name] = { cls: 'fail', text: 'no answer after 10 minutes — check the rig' };
+  refresh();
+  return false;
+}
+
+async function updateAll() {
+  const rigs = LAST_RIGS.filter(r => r.launcherUp);
+  if (!rigs.length || !confirm(`Update ${rigs.length} rig(s) one at a time?
+
+Each restarts its running theatre (about 30 s off the air) and its launcher. Stops at the first failure.`)) return;
+  document.getElementById('updAll').disabled = true;
+  for (const r of rigs) {
+    if (!(await updateRig(r.name, r.self, true))) break;
+  }
+  document.getElementById('updAll').disabled = false;
+}
+
 refresh();
 setInterval(refresh, 5000);
 </script>

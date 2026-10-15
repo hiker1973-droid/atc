@@ -107,6 +107,7 @@ func main() {
 	fmt.Println(authSummary())
 
 	discoverRoles()
+	loadUpdateState()
 	fleetRigs = parseFleet(*flagFleet)
 	cachedVersion = computeVersion()
 	go healthLoop()
@@ -140,13 +141,24 @@ func main() {
 	mux.HandleFunc("/api/stop-region", requireControl(handleStopRegion))
 	mux.HandleFunc("/api/restart", requireControl(handleRestart))
 	mux.HandleFunc("/api/rescan", requireControl(handleRescan))
+	// GET = progress (viewer); POST = run (control, checked inside).
+	mux.HandleFunc("/api/update", handleUpdate)
 
 	// Mixed — the proxy gates per-method itself: GET /status is a viewer read,
 	// POST /runway and /weather are control actions.
 	mux.HandleFunc("/tower/", handleTowerProxy)
 	mux.HandleFunc("/rig/", handleRigProxy)
 
-	if err := http.ListenAndServe(*flagListen, withAuth(mux)); err != nil {
+	// Retry the listen for a while: after a one-click update the new launcher
+	// starts while the old one is still letting go of the port.
+	var err error
+	for i := 0; i < 20; i++ {
+		if err = http.ListenAndServe(*flagListen, withAuth(mux)); err == nil || !strings.Contains(err.Error(), "bind") {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -1008,6 +1020,7 @@ func startRole(name string) error {
 	if r == nil {
 		return fmt.Errorf("unknown role: %s", name)
 	}
+	refreshKeyEnv() // a key set with setx after this launcher started still reaches the role
 	cmd := exec.Command("cmd", "/c", "start", "", filepath.Join(rootDir, r.Bat))
 	cmd.Dir = rootDir
 	return cmd.Start()
@@ -1053,6 +1066,7 @@ func startRegion(region string) error {
 	if _, err := os.Stat(full); err != nil {
 		return fmt.Errorf("region bat missing: %s", bat)
 	}
+	refreshKeyEnv() // a key set with setx after this launcher started still reaches the roles
 	cmd := exec.Command("cmd", "/c", "start", "", full)
 	cmd.Dir = rootDir
 	return cmd.Start()

@@ -1,0 +1,81 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"golang.org/x/sys/windows/registry"
+)
+
+func TestSwapExeKeepsRollback(t *testing.T) {
+	defer func(r string) { rootDir = r }(rootDir)
+	rootDir = t.TempDir()
+	write := func(n, s string) { os.WriteFile(filepath.Join(rootDir, n), []byte(s), 0o644) }
+	read := func(n string) string { b, _ := os.ReadFile(filepath.Join(rootDir, n)); return string(b) }
+	write("atc.exe", "v1")
+	write("atc.new.exe", "v2")
+	if err := swapExe("atc.exe", "atc.new.exe", "atc.prev.exe"); err != nil {
+		t.Fatal(err)
+	}
+	if read("atc.exe") != "v2" || read("atc.prev.exe") != "v1" {
+		t.Fatalf("after swap: atc=%q prev=%q", read("atc.exe"), read("atc.prev.exe"))
+	}
+	if _, err := os.Stat(filepath.Join(rootDir, "atc.new.exe")); !os.IsNotExist(err) {
+		t.Error("atc.new.exe left behind")
+	}
+	// A second update replaces the rollback copy.
+	write("atc.new.exe", "v3")
+	if err := swapExe("atc.exe", "atc.new.exe", "atc.prev.exe"); err != nil {
+		t.Fatal(err)
+	}
+	if read("atc.exe") != "v3" || read("atc.prev.exe") != "v2" {
+		t.Errorf("second swap: atc=%q prev=%q", read("atc.exe"), read("atc.prev.exe"))
+	}
+}
+
+// A key set with setx after the launcher started reaches the roles it starts.
+func TestRefreshKeyEnvReadsTheRegistry(t *testing.T) {
+	const name = "SKYEYE_UPDATE_TEST_KEY"
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.SET_VALUE)
+	if err != nil {
+		t.Skip("cannot open HKCU Environment")
+	}
+	defer k.Close()
+	if err := k.SetStringValue(name, "fresh"); err != nil {
+		t.Skip(err)
+	}
+	defer k.DeleteValue(name)
+	os.Setenv(name, "stale")
+	defer os.Unsetenv(name)
+	if n := refreshKeyEnv(); n < 1 {
+		t.Fatalf("refreshKeyEnv set %d", n)
+	}
+	if got := os.Getenv(name); got != "fresh" {
+		t.Errorf("%s = %q, want the registry's value", name, got)
+	}
+}
+
+// The launcher restarts at the end of an update; the new one shows how it went.
+func TestUpdateStateSurvivesRestart(t *testing.T) {
+	defer func(r string) { rootDir = r }(rootDir)
+	rootDir = t.TempDir()
+	updMu.Lock()
+	upd = updateState{Running: true, From: "aaa", To: "bbb", Log: []string{"built atc.new.exe"}}
+	updMu.Unlock()
+	updLog("launcher.exe updated - restarting the launcher")
+	updMu.Lock()
+	upd.Done = true
+	updMu.Unlock()
+	saveUpdateState()
+
+	updMu.Lock()
+	upd = updateState{}
+	updMu.Unlock()
+	loadUpdateState()
+	updMu.Lock()
+	defer updMu.Unlock()
+	if !upd.Done || upd.Running || upd.To != "bbb" || len(upd.Log) != 2 {
+		t.Errorf("reloaded state %+v", upd)
+	}
+}

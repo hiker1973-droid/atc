@@ -56,6 +56,7 @@ func elevenGet(path string, v any) error {
 // period's usage by voice per day. nil when there is no key or the
 // subscription cannot be read.
 func fetchElevenAccount(now time.Time) (*elevenAccount, error) {
+	refreshKeyEnv() // pick up a key changed with setx since the launcher started
 	if elevenAccountKey() == "" {
 		return nil, fmt.Errorf("no ELEVENLABS_API_KEY in the launcher's environment")
 	}
