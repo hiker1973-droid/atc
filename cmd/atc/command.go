@@ -133,7 +133,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		"Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle",
 		inFlight,
 		func(text string) (string, string) {
-			cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
+			cs := joinCallsignDigits(extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command"))
 			if tracker != nil {
 				tracker.Note(cs, text)
 			}
@@ -324,6 +324,10 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command: hallucination filtered")
 								return
 							}
+							if isOwnEcho(freqMHz, text) {
+								log.Info().Str("text", text).Str("channel", channelName).Msg("Command: own transmission heard back - dropped")
+								return
+							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
 							cs, resp := handle(text)
 							if resp == "" {
@@ -339,6 +343,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							}
 							atomic.StoreInt64(&txCooldown, time.Now().Add(estimateTTSDuration(resp)).UnixNano())
 							log.Info().Str("callsign", cs).Str("text", resp).Float64("freq", freqMHz).Msg("Command TX")
+							noteOwnTX(freqMHz, resp)
 							transmitExternalAudioFile(ctx, mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
 						}(frames)
 					}

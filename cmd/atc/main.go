@@ -702,6 +702,7 @@ func run(cmd *cobra.Command, args []string) error {
 					log.Error().Err(err).Msg("Command handoff TTS failed")
 					return
 				}
+				noteOwnTX(cmdFreq, text)
 				transmitExternalAudioFile(ctx, mp3, cmdFreq, flagCommandName, srsHost, srsPort, flagExternalAudio)
 			}
 			go runCommandHandoffWatch(ctx, tracker, store, handoffTX)

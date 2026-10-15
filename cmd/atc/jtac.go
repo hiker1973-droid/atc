@@ -46,8 +46,12 @@ const (
 )
 
 const (
-	// jtacIPNearNm: "at the IP" for check-in and IP inbound.
+	// jtacIPNearNm: "at the IP" for check-in - inside it the brief leaves out
+	// the bearing and range to the IP.
 	jtacIPNearNm = 5.0
+	// jtacIPInboundNm: an IP inbound call is accepted this far from the IP
+	// (operator 2026-10-15: "change IP inbound 20 miles"; was jtacIPNearNm).
+	jtacIPInboundNm = 20.0
 	// jtacInboundTolDeg: IP inbound heading must be within this of the
 	// bearing to the target.
 	jtacInboundTolDeg = 30.0
@@ -240,7 +244,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		if ok {
 			brgIP, nmIP := bearingRangeFromRef(pos, t.IPPos[0], t.IPPos[1])
 			brgT, _ := bearingRangeFromRef(pos, t.TgtPos[0], t.TgtPos[1])
-			if nmIP > jtacIPNearNm {
+			if nmIP > jtacIPInboundNm {
 				log.Info().Str("callsign", callsign).Float64("ipNm", nmIP).Msg("JTAC: IP inbound refused, not at the IP")
 				return say("negative, you are not at %s. %s bears %s for %d. Report IP inbound from %s.",
 					t.IP, t.IP, spokenBearing(toMagnetic(brgIP, t.MagVar)), int(nmIP+0.5), t.IP)
@@ -392,7 +396,7 @@ func jtacCallsign(text string) string {
 	if strings.HasSuffix(lower[:cut], " in") {
 		cut -= 3
 	}
-	return strings.TrimSpace(cs[:cut])
+	return joinCallsignDigits(strings.TrimSpace(cs[:cut]))
 }
 
 // angleDiff is the smallest difference between two headings, 0-180.
@@ -430,6 +434,7 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions) {
 			return
 		}
 		broadcastLog("tx", fmt.Sprintf("JTAC TX → %q", text))
+		noteOwnTX(flagJTACFreq, text)
 		transmitExternalAudioFile(ctx, mp3, flagJTACFreq, flagJTACName, srsHost, srsPort, flagExternalAudio)
 	}
 	go voiceNetLoop(ctx, flagSRSAddr, flagJTACFreq, flagJTACName, apiKey, flagEAMPassword, jtacVoice(), flagExternalAudio,
