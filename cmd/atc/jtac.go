@@ -433,7 +433,7 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions) {
 		transmitExternalAudioFile(ctx, mp3, flagJTACFreq, flagJTACName, srsHost, srsPort, flagExternalAudio)
 	}
 	go voiceNetLoop(ctx, flagSRSAddr, flagJTACFreq, flagJTACName, apiKey, flagEAMPassword, jtacVoice(), flagExternalAudio,
-		jtacWhisperPrompt, func(text string) (string, string) {
+		jtacWhisperPrompt, nil, func(text string) (string, string) {
 			cs := jtacCallsign(text)
 			return cs, board.JTACResponse(text, cs, flagJTACSpoken, pic)
 		})

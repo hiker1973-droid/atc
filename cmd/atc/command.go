@@ -77,8 +77,7 @@ func commandResponse(text, callsign, channelName string) string {
 	// command_handoff.go issues the real "contact <facility> on <freq>" TX
 	// when the pilot closes through handoffThresholdNm, so this ack tells them
 	// what to expect rather than guessing a field.
-	if containsAny(lower, "rtb", "returning to base", "request recovery", "request handoff",
-		"request tower", "request marshal", "inbound home plate", "bingo home plate") {
+	if containsAny(lower, rtbPhrases...) {
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, copy RTB, expect recovery handoff at three zero miles, continue.", callsign, channelName),
 			fmt.Sprintf("%s, %s, roger returning to base, stand by for handoff inside three zero miles.", callsign, channelName),
@@ -126,12 +125,17 @@ func commandResponse(text, callsign, channelName string) string {
 // is recorded so the Tacview-driven handoff watcher knows who to monitor.
 func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword, voice, externalAudioPath string, tracker *pilotTracker, store *tacviewPositions) {
 	footholdTaskingBoard() // on Syria: log now whether the Foothold save file is readable
+	var inFlight *atomic.Int32
+	if tracker != nil {
+		inFlight = &tracker.inFlight
+	}
 	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, commandVoice(voice), externalAudioPath,
 		"Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle",
+		inFlight,
 		func(text string) (string, string) {
 			cs := extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command")
 			if tracker != nil {
-				tracker.Note(cs)
+				tracker.Note(cs, text)
 			}
 			return cs, commandReply(text, cs, channelName, store)
 		})
@@ -140,8 +144,10 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 // voiceNetLoop is one controller on one SRS frequency: it hears each pilot
 // transmission, has Whisper transcribe it with prompt, and speaks whatever
 // handle answers (callsign, reply; "" reply = stay silent). Command and the
-// JTAC both run on it.
-func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword string, vp voiceProfile, externalAudioPath, prompt string, handle func(text string) (string, string)) {
+// JTAC both run on it. inFlight, when set, counts the transmissions between
+// the flush to Whisper and the end of the reply, so the handoff watcher can
+// hold off while a pilot's call is still being answered. May be nil.
+func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword string, vp voiceProfile, externalAudioPath, prompt string, inFlight *atomic.Int32, handle func(text string) (string, string)) {
 	guidLen := 22
 	var txCooldown int64
 	for {
@@ -302,7 +308,13 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 						frames := tx.opusFrames
 						delete(transmissions, origin)
 						log.Info().Str("origin", origin).Int("frames", len(frames)).Str("channel", channelName).Msg("Command: flushing transmission to Whisper")
+						if inFlight != nil {
+							inFlight.Add(1)
+						}
 						go func(f [][]byte) {
+							if inFlight != nil {
+								defer inFlight.Add(-1)
+							}
 							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, prompt)
 							if err != nil || text == "" {
 								log.Info().Err(err).Str("channel", channelName).Msg("Command: empty/error transcription")

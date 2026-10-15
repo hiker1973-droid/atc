@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/paulmach/orb"
@@ -37,33 +38,87 @@ type trackedPilot struct {
 	// and a carrier on scope.
 	carrierBased   bool
 	carrierChecked bool
+	// tasked: the pilot asked Command for tasking and has not since made a
+	// recovery call (RTB, fence out, off station). A tasked pilot is going
+	// to work, not home, so the proactive recovery handoff stays quiet.
+	tasked bool
 }
 
 type pilotTracker struct {
 	mu     sync.Mutex
 	pilots map[string]*trackedPilot
+	// inFlight counts Command transmissions heard but not yet answered
+	// (Whisper, reply, TTS, TX). Set by voiceNetLoop, read by the watcher.
+	inFlight atomic.Int32
 }
 
 func newPilotTracker() *pilotTracker {
 	return &pilotTracker{pilots: make(map[string]*trackedPilot)}
 }
 
-// Note records that this callsign has transmitted to Command.
-func (t *pilotTracker) Note(callsign string) {
+// rtbPhrases mark a pilot asking Command for the recovery handoff. Shared with
+// commandResponse so the reply and the watcher agree on what an RTB call is.
+var rtbPhrases = []string{"rtb", "returning to base", "request recovery", "request handoff",
+	"request tower", "request marshal", "inbound home plate", "bingo home plate"}
+
+// isRecoveryCall: the pilot is done working and heading home.
+func isRecoveryCall(lower string) bool {
+	return containsAny(lower, rtbPhrases...) ||
+		containsAny(lower, "fence out", "fence-out", "fenceout",
+			"off station", "off-station", "offstation", "departing station")
+}
+
+// Note records that this callsign has transmitted text to Command.
+func (t *pilotTracker) Note(callsign, text string) {
 	if callsign == "" {
 		return
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if p, ok := t.pilots[callsign]; ok {
-		p.lastSeen = time.Now()
-		return
+	p, ok := t.pilots[callsign]
+	if !ok {
+		p = &trackedPilot{callsign: callsign, lastDistNm: -1}
+		t.pilots[callsign] = p
 	}
-	t.pilots[callsign] = &trackedPilot{
-		callsign:   callsign,
-		lastSeen:   time.Now(),
-		lastDistNm: -1,
+	p.lastSeen = time.Now()
+	lower := strings.ToLower(text)
+	switch {
+	case isRecoveryCall(lower):
+		if p.tasked {
+			// The crossing may have been skipped while tasked; count the
+			// pilot as outside so the next check hands him off from
+			// wherever he is.
+			p.lastDistNm = math.Inf(1)
+		}
+		p.tasked = false
+	case isTaskingRequest(lower):
+		p.tasked = true
 	}
+}
+
+// handoffGate is what the watcher does with a pilot who has just closed
+// through the handoff threshold.
+type handoffGate int
+
+const (
+	handoffFire  handoffGate = iota
+	handoffDefer             // Command is mid-reply: keep the crossing armed for the next check
+	handoffSkip              // the pilot has been sent to work: drop this crossing
+)
+
+// gateHandoff keeps the proactive recovery handoff from contradicting
+// Command's own replies. On DCS3 2026-10-15 Raider 302 asked for tasking at
+// 12:11:42, the handoff fired at 12:11:43 while Whisper still had his call
+// ("contact Senaki tower ... good landing"), and Command's reply followed at
+// 12:11:47 ("contact Hitman one one ... for tasking").
+func gateHandoff(p *trackedPilot, busy bool) handoffGate {
+	if busy {
+		return handoffDefer
+	}
+	if p.tasked {
+		return handoffSkip
+	}
+	return handoffFire
 }
 
 // tacviewContactInfo is what Command keeps per callsign beyond position:
@@ -572,6 +627,19 @@ func runCommandHandoffWatch(
 			// firing when pilot starts a sortie already within range, and
 			// prevents repeat fires when they orbit at the edge.
 			if recoveryName != "" && pilot.lastDistNm > handoffThresholdNm && nearestDist <= handoffThresholdNm {
+				switch gateHandoff(pilot, tracker.inFlight.Load() > 0) {
+				case handoffDefer:
+					// Leave lastDistNm outside the threshold so the
+					// crossing still counts at the next check.
+					log.Info().Str("callsign", cs).Float64("dist", nearestDist).
+						Msg("Command: recovery handoff deferred - a call is being answered")
+					continue
+				case handoffSkip:
+					log.Info().Str("callsign", cs).Float64("dist", nearestDist).
+						Msg("Command: recovery handoff skipped - pilot is tasked, waiting for RTB")
+					pilot.lastDistNm = nearestDist
+					continue
+				}
 				// FAA 2-1-17 order: name the facility, then the frequency.
 				tail := "switching now approved, good landing."
 				if recoveryKind == "marshal" {
