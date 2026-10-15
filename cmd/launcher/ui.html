@@ -247,6 +247,11 @@
   .region-btn.stop { background: #6e111133; color: #ff9492; border-color: #da363366; margin-left: 0.35rem; }
   .region-btn.stop:hover { background: #da363366; color: #fff; }
   .region-btn:disabled { opacity: 0.5; cursor: default; }
+  .region-btn.update { background: #3d2f0a33; color: var(--gold); border-color: #7a5f1f99; margin-left: 0.35rem; }
+  .region-btn.update:hover { background: #7a5f1f66; color: #fff; }
+  .upd-chip { display: none; margin-left: 0.5rem; font-size: 0.75rem; color: var(--gold); max-width: 28rem;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+  .upd-chip.ok { color: var(--green); } .upd-chip.fail { color: var(--red); white-space: normal; }
   /* Per-airfield takeoff/landing traffic */
   #trafficTbl { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0.8rem; }
   .af-traffic { border: 1px solid var(--border); border-radius: 7px; padding: 0.5rem 0.6rem; background: var(--bg); }
@@ -308,6 +313,8 @@
     <button class="region-btn start" id="startRegionBtn" onclick="startRegion()" title="Start every role in the selected theatre">▶ Start</button>
     <button class="region-btn atis" id="startAtisBtn" onclick="startAtis()" title="Start only the ATIS set for the selected theatre">🔊 ATIS</button>
     <button class="region-btn stop" id="stopRegionBtn" onclick="stopRegion()" title="Stop every role in the selected theatre">■ Stop</button>
+    <button class="region-btn update" id="updateRigBtn" onclick="updateThisRig()" title="Update this rig: git pull, build, restart the running theatre, then the launcher">⟳ Update</button>
+    <span class="upd-chip" id="updChip"></span>
   </div>
   <div class="topnav" style="display:flex;gap:0.4rem;margin:0 0.8rem;">
     <a href="/fleet" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Fleet</a>
@@ -1430,6 +1437,60 @@ async function refreshEleven() {
     ${days.length ? `<div class="el-line" style="margin-top:0.5rem">By day (UTC)</div><div class="el-chips">${days.map(([d, c]) => `<span class="el-chip">${d.slice(5)} <b>${elNum(c)}</b></span>`).join('')}</div>` : ''}
     <div class="el-line" style="margin-top:0.5rem">${acctLine}</div>
     <div class="el-line" style="color:var(--muted)">Servers = every SkyEye transmission since each rig ran this build. At 100% of the account every role drops to OpenAI voices.</div>`;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// One-click update of the rig this page drives (same as the Fleet page's
+// button): POST /api/update, then follow GET /api/update. The launcher
+// restarts itself last, so calls fail for a few seconds; done when the rig's
+// /api/version names the commit it updated to.
+// ──────────────────────────────────────────────────────────────────────────
+function updChip(text, cls) {
+  const c = $('updChip');
+  c.style.display = text ? 'inline-block' : 'none';
+  c.className = 'upd-chip' + (cls ? ' ' + cls : '');
+  c.textContent = text || '';
+  c.title = text || '';
+}
+async function updateThisRig() {
+  const sel = $('rigSel');
+  const rigName = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex].text.replace(/\s*\(.*\)\s*$/, '') : 'this rig';
+  if (!confirm(`Update ${rigName}?
+
+git pull, build, then restart the running theatre (about 30 s off the air) and the launcher.`)) return;
+  const btn = $('updateRigBtn');
+  btn.disabled = true;
+  updChip('starting…');
+  try {
+    const r = await fetch(api('/api/update'), { method: 'POST' });
+    if (!r.ok) throw new Error(await r.text());
+  } catch (e) { updChip('could not start: ' + e.message, 'fail'); btn.disabled = false; return; }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let target = '';
+  for (let i = 0; i < 200; i++) {
+    await sleep(3000);
+    try {
+      const s = await fetch(api('/api/update'), { cache: 'no-store' }).then(r => r.json());
+      if (s.to) target = s.to;
+      if (s.done && s.err) { updChip('FAILED: ' + s.err, 'fail'); btn.disabled = false; return; }
+      if (s.done && /already up to date/.test(s.step || '')) { updChip('✓ ' + s.step, 'ok'); btn.disabled = false; return; }
+      updChip((s.from && s.to ? `${s.from} → ${s.to}: ` : '') + (s.step || '…'));
+    } catch (e) { updChip('launcher restarting…'); }
+    if (target) {
+      try {
+        const v = await fetch(api('/api/version'), { cache: 'no-store' }).then(r => r.json());
+        const s = await fetch(api('/api/update'), { cache: 'no-store' }).then(r => r.json());
+        if (v.short === target && !s.running) {
+          updChip(`✓ updated to ${target}`, 'ok');
+          btn.disabled = false;
+          setTimeout(() => location.reload(), 2500);   // pick up the new page
+          return;
+        }
+      } catch (e) { /* still restarting */ }
+    }
+  }
+  updChip('no answer after 10 minutes — check the rig', 'fail');
+  btn.disabled = false;
 }
 
 // Boot
