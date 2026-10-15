@@ -120,3 +120,21 @@ func TestCommandPositionResponse(t *testing.T) {
 		t.Errorf("non-position call should fall through, got %q", got)
 	}
 }
+
+// Command did not answer a radar check (DCS3 2026-10-15 14:51:49).
+func TestCommandRadarCheck(t *testing.T) {
+	store := newTacviewPositions()
+	p := newMiniTacviewParser(store)
+	feedACMI(p,
+		"0,ReferenceLongitude=40,ReferenceLatitude=42",
+		"a1,T=1|1|2438,Type=Air+FixedWing,Name=FA-18C_hornet,Pilot=Raider 302,Coalition=Allies",
+	)
+	zero := func(orb.Point) float64 { return 0 }
+	got := commandPositionResponse("Command, Raider 302 radar check.", "Raider 302", "vSFG-7-Command", store, zero)
+	if !strings.HasPrefix(got, "Raider 302, vSFG-7-Command, radar contact") || !strings.Contains(got, "angels 8") {
+		t.Errorf("radar check = %q", got)
+	}
+	if got := commandPositionResponse("Command, Raider 999 radar check.", "Raider 999", "vSFG-7-Command", store, zero); !strings.Contains(got, "no radar contact") {
+		t.Errorf("unknown caller = %q", got)
+	}
+}

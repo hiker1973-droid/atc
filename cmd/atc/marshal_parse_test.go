@@ -205,3 +205,45 @@ func TestDeckbossCallsignFlown20261014(t *testing.T) {
 		}
 	}
 }
+
+// Raider 302 off and back to the boat, DCS3 2026-10-15 14:43-15:00.
+func TestMarshalCallsFlown20261015(t *testing.T) {
+	cases := []struct {
+		text   string
+		cs     string
+		intent marshalIntent
+	}{
+		// Whisper's "marker" for "marking": got only "state 7.6, copy".
+		{"Union Marshal Raider 302, marker mom's 300 for 27, angels 9.7, state 7.6.", "Raider 302", marshalMarkingMom},
+		// "You need Marshall" for "Union Marshal": dropped as not addressed.
+		{"You need Marshall, Raider 302, marking moms, 305, angels not for 25, angels 9.3, state 7.9.", "Raider 302", marshalMarkingMom},
+		// A readback of "report see me at ten", at 29 nm: answered "copy visual
+		// at ten miles". Now no reply.
+		{"Unit Marshall, Raider 302, BRC 96, Marshalling at Angels 2, we'll report see you at 10.", "Raider 302", marshalNone},
+		// The real call still lands.
+		{"Union Marshal Raider 302, see you at 10.", "Raider 302", marshalSeeYouAtTen},
+		// A jet leaving: answered "contact 7 DME, continue".
+		{"Union Marshal Raider 302 is seven miles out, pushing command.", "Raider 302", marshalPushCommand},
+		// A bare distance is still a DME report.
+		{"Union Marshal Raider 302, altitude Angels 4.2, range 16.", "Raider 302", marshalDME},
+	}
+	for _, tc := range cases {
+		t.Run(tc.text, func(t *testing.T) {
+			if cs := marshalCallsignFromText(tc.text); cs != tc.cs {
+				t.Errorf("callsign = %q, want %q", cs, tc.cs)
+			}
+			lower := strings.ToLower(tc.text)
+			if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != tc.intent {
+				t.Errorf("intent = %d, want %d", got, tc.intent)
+			}
+		})
+	}
+}
+
+// "Tac boss, Raider 302 airborne" was answered "Tac boss, Deckboss, copy
+// airborne" (DCS3 2026-10-15 14:49:43).
+func TestDeckbossCallsignFlown20261015(t *testing.T) {
+	if got := extractCallsignSkippingAddress("Tac boss, Raider 302 airborne.", deckbossAddrPrefixes...); got != "Raider 302" {
+		t.Errorf("callsign = %q, want Raider 302", got)
+	}
+}

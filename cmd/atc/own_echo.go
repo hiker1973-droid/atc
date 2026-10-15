@@ -124,3 +124,34 @@ func isAllDigits(s string) bool {
 	}
 	return true
 }
+
+// undoubleCallsign repairs a modex Whisper heard with a digit doubled, using
+// the Tacview picture: "Raider 3022" with no such contact but a "Raider 302"
+// on scope becomes "Raider 302". Marshal tracked a phantom "Raider 3022" on
+// DCS3 2026-10-15 14:54:27 (also 311 -> 3311 on 2026-07-02). Unchanged when
+// the callsign is known, when no single repair is known, or when two are.
+func undoubleCallsign(cs string, known func(string) bool) string {
+	i := strings.LastIndexByte(cs, ' ')
+	if i < 0 || known == nil || !isAllDigits(cs[i+1:]) || len(cs)-i-1 < 3 || known(cs) {
+		return cs
+	}
+	word, num := cs[:i], cs[i+1:]
+	found := ""
+	for j := 1; j < len(num); j++ {
+		if num[j] != num[j-1] {
+			continue
+		}
+		c := word + " " + num[:j] + num[j+1:]
+		if c == found || !known(c) {
+			continue
+		}
+		if found != "" {
+			return cs
+		}
+		found = c
+	}
+	if found == "" {
+		return cs
+	}
+	return found
+}

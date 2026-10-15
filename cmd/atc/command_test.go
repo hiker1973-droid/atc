@@ -66,3 +66,18 @@ func TestCommandResponseFuelState(t *testing.T) {
 		t.Errorf("unrelated call should stay silent, got %q", got)
 	}
 }
+
+// Flown on DCS3 2026-10-15.
+func TestCommandCallsFlown20261015(t *testing.T) {
+	if got := commandResponse("Command, Raider 302, fencing in air-to-ground 11.0.", "Raider 302", "vSFG-7-Command"); got == "" {
+		t.Error("fencing in not answered")
+	}
+	if got := commandResponse("Command, Raider 302, fencing out.", "Raider 302", "vSFG-7-Command"); got == "" {
+		t.Error("fencing out not answered")
+	}
+	// A call for Marshal on Command's radio: the callsign is the pilot's.
+	cs := extractCallsignSkippingAddress("Union Marshall, Raider 302, Comcheck.", commandAddresses...)
+	if cs != "Raider 302" {
+		t.Errorf("callsign = %q, want Raider 302", cs)
+	}
+}

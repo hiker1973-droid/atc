@@ -64,7 +64,7 @@ var rtbPhrases = []string{"rtb", "returning to base", "request recovery", "reque
 // isRecoveryCall: the pilot is done working and heading home.
 func isRecoveryCall(lower string) bool {
 	return containsAny(lower, rtbPhrases...) ||
-		containsAny(lower, "fence out", "fence-out", "fenceout",
+		containsAny(lower, "fence out", "fence-out", "fenceout", "fencing out",
 			"off station", "off-station", "offstation", "departing station")
 }
 

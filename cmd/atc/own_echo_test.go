@@ -69,3 +69,24 @@ func TestJoinCallsignDigits(t *testing.T) {
 		t.Errorf("jtacCallsign = %q, want Raider 302", got)
 	}
 }
+
+func TestUndoubleCallsign(t *testing.T) {
+	scope := map[string]bool{"Raider 302": true, "Raider 311": true, "Venom 33": true}
+	known := func(c string) bool { return scope[c] }
+	for in, want := range map[string]string{
+		"Raider 3022": "Raider 302", // DCS3 2026-10-15 14:54:27
+		"Raider 3311": "Raider 311", // 2026-07-02
+		"Raider 302":  "Raider 302", // already right
+		"Raider 4455": "Raider 4455", // no repair on scope
+		"Venom 33":    "Venom 33",   // known, and too short to touch
+		"Raider":      "Raider",
+		"":            "",
+	} {
+		if got := undoubleCallsign(in, known); got != want {
+			t.Errorf("undoubleCallsign(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := undoubleCallsign("Raider 3022", nil); got != "Raider 3022" {
+		t.Errorf("no picture = %q", got)
+	}
+}

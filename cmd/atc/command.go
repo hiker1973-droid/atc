@@ -28,6 +28,14 @@ func commandPick(opts [3]string) string {
 var radioCheckPhrases = []string{"radio check", "comm check", "comms check", "com check", "coms check",
 	"comcheck", "commcheck", "comp check", "how copy"}
 
+// commandAddresses open a call to Command, plus the other roles' addresses so
+// a pilot on the wrong radio still gets his own callsign back. Longest first:
+// extractCallsignSkippingAddress takes the first exact prefix followed by a
+// space or comma, so "union marshal" would not match "Union Marshall".
+var commandAddresses = []string{"vsfg-7-command", "vsfg 7 command", "command",
+	"union marshall", "union marshal", "unit marshall", "marshall", "marshal",
+	"deck boss", "deckboss", "hitman 1-1", "hitman one one", "hitman"}
+
 // commandResponse generates an ATC response for a command channel intent.
 func commandResponse(text, callsign, channelName string) string {
 	lower := strings.ToLower(text)
@@ -87,7 +95,7 @@ func commandResponse(text, callsign, channelName string) string {
 
 	// Fence out — leaving combat/training area (check before fence in/check
 	// so "fence out" isn't swallowed by a looser "fence" match).
-	if containsAny(lower, "fence out", "fence-out", "fenceout") {
+	if containsAny(lower, "fence out", "fence-out", "fenceout", "fencing out") {
 		if fuel := extractFuelStateMarshal(lower); fuel > 0 {
 			return composer.NewATCComposer(channelName).CommandFenceOut(callsign, fuel)
 		}
@@ -99,7 +107,9 @@ func commandResponse(text, callsign, channelName string) string {
 	}
 
 	// Fence in / fence check — entering combat/training area, systems hot
-	if containsAny(lower, "fence in", "fence-in", "fencein", "fence check", "fence-check") {
+	// "fencing in" flown on DCS3 2026-10-15 14:18:55 and missed (pending since
+	// 2026-07-02).
+	if containsAny(lower, "fence in", "fence-in", "fencein", "fence check", "fence-check", "fencing in") {
 		if fuel := extractFuelStateMarshal(lower); fuel > 0 {
 			return composer.NewATCComposer(channelName).CommandFenceIn(callsign, fuel)
 		}
@@ -133,7 +143,13 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		"Command, Raider, Venom, Viper, request tasking, copy, IP Anvil, Brick, Cobra, Dagger, Eagle",
 		inFlight,
 		func(text string) (string, string) {
-			cs := joinCallsignDigits(extractCallsignSkippingAddress(text, "command", "vsfg-7-command", "vsfg 7 command"))
+			// Another role's address is skipped too: on 2026-10-15 a pilot on the
+			// wrong radio called "Union Marshall, Raider 302, comcheck" on 282 and
+			// was answered "Union Marshall, vSFG-7-Command, loud and clear".
+			cs := joinCallsignDigits(extractCallsignSkippingAddress(text, commandAddresses...))
+			if store != nil {
+				cs = undoubleCallsign(cs, func(c string) bool { _, ok := store.Get(c); return ok })
+			}
 			if tracker != nil {
 				tracker.Note(cs, text)
 			}

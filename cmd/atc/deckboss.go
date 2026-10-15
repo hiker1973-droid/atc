@@ -25,7 +25,10 @@ import (
 // boss" to the other as the callsign. Add both spaced and unspaced forms.
 var deckbossAddrPrefixes = []string{"deckboss", "deck boss", "duck boss", "duckboss", "tech boss", "techboss",
 	"dec boss", "decboss", "check boss", "checkboss", "yak boss", "yakboss", "dakwas", "dak was",
-	"dark boss", "darkboss", "black boss", "blackboss"}
+	"dark boss", "darkboss", "black boss", "blackboss",
+	// DCS3 2026-10-15 14:49:43: "Tac boss, Raider 302 airborne" was answered
+	// "Tac boss, Deckboss, copy airborne".
+	"tac boss", "tacboss", "tack boss", "tackboss"}
 
 // catNumRe captures the cat number from "cat 1" / "CAT 2" / "cat3".
 var catNumRe = regexp.MustCompile(`\bcat\s*(\d)\b`)

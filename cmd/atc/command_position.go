@@ -38,6 +38,12 @@ func isBullseyeRequest(lower string) bool {
 	return containsAny(lower, "say bullseye", "request bullseye", "bullseye check", "say my bullseye", "request my bullseye", "bullseye position")
 }
 
+// isRadarCheck: Marshal and the towers answer it; Command did not (DCS3
+// 2026-10-15 14:51:49, open since 2026-10-14).
+func isRadarCheck(lower string) bool {
+	return containsAny(lower, "radar check", "request radar", "radar contact check")
+}
+
 func isTankerRequest(lower string) bool {
 	return containsAny(lower, "request tanker", "say tanker", "where's the tanker", "where is the tanker", "wheres the tanker",
 		"nearest tanker", "tanker location", "tanker bearing",
@@ -67,8 +73,8 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 // it says so rather than going silent, because the pilot asked a question.
 func commandPositionResponse(text, callsign, channelName string, store *tacviewPositions, magVar magVarFn) string {
 	lower := strings.ToLower(text)
-	wantBull, wantTanker := isBullseyeRequest(lower), isTankerRequest(lower)
-	if !wantBull && !wantTanker {
+	wantBull, wantTanker, wantRadar := isBullseyeRequest(lower), isTankerRequest(lower), isRadarCheck(lower)
+	if !wantBull && !wantTanker && !wantRadar {
 		return ""
 	}
 	if store == nil {
@@ -92,6 +98,15 @@ func commandPositionResponse(text, callsign, channelName string, store *tacviewP
 	}
 
 	bull, ok := store.Bullseye(coalition)
+	if wantRadar {
+		angels := int(store.Info(callsign).AltFt/1000 + 0.5)
+		if !ok {
+			return fmt.Sprintf("%s, %s, radar contact, angels %d.", callsign, channelName, angels)
+		}
+		brg, nm := bearingRangeFromRef(bull, pos[0], pos[1])
+		return fmt.Sprintf("%s, %s, radar contact, bullseye %s for %d, angels %d.",
+			callsign, channelName, spokenBearing(toMagnetic(brg, magVar(bull))), int(nm+0.5), angels)
+	}
 	if !ok {
 		return fmt.Sprintf("%s, %s, unable, no bullseye on scope.", callsign, channelName)
 	}

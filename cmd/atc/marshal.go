@@ -89,7 +89,7 @@ func isDepartureClearCall(lower string) bool {
 // "Marshal"/"Marshall". The filler list is closed on purpose — our own TX comes
 // back as "<callsign>, Union Marshal, …" and a callsign is never one of these
 // words, so the echo still fails to match.
-var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|inner|leader|you|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so)\W+){0,2}marshall?\b\W*`)
+var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|inner|leader|you|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,2}marshall?\b\W*`)
 
 // splitMarshalAddress reports whether text opens with the Marshal address and
 // returns what follows it.
@@ -187,12 +187,27 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		"what's brc", "what is brc", "say bearing", "say mother's heading", "mother's heading", "mothers heading",
 		"say heading of mother", "base recovery course"):
 		return marshalBRCRequest
-	case containsAny(lower, "marking mom", "marking moms", "marking mum", "marking bomb", "marking bombs", "mark your mom", "mark your mum"):
+	case containsAny(lower, "marking mom", "marking moms", "marking mum", "marking bomb", "marking bombs", "mark your mom", "mark your mum",
+		// DCS3 2026-10-15 14:53:37: "marker mom's 300 for 27" got only "state 7.6, copy".
+		"marker mom", "marker mum", "marker bomb"):
 		return marshalMarkingMom
+	case containsAny(lower, "report see you at", "report see me at", "wilco see you at", "wilco see me at"):
+		// The pilot reading back "report see me at ten", not making the call.
+		// DCS3 2026-10-15 14:54:27: "BRC 96, Marshalling at Angels 2, we'll
+		// report see you at 10" at 29 nm was answered "copy visual at ten
+		// miles". No reply: the readback needs none.
+		return marshalNone
 	case containsAny(lower, "see you at 10", "see you at ten", "see me at 10", "see me at ten"):
 		return marshalSeeYouAtTen
 	case isDepartureClearCall(lower):
 		return marshalDepartureClear
+	case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
+		"pushing strike", "switching strike"):
+		// After the departure-clear call ("clear Mother's, push command" is
+		// that) but ahead of the DME report: "seven miles out, pushing command"
+		// is a jet leaving, and was answered "contact 7 DME, continue" (DCS3
+		// 2026-10-15 14:50:46). A bare distance is still a DME report.
+		return marshalPushCommand
 	case containsAny(lower, " dme", " mile") || rangeDistanceRe.MatchString(lower):
 		return marshalDME
 	case containsAny(lower, "state") && fuelState > 0:
@@ -203,9 +218,6 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		return marshalCommencing
 	case containsAny(lower, "platform", "passing five thousand", "passing 5000", "at platform"):
 		return marshalPlatform
-	case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
-		"pushing strike", "switching strike"):
-		return marshalPushCommand
 	case containsAny(lower, "pushing paddles", "switching paddles", "push paddles", "switch paddles",
 		"pushing lso", "switching lso", "pushing button", "pushing channel"):
 		return marshalPushPaddles
@@ -465,7 +477,10 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 								return
 							}
 							log.Info().Str("text", text).Msg("Marshal heard")
-							handleMarshalCall(text, marshalCallsignFromText(text), stack, comp, transmit, atcCtrl)
+							cs := undoubleCallsign(marshalCallsignFromText(text), func(c string) bool {
+								return atcCtrl.HasRecentContact(c, time.Minute)
+							})
+							handleMarshalCall(text, cs, stack, comp, transmit, atcCtrl)
 						}(frames)
 					}
 				}
