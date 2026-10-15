@@ -13,7 +13,15 @@ import (
 // ATCComposer generates ATC clearance text for a specific tower callsign.
 type ATCComposer struct {
 	towerCallsign string
+	// expectHandoff: the tower calls departures itself at the departure
+	// distance (controller SetDepartureCalls), so the release says "expect
+	// handoff" instead of asking the pilot to report.
+	expectHandoff bool
 }
+
+// SetExpectHandoff switches DepartureRelease between "report seven DME" (the
+// pilot calls) and "expect handoff at seven DME" (the tower calls).
+func (c *ATCComposer) SetExpectHandoff(on bool) { c.expectHandoff = on }
 
 // NewATCComposer creates a composer for the given tower callsign.
 func NewATCComposer(towerCallsign string) *ATCComposer {
@@ -234,10 +242,18 @@ func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromM
 // departures don't all get assigned the same altitude. Range chosen
 // to stay below typical MOA/CAS floors at the UAE training fields —
 // angels 7 was too high in live ops. Pilot is told to call tower
-// back at distNm DME for the Command handoff.
+// back at distNm DME for the Command handoff - or, when the tower makes that
+// call itself, to expect it there (operator 2026-10-15: "change it to expect
+// handoff at seven").
 func (c *ATCComposer) DepartureRelease(callsign string, distNm, angels int) string {
 	dist := numberWord(distNm)
 	ang := numberWord(3 + rand.Intn(4))
+	if c.expectHandoff {
+		return pick([]string{
+			fmt.Sprintf("%s, %s, proceed to angels %s, expect handoff at %s DME.", callsign, c.towerCallsign, ang, dist),
+			fmt.Sprintf("%s, %s, climb angels %s, expect handoff at %s DME.", callsign, c.towerCallsign, ang, dist),
+		})
+	}
 	return pick([]string{
 		fmt.Sprintf("%s, %s, proceed to angels %s, report %s DME.", callsign, c.towerCallsign, ang, dist),
 		fmt.Sprintf("%s, %s, proceed to angels %s, report passing %s DME.", callsign, c.towerCallsign, ang, dist),

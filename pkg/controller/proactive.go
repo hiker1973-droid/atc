@@ -221,6 +221,7 @@ func (c *ATCController) SetDepartureCalls(enabled bool, signOff string) {
 	defer c.mu.Unlock()
 	c.departureCalls = enabled
 	c.departureSignOff = signOff
+	c.composer.SetExpectHandoff(enabled)
 }
 
 // watchDeparture starts watching callsign for the departure call. Caller holds c.mu.

@@ -35,6 +35,9 @@ func TestDepartureCallAtSevenMiles(t *testing.T) {
 	c, sent, handle := departureController(t)
 	handle("Test Tower, Raider 302, airborne")
 	n := len(*sent)
+	if rel := (*sent)[n-1]; !strings.Contains(rel, "expect handoff at") {
+		t.Errorf("release %q should say expect handoff", rel)
+	}
 
 	putContact(c, "Raider 302", airplane, 4, testFieldElevFt+3000)
 	tick(c)
@@ -101,6 +104,9 @@ func TestDepartureCallOff(t *testing.T) {
 	c.SetDepartureCalls(false, "")
 	handle("Test Tower, Raider 302, airborne")
 	n := len(*sent)
+	if rel := (*sent)[n-1]; strings.Contains(rel, "expect handoff") {
+		t.Errorf("flag off: release %q must ask the pilot to report", rel)
+	}
 	putContact(c, "Raider 302", airplane, 7.5, testFieldElevFt+5000)
 	c.checkConflicts(context.Background()) // takes c.mu itself
 	if len(*sent) != n {
