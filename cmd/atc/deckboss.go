@@ -193,7 +193,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 		// Deckboss TX contains "airborne" or "clear traffic").
 		// Defensive prefix list — Whisper variants of "Deck boss" we've seen
 		// in the wild: "duck boss", "tech boss", "dec boss". Add as observed.
-		addrPrefixes := []string{"deckboss", "deck boss", "duck boss", "duckboss", "tech boss", "techboss", "dec boss", "decboss", "check boss", "checkboss", "yak boss", "yakboss", "dakwas", "dak was"}
+		addrPrefixes := []string{"deckboss", "deck boss", "duck boss", "duckboss", "tech boss", "techboss", "dec boss", "decboss", "check boss", "checkboss", "yak boss", "yakboss", "dakwas", "dak was", "dark boss", "darkboss"}
 		addressed := false
 		for _, p := range addrPrefixes {
 			if strings.HasPrefix(lower, p) {
@@ -381,7 +381,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 			// ("looking good") can't false-fire it.
 			transmit(comp.DeckbossBolterPattern(callsign))
 
-		case containsAny(lower, "radio check", "comm check", "comms check", "com check", "com-check", "comm-check", "how copy", "five by five", "five by"):
+		case containsAny(lower, "radio check", "comm check", "comms check", "com check", "com-check", "comm-check", "comcheck", "comp check", "how copy", "five by five", "five by"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §6 radio check dropped — not address-led")
 				return
