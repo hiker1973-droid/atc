@@ -215,17 +215,19 @@ func doUpdate(force bool) error {
 // buildsBehind says why the binaries on disk are not the build of commit
 // head ("" when both are). "Up to date" used to compare git alone (and the
 // launcher's own build), so a rig whose atc.exe was older than its checkout -
-// a launcher-only redeploy, a hand build from a dirty tree - read as current.
+// a launcher-only redeploy - read as current. Go's vcs.modified is not used:
+// any untracked file in the checkout (a launcher.exe.bak-*) sets it, and every
+// press would then restart every role.
 func buildsBehind(head string) string {
-	if !sameRev(head, cachedVersion.Revision) || cachedVersion.Modified {
-		return fmt.Sprintf("launcher.exe is built from %s%s", cachedVersion.Short, dirty(cachedVersion.Modified))
+	if !sameRev(head, cachedVersion.Revision) {
+		return fmt.Sprintf("launcher.exe is built from %s", cachedVersion.Short)
 	}
-	rev, modified, err := exeRevision(filepath.Join(rootDir, "atc.exe"))
+	rev, _, err := exeRevision(filepath.Join(rootDir, "atc.exe"))
 	if err != nil {
 		return "atc.exe build unknown (" + err.Error() + ")"
 	}
-	if !sameRev(head, rev) || modified {
-		return fmt.Sprintf("atc.exe is built from %s%s", shortRev(rev), dirty(modified))
+	if !sameRev(head, rev) {
+		return fmt.Sprintf("atc.exe is built from %s", shortRev(rev))
 	}
 	return ""
 }
@@ -260,13 +262,6 @@ func shortRev(rev string) string {
 		return rev[:7]
 	}
 	return rev
-}
-
-func dirty(modified bool) string {
-	if modified {
-		return " with uncommitted changes"
-	}
-	return ""
 }
 
 func errSuffix(err error) string {
