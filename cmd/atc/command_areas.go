@@ -71,7 +71,7 @@ const rangeAreaHold = 45 * time.Minute
 var (
 	// rangeAreaMoveRe: the pilot says he is on his way ("proceeding to
 	// Alpha", "pushing Alpha", "entering area Bravo").
-	rangeAreaMoveRe = regexp.MustCompile(`\b(proceeding|heading|en ?route|enroute|inbound|going|moving|pushing|entering|tracking|vectoring|on the way|working|setting up|rolling)\b`)
+	rangeAreaMoveRe = regexp.MustCompile(`\b(proceeding|heading|en ?route|enroute|inbound|going|moving|pushing|entering|tracking|vectoring|on the way|working|setting up|rolling|fencing in|fence in|fenced in)\b`)
 	// rangeAreaWordRe: a phonetic letter anywhere in the call. Pilots ask for
 	// an area every way there is ("request Alpha", "request to work Alpha",
 	// "request clearance into Alpha", "permission to proceed Alpha"), so the

@@ -351,7 +351,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 								log.Info().Err(err).Str("channel", channelName).Msg("Command: empty/error transcription")
 								return
 							}
-							if isWhisperHallucination(text) {
+							if isWhisperHallucination(text) || isPromptEcho(text, prompt) {
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command: hallucination filtered")
 								return
 							}

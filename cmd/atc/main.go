@@ -1066,6 +1066,29 @@ var carrierPromptFragments = []string{
 	"see you at ten", "signal charlie", "brc", "altimeter", "radio check", "five by five",
 }
 
+// isPromptEcho reports whether Whisper handed back the prompt it was given
+// instead of speech: eight or more of the prompt's comma-separated phrases,
+// and at least a third of them, in one transcript. A real call carries a few
+// (a busy close-out, "Command, Raider 302, copy, off target Bravo, Winchester,
+// Bingo, RTB", carries eight of Command's 37). Day 2026-10-16 16:57: a
+// 0.4 s blip on 282 came back as Command's whole prompt ("Command, Raider,
+// Venom, Viper, request tasking, ... Winchester, Bingo, Joker, RTB") and
+// Command answered it with "copy off target, Winchester, RTB" - the fixed
+// fragment lists below only know the tower and carrier prompts.
+func isPromptEcho(text, prompt string) bool {
+	lower := strings.ToLower(text)
+	n, total := 0, 0
+	for _, frag := range strings.Split(strings.ToLower(prompt), ",") {
+		if frag = strings.TrimSpace(frag); len(frag) >= 3 {
+			total++
+			if strings.Contains(lower, frag) {
+				n++
+			}
+		}
+	}
+	return n >= 8 && n*3 >= total
+}
+
 // isWhisperHallucination returns true if Whisper returned the prompt text
 // or other known hallucination patterns instead of real speech.
 func isWhisperHallucination(text string) bool {
@@ -1744,7 +1767,7 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 		log.Warn().Msg("Whisper returned empty transcription")
 		return
 	}
-	if isWhisperHallucination(text) {
+	if isWhisperHallucination(text) || isPromptEcho(text, prompt) {
 		log.Warn().Str("text", text).Msg("Whisper hallucination — dropping")
 		if len(frames) >= lostCallMinFrames {
 			// A real call was keyed and lost; short blips are not worth a line.

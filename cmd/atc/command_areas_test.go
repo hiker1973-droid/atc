@@ -217,6 +217,7 @@ func TestRangeAreaPhrasings(t *testing.T) {
 		"Command, Raider 302, inbound Alpha",
 		"Command, Raider 302, entering Alpha",
 		"Command, Raider 302, setting up for Alpha",
+		"Command, Raiders 302, fencing in air-to-ground for target Alpha, state 10.7.", // Day 2026-10-16 16:39
 	}
 	none := []string{
 		"Command, Raider 302, request tasking",
