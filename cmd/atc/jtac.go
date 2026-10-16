@@ -227,6 +227,14 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 	t := b.targets[cur.target]
 
 	switch {
+	case !cur.effectsAsked.IsZero() && now.Sub(cur.effectsAsked) <= bdaEffectsWindow && !isBDARequest(lower) && pilotEffects(lower) != 0:
+		// The answer to "say your observed effects".
+		cur.effectsAsked = time.Time{}
+		if pilotEffects(lower) > 0 {
+			return say("copy, %s. %s Report ready for further tasking.", oneOf(b.intn, bdaCopyGood), oneOf(b.intn, bdaThanks))
+		}
+		return say("copy, no effects. "+oneOf(b.intn, bdaReattack), t.IP)
+
 	case isBDARequest(lower):
 		// Impacts since cleared hot, or since the brief when there was none: on
 		// 2026-10-15 Raider 302 released twice with no in call and was told
@@ -240,7 +248,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 			return say("negative BDA, no attack yet.")
 		}
 		cur.bdaDone = true
-		return bdaFor(callsign, name, t, pic.GroundObjects(), imps)
+		return b.bda(cur, callsign, name, t, pic, imps, now)
 
 	case jtacAbortRe.MatchString(lower):
 		cur.stage = jtacReady
@@ -588,8 +596,22 @@ func (b *taskingBoard) bdaDue(key string, cur *taskingAssignment, name string, p
 	}
 	cur.bdaDone = true
 	log.Info().Str("callsign", cs).Int("impacts", len(imps)).Int("target", t.Number).Msg("JTAC: BDA")
-	return bdaFor(cs, name, t, pic.GroundObjects(), imps)
+	return b.bda(cur, cs, name, t, pic, imps, now)
 }
+
+// bda builds the flight's BDA call; one that could not assess leaves the
+// flight's own effects report awaited. Caller holds b.mu.
+func (b *taskingBoard) bda(cur *taskingAssignment, cs, name string, t taskingTarget, pic jtacPicture, imps []tacviewImpact, now time.Time) string {
+	text, out := bdaFor(cs, name, t, pic.GroundObjects(), imps, b.intn)
+	cur.effectsAsked = time.Time{}
+	if out == bdaUnable {
+		cur.effectsAsked = now
+	}
+	return text
+}
+
+// oneOf picks one of the wordings. The modulo keeps a test's fixed intn in range.
+func oneOf(pick func(int) int, opts []string) string { return opts[pick(len(opts))%len(opts)] }
 
 // jtacVoice is Hitman's TTS voice: his own delivery (a ground party on a
 // manpack, not a controller at a console) at the common speed.

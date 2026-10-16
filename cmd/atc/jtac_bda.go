@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"time"
 
@@ -160,18 +161,23 @@ func roundMetres(m float64) int {
 	return int(math.Round(m/50) * 50)
 }
 
-// bdaImpactText describes the impacts against the aim point.
-func bdaImpactText(t taskingTarget, bt bdaTarget, impacts []tacviewImpact) string {
-	if len(impacts) == 0 {
-		return "No impacts observed."
-	}
+// nearestImpact is the impact closest to the aim point and its distance.
+func nearestImpact(t taskingTarget, impacts []tacviewImpact) (tacviewImpact, float64) {
 	near := impacts[0]
 	for _, i := range impacts[1:] {
 		if metresBetween(i.Pos, t.TgtPos) < metresBetween(near.Pos, t.TgtPos) {
 			near = i
 		}
 	}
-	m := metresBetween(near.Pos, t.TgtPos)
+	return near, metresBetween(near.Pos, t.TgtPos)
+}
+
+// bdaImpactText describes the impacts against the aim point.
+func bdaImpactText(t taskingTarget, bt bdaTarget, impacts []tacviewImpact) string {
+	if len(impacts) == 0 {
+		return "No impacts observed."
+	}
+	near, m := nearestImpact(t, impacts)
 	var b strings.Builder
 	if len(impacts) > 1 {
 		fmt.Fprintf(&b, "%d impacts, closest ", len(impacts))
@@ -187,7 +193,7 @@ func bdaImpactText(t taskingTarget, bt bdaTarget, impacts []tacviewImpact) strin
 	if bt.NoStrike != nil {
 		for _, i := range impacts {
 			if metresBetween(i.Pos, *bt.NoStrike) <= bdaNoStrikeM {
-				b.WriteString(" Impact on the no-strike road bridge.")
+				b.WriteString(" Impact on the no-strike road bridge, check your aim point.")
 				break
 			}
 		}
@@ -210,18 +216,31 @@ func bdaCount(spoken string, n, total int) string {
 	return fmt.Sprintf("%s, %d of %d destroyed.", title, n, total)
 }
 
+// bdaDamage is the kill side of a BDA.
+type bdaDamage struct {
+	text     string // the kill sentences, "" when there is nothing to say
+	assessed bool   // the target's objects are in the picture
+	dead     int    // objects destroyed
+	allDown  bool   // every object, or every priority object, destroyed
+	total    bool   // every object destroyed
+}
+
 // bdaKillText describes the damage, "" when there is nothing to say.
 func bdaKillText(bt bdaTarget, ground []tacviewGround) string {
+	return bdaDamageOf(bt, ground).text
+}
+
+func bdaDamageOf(bt bdaTarget, ground []tacviewGround) bdaDamage {
 	var parts []string
 	if bt.Bridge {
 		parts = append(parts, "Unable to assess the bridge.")
 	}
 	if len(bt.Objects) == 0 {
-		return strings.Join(parts, " ")
+		return bdaDamage{text: strings.Join(parts, " ")}
 	}
 	seen, dead := bdaKills(bt, ground)
 	if seen == 0 {
-		return strings.Join(append(parts, "Unable to assess damage."), " ")
+		return bdaDamage{text: strings.Join(append(parts, "Unable to assess damage."), " ")}
 	}
 	var pn, pt, n int
 	for i, o := range bt.Objects {
@@ -236,8 +255,10 @@ func bdaKillText(bt bdaTarget, ground []tacviewGround) string {
 			}
 		}
 	}
-	if n == len(bt.Objects) {
-		return strings.Join(append(parts, bdaDestroyed), " ")
+	d := bdaDamage{assessed: true, dead: n, allDown: n == len(bt.Objects) || pt > 0 && pn == pt, total: n == len(bt.Objects)}
+	if d.total {
+		d.text = strings.Join(append(parts, bdaDestroyed), " ")
+		return d
 	}
 	if pt > 0 {
 		parts = append(parts, bdaCount(bt.Spoken, pn, pt))
@@ -245,24 +266,104 @@ func bdaKillText(bt bdaTarget, ground []tacviewGround) string {
 	if len(bt.Objects) > pt {
 		parts = append(parts, fmt.Sprintf("%d of %d on target destroyed.", n, len(bt.Objects)))
 	}
-	return strings.Join(parts, " ")
+	d.text = strings.Join(parts, " ")
+	return d
 }
 
-// bdaFor is the full BDA call for one flight's pass.
 // bdaDestroyed ends the kill text when every object on the target is down.
 const bdaDestroyed = "Target destroyed."
 
-func bdaFor(callsign, name string, t taskingTarget, ground []tacviewGround, impacts []tacviewImpact) string {
+// bdaOutcome is which of the four BDA calls a pass gets (operator 2026-10-16:
+// "Do all 4 with the variations").
+type bdaOutcome int
+
+const (
+	bdaGood     bdaOutcome = iota // target destroyed, or all its priority objects
+	bdaPartial                    // some kills
+	bdaNoEffect                   // impacts, nothing destroyed: a correction and re-attack
+	bdaUnable                     // nothing to assess from (the bridges, no picture): ask the pilot
+)
+
+// Two or three wordings for each part, so regulars do not hear the same
+// sentence every pass. The first of each is the one the tests pin.
+var (
+	bdaGoodLines     = []string{"Good effects on target.", "Good hits.", "Shack."}
+	bdaPartialLines  = []string{"Partial effects.", "Target damaged.", "Some effects on target."}
+	bdaNoEffectLines = []string{"No effects observed.", "No effect on target.", "Negative effects."}
+	bdaUnableLines   = []string{"Unable to assess, smoke and dust over the target.", "Unable to assess, no eyes on the target.", "Cannot assess, target obscured."}
+	bdaSayEffects    = []string{"Say your observed effects.", "Say effects observed.", "Pass your effects."}
+	bdaThanks        = []string{"Thanks for the help.", "Nice work.", "Good work."}
+	bdaReattack      = []string{"Re-attack approved, report IP inbound from %s.", "Cleared to re-attack, report IP inbound from %s."}
+	bdaCorrect       = []string{"Re-attack, correct %s %d. Report IP inbound from %s.", "Correct %s %d and re-attack. Report IP inbound from %s."}
+	bdaCopyGood      = []string{"good effects", "copy your effects", "good hits"}
+)
+
+// bdaFor is the full BDA call for one flight's pass and which of the four it
+// was. pick chooses among the wordings (the board's intn).
+func bdaFor(callsign, name string, t taskingTarget, ground []tacviewGround, impacts []tacviewImpact, pick func(int) int) (string, bdaOutcome) {
+	one := func(opts []string) string { return oneOf(pick, opts) }
 	bt := caucasusBDA[t.Number]
-	text := fmt.Sprintf("%s, %s, BDA. %s", callsign, name, bdaImpactText(t, bt, impacts))
-	if k := bdaKillText(bt, ground); k != "" {
+	d := bdaDamageOf(bt, ground)
+	parts := []string{fmt.Sprintf("%s, %s, BDA.", callsign, name), bdaImpactText(t, bt, impacts)}
+	var out bdaOutcome
+	switch {
+	case !d.assessed:
+		out = bdaUnable
+		parts = append(parts, one(bdaUnableLines), one(bdaSayEffects))
+	case d.allDown:
+		out = bdaGood
+		k := d.text
 		// Operator 2026-10-15: "target destroyed Raider XX thanks for the help".
-		if strings.HasSuffix(k, bdaDestroyed) {
-			k = strings.TrimSuffix(k, bdaDestroyed) + fmt.Sprintf("Target destroyed, %s. Thanks for the help.", callsign)
+		if d.total {
+			k = strings.TrimSuffix(k, bdaDestroyed) + fmt.Sprintf("Target destroyed, %s.", callsign)
+		} else {
+			k += " Mission successful."
 		}
-		text += " " + k
+		parts = append(parts, one(bdaGoodLines), strings.TrimSpace(k), one(bdaThanks),
+			fmt.Sprintf("Egress %s, report ready for further tasking.", t.Egress))
+	case d.dead > 0:
+		out = bdaPartial
+		parts = append(parts, one(bdaPartialLines), d.text, fmt.Sprintf(one(bdaReattack), t.IP))
+	default:
+		out = bdaNoEffect
+		parts = append(parts, one(bdaNoEffectLines))
+		if bt.Bridge {
+			parts = append(parts, "Unable to assess the bridge.")
+		}
+		// Talk the next pass onto the aim point from the closest miss.
+		if len(impacts) > 0 {
+			if near, m := nearestImpact(t, impacts); m > bdaGoodHitM {
+				brg, _ := bearingRangeFromRef(t.TgtPos, near.Pos[0], near.Pos[1])
+				parts = append(parts, fmt.Sprintf(one(bdaCorrect), compass8(brg+180), roundMetres(m), t.IP))
+				break
+			}
+		}
+		parts = append(parts, fmt.Sprintf(one(bdaReattack), t.IP))
 	}
-	return text
+	return strings.Join(parts, " "), out
+}
+
+// bdaEffectsWindow: how long after "say your observed effects" the pilot's
+// own BDA is taken as the answer.
+const bdaEffectsWindow = 3 * time.Minute
+
+var (
+	// The pilot's effects, after Hitman could not assess. Misses first: "no
+	// effects" holds "effects". "hitman" is cut before matching ("hit").
+	pilotNoEffectsRe = regexp.MustCompile(`\b(no effects?|negative effects?|no damage|missed|miss|nothing|still standing|still up)\b`)
+	pilotEffectsRe   = regexp.MustCompile(`\b(destroyed|dropped|down|collapsed|good effects?|good hits?|shack|direct hits?|hits?|on target|burning|secondar(y|ies)|effects? good)\b`)
+)
+
+// pilotEffects reads the pilot's own BDA: 1 good, -1 none, 0 not an effects call.
+func pilotEffects(lower string) int {
+	lower = strings.ReplaceAll(lower, "hitman", "")
+	switch {
+	case pilotNoEffectsRe.MatchString(lower):
+		return -1
+	case pilotEffectsRe.MatchString(lower):
+		return 1
+	}
+	return 0
 }
 
 // flightImpacts are the impacts on t since since that belong to callsign: its

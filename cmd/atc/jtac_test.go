@@ -459,7 +459,8 @@ func TestJTACBDAAfterPass(t *testing.T) {
 	}
 	*clock = clock.Add(bdaSettle)
 	out := b.jtacWatch(hitman, pic)
-	want := "Raider 11, Hitman one one, BDA. 2 impacts, closest 30 metres north of the aim point. Large tanks, 2 of 4 destroyed. 3 of 14 on target destroyed."
+	// intn 3 picks wording 3 mod n: "Partial effects.", "Cleared to re-attack".
+	want := "Raider 11, Hitman one one, BDA. 2 impacts, closest 30 metres north of the aim point. Partial effects. Large tanks, 2 of 4 destroyed. 3 of 14 on target destroyed. Cleared to re-attack, report IP inbound from Indigo."
 	if len(out) != 1 || out[0] != want {
 		t.Fatalf("BDA = %v\nwant %q", out, want)
 	}
@@ -476,29 +477,50 @@ func TestBDAText(t *testing.T) {
 	t1, t2, t4 := caucasusTaskingTargets[0], caucasusTaskingTargets[2], caucasusTaskingTargets[4] // bridge, rail bridge + no-strike, command post
 	now := time.Now()
 	hit := func(p orb.Point) []tacviewImpact { return []tacviewImpact{{Pos: p, At: now}} }
+	first := func(int) int { return 0 }
+	bda := func(cs string, tt taskingTarget, g []tacviewGround, imps []tacviewImpact) (string, bdaOutcome) {
+		return bdaFor(cs, hitman, tt, g, imps, first)
+	}
 
-	// Bridge: no damage picture, the checkpoint is counted.
+	// Bridge: no damage picture, the checkpoint is counted - partial effects.
 	g := groundAt(1)
 	g[0].Alive = false
-	got := bdaFor("Raider 11", hitman, t1, g, hit(t1.TgtPos))
-	if want := "Raider 11, Hitman one one, BDA. Impact on the aim point. Unable to assess the bridge. Checkpoint, 1 of 4 destroyed."; got != want {
-		t.Errorf("Valley Road Bridge = %q", got)
+	got, out := bda("Raider 11", t1, g, hit(t1.TgtPos))
+	if want := "Raider 11, Hitman one one, BDA. Impact on the aim point. Partial effects. Unable to assess the bridge. Checkpoint, 1 of 4 destroyed. Re-attack approved, report IP inbound from Falcon."; got != want || out != bdaPartial {
+		t.Errorf("Valley Road Bridge = %q (%d)", got, out)
 	}
-	// Kuban Rail Bridge: an impact on the road bridge is called out.
-	got = bdaFor("Raider 11", hitman, t2, nil, hit(kubanRoadBridge))
-	if !strings.Contains(got, "Impact on the no-strike road bridge.") || !strings.Contains(got, "Unable to assess the bridge.") {
-		t.Errorf("Kuban Rail Bridge = %q", got)
+	// Kuban Rail Bridge: nothing to assess, so the pilot is asked; an impact
+	// on the road bridge is called out.
+	got, out = bda("Raider 11", t2, nil, hit(kubanRoadBridge))
+	if !strings.Contains(got, "Impact on the no-strike road bridge, check your aim point.") ||
+		!strings.HasSuffix(got, "Unable to assess, smoke and dust over the target. Say your observed effects.") || out != bdaUnable {
+		t.Errorf("Kuban Rail Bridge = %q (%d)", got, out)
 	}
-	// Command post with nothing in the picture: impacts only.
-	got = bdaFor("Raider 11", hitman, t4, nil, hit(offset(t4.TgtPos, -150, 0)))
-	if want := "Raider 11, Hitman one one, BDA. Impact 150 metres south of the aim point. Unable to assess damage."; got != want {
-		t.Errorf("no picture = %q", got)
+	// Command post with nothing in the picture: impacts, then ask the pilot.
+	got, out = bda("Raider 11", t4, nil, hit(offset(t4.TgtPos, -150, 0)))
+	if want := "Raider 11, Hitman one one, BDA. Impact 150 metres south of the aim point. Unable to assess, smoke and dust over the target. Say your observed effects."; got != want || out != bdaUnable {
+		t.Errorf("no picture = %q (%d)", got, out)
+	}
+	// Seen and nothing destroyed: no effects, and a correction from the
+	// closest miss (150 m south -> correct north 150).
+	got, out = bda("Raider 11", t4, groundAt(5), hit(offset(t4.TgtPos, -150, 0)))
+	if want := "Raider 11, Hitman one one, BDA. Impact 150 metres south of the aim point. No effects observed. Re-attack, correct north 150. Report IP inbound from Javelin."; got != want || out != bdaNoEffect {
+		t.Errorf("miss = %q (%d)", got, out)
+	}
+	// On the aim point and still nothing: re-attack, no correction.
+	if got, _ := bda("Raider 11", t4, groundAt(5), hit(t4.TgtPos)); !strings.HasSuffix(got, "No effects observed. Re-attack approved, report IP inbound from Javelin.") {
+		t.Errorf("no effects on the aim point = %q", got)
 	}
 	// Single primary object, then everything down.
 	g = groundAt(5)
 	g[0].Alive = false
 	if got := bdaKillText(caucasusBDA[5], g); got != "Command building destroyed. 1 of 14 on target destroyed." {
 		t.Errorf("command building = %q", got)
+	}
+	// The priority object down is good effects, mission successful.
+	got, out = bda("Raider 11", t4, g, hit(t4.TgtPos))
+	if want := "Raider 11, Hitman one one, BDA. Impact on the aim point. Good effects on target. Command building destroyed. 1 of 14 on target destroyed. Mission successful. Thanks for the help. Egress angels 13, report ready for further tasking."; got != want || out != bdaGood {
+		t.Errorf("priority down = %q (%d)", got, out)
 	}
 	for i := range g {
 		g[i].Alive = false
@@ -507,9 +529,64 @@ func TestBDAText(t *testing.T) {
 		t.Errorf("all down = %q", got)
 	}
 	// Operator 2026-10-15: "target destroyed Raider XX thanks for the help".
-	got = bdaFor("Raider 302", hitman, t4, g, hit(t4.TgtPos))
-	if !strings.HasSuffix(got, "Target destroyed, Raider 302. Thanks for the help.") {
+	got, _ = bda("Raider 302", t4, g, hit(t4.TgtPos))
+	if want := "Raider 302, Hitman one one, BDA. Impact on the aim point. Good effects on target. Target destroyed, Raider 302. Thanks for the help. Egress angels 13, report ready for further tasking."; got != want {
 		t.Errorf("all down BDA = %q", got)
+	}
+	// The other wordings come round too.
+	last := func(n int) int { return n - 1 }
+	got, _ = bdaFor("Raider 302", hitman, t4, g, hit(t4.TgtPos), last)
+	if !strings.Contains(got, " Shack. ") || !strings.Contains(got, " Good work. ") {
+		t.Errorf("last wordings = %q", got)
+	}
+}
+
+// Hitman could not assess, so he asks; the pilot's own effects close it.
+func TestBDAPilotEffects(t *testing.T) {
+	b, clock := newJTACBoard(t)
+	b.intn = func(int) int { return 2 } // third free target = 3, Kuban Rail Bridge
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, in from the east", "Raider 11", hitman, pic)
+	tgt := caucasusTaskingTargets[2]
+	*clock = clock.Add(20 * time.Second)
+	pic.impacts = []tacviewImpact{{Pos: tgt.TgtPos, At: *clock, Shooter: "Raider 11"}}
+	*clock = clock.Add(bdaSettle)
+	if out := b.jtacWatch(hitman, pic); len(out) != 1 || !strings.Contains(out[0], "Pass your effects.") {
+		t.Fatalf("BDA = %v", out)
+	}
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, bridge dropped", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy, good hits. Good work. Report ready for further tasking." {
+		t.Errorf("good effects = %q", got)
+	}
+	// Answered once only.
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, bridge dropped", "Raider 11", hitman, pic); strings.Contains(got, "copy, good") {
+		t.Errorf("second report = %q", got)
+	}
+	// Asked again, a miss gets a re-attack.
+	b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic)
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, no effects, missed long", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy, no effects. Re-attack approved, report IP inbound from Hammer." {
+		t.Errorf("no effects = %q", got)
+	}
+	// "Ready for further tasking" is a new tasking.
+	if !isTaskingRequest("hitman 1-1, raider 11, ready for further tasking") {
+		t.Error("ready for further tasking is not a tasking request")
+	}
+}
+
+func TestPilotEffects(t *testing.T) {
+	for in, want := range map[string]int{
+		"hitman, raider 11, bridge down":        1,
+		"raider 11, good effects":               1,
+		"raider 11, shack":                      1,
+		"raider 11, no effect":                  -1,
+		"raider 11, missed":                     -1,
+		"hitman 1-1, raider 11, ip inbound":     0,
+		"hitman 1-1, raider 11, off, egressing": 0,
+	} {
+		if got := pilotEffects(in); got != want {
+			t.Errorf("pilotEffects(%q) = %d, want %d", in, got, want)
+		}
 	}
 }
 

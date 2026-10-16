@@ -90,6 +90,7 @@ type taskingAssignment struct {
 	offAxis   int       // consecutive watch samples outside the attack window
 	bdaDone   bool      // this pass's BDA has gone out
 	offAcked  bool      // this pass's "off" has been answered
+	effectsAsked time.Time // the BDA could not assess and asked the pilot for theirs
 }
 
 // taskingBoard tracks which flight holds which target.
@@ -153,6 +154,8 @@ func isTaskingRequest(lower string) bool {
 		"request a task", "ready for tasking", "request target", "requesting target", "request a target",
 		"request new tasking", "request new target", "request next tasking", "request next target",
 		"say tasking", "any tasking",
+		// The answer to a good BDA's "report ready for further tasking".
+		"ready for further tasking", "request further tasking", "ready for more tasking",
 		// Whisper heard "request tasking" as "request taxiing" on Hitman's net
 		// (DCS3 2026-10-14). Nobody taxis on Command or the JTAC net.
 		"request taxiing", "requesting taxiing", "request taxing", "requesting taxing")
