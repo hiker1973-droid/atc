@@ -68,7 +68,7 @@ const (
 	jtacWatchStopNm   = 1.5  // inside this the run is over either way
 	jtacReleaseRadius = 1.5  // a weapon first seen this close to the jet is its release
 	jtacContactMaxAge = 30 * time.Second
-	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, Anvil, Brick, Cobra, Dagger, Eagle"
+	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, Falcon, Granite, Hammer, Indigo, Javelin"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the

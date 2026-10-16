@@ -135,8 +135,8 @@ and the exchange still ends in "cleared hot".
 
 | Intent | Say | What happens |
 |---|---|---|
-| Check in | `"...checking in"`, `"ready for 9-line"`, `"request tasking"` | Hitman picks your target and gives only its number, name and IP, e.g. "target 3, Fuel Depot, IP Cobra"; the rest of the 9-line is on your card. If you are more than 5 nm from the IP, where the IP is |
-| Readback | `"...target 3, Cobra"` (the target or the IP), or `"...copy"` | "Good readback, report IP inbound" |
+| Check in | `"...checking in"`, `"ready for 9-line"`, `"request tasking"` | Hitman picks your target and gives only its number, name and IP, e.g. "target 4, Fuel Depot, IP Indigo"; the rest of the 9-line is on your card. If you are more than 5 nm from the IP, where the IP is |
+| Readback | `"...target 4, Indigo"` (the target or the IP), or `"...copy"` | "Good readback, report IP inbound" |
 | IP inbound | `"...IP inbound"` | "Continue" if you are within 5 nm of the IP. Further away: refused, with the IP's bearing and range. Nose more than 30° off the target: "check heading, target bears ..." |
 | In | `"...in from the north"`, `"in heading 330"`, `"...in"` | **Cleared hot** when your magnetic heading is inside the card's final attack heading and you are 0.5–15 nm from the target. Otherwise **abort, abort, abort** with the reason; go round from the IP |
 | (no call) | — | After cleared hot, Hitman watches the run. If you swing more than 10° outside the final attack heading while still pointed at the target, before a weapon comes off, it calls the abort. Pulling off (target well off the nose), a release, or reaching 1.5 nm ends the watch |
@@ -146,10 +146,10 @@ and the exchange still ends in "cleared hot".
 | Abort | `"...abort"` | Copies; re-attack from the IP |
 | Radio check | `"...radio check"` | Loud and clear |
 
-**BDA limits.** The bridges (targets 1 and 2) are map objects that Tacview does
+**BDA limits.** The bridges (targets 1 and 3) are map objects that Tacview does
 not carry: Hitman says "unable to assess the bridge" and gives impacts, plus the
-Enguri checkpoint vehicles and a call-out for any impact on the Rioni no-strike
-road bridge. A target whose objects are not in the Tacview stream at all gets
+Valley Road Bridge checkpoint vehicles and a call-out for any impact on the Kuban
+Rail Bridge's no-strike road bridge (training V1.25: the range is north of the ridge). A target whose objects are not in the Tacview stream at all gets
 impacts and "unable to assess damage". Kills last until the mission restarts.
 
 **Voice.** `ash` with a ground-JTAC delivery (`--voice-style-jtac`) and the
@@ -157,11 +157,11 @@ impacts and "unable to assess damage". Kills last until the mission restarts.
 Command, as a manpack FM set on the ground.
 
 > Pilot: *"Hitman 1-1, Raider 1-1, checking in."*
-> Hitman: *"Raider 1-1, Hitman one one, target 1, Enguri Bridge, IP Anvil. Read back."*
-> Pilot: *"Hitman, Raider 1-1, target 1, Anvil."* → *"... good readback. Report IP inbound."*
+> Hitman: *"Raider 1-1, Hitman one one, target 1, Valley Road Bridge, IP Falcon. Read back."*
+> Pilot: *"Hitman, Raider 1-1, target 1, Falcon."* → *"... good readback. Report IP inbound."*
 > Pilot: *"Hitman, Raider 1-1, IP inbound."* → *"... continue."*
-> Pilot: *"Hitman, Raider 1-1, in from the southeast."* → *"... cleared hot."*
-> Pilot: *"Hitman, Raider 1-1, off."* → *"... copy off. Egress back to Anvil, angels 15. Report IP inbound for re-attack."*
+> Pilot: *"Hitman, Raider 1-1, in from the south."* → *"... cleared hot."*
+> Pilot: *"Hitman, Raider 1-1, off."* → *"... copy off. Egress back to Falcon, angels 15. Report IP inbound for re-attack."*
 
 ---
 

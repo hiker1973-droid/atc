@@ -18,8 +18,8 @@ import (
 //              list, with the target's priority objects first
 //
 // The two bridges are map objects, which Tacview does not carry, so their
-// damage cannot be assessed; Enguri's checkpoint and Rioni's no-strike road
-// bridge (impacts only) can. With no ground objects seen at a target, the
+// damage cannot be assessed; the Valley Road Bridge checkpoint and the Kuban
+// Rail Bridge's no-strike road bridge (impacts only) can. With no ground objects seen at a target, the
 // report says it cannot assess and gives impacts only. Operator 2026-10-14:
 // "write it to handle all cases".
 
@@ -35,7 +35,7 @@ const (
 	bdaGoodHitM = 20.0
 	// bdaMatchM: a Tacview object within this of a placed object is that object.
 	bdaMatchM = 40.0
-	// bdaNoStrikeM: an impact within this of the Rioni road bridge hit it.
+	// bdaNoStrikeM: an impact within this of a no-strike object hit it.
 	bdaNoStrikeM = 50.0
 )
 
@@ -54,68 +54,68 @@ type bdaTarget struct {
 	NoStrike *orb.Point // an impact near it is called out
 }
 
-// rioniRoadBridge is build_ag.ROAD_BRIDGE_NO_STRIKE.
-var rioniRoadBridge = orb.Point{42.332265, 42.119356}
+// kubanRoadBridge is range_north.ROAD_BRIDGE_NO_STRIKE (TGT 3).
+var kubanRoadBridge = orb.Point{41.971038, 44.077495}
 
-// caucasusBDA is keyed by target number. Positions are build_ag.SITES layout
-// offsets (and ENGURI_CHECKPOINT) turned into lat/lon with each site's grid
-// convergence (about 6 deg here) taken from its target-to-IP line.
+// caucasusBDA is keyed by target number. Positions are every static range_north.placed()
+// puts at a target (layout offsets and the TGT 1 CHECKPOINT), converted x/y -> lat/lon by
+// DCS's own terrain module, so no convergence approximation.
 var caucasusBDA = map[int]bdaTarget{
 	1: {Primary: "checkpoint", Spoken: "checkpoint", Bridge: true, Objects: []bdaObject{
-		{"checkpoint vehicle", orb.Point{41.848118, 42.584173}},
-		{"checkpoint vehicle", orb.Point{41.847791, 42.584281}},
-		{"checkpoint vehicle", orb.Point{41.847459, 42.584360}},
-		{"checkpoint outpost", orb.Point{41.847893, 42.584049}},
+		{"checkpoint vehicle", orb.Point{41.886978, 43.897335}},
+		{"checkpoint vehicle", orb.Point{41.886826, 43.897266}},
+		{"checkpoint vehicle", orb.Point{41.886672, 43.897210}},
+		{"checkpoint outpost", orb.Point{41.887099, 43.897236}},
 	}},
-	2: {Bridge: true, NoStrike: &rioniRoadBridge},
-	3: {Primary: "large tank", Spoken: "large tank", Objects: []bdaObject{
-		{"large tank", orb.Point{41.805736, 42.365177}},
-		{"large tank", orb.Point{41.806156, 42.365144}},
-		{"large tank", orb.Point{41.806564, 42.365113}},
-		{"large tank", orb.Point{41.806983, 42.365080}},
-		{"small tank", orb.Point{41.805943, 42.364758}},
-		{"small tank", orb.Point{41.806663, 42.364702}},
-		{"fuel bladder", orb.Point{41.805959, 42.364443}},
-		{"fuel bladder", orb.Point{41.806558, 42.364397}},
-		{"fuel truck", orb.Point{41.805969, 42.364084}},
-		{"fuel truck", orb.Point{41.806208, 42.364066}},
-		{"fuel truck", orb.Point{41.806448, 42.364047}},
-		{"power box", orb.Point{41.807177, 42.364483}},
-		{"generator", orb.Point{41.805379, 42.364623}},
-		{"workshop", orb.Point{41.806455, 42.365793}},
+	2: {Primary: "gun", Spoken: "gun", Objects: []bdaObject{
+		{"gun", orb.Point{41.890250, 43.951988}},
+		{"gun", orb.Point{41.890619, 43.951959}},
+		{"gun", orb.Point{41.890988, 43.951930}},
+		{"gun", orb.Point{41.891358, 43.951901}},
+		{"gun", orb.Point{41.891727, 43.951872}},
+		{"gun", orb.Point{41.892096, 43.951843}},
+		{"rocket launcher", orb.Point{41.890860, 43.951490}},
+		{"rocket launcher", orb.Point{41.891352, 43.951451}},
+		{"ammunition truck", orb.Point{41.890745, 43.951139}},
+		{"ammunition truck", orb.Point{41.891053, 43.951115}},
+		{"ammunition truck", orb.Point{41.891360, 43.951090}},
+		{"ammo dump", orb.Point{41.890623, 43.950743}},
+		{"ammo dump", orb.Point{41.891362, 43.950685}},
+		{"tent", orb.Point{41.892016, 43.951309}},
+		{"command vehicle", orb.Point{41.890169, 43.951454}},
 	}},
-	4: {Primary: "command building", Spoken: "command building", Objects: []bdaObject{
-		{"command building", orb.Point{42.155376, 42.170030}},
-		{"radio mast", orb.Point{42.155905, 42.170346}},
-		{"bunker", orb.Point{42.154960, 42.169660}},
-		{"bunker", orb.Point{42.155677, 42.169603}},
-		{"tent", orb.Point{42.154877, 42.170338}},
-		{"tent", orb.Point{42.154638, 42.170357}},
-		{"tent", orb.Point{42.154399, 42.170376}},
-		{"generator", orb.Point{42.156140, 42.169880}},
-		{"command vehicle", orb.Point{42.155340, 42.170615}},
-		{"command vehicle", orb.Point{42.155579, 42.170596}},
-		{"jeep", orb.Point{42.155280, 42.169366}},
-		{"jeep", orb.Point{42.155423, 42.169355}},
-		{"command vehicle", orb.Point{42.156010, 42.170651}},
-		{"outpost", orb.Point{42.155222, 42.168968}},
+	3: {Bridge: true, NoStrike: &kubanRoadBridge},
+	4: {Primary: "large tank", Spoken: "large tank", Objects: []bdaObject{
+		{"large tank", orb.Point{42.114338, 44.191097}},
+		{"large tank", orb.Point{42.114770, 44.191062}},
+		{"large tank", orb.Point{42.115190, 44.191028}},
+		{"large tank", orb.Point{42.115623, 44.190993}},
+		{"small tank", orb.Point{42.114547, 44.190675}},
+		{"small tank", orb.Point{42.115289, 44.190615}},
+		{"fuel bladder", orb.Point{42.114561, 44.190359}},
+		{"fuel bladder", orb.Point{42.115178, 44.190309}},
+		{"fuel truck", orb.Point{42.114567, 44.189998}},
+		{"fuel truck", orb.Point{42.114814, 44.189978}},
+		{"fuel truck", orb.Point{42.115061, 44.189959}},
+		{"power box", orb.Point{42.115817, 44.190393}},
+		{"generator", orb.Point{42.113964, 44.190542}},
+		{"workshop", orb.Point{42.115084, 44.191712}},
 	}},
-	5: {Primary: "gun", Spoken: "gun", Objects: []bdaObject{
-		{"gun", orb.Point{41.728466, 42.057486}},
-		{"gun", orb.Point{41.728825, 42.057459}},
-		{"gun", orb.Point{41.729184, 42.057432}},
-		{"gun", orb.Point{41.729542, 42.057406}},
-		{"gun", orb.Point{41.729901, 42.057379}},
-		{"gun", orb.Point{41.730260, 42.057352}},
-		{"rocket launcher", orb.Point{41.729063, 42.056993}},
-		{"rocket launcher", orb.Point{41.729542, 42.056957}},
-		{"ammunition truck", orb.Point{41.728955, 42.056643}},
-		{"ammunition truck", orb.Point{41.729254, 42.056620}},
-		{"ammunition truck", orb.Point{41.729553, 42.056598}},
-		{"ammo dump", orb.Point{41.728841, 42.056248}},
-		{"ammo dump", orb.Point{41.729558, 42.056194}},
-		{"tent", orb.Point{41.730187, 42.056819}},
-		{"command vehicle", orb.Point{41.728394, 42.056954}},
+	5: {Primary: "command building", Spoken: "command building", Objects: []bdaObject{
+		{"command building", orb.Point{41.980892, 44.336361}},
+		{"radio mast", orb.Point{41.981442, 44.336677}},
+		{"bunker", orb.Point{41.980459, 44.335990}},
+		{"bunker", orb.Point{41.981202, 44.335931}},
+		{"tent", orb.Point{41.980376, 44.336672}},
+		{"tent", orb.Point{41.980128, 44.336691}},
+		{"tent", orb.Point{41.979880, 44.336711}},
+		{"generator", orb.Point{41.981684, 44.336208}},
+		{"command vehicle", orb.Point{41.980857, 44.336949}},
+		{"command vehicle", orb.Point{41.981105, 44.336929}},
+		{"jeep", orb.Point{41.980789, 44.335694}},
+		{"jeep", orb.Point{41.980938, 44.335682}},
+		{"command vehicle", orb.Point{41.981552, 44.336984}},
+		{"outpost", orb.Point{41.980728, 44.335294}},
 	}},
 }
 

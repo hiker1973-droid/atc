@@ -49,7 +49,7 @@ const hitman = "Hitman one one"
 
 func newJTACBoard(t *testing.T) (*taskingBoard, *time.Time) {
 	t.Helper()
-	b, clock := newTestTaskingBoard(caucasusTaskingTargets) // always target 1, Anvil
+	b, clock := newTestTaskingBoard(caucasusTaskingTargets) // always target 1, Falcon
 	b.jtac = &jtacNet{Spoken: hitman, FreqMHz: 61.0}
 	return b, clock
 }
@@ -69,7 +69,7 @@ func TestJTACCommandHandsOff(t *testing.T) {
 	if got := b.Response("Command, Raider 11, copy", "Raider 11", "Command"); got != "" {
 		t.Errorf("second copy = %q, want silence", got)
 	}
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 1, Enguri Bridge") {
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 1, Valley Road Bridge") {
 		t.Fatalf("first check-in = %q", got)
 	}
 	// Re-checking in mid-run repeats the same card.
@@ -77,7 +77,7 @@ func TestJTACCommandHandsOff(t *testing.T) {
 		t.Errorf("repeat check-in = %q, want the same target", got)
 	}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 2, Rioni Rail Bridge") {
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 2, Artillery Park") {
 		t.Errorf("check-in after a new Command request = %q, want the next target", got)
 	}
 }
@@ -102,28 +102,28 @@ func TestJTACFullRun(t *testing.T) {
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
 
-	pic.place(tgt.IPPos, 0, 1, 90) // at Anvil
+	pic.place(tgt.IPPos, 0, 1, 90) // at Falcon
 	got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	if want := "Raider 11, Hitman one one, target 1, Enguri Bridge, IP Anvil. Read back."; got != want {
+	if want := "Raider 11, Hitman one one, target 1, Valley Road Bridge, IP Falcon. Read back."; got != want {
 		t.Errorf("check-in = %q, want %q", got, want)
 	}
 
 	// Our own brief heard back must not pass as the readback.
-	if got := b.JTACResponse("Raider 11, Hitman 1-1, target 1, Enguri Bridge, IP Anvil, read back.", "Raider 11", hitman, pic); got != "" {
+	if got := b.JTACResponse("Raider 11, Hitman 1-1, target 1, Valley Road Bridge, IP Falcon, read back.", "Raider 11", hitman, pic); got != "" {
 		t.Errorf("echoed brief = %q, want no reply", got)
 	}
 
-	if got := b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, good readback. Report IP inbound." {
+	if got := b.JTACResponse("Hitman, Raider 11, target 1, Falcon", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, good readback. Report IP inbound." {
 		t.Errorf("readback = %q", got)
 	}
 
-	pic.place(tgt.IPPos, 0, 1, 329)
+	pic.place(tgt.IPPos, 0, 1, 349)
 	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue." {
 		t.Errorf("IP inbound = %q", got)
 	}
 
 	// 5 nm short of the target on the run-in (target bears 329 = jet is on 149 from it).
-	pic.place(tgt.TgtPos, 149, 5, 329)
+	pic.place(tgt.TgtPos, 169, 5, 349)
 	if got := b.JTACResponse("Hitman, Raider 11, in from the southeast", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, cleared hot." {
 		t.Errorf("in call = %q", got)
 	}
@@ -136,13 +136,13 @@ func TestJTACFullRun(t *testing.T) {
 		t.Errorf("rifle = %q", got)
 	}
 
-	pic.place(tgt.TgtPos, 149, 1, 200)
-	if got := b.JTACResponse("Hitman, Raider 11, off", "Raider 11", hitman, pic); !strings.Contains(got, "copy off. Egress back to Anvil, angels 15.") {
+	pic.place(tgt.TgtPos, 169, 1, 200)
+	if got := b.JTACResponse("Hitman, Raider 11, off", "Raider 11", hitman, pic); !strings.Contains(got, "copy off. Egress back to Falcon, angels 15.") {
 		t.Errorf("off = %q", got)
 	}
 	// 2026-10-15: our "copy off" heard back was answered every ~16 s. A second
 	// "off" in the same pass gets nothing.
-	if got := b.JTACResponse("Raider 11, Hitman 11, copy off. Egress back to Anvil, angels 15. Report IP inbound for re-attack.", "Raider 11", hitman, pic); got != "" {
+	if got := b.JTACResponse("Raider 11, Hitman 11, copy off. Egress back to Falcon, angels 15. Report IP inbound for re-attack.", "Raider 11", hitman, pic); got != "" {
 		t.Errorf("second off in the pass = %q, want no reply", got)
 	}
 }
@@ -156,7 +156,7 @@ func TestJTACPickleNotClearedAnswered(t *testing.T) {
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, negative, you are not cleared. Re-attack from Anvil." {
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, negative, you are not cleared. Re-attack from Falcon." {
 		t.Errorf("pickle before IP inbound = %q", got)
 	}
 }
@@ -169,7 +169,7 @@ func TestJTACPickleOffIPInboundIsTheAttack(t *testing.T) {
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Falcon", "Raider 11", hitman, pic)
 	b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic)
 	if got := b.JTACResponse("Hitman 1-1, Raider 3-0-2, pickle times one", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy pickle, will report BDA." {
 		t.Errorf("pickle off IP inbound = %q", got)
@@ -189,7 +189,7 @@ func TestJTACBDAWithoutClearedHot(t *testing.T) {
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Falcon", "Raider 11", hitman, pic)
 	if got := b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic); !strings.Contains(got, "no attack yet") {
 		t.Errorf("BDA with nothing dropped = %q", got)
 	}
@@ -207,33 +207,33 @@ func TestJTACSecondInboundIsTheInCall(t *testing.T) {
 	tgt := caucasusTaskingTargets[0]
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
-	pic.place(tgt.IPPos, 0, 1, 329)
+	pic.place(tgt.IPPos, 0, 1, 349)
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Falcon", "Raider 11", hitman, pic)
 	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue." {
 		t.Fatalf("IP inbound = %q", got)
 	}
 	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue." {
 		t.Errorf("repeated IP inbound = %q, want continue", got)
 	}
-	pic.place(tgt.TgtPos, 149, 5, 329) // on the run-in, 5 nm out
+	pic.place(tgt.TgtPos, 169, 5, 349) // on the run-in, 5 nm out
 	if got := b.JTACResponse("Hitman 1-1, Raider 11, inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, cleared hot." {
 		t.Errorf("second inbound = %q, want cleared hot", got)
 	}
 }
 
-// IP inbound accepted off the run-in line gets the run-in heading (Brick's
+// IP inbound accepted off the run-in line gets the run-in heading (Granite's
 // 169 with the jet on 109, 2026-10-15 16:10-16:12).
 func TestJTACIPInboundOffAxisGetsRunIn(t *testing.T) {
 	b, _ := newJTACBoard(t)
-	tgt := caucasusTaskingTargets[0] // Anvil, run-in 329, window 309-349
+	tgt := caucasusTaskingTargets[0] // Falcon, run-in 349, window 329-009
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
-	pic.place(tgt.IPPos, 0, 1, 329)
+	pic.place(tgt.IPPos, 0, 1, 349)
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	b.JTACResponse("Hitman, Raider 11, target 1, Anvil", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, target 1, Falcon", "Raider 11", hitman, pic)
 	pic.place(tgt.TgtPos, 240, 8, 60) // west of the target: it bears ~060
-	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue. Run in heading three-two-niner from Anvil." {
+	if got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, continue. Run in heading three-four-niner from Falcon." {
 		t.Errorf("off-axis IP inbound = %q", got)
 	}
 }
@@ -246,13 +246,13 @@ func TestJTACInOutsideWindowAborts(t *testing.T) {
 	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
 	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic)
 
-	pic.place(tgt.TgtPos, 90, 5, 270) // coming in from the east, heading 270: window is 309-349
+	pic.place(tgt.TgtPos, 90, 5, 270) // coming in from the east, heading 270: window is 329-009
 	got := b.JTACResponse("Hitman, Raider 11, in from the east", "Raider 11", hitman, pic)
 	if !strings.Contains(got, "abort, abort, abort. Outside final attack heading") {
 		t.Errorf("in call outside window = %q, want abort", got)
 	}
 	// After the wave-off the flight goes round again from the IP.
-	pic.place(tgt.TgtPos, 149, 5, 335)
+	pic.place(tgt.TgtPos, 169, 5, 355)
 	if got := b.JTACResponse("Hitman, Raider 11, in from the southeast", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, cleared hot." {
 		t.Errorf("re-attack in call = %q", got)
 	}
@@ -264,9 +264,9 @@ func TestJTACInboundNotAtIP(t *testing.T) {
 	tgt := caucasusTaskingTargets[0]
 	pic := &fakePicture{}
 	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
-	pic.place(tgt.IPPos, 270, 20, 90) // 20 nm west of Anvil
+	pic.place(tgt.IPPos, 270, 20, 90) // 20 nm west of Falcon
 	got := b.JTACResponse("Hitman, Raider 11, IP inbound", "Raider 11", hitman, pic)
-	if !strings.Contains(got, "negative, you are not at Anvil. Anvil bears zero-niner-zero for 20.") {
+	if !strings.Contains(got, "negative, you are not at Falcon. Falcon bears zero-eight-niner for 20.") {
 		t.Errorf("IP inbound far from IP = %q", got)
 	}
 }
@@ -275,9 +275,9 @@ func TestJTACInboundNotAtIP(t *testing.T) {
 func TestJTACCheckInGivesIPBearing(t *testing.T) {
 	b, _ := newJTACBoard(t)
 	pic := &fakePicture{}
-	pic.place(caucasusTaskingTargets[0].IPPos, 180, 30, 0) // 30 nm south of Anvil
+	pic.place(caucasusTaskingTargets[0].IPPos, 180, 30, 0) // 30 nm south of Falcon
 	got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	if !strings.Contains(got, "Anvil bears zero-zero-zero for 30.") {
+	if !strings.Contains(got, "Falcon bears zero-zero-zero for 30.") {
 		t.Errorf("check-in far out = %q", got)
 	}
 }
@@ -312,7 +312,7 @@ func clearedFlight(t *testing.T) (*taskingBoard, *fakePicture) {
 	pic := &fakePicture{}
 	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
 	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic)
-	pic.place(tgt.TgtPos, 149, 6, 329)
+	pic.place(tgt.TgtPos, 169, 6, 349)
 	if got := b.JTACResponse("Hitman, Raider 11, in from the southeast", "Raider 11", hitman, pic); !strings.Contains(got, "cleared hot") {
 		t.Fatalf("setup in call = %q", got)
 	}
@@ -342,7 +342,7 @@ func TestJTACWatchAbortsOffAxisRun(t *testing.T) {
 func TestJTACWatchIgnoresPullOffAndRelease(t *testing.T) {
 	b, pic := clearedFlight(t)
 	tgt := caucasusTaskingTargets[0]
-	pic.place(tgt.TgtPos, 149, 4, 60) // turning away hard
+	pic.place(tgt.TgtPos, 169, 4, 60) // turning away hard
 	for i := 0; i < 3; i++ {
 		if out := b.jtacWatch(hitman, pic); len(out) != 0 {
 			t.Fatalf("pull-off aborted: %v", out)
@@ -438,15 +438,15 @@ func groundAt(num int) []tacviewGround {
 // gives impacts and the kill count, priority objects first, once.
 func TestJTACBDAAfterPass(t *testing.T) {
 	b, clock := newJTACBoard(t)
-	b.intn = func(n int) int { return 2 } // third free target = 3, Fuel Depot
-	tgt := caucasusTaskingTargets[2]
+	b.intn = func(n int) int { return 3 } // fourth free target = 4, Fuel Depot
+	tgt := caucasusTaskingTargets[3]
 	pic := &fakePicture{}
 	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
 	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic) // no picture: cleared hot unchecked
 	if got := b.JTACResponse("Hitman, Raider 11, in from the east", "Raider 11", hitman, pic); !strings.Contains(got, "cleared hot") {
 		t.Fatalf("in call = %q", got)
 	}
-	pic.ground = groundAt(3)
+	pic.ground = groundAt(4)
 	pic.ground[0].Alive, pic.ground[1].Alive, pic.ground[8].Alive = false, false, false // two large tanks, a fuel truck
 	*clock = clock.Add(20 * time.Second)
 	pic.impacts = []tacviewImpact{
@@ -473,7 +473,7 @@ func TestJTACBDAAfterPass(t *testing.T) {
 }
 
 func TestBDAText(t *testing.T) {
-	t1, t2, t4 := caucasusTaskingTargets[0], caucasusTaskingTargets[1], caucasusTaskingTargets[3]
+	t1, t2, t4 := caucasusTaskingTargets[0], caucasusTaskingTargets[2], caucasusTaskingTargets[4] // bridge, rail bridge + no-strike, command post
 	now := time.Now()
 	hit := func(p orb.Point) []tacviewImpact { return []tacviewImpact{{Pos: p, At: now}} }
 
@@ -482,12 +482,12 @@ func TestBDAText(t *testing.T) {
 	g[0].Alive = false
 	got := bdaFor("Raider 11", hitman, t1, g, hit(t1.TgtPos))
 	if want := "Raider 11, Hitman one one, BDA. Impact on the aim point. Unable to assess the bridge. Checkpoint, 1 of 4 destroyed."; got != want {
-		t.Errorf("Enguri = %q", got)
+		t.Errorf("Valley Road Bridge = %q", got)
 	}
-	// Rioni: an impact on the road bridge is called out.
-	got = bdaFor("Raider 11", hitman, t2, nil, hit(rioniRoadBridge))
+	// Kuban Rail Bridge: an impact on the road bridge is called out.
+	got = bdaFor("Raider 11", hitman, t2, nil, hit(kubanRoadBridge))
 	if !strings.Contains(got, "Impact on the no-strike road bridge.") || !strings.Contains(got, "Unable to assess the bridge.") {
-		t.Errorf("Rioni = %q", got)
+		t.Errorf("Kuban Rail Bridge = %q", got)
 	}
 	// Command post with nothing in the picture: impacts only.
 	got = bdaFor("Raider 11", hitman, t4, nil, hit(offset(t4.TgtPos, -150, 0)))
@@ -495,15 +495,15 @@ func TestBDAText(t *testing.T) {
 		t.Errorf("no picture = %q", got)
 	}
 	// Single primary object, then everything down.
-	g = groundAt(4)
+	g = groundAt(5)
 	g[0].Alive = false
-	if got := bdaKillText(caucasusBDA[4], g); got != "Command building destroyed. 1 of 14 on target destroyed." {
+	if got := bdaKillText(caucasusBDA[5], g); got != "Command building destroyed. 1 of 14 on target destroyed." {
 		t.Errorf("command building = %q", got)
 	}
 	for i := range g {
 		g[i].Alive = false
 	}
-	if got := bdaKillText(caucasusBDA[4], g); got != bdaDestroyed {
+	if got := bdaKillText(caucasusBDA[5], g); got != bdaDestroyed {
 		t.Errorf("all down = %q", got)
 	}
 	// Operator 2026-10-15: "target destroyed Raider XX thanks for the help".

@@ -38,7 +38,7 @@ func TestTaskingExchange(t *testing.T) {
 		t.Errorf("copy before any tasking = %q, want silence", got)
 	}
 
-	want := "Raider 11, Command, proceed to IP Anvil, target 1, Enguri Bridge."
+	want := "Raider 11, Command, proceed to IP Falcon, target 1, Valley Road Bridge."
 	if got := b.Response("Command, Raider 11, request tasking", "Raider 11", channel); got != want {
 		t.Errorf("request = %q, want %q", got, want)
 	}
@@ -61,12 +61,12 @@ func TestTaskingExchange(t *testing.T) {
 	}
 
 	// Asking after the readback moves to the next target.
-	want = "Raider 11, Command, proceed to IP Brick, target 2, Rioni Rail Bridge."
+	want = "Raider 11, Command, proceed to IP Granite, target 2, Artillery Park."
 	if got := b.Response("Command, Raider 11, request tasking", "Raider 11", channel); got != want {
 		t.Errorf("next request = %q, want %q", got, want)
 	}
 	// Reading back the IP name counts without a "copy".
-	if got := b.Response("Command, Raider 11, IP Brick", "Raider 11", channel); got != "Raider 11, Command, you are cleared hot." {
+	if got := b.Response("Command, Raider 11, IP Granite", "Raider 11", channel); got != "Raider 11, Command, you are cleared hot." {
 		t.Errorf("IP readback = %q", got)
 	}
 }
@@ -75,22 +75,22 @@ func TestTaskingExchange(t *testing.T) {
 func TestTaskingSkipsHeldTargets(t *testing.T) {
 	b, clock := newTestTaskingBoard(caucasusTaskingTargets[:2])
 
-	if got := b.Response("request tasking", "Raider 11", "Command"); got != "Raider 11, Command, proceed to IP Anvil, target 1, Enguri Bridge." {
+	if got := b.Response("request tasking", "Raider 11", "Command"); got != "Raider 11, Command, proceed to IP Falcon, target 1, Valley Road Bridge." {
 		t.Errorf("Raider 11 = %q", got)
 	}
-	if got := b.Response("request tasking", "Viper 21", "Command"); got != "Viper 21, Command, proceed to IP Brick, target 2, Rioni Rail Bridge." {
+	if got := b.Response("request tasking", "Viper 21", "Command"); got != "Viper 21, Command, proceed to IP Granite, target 2, Artillery Park." {
 		t.Errorf("Viper 21 = %q", got)
 	}
-	// Raider is done with Anvil; Brick is still Viper's, so Raider gets Anvil back.
+	// Raider is done with Falcon; Granite is still Viper's, so Raider gets Falcon back.
 	b.Response("copy", "Raider 11", "Command")
-	if got := b.Response("request tasking", "Raider 11", "Command"); got != "Raider 11, Command, proceed to IP Anvil, target 1, Enguri Bridge." {
+	if got := b.Response("request tasking", "Raider 11", "Command"); got != "Raider 11, Command, proceed to IP Falcon, target 1, Valley Road Bridge." {
 		t.Errorf("Raider 11 second = %q", got)
 	}
 	b.Response("copy", "Raider 11", "Command")
 
-	// Once Viper's hold lapses Brick is free again.
+	// Once Viper's hold lapses Granite is free again.
 	*clock = clock.Add(taskingHoldTime + time.Minute)
-	if got := b.Response("request tasking", "Raider 11", "Command"); got != "Raider 11, Command, proceed to IP Brick, target 2, Rioni Rail Bridge." {
+	if got := b.Response("request tasking", "Raider 11", "Command"); got != "Raider 11, Command, proceed to IP Granite, target 2, Artillery Park." {
 		t.Errorf("Raider 11 after hold = %q", got)
 	}
 }
@@ -122,7 +122,7 @@ func TestTaskingNoTargetsOnThisMap(t *testing.T) {
 
 // "Raider 11 copy" with no comma must not carry the "copy" into the callsign.
 func TestTaskingReadbackCallsign(t *testing.T) {
-	for _, text := range []string{"Command, Raider 11 copy", "Command Raider 11 copy", "Command, Viper 21 wilco, proceeding IP Anvil", "Command Raider 11 request tasking"} {
+	for _, text := range []string{"Command, Raider 11 copy", "Command Raider 11 copy", "Command, Viper 21 wilco, proceeding IP Falcon", "Command Raider 11 request tasking"} {
 		cs := extractCallsignSkippingAddress(text, "command")
 		if cs != "Raider 11" && cs != "Viper 21" {
 			t.Errorf("extractCallsignSkippingAddress(%q) = %q", text, cs)

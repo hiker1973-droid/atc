@@ -233,8 +233,8 @@ func jtacKind(lower string) string {
 }
 
 // docReadbackTarget is the card target the Phraseology Reference's Hitman
-// readback example names ("target 3, Cobra").
-var docReadbackTarget = taskingTarget{IP: "Cobra", Number: 3, Name: "Fuel Depot"}
+// readback example names ("target 4, Indigo"; training V1.25 north range).
+var docReadbackTarget = taskingTarget{IP: "Indigo", Number: 4, Name: "Fuel Depot"}
 
 func TestDocPhrases(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(docsDir, "phrases.json"))

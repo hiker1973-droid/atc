@@ -22,6 +22,7 @@ type taskingTarget struct {
 	Number  int
 	Name    string
 	Control string // "type 1" / "type 2", as the card prints it
+	Sector  string // range_north sector; one JTAC per sector once Hitman 1-2 exists (unused today)
 	IPPos   orb.Point // lon, lat
 	TgtPos  orb.Point // lon, lat
 	MagVar  float64   // east, degrees, at the target
@@ -33,27 +34,29 @@ type taskingTarget struct {
 }
 
 // caucasusTaskingTargets mirrors the 9-line pages of the vSFG-7 Caucasus
-// Training kneeboard (V1.22, pages 19-23). The IP names are what the pilot
-// reads back, so they must stay in step with the kneeboard. Positions, run-in,
-// final attack headings, elevation and egress are build_ag.SITES /
-// nine_line() in the AG Range builder (Saved Games, Missions/Caucasus/
-// Training/AG Range/_BUILD/build_ag.py), which draws the cards.
+// Training kneeboard (V1.25, Hornet 081-085 / Viper 091-095). The IP names are
+// what the pilot reads back, so they must stay in step with the kneeboard.
+// V1.25 (operator 2026-10-15): the range moved past the Main Caucasus ridge,
+// 100-127 nm north of Senaki, in two sectors (Kuban Valley 1-3, Cherkessk 4-5).
+// GENERATED from range_north.SITES / build_ag.nine_line() (Saved Games,
+// Missions/Caucasus/Training/AG Range/_BUILD/range_north.py), positions
+// converted by DCS's terrain module. Regenerate, do not hand-edit.
 var caucasusTaskingTargets = []taskingTarget{
-	{IP: "Anvil", Number: 1, Name: "Enguri Bridge", Control: "type 2",
-		IPPos: orb.Point{41.942121, 42.431496}, TgtPos: orb.Point{41.851168, 42.582912}, MagVar: 7.21,
-		RunIn: 329, FAHLow: 309, FAHHigh: 349, ElevFt: 445, Egress: "angels 15"},
-	{IP: "Brick", Number: 2, Name: "Rioni Rail Bridge", Control: "type 1",
-		IPPos: orb.Point{42.314535, 42.284035}, TgtPos: orb.Point{42.328935, 42.118794}, MagVar: 7.08,
-		RunIn: 169, FAHLow: 149, FAHHigh: 189, ElevFt: 135, Egress: "angels 12"},
-	{IP: "Cobra", Number: 3, Name: "Fuel Depot", Control: "type 2",
-		IPPos: orb.Point{42.020965, 42.318974}, TgtPos: orb.Point{41.806303, 42.364730}, MagVar: 7.14,
-		RunIn: 279, FAHLow: 259, FAHHigh: 299, ElevFt: 25, Egress: "angels 14"},
-	{IP: "Dagger", Number: 4, Name: "Command Post", Control: "type 2",
-		IPPos: orb.Point{41.939278, 42.130233}, TgtPos: orb.Point{42.155376, 42.170030}, MagVar: 7.09,
-		RunIn: 69, FAHLow: 49, FAHHigh: 89, ElevFt: 50, Egress: "angels 13"},
-	{IP: "Eagle", Number: 5, Name: "Artillery Park", Control: "type 1",
-		IPPos: orb.Point{41.889289, 42.172673}, TgtPos: orb.Point{41.729363, 42.057419}, MagVar: 7.05,
-		RunIn: 219, FAHLow: 199, FAHHigh: 239, ElevFt: 15, Egress: "angels 12"},
+	{IP: "Falcon", Number: 1, Name: "Valley Road Bridge", Control: "type 2", Sector: "Kuban Valley",
+		IPPos: orb.Point{41.898726, 43.753326}, TgtPos: orb.Point{41.887660, 43.897790}, MagVar: 7.64,
+		RunIn: 349, FAHLow: 329, FAHHigh: 9, ElevFt: 2615, Egress: "angels 15"},
+	{IP: "Granite", Number: 2, Name: "Artillery Park", Control: "type 1", Sector: "Kuban Valley",
+		IPPos: orb.Point{41.757882, 44.061294}, TgtPos: orb.Point{41.891173, 43.951915}, MagVar: 7.66,
+		RunIn: 131, FAHLow: 111, FAHHigh: 151, ElevFt: 2375, Egress: "angels 14"},
+	{IP: "Hammer", Number: 3, Name: "Kuban Rail Bridge", Control: "type 1", Sector: "Kuban Valley",
+		IPPos: orb.Point{42.181234, 44.054785}, TgtPos: orb.Point{41.975988, 44.073047}, MagVar: 7.70,
+		RunIn: 269, FAHLow: 249, FAHHigh: 289, ElevFt: 2080, Egress: "angels 13"},
+	{IP: "Indigo", Number: 4, Name: "Fuel Depot", Control: "type 2", Sector: "Cherkessk",
+		IPPos: orb.Point{42.277286, 44.109959}, TgtPos: orb.Point{42.114918, 44.190645}, MagVar: 7.75,
+		RunIn: 297, FAHLow: 277, FAHHigh: 317, ElevFt: 2110, Egress: "angels 14"},
+	{IP: "Javelin", Number: 5, Name: "Command Post", Control: "type 2", Sector: "Cherkessk",
+		IPPos: orb.Point{42.020807, 44.472706}, TgtPos: orb.Point{41.980892, 44.336361}, MagVar: 7.79,
+		RunIn: 184, FAHLow: 164, FAHHigh: 204, ElevFt: 1510, Egress: "angels 13"},
 }
 
 // taskingTargetsForMap returns the tasking set for a theatre, nil where the
