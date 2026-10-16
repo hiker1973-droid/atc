@@ -304,6 +304,48 @@ func (b *taskingBoard) chooseJTAC(key string, now time.Time) *jtacNet {
 	return b.jtacs[0]
 }
 
+// handOffTarget sends a flight that named a 9-line area to the JTAC running
+// one of those targets, with that target already drawn so its check-in briefs
+// it (command_areas.go). nil when no JTAC runs any of them.
+func (b *taskingBoard) handOffTarget(key string, numbers []int) *jtacNet {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := b.now()
+	for _, n := range b.jtacs {
+		jb := n.workBoard(b)
+		if jb != b {
+			jb.mu.Lock()
+		}
+		// One the other flights do not hold, when the area has a choice.
+		pick := -1
+		_, _, held := jb.free(key, now)
+		for i, t := range jb.targets {
+			for _, num := range numbers {
+				if t.Number == num && (pick < 0 || held[pick] && !held[i]) {
+					pick = i
+				}
+			}
+		}
+		if pick >= 0 {
+			jb.flights[key] = &taskingAssignment{target: pick, issued: now}
+		}
+		if jb != b {
+			jb.mu.Unlock()
+		}
+		if pick < 0 {
+			continue
+		}
+		for _, o := range b.jtacs {
+			if o != n && o.board != nil {
+				o.board.release(key)
+			}
+		}
+		b.handoffs[key] = jtacHandoff{at: now, net: n}
+		return n
+	}
+	return nil
+}
+
 // markRedraw: the flight asked Command for more, so its next check-in on this
 // board draws a new target.
 func (b *taskingBoard) markRedraw(key string) {

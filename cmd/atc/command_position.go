@@ -60,6 +60,13 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
 	}
+	var pic jtacPicture
+	if store != nil {
+		pic = tacviewJTAC{store: store}
+	}
+	if resp := commandRangeAreaBoard().Response(text, callsign, channelName, pic, nearestFieldMagVar); resp != "" {
+		return resp
+	}
 	if fb := footholdTaskingBoard(); fb != nil {
 		if resp := fb.Response(text, callsign, channelName, store); resp != "" {
 			return resp

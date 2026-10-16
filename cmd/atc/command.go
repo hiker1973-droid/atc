@@ -140,7 +140,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		inFlight = &tracker.inFlight
 	}
 	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, commandVoice(voice), externalAudioPath,
-		"Command, Raider, Venom, Viper, request tasking, copy, IP Falcon, Granite, Hammer, Indigo, Javelin",
+		"Command, Raider, Venom, Viper, request tasking, copy, IP Falcon, Granite, Hammer, Indigo, Javelin, "+rangeAreaWhisperWords,
 		inFlight,
 		func(text string) (string, string) {
 			// Another role's address is skipped too: on 2026-10-15 a pilot on the
