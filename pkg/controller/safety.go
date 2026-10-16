@@ -44,6 +44,7 @@ const (
 	EventDepartedNoClear = "departed_without_clearance"
 	EventLandedNoClear   = "landed_without_clearance"
 	EventNearMiss        = "near_miss"
+	EventLostCall        = "lost_call"
 )
 
 const (
@@ -87,6 +88,15 @@ func (c *ATCController) SetTrafficAlerts(enabled bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.trafficAlerts = enabled
+}
+
+// ReportLostCall records a transmission SkyEye heard but could not use:
+// Whisper handed back its own prompt word list instead of the call (Senaki
+// 2026-10-15 18:34, three times on 10-14). Nothing is said on the radio.
+func (c *ATCController) ReportLostCall(text, detail string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.report(CommsEvent{Kind: EventLostCall, Detail: detail, Text: text})
 }
 
 func (c *ATCController) report(ev CommsEvent) {

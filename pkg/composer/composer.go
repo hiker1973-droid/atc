@@ -227,7 +227,7 @@ func (c *ATCComposer) ClearedForTakeoff(callsign, activeRunway string, windFromM
 		fmt.Sprintf("%s, %s, wind %s, runway %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, wind, rwy, trafficNote),
 		fmt.Sprintf("%s, %s, runway %s, wind %s%s, you are cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, cleared for takeoff runway %s, wind %s%s, report airborne when clear, have a good flight.", callsign, c.towerCallsign, rwy, wind, trafficNote),
-		fmt.Sprintf("%s, %s, you are number %s for takeoff, runway %s, wind %s%s. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, number %s, runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, runway %s, wind %s%s, cleared for takeoff, report airborne.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, wind %s, cleared for takeoff runway %s%s, report airborne when clear.", callsign, c.towerCallsign, wind, rwy, trafficNote),
 		fmt.Sprintf("%s, %s, clear for departure runway %s, wind %s%s, report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
@@ -537,9 +537,15 @@ func (c *ATCComposer) ContinueInbound(callsign, activeRunway string, distNm, seq
 	if sequenceNum > 1 {
 		traffic = fmt.Sprintf(" Number %s in sequence.", numberWord(sequenceNum))
 	}
+	// "Call N mile final" only for a real final. Senaki 2026-10-15 19:26 told
+	// a jet at 45 miles to "call 22 mile final".
+	callAt := fmt.Sprintf("call %s mile final", reportWord)
+	if reportAt > 10 {
+		callAt = fmt.Sprintf("call %s miles", reportWord)
+	}
 	return pick([]string{
 		fmt.Sprintf("%s, %s, expect runway %s, continue inbound, report %s miles.%s", callsign, c.towerCallsign, rwy, reportWord, traffic),
-		fmt.Sprintf("%s, %s, runway %s is active, continue inbound, call %s mile final.%s", callsign, c.towerCallsign, rwy, reportWord, traffic),
+		fmt.Sprintf("%s, %s, runway %s is active, continue inbound, %s.%s", callsign, c.towerCallsign, rwy, callAt, traffic),
 		fmt.Sprintf("%s, %s, copy inbound, plan runway %s, report %s miles.%s", callsign, c.towerCallsign, rwy, reportWord, traffic),
 	})
 }
@@ -736,7 +742,7 @@ func (c *ATCComposer) ProceedToRunway(callsign, activeRunway string, windFromMag
 		fmt.Sprintf("%s, %s, proceed to runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, enter and line up runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
 		fmt.Sprintf("%s, %s, runway %s is yours, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, rwy, wind, trafficNote),
-		fmt.Sprintf("%s, %s, you are number %s for takeoff, runway %s, wind %s%s. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
+		fmt.Sprintf("%s, %s, number %s, runway %s, wind %s%s, cleared for takeoff. Report airborne when clear.", callsign, c.towerCallsign, pos, rwy, wind, trafficNote),
 	})
 }
 

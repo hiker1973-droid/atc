@@ -1109,6 +1109,10 @@ func containsAny(s string, subs ...string) bool {
 	return false
 }
 
+// lostCallMinFrames is about one second of 40 ms SRS Opus frames: below that a
+// dropped transcription is a squelch blip, not a lost call.
+const lostCallMinFrames = 25
+
 // extractOriginFromUDP extracts the client GUID from a UDP voice packet.
 func extractOriginFromUDP(buf []byte) string {
 	if len(buf) < 22 { return "" }
@@ -1523,7 +1527,7 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 				log.Debug().Str("origin", origin).Int("opusBytes", len(opusBytes)).Msg("voice packet accepted")
 
 				// TX cooldown — ignore all audio for 4s after we transmit
-				if until := atomic.LoadInt64(txCooldown); until > 0 && time.Now().UnixNano() < until {
+				if rxMuted(txCooldown, freqMHz) {
 					log.Debug().Str("origin", origin).Msg("TX cooldown — ignoring")
 					continue
 				}
@@ -1712,6 +1716,10 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 	}
 	if isWhisperHallucination(text) {
 		log.Warn().Str("text", text).Msg("Whisper hallucination — dropping")
+		if len(frames) >= lostCallMinFrames {
+			// A real call was keyed and lost; short blips are not worth a line.
+			atcCtrl.ReportLostCall(text, fmt.Sprintf("a %.1f s call came back from Whisper as its prompt or noise - call lost, nothing said", float64(len(frames))*0.04))
+		}
 		return
 	}
 	log.Info().Str("text", text).Msg("recognized")
@@ -2660,6 +2668,9 @@ func concatMP3WithSilence(en, ar []byte, ffmpegPath string, silenceSec float64) 
 // transmitExternalAudioFile injects a pre-generated MP3 file via ExternalAudio.
 // ctx bounds the subprocess so a hung ExternalAudio.exe can't stall the TX queue.
 func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64, callsign, srsHost, srsPort, exePath string) {
+	// Our receivers on this frequency ignore what they hear until playback
+	// has ended (tx_guard.go).
+	defer beginTX(freqMHz)()
 	// Write MP3 to temp file
 	tmp, err := os.CreateTemp("", "atc-tts-*.mp3")
 	if err != nil {

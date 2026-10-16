@@ -49,3 +49,22 @@ func TestCommsReportReadsTheWindowNewestFirst(t *testing.T) {
 		t.Errorf("a week should include the old event: %+v", rep.Events)
 	}
 }
+
+func TestUpdateRevisionHelpers(t *testing.T) {
+	full := "87b115b0c0ffee0000000000000000000000abcd"
+	if !sameRev("87b115b", full) || sameRev("abda3d5", full) || sameRev("", full) || sameRev("87b115b", "") {
+		t.Error("sameRev")
+	}
+	if shortRev(full) != "87b115b" {
+		t.Error("shortRev")
+	}
+	// A test binary carries no commit stamp: buildsBehind must say so rather
+	// than call it current.
+	exe, _ := os.Executable()
+	if _, _, err := exeRevision(exe); err == nil {
+		t.Log("test binary is stamped; skipping the unstamped case")
+	}
+	if _, _, err := exeRevision(filepath.Join(t.TempDir(), "missing.exe")); err == nil {
+		t.Error("a missing atc.exe read as a build")
+	}
+}

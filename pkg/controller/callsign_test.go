@@ -138,3 +138,38 @@ func TestPermissionToTheActiveIsTaxi(t *testing.T) {
 		}
 	}
 }
+
+// Senaki, 2026-10-15: "Veta 201" was Venom 201 (18:34), and "Venom 2-0-3"
+// (19:43) was answered and tracked apart from "Venom 203".
+func TestParseIntentCallsignRepairs20261015(t *testing.T) {
+	cases := []struct{ text, want string }{
+		{"Tower, Veta 201, permission to taxi the active.", "Venom 201"},
+		{"Senaki Tower, Vetta 2-0-1, request taxi.", "Venom 201"},
+		{"Senaki Tower, Venom 2-0-3, holding short runway 09.", "Venom 203"},
+		{"Senaki traffic, Raider 3-0-2, request taxi.", "Raider 302"},
+		{"Senaki Tower, Raider 3 0 2, inbound.", "Raider 302"},
+		{"Senaki Tower, Viper 1-1, request taxi.", "Viper 1-1"},
+		{"Senaki Tower, Raider 302, request taxi.", "Raider 302"},
+	}
+	for _, tc := range cases {
+		req := ParseIntent(tc.text, "Senaki Tower")
+		if req == nil {
+			t.Fatalf("ParseIntent(%q) = nil", tc.text)
+		}
+		if req.Callsign != tc.want {
+			t.Errorf("ParseIntent(%q).Callsign = %q, want %q", tc.text, req.Callsign, tc.want)
+		}
+	}
+	for in, want := range map[string]string{
+		"the veteran pilot": "the veteran pilot",
+		"Veta flight":       "Veta flight",
+		"Venom 2-0-3":       "Venom 203",
+		"Viper 1 1":         "Viper 1 1",
+		"Raider 302":        "Raider 302",
+	} {
+		got := JoinModexDigits(normalizeCallsign(in))
+		if got != want {
+			t.Errorf("repair(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -1340,7 +1340,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	}
 	req := &ATCRequest{
 		Raw:      text,
-		Callsign: extractCallsign(text, towerCallsign),
+		Callsign: JoinModexDigits(extractCallsign(text, towerCallsign)),
 		Airframe: extractAirframe(lower),
 	}
 	// "request for taxi" / "requesting for takeoff" — the extra "for" broke
@@ -1541,7 +1541,52 @@ func normalizeCallsign(text string) string {
 			lower = strings.ToLower(text)
 		}
 	}
+	// "Veta 201" (Senaki 2026-10-15 18:34) was Venom 201's taxi call and the
+	// phantom headed the departure queue. Only before a number, so no real
+	// word that merely contains "veta" is touched. Backstop to the radio-based
+	// merge in reconcileOrigin.
+	text = vetaRe.ReplaceAllString(text, "Venom$1")
 	return text
+}
+
+var vetaRe = regexp.MustCompile(`(?i)\bvett?a\b([\s-]*\d)`)
+
+// JoinModexDigits folds a modex Whisper wrote digit by digit back into one
+// number: "Venom 2-0-3" and "Venom 2 0 3" become "Venom 203", so one jet is
+// not tracked twice (Senaki 2026-10-15 19:43 answered and tracked "Venom
+// 2-0-3"). Only for three digits or more: "Viper 1-1" stays a flight-member
+// callsign rather than becoming "Viper 11". Lookups against Tacview already
+// ignore dashes and spaces (compactCallsign).
+func JoinModexDigits(cs string) string {
+	f := strings.Fields(strings.ReplaceAll(cs, "-", " "))
+	i := 0
+	for i < len(f) && !isDigits(f[i]) {
+		i++
+	}
+	j := i
+	for j < len(f) && isDigits(f[j]) {
+		j++
+	}
+	if j-i < 2 || j < len(f) {
+		return cs
+	}
+	joined := strings.Join(f[i:j], "")
+	if len(joined) < 3 {
+		return cs
+	}
+	return strings.Join(append(f[:i:i], joined), " ")
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func extractCallsign(text, towerCallsign string) string {

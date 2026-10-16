@@ -292,3 +292,21 @@ func TestDepartureChainEmitsNoNumerals(t *testing.T) {
 		}
 	}
 }
+
+// Senaki 2026-10-15 19:26: a jet at 45 miles was told "call 22 mile final".
+// Far out, the report point is a range, not a final.
+func TestContinueInboundFarOutIsNotAFinal(t *testing.T) {
+	c := NewATCComposer("Senaki Tower")
+	for i := 0; i < 60; i++ {
+		if got := c.ContinueInbound("Venom 201", "09", 45, 1); strings.Contains(got, "mile final") {
+			t.Fatalf("45 nm out: %q", got)
+		}
+	}
+	sawFinal := false
+	for i := 0; i < 60; i++ {
+		sawFinal = sawFinal || strings.Contains(c.ContinueInbound("Venom 201", "09", 16, 1), "eight mile final")
+	}
+	if !sawFinal {
+		t.Errorf("16 nm out should still be able to ask for an eight mile final")
+	}
+}

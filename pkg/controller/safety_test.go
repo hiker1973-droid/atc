@@ -26,6 +26,13 @@ func recordReports(c *ATCController) *[]CommsEvent {
 	return evs
 }
 
+// isTakeoffClearance matches every ClearedForTakeoff wording ("cleared for
+// takeoff", "clear for departure", "cleared for departure").
+func isTakeoffClearance(s string) bool {
+	l := strings.ToLower(s)
+	return strings.Contains(l, "cleared for") || strings.Contains(l, "clear for departure")
+}
+
 func hasKind(evs []CommsEvent, kind string) bool {
 	for _, e := range evs {
 		if e.Kind == kind {
@@ -39,6 +46,8 @@ func hasKind(evs []CommsEvent, kind string) bool {
 // "Veta 201". The phantom headed the departure queue, Venom 201 was told to
 // line up and wait and never released, and took off without a clearance.
 // Same radio, so one aircraft: Venom 201 keeps the queue place and goes.
+// ("Veta" itself is now repaired in normalizeCallsign, so a mishearing with
+// no fix stands in for it here.)
 func TestMisheardCallsignFromTheSameRadioIsOneAircraft(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -46,10 +55,10 @@ func TestMisheardCallsignFromTheSameRadioIsOneAircraft(t *testing.T) {
 	evs := recordReports(c)
 	s := c.airfieldState
 
-	callFrom(t, c, ctx, "radioA", "Tower, Veta 201, permission to taxi the active.")
+	callFrom(t, c, ctx, "radioA", "Tower, Ventum 201, permission to taxi the active.")
 	callFrom(t, c, ctx, "radioA", "Tower, Venom 201, holding short runway 27.")
 
-	if s.Get("Veta 201") != nil {
+	if s.Get("Ventum 201") != nil {
 		t.Errorf("the misheard callsign is still tracked")
 	}
 	if n := s.DepartureQueueLen(); n != 1 {
@@ -61,7 +70,7 @@ func TestMisheardCallsignFromTheSameRadioIsOneAircraft(t *testing.T) {
 	s.Get("Venom 201").AutoReleaseAt = time.Now().Add(-time.Second) // past the LUAW gap
 	c.checkConflicts(ctx)
 	last := (*sent)[len(*sent)-1]
-	if !strings.HasPrefix(last, "Venom 201") || !strings.Contains(strings.ToLower(last), "cleared for") {
+	if !strings.HasPrefix(last, "Venom 201") || !isTakeoffClearance(last) {
 		t.Fatalf("Venom 201 was not released: %q", *sent)
 	}
 }
@@ -78,7 +87,7 @@ func TestJetAtTheRunwayIsNotHeldBehindOneStillTaxiing(t *testing.T) {
 	c.airfieldState.Get("Venom 21").AutoReleaseAt = time.Now().Add(-time.Second)
 	c.checkConflicts(ctx)
 	last := (*sent)[len(*sent)-1]
-	if !strings.HasPrefix(last, "Venom 21") || !strings.Contains(strings.ToLower(last), "cleared for") {
+	if !strings.HasPrefix(last, "Venom 21") || !isTakeoffClearance(last) {
 		t.Fatalf("Venom 21 held behind a taxiing jet: %q", *sent)
 	}
 	if c.airfieldState.Get("Raider 11") == nil || c.airfieldState.DeparturePosition("Raider 11") != 1 {
@@ -286,5 +295,18 @@ func TestTrafficAlertOnlyCallsAddressableJets(t *testing.T) {
 	c.checkConflicts(ctx)
 	if !hasKind(*evs, EventNearMiss) || len(*sent) != 1 || !strings.HasPrefix((*sent)[0], "Raider 031") {
 		t.Fatalf("want one call to Raider 031 and a report, got %q / %+v", *sent, *evs)
+	}
+}
+
+// A call Whisper handed back as its own prompt goes to the comms report.
+func TestLostCallIsReported(t *testing.T) {
+	c, sent := proactiveController(t)
+	evs := recordReports(c)
+	c.ReportLostCall("Senaki Tower, Raider, Venom, radio check, request taxi", "lost")
+	if !hasKind(*evs, EventLostCall) || (*evs)[0].Text == "" {
+		t.Errorf("lost call not reported: %+v", *evs)
+	}
+	if len(*sent) != 0 {
+		t.Errorf("a lost call must not be answered: %q", *sent)
 	}
 }

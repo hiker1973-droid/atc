@@ -1,6 +1,7 @@
 package main
 
 import (
+	"debug/buildinfo"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -150,9 +151,11 @@ func doUpdate(force bool) error {
 	updMu.Lock()
 	upd.To = to
 	updMu.Unlock()
-	if to == from && cachedVersion.Short == to && !force {
+	if why := buildsBehind(to); why == "" && to == from && !force {
 		updLog("already up to date at %s - nothing restarted", to)
 		return nil
+	} else if why != "" && to == from {
+		updLog("git already at %s, but %s - rebuilding", to, why)
 	}
 	updLog("now at %s - building", to)
 
@@ -207,6 +210,63 @@ func doUpdate(force bool) error {
 	updMu.Unlock()
 	saveUpdateState()
 	return restartLauncher()
+}
+
+// buildsBehind says why the binaries on disk are not the build of commit
+// head ("" when both are). "Up to date" used to compare git alone (and the
+// launcher's own build), so a rig whose atc.exe was older than its checkout -
+// a launcher-only redeploy, a hand build from a dirty tree - read as current.
+func buildsBehind(head string) string {
+	if !sameRev(head, cachedVersion.Revision) || cachedVersion.Modified {
+		return fmt.Sprintf("launcher.exe is built from %s%s", cachedVersion.Short, dirty(cachedVersion.Modified))
+	}
+	rev, modified, err := exeRevision(filepath.Join(rootDir, "atc.exe"))
+	if err != nil {
+		return "atc.exe build unknown (" + err.Error() + ")"
+	}
+	if !sameRev(head, rev) || modified {
+		return fmt.Sprintf("atc.exe is built from %s%s", shortRev(rev), dirty(modified))
+	}
+	return ""
+}
+
+// exeRevision reads the commit Go stamped into a binary at build time.
+func exeRevision(path string) (rev string, modified bool, err error) {
+	bi, err := buildinfo.ReadFile(path)
+	if err != nil {
+		return "", false, err
+	}
+	for _, st := range bi.Settings {
+		switch st.Key {
+		case "vcs.revision":
+			rev = st.Value
+		case "vcs.modified":
+			modified = st.Value == "true"
+		}
+	}
+	if rev == "" {
+		return "", false, fmt.Errorf("no commit stamped in it")
+	}
+	return rev, modified, nil
+}
+
+// sameRev compares git's short hash with a full one.
+func sameRev(short, full string) bool {
+	return short != "" && full != "" && strings.HasPrefix(full, short)
+}
+
+func shortRev(rev string) string {
+	if len(rev) > 7 {
+		return rev[:7]
+	}
+	return rev
+}
+
+func dirty(modified bool) string {
+	if modified {
+		return " with uncommitted changes"
+	}
+	return ""
 }
 
 func errSuffix(err error) string {
