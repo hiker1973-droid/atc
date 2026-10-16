@@ -71,10 +71,10 @@ const (
 	// elDeparture11 is voice 4 of round 11, picked for the tower's "Departure"
 	// 7-mile call (operator 2026-10-15: "use this for departure call
 	// command_4_FF59babHL8N8gfTgtBMT").
-	elDeparture11 = "FF59babHL8N8gfTgtBMT" // "Jodi" - Departure, and Command 2026-10-15/16 (operator: "use this voice for command. good speed though")
+	elDeparture11 = "FF59babHL8N8gfTgtBMT" // "Jodi" - Departure, and Command since 2026-10-15 (operator: "use this voice for command. good speed though"; back from Nora 2026-10-16: "go back to Jodi for Command")
 	// Round 18 (2026-10-16, operator-sent library IDs): "Ok Nora for Command,
 	// Lets do Hitman on 62.00 ... use command_5_9JbYHzFp74No6NSJoI0w".
-	elNora     = "iV1OKYxbmgRtpzJ2q8kx" // "Nora Vale - Mission Control", mature woman, calm authority (Command)
+	elNora     = "iV1OKYxbmgRtpzJ2q8kx" // "Nora Vale - Mission Control", mature woman, calm authority (Command c0fccab only, reverted same day)
 	elHitman21 = "9JbYHzFp74No6NSJoI0w" // "George - Casual, Laid-Back", young American man (Hitman 2-1)
 	elHank        = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
 )

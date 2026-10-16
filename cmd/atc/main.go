@@ -224,7 +224,7 @@ func main() {
 	// not hear the difference on the round 15 A/B ("Do flash I cannot tell the
 	// difference"). eleven_multilingual_v2 is the richer, 2x-cost model.
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elNora, "ElevenLabs voice ID for Command (default round 18 \"Nora Vale\", library)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",
 		"ElevenLabs voice ID of this tower's alternate controller; the two swap every --tower-shift once the frequency has been quiet 5 min (\"\" = one controller)")
