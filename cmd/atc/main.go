@@ -120,6 +120,7 @@ var (
 	flagElevenLabs         bool
 	flagElevenLabsKey      string
 	flagElevenLabsModel    string
+	flagElevenStopAt       int
 	flagElevenCommandVoice string
 	flagElevenJTACVoice    string
 	flagElevenMarshalVoice string
@@ -231,6 +232,7 @@ func main() {
 	// (measured: Lisa's 194-char tower line 85 -> 43), and the operator could
 	// not hear the difference on the round 15 A/B ("Do flash I cannot tell the
 	// difference"). eleven_multilingual_v2 is the richer, 2x-cost model.
+	f.IntVar(&flagElevenStopAt, "elevenlabs-stop-at", 127000, "ElevenLabs credits used this billing period (the account's count) at which every role switches to OpenAI until the period resets; checked every 10 min (operator 2026-10-16: \"flip to open AI once we hit 127k\"; 0 = never)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
@@ -475,6 +477,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	go runElevenCapWatch(ctx)
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -2039,6 +2042,9 @@ func atisVoiceFor(st *atisStation) voiceProfile {
 
 // synthesizeSpeech checks cache first, falls back to API on miss.
 func synthesizeSpeech(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
+	if elevenCapped() {
+		v.eleven = elevenVoice{} // past the credit cap: OpenAI only, cached ElevenLabs clips too (eleven_cap.go)
+	}
 	if mp3, ok := globalTTSCache.get(v, text); ok {
 		log.Debug().Str("text", text).Msg("TTS cache hit")
 		return mp3, nil

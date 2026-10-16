@@ -24,6 +24,9 @@ import (
 // credits run out every role silently drops to OpenAI.
 
 var (
+	// Must match atc.exe's --elevenlabs-stop-at (same default): the dashboard
+	// warns ahead of the switch the roles make (cmd/atc/eleven_cap.go).
+	flagElevenStopAt = flag.Int("elevenlabs-stop-at", 127000, "ElevenLabs credits at which the SkyEye roles switch to OpenAI (atc.exe --elevenlabs-stop-at); the dashboard warns as it nears")
 	flagElevenMonthly  = flag.Int("elevenlabs-monthly-credits", 127500, "ElevenLabs plan credits per billing month, used only when the account cannot be read (squadron plan: 127,500 - operator 2026-10-15); the dashboard warns at 80 % and 95 %")
 	flagElevenResetDay = flag.Int("elevenlabs-reset-day", 14, "Day of the month the ElevenLabs credits reset (the subscription date; Creator from 2026-10-14)")
 )
@@ -251,24 +254,82 @@ func handleElevenFleet(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, fleetUsage(60*time.Second))
 }
 
-// elevenUsageAlerts is the dashboard alert at 80 % / 95 % of the plan, and a
-// heads-up when this period's pace runs past it.
+// elevenUsageAlerts warns ahead of the OpenAI switch at --elevenlabs-stop-at
+// (operator 2026-10-16: "flip to open AI once we hit 127k. We should see that
+// coming though"):
+//
+//	past the switch         error  the roles are on OpenAI until the reset
+//	within 10,000 of it     warn   how far, and the day at the servers' pace
+//	pace reaches it         warn   the day it will, before the reset
+//
+// then the plan's own 80 % / 95 % when there is no switch.
 func elevenUsageAlerts() []Alert {
-	fu := fleetUsage(5 * time.Minute)
+	return usageAlerts(fleetUsage(5*time.Minute), *flagElevenStopAt, time.Now())
+}
+
+// elevenCapNear: the warning band below the switch.
+const elevenCapNear = 10000
+
+func usageAlerts(fu FleetUsage, stopAt int, now time.Time) []Alert {
 	if fu.Quota <= 0 {
+		return nil
+	}
+	alert := func(level, format string, a ...any) []Alert {
+		return []Alert{{Level: level, Source: "ElevenLabs", Message: fmt.Sprintf(format, a...), Time: now}}
+	}
+	reset := fu.PeriodEnd.Local().Format("Mon 2 Jan 15:04")
+	if stopAt > 0 {
+		if fu.Credits >= stopAt {
+			return alert("error", "ElevenLabs %s used - past the %s switch: SkyEye is speaking with OpenAI voices until the reset %s",
+				thousands(fu.Credits), thousands(stopAt), reset)
+		}
+		hit, ok := capDay(fu, stopAt, now)
+		switch {
+		case fu.Credits >= stopAt-elevenCapNear && ok:
+			return alert("warn", "ElevenLabs %s used - %s to the %s OpenAI switch, about %s at the servers' pace",
+				thousands(fu.Credits), thousands(stopAt-fu.Credits), thousands(stopAt), hit.Local().Format("Mon 2 Jan"))
+		case fu.Credits >= stopAt-elevenCapNear:
+			return alert("warn", "ElevenLabs %s used - %s to the %s OpenAI switch",
+				thousands(fu.Credits), thousands(stopAt-fu.Credits), thousands(stopAt))
+		case ok:
+			return alert("warn", "ElevenLabs on pace to reach the %s OpenAI switch about %s (resets %s) - %s used",
+				thousands(stopAt), hit.Local().Format("Mon 2 Jan"), reset, thousands(fu.Credits))
+		}
 		return nil
 	}
 	msg := fmt.Sprintf("ElevenLabs credits %s of %s this month (%.0f%%) - at 100%% every role drops to OpenAI voices",
 		thousands(fu.Credits), thousands(fu.Quota), fu.Percent)
 	switch fu.Level {
 	case "error", "warn":
-		return []Alert{{Level: fu.Level, Source: "ElevenLabs", Message: msg, Time: time.Now()}}
+		return alert(fu.Level, "%s", msg)
 	}
 	if fu.Projected > fu.Quota && fu.Credits > 0 {
-		return []Alert{{Level: "warn", Source: "ElevenLabs", Time: time.Now(),
-			Message: fmt.Sprintf("ElevenLabs on pace for %s credits this month, plan is %s", thousands(fu.Projected), thousands(fu.Quota))}}
+		return alert("warn", "ElevenLabs on pace for %s credits this month, plan is %s", thousands(fu.Projected), thousands(fu.Quota))
 	}
 	return nil
+}
+
+// capDay is when the servers' daily burn reaches stopAt, if that is before
+// the period resets. The servers' rate, not the account's, so a day of voice
+// auditions does not bring the date in (see applyAccount).
+func capDay(fu FleetUsage, stopAt int, now time.Time) (time.Time, bool) {
+	from := fu.First
+	if from.IsZero() || from.Before(fu.PeriodStart) {
+		from = fu.PeriodStart
+	}
+	days := now.Sub(from).Hours() / 24
+	if days < 1 {
+		days = 1
+	}
+	rate := float64(fu.SkyEyeCredits) / days // credits a day
+	if rate <= 0 {
+		return time.Time{}, false
+	}
+	hit := now.Add(time.Duration(float64(stopAt-fu.Credits) / rate * 24 * float64(time.Hour)))
+	if !fu.PeriodEnd.IsZero() && !hit.Before(fu.PeriodEnd) {
+		return time.Time{}, false
+	}
+	return hit, true
 }
 
 func thousands(n int) string {

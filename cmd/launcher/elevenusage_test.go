@@ -102,3 +102,34 @@ func TestApplyAccount(t *testing.T) {
 		t.Errorf("days %v", d)
 	}
 }
+
+func TestUsageAlertsCap(t *testing.T) {
+	now := time.Date(2026, 10, 16, 20, 0, 0, 0, time.UTC)
+	fu := FleetUsage{Quota: 127855, PeriodStart: time.Date(2026, 10, 14, 16, 31, 0, 0, time.UTC),
+		PeriodEnd: time.Date(2026, 11, 14, 16, 31, 0, 0, time.UTC),
+		First:     time.Date(2026, 10, 15, 16, 0, 0, 0, time.UTC)}
+	// Today's numbers: 15.6k used, servers 4.5k over ~1.2 days -> ~3.8k a day,
+	// so the switch is ~29 days out: past the 14 Nov reset - no alert.
+	fu.Credits, fu.SkyEyeCredits = 15600, 4500
+	if a := usageAlerts(fu, 127000, now); len(a) != 0 {
+		t.Errorf("far from the switch: %+v", a)
+	}
+	// A heavier burn reaches it before the reset: dated warning.
+	fu.SkyEyeCredits = 12000
+	a := usageAlerts(fu, 127000, now)
+	if len(a) != 1 || a[0].Level != "warn" || !strings.Contains(a[0].Message, "on pace to reach the 127,000 OpenAI switch about") {
+		t.Errorf("pace warning = %+v", a)
+	}
+	// Within 10,000.
+	fu.Credits = 120000
+	a = usageAlerts(fu, 127000, now)
+	if len(a) != 1 || a[0].Level != "warn" || !strings.Contains(a[0].Message, "7,000 to the 127,000 OpenAI switch") {
+		t.Errorf("near warning = %+v", a)
+	}
+	// Past it.
+	fu.Credits = 127001
+	a = usageAlerts(fu, 127000, now)
+	if len(a) != 1 || a[0].Level != "error" || !strings.Contains(a[0].Message, "SkyEye is speaking with OpenAI voices until the reset") {
+		t.Errorf("past the switch = %+v", a)
+	}
+}
