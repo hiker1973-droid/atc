@@ -614,11 +614,15 @@ func (b *taskingBoard) bda(cur *taskingAssignment, cs, name string, t taskingTar
 func oneOf(pick func(int) int, opts []string) string { return opts[pick(len(opts))%len(opts)] }
 
 // jtacVoice is Hitman's TTS voice: his own delivery (a ground party on a
-// manpack, not a controller at a console) at the common speed.
+// manpack, not a controller at a console), jtacSpeedUp over the common speed.
 func jtacVoice() voiceProfile {
-	return voiceProfile{voice: flagJTACVoice, speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC,
-		eleven: elHard(flagElevenJTACVoice, "Hitman", 1.0)}
+	return voiceProfile{voice: flagJTACVoice, speed: flagTTSSpeed * jtacSpeedUp, instructions: flagVoiceStyleJTAC,
+		eleven: elHard(flagElevenJTACVoice, "Hitman", jtacSpeedUp)}
 }
+
+// jtacSpeedUp: Hitman 1-1 8% quicker (operator 2026-10-16: "speed Hitman
+// 1-1 up by 5-10%"; was 1.0). Hitman 2-1 keeps Command's read.
+const jtacSpeedUp = 1.08
 
 // jtac2Voice is Hitman 2-1's: the read the operator picked it on (round 18,
 // Command's settings), an American OpenAI fallback.
