@@ -114,6 +114,9 @@ var (
 	flagJTAC2Sector        string
 	flagVoiceStyleJTAC2    string
 	flagElevenJTAC2Voice   string
+	flagOverlordName       string
+	flagOverlordVoice      string
+	flagElevenOverlord     string
 	flagElevenLabs         bool
 	flagElevenLabsKey      string
 	flagElevenLabsModel    string
@@ -216,6 +219,11 @@ func main() {
 	f.StringVar(&flagJTAC2Sector, "jtac2-sector", "Cherkessk", "The range sector the second JTAC runs (targets 4-5 on Caucasus)")
 	f.StringVar(&flagVoiceStyleJTAC2, "voice-style-jtac2", styleJTAC2, "TTS delivery instructions for the second JTAC (empty=none)")
 	f.StringVar(&flagElevenJTAC2Voice, "elevenlabs-jtac2-voice", elHitman21, "ElevenLabs voice ID for the second JTAC (default round 18 \"George\", library)")
+	// Overlord Actual (operator 2026-10-16): answers "permission to proceed to
+	// <area>" on Command's frequency ~10 s after Command's stand by.
+	f.StringVar(&flagOverlordName, "overlord-name", "Overlord-Actual", "SRS client name Overlord Actual transmits under on the Command frequency (\"\" = no Overlord: permission requests get Command's brief)")
+	f.StringVar(&flagOverlordVoice, "overlord-voice", "ash", "OpenAI TTS voice for Overlord Actual (the ElevenLabs fallback)")
+	f.StringVar(&flagElevenOverlord, "elevenlabs-overlord-voice", elBrad, "ElevenLabs voice ID for Overlord Actual (default round 10 \"Brad\", library)")
 	f.BoolVar(&flagElevenLabs, "elevenlabs", true,
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
@@ -1903,6 +1911,9 @@ const (
 		"talking on a manpack radio from a covered position near the target. " +
 		"Low, calm, clipped and deliberate, slightly hushed as if keeping your voice down. Crisp on every number. No emotion."
 	// styleJTAC2: Hitman 2-1, the OpenAI fallback for its American ElevenLabs voice.
+	// styleOverlord: the OpenAI fallback for Overlord Actual's American ElevenLabs voice.
+	styleOverlord = "Speak as a senior American commander on a military radio net, General American accent. " +
+		"Calm, measured and commanding, unhurried, every word deliberate. No emotion."
 	styleJTAC2 = "Speak as a JTAC on the ground, a young American man with a clear, neutral General American accent, " +
 		"talking on a manpack radio from a covered position near the target. " +
 		"Calm, relaxed and confident, clipped on the radio. Crisp on every number. No emotion."

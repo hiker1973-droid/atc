@@ -34,7 +34,8 @@ var radioCheckPhrases = []string{"radio check", "comm check", "comms check", "co
 // space or comma, so "union marshal" would not match "Union Marshall".
 var commandAddresses = []string{"vsfg-7-command", "vsfg 7 command", "command",
 	"union marshall", "union marshal", "unit marshall", "marshall", "marshal",
-	"deck boss", "deckboss", "hitman 1-1", "hitman one one", "hitman"}
+	"deck boss", "deckboss", "hitman 1-1", "hitman one one", "hitman",
+	"overlord actual", "overlord"}
 
 // commandResponse generates an ATC response for a command channel intent.
 func commandResponse(text, callsign, channelName string) string {
@@ -138,6 +139,20 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 	var inFlight *atomic.Int32
 	if tracker != nil {
 		inFlight = &tracker.inFlight
+	}
+	if flagOverlordName != "" {
+		srsHost, srsPort, _ := net.SplitHostPort(srsAddr)
+		commandRangeAreaBoard().overlordTX = func(text string) {
+			mp3, err := synthesizeSpeech(ctx, apiKey, text, overlordVoice())
+			if err != nil {
+				log.Error().Err(err).Msg("Overlord TTS failed")
+				return
+			}
+			broadcastLog("tx", fmt.Sprintf("Overlord TX → %q", text))
+			log.Info().Str("text", text).Float64("freq", freqMHz).Msg("Command TX")
+			noteOwnTX(freqMHz, text)
+			transmitExternalAudioFile(ctx, mp3, freqMHz, flagOverlordName, srsHost, srsPort, externalAudioPath)
+		}
 	}
 	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, commandVoice(voice), externalAudioPath,
 		"Command, Raider, Venom, Viper, request tasking, copy, IP Falcon, Granite, Hammer, Indigo, Javelin, "+rangeAreaWhisperWords,

@@ -69,7 +69,7 @@ const rangeAreaHold = 45 * time.Minute
 
 var (
 	// rangeAreaMoveRe: the pilot is on his way somewhere.
-	rangeAreaMoveRe = regexp.MustCompile(`\b(proceeding|heading|en ?route|enroute|inbound|going|moving|pushing|tracking|vectoring|on the way|working|setting up)\b`)
+	rangeAreaMoveRe = regexp.MustCompile(`\b(proceed|proceeding|heading|en ?route|enroute|inbound|going|moving|pushing|tracking|vectoring|on the way|working|setting up)\b`)
 	// rangeAreaWordRe: a phonetic letter after "to", "for", "area" etc.
 	rangeAreaWordRe = regexp.MustCompile(`\b(?:to|for|towards?|area|target|range|inbound|working)\s+(?:the\s+)?(?:target\s+area\s+|area\s+|target\s+|range\s+)?(alpha|alfa|bravo|charlie|delta|echo|foxtrot|golf|hotel|india|juliet|juliett|kilo|lima|mike|november|oscar)\b`)
 	// rangeAreaLetterRe: a bare letter only after "area", "target" or "range".
@@ -106,12 +106,38 @@ type rangeAreaBoard struct {
 	now     func() time.Time
 	// toJTAC hands a 9-line area to the JTAC that runs it; nil = no JTAC.
 	toJTAC func(key string, numbers []int) *jtacNet
+
+	// Permission requests go up to Overlord Actual (operator 2026-10-16:
+	// "permission to proceed to Alpha" -> "stand by for Overlord Actual",
+	// ~10 s, then Overlord in his own voice: "you are Irene, report copy").
+	pending    map[string]*overlordRequest
+	after      func(time.Duration, func()) // time.AfterFunc; tests run it by hand
+	overlordTX func(text string)           // speaks as Overlord Actual; nil = no Overlord
 }
 
 type rangeWork struct {
 	area int
 	at   time.Time
 }
+
+// overlordRequest is a permission request waiting on Overlord, then on the
+// pilot's copy.
+type overlordRequest struct {
+	area     int
+	callsign string // as the pilot said it
+	at       time.Time
+	spoken   bool // Overlord has answered; the copy is now awaited
+}
+
+const (
+	// overlordDelay: Overlord "comes up" this long after Command's stand by.
+	overlordDelay = 10 * time.Second
+	// overlordCopyWindow: the pilot's copy of Irene counts this long.
+	overlordCopyWindow = 5 * time.Minute
+)
+
+// rangeAreaPermissionRe: the pilot asks, rather than tells.
+var rangeAreaPermissionRe = regexp.MustCompile(`\b(permission|request(?:ing)?\s+(?:to\s+)?(?:proceed|push|go)|request(?:ing)?\s+clearance|clearance\s+to|cleared\s+to\s+proceed)\b`)
 
 var (
 	commandRangeAreas     *rangeAreaBoard
@@ -121,7 +147,9 @@ var (
 func commandRangeAreaBoard() *rangeAreaBoard {
 	commandRangeAreasOnce.Do(func() {
 		commandRangeAreas = &rangeAreaBoard{areas: rangeAreasForMap(flagMap), working: make(map[string]rangeWork), now: time.Now,
-			toJTAC: func(key string, numbers []int) *jtacNet { return commandTaskingBoard().handOffTarget(key, numbers) }}
+			toJTAC:  func(key string, numbers []int) *jtacNet { return commandTaskingBoard().handOffTarget(key, numbers) },
+			pending: make(map[string]*overlordRequest),
+			after:   func(d time.Duration, f func()) { time.AfterFunc(d, f) }}
 	})
 	return commandRangeAreas
 }
@@ -158,6 +186,16 @@ func (r *rangeAreaBoard) Response(text, callsign, channelName string, pic jtacPi
 		return say("copy off %s.", a.Word)
 	}
 
+	// The copy of Overlord's Irene: Command passes the area brief.
+	if req, ok := r.pending[key]; ok && req.spoken {
+		if now.Sub(req.at) > overlordCopyWindow {
+			delete(r.pending, key)
+		} else if isTaskingAck(lower) && rangeAreaIn(r.areas, lower) < 0 || strings.Contains(lower, "irene") {
+			delete(r.pending, key)
+			return r.brief(req.area, key, callsign, say, pic, magVar, now, "copy Irene. ")
+		}
+	}
+
 	if !rangeAreaMoveRe.MatchString(lower) {
 		return ""
 	}
@@ -165,8 +203,56 @@ func (r *rangeAreaBoard) Response(text, callsign, channelName string, pic jtacPi
 	if i < 0 {
 		return ""
 	}
-	a := r.areas[i]
 
+	// Asking permission goes to Overlord Actual, when there is one.
+	if r.overlordTX != nil && r.after != nil && rangeAreaPermissionRe.MatchString(lower) {
+		if req, ok := r.pending[key]; ok && req.area == i && !req.spoken {
+			return "" // asked again before Overlord came up
+		}
+		req := &overlordRequest{area: i, callsign: callsign, at: now}
+		r.pending[key] = req
+		r.after(overlordDelay, func() { r.overlordAnswers(key, req) })
+		return say("stand by for Overlord Actual.")
+	}
+	return r.brief(i, key, callsign, say, pic, magVar, now, "")
+}
+
+// overlordAnswers is Overlord Actual coming up on the net, overlordDelay
+// after Command's stand by: Irene, or not with someone else working the area.
+func (r *rangeAreaBoard) overlordAnswers(key string, req *overlordRequest) {
+	r.mu.Lock()
+	if r.pending[key] != req {
+		r.mu.Unlock()
+		return
+	}
+	now := r.now()
+	a := r.areas[req.area]
+	var others []string
+	if len(a.NineLine) == 0 {
+		for k, w := range r.working {
+			if k != key && w.area == req.area && now.Sub(w.at) <= rangeAreaHold {
+				others = append(others, displayCallsign(k))
+			}
+		}
+	}
+	var text string
+	if len(others) > 0 {
+		delete(r.pending, key)
+		text = fmt.Sprintf("%s, Overlord Actual, negative Irene, %s working %s. Request another area.",
+			req.callsign, strings.Join(others, " and "), a.Word)
+	} else {
+		req.spoken, req.at = true, now
+		text = fmt.Sprintf("%s, Overlord Actual, you are Irene for %s, report copy.", req.callsign, a.Word)
+	}
+	tx := r.overlordTX
+	r.mu.Unlock()
+	tx(text)
+}
+
+// brief is Command's answer for area i: the 9-line handoff, or what is
+// there. lead goes after "<callsign>, Command, " ("copy Irene. ").
+func (r *rangeAreaBoard) brief(i int, key, callsign string, say func(string, ...interface{}) string, pic jtacPicture, magVar magVarFn, now time.Time, lead string) string {
+	a := r.areas[i]
 	if len(a.NineLine) > 0 {
 		nums := make([]string, len(a.NineLine))
 		for j, n := range a.NineLine {
@@ -181,12 +267,16 @@ func (r *rangeAreaBoard) Response(text, callsign, channelName string, pic jtacPi
 			n = r.toJTAC(key, a.NineLine)
 		}
 		if n == nil {
-			return say("%s is %s. Request tasking.", a.Word, what)
+			return say(lead+"%s is %s. Request tasking.", a.Word, what)
 		}
-		return say("%s is %s. Contact %s on %s for tasking.", a.Word, what, n.Spoken, formatFreqMHz(n.FreqMHz))
+		return say(lead+"%s is %s. Contact %s on %s for tasking.", a.Word, what, n.Spoken, formatFreqMHz(n.FreqMHz))
 	}
 
-	parts := []string{say("copy %s, %s, %s.", a.Word, a.Where, a.What)}
+	head := say("copy %s, %s, %s.", a.Word, a.Where, a.What)
+	if lead != "" {
+		head = say(lead+"%s, %s, %s.", a.Word, a.Where, a.What)
+	}
+	parts := []string{head}
 	if a.Threat != "" {
 		parts = append(parts, fmt.Sprintf("Threat %s.", a.Threat))
 	} else {
@@ -214,4 +304,11 @@ func (r *rangeAreaBoard) Response(text, callsign, channelName string, pic jtacPi
 }
 
 // rangeAreaWhisperWords: the area names for Command's Whisper prompt.
-const rangeAreaWhisperWords = "proceeding to Alpha, Bravo, Charlie, Delta, Echo, Foxtrot, Golf, Hotel, India, Juliet, Kilo, Lima, Mike, November, Oscar, off target"
+const rangeAreaWhisperWords = "permission to proceed to Alpha, Bravo, Charlie, Delta, Echo, Foxtrot, Golf, Hotel, India, Juliet, Kilo, Lima, Mike, November, Oscar, off target, Overlord Actual, Irene"
+
+// overlordVoice is Overlord Actual: Brad at the steadier read he was
+// auditioned on in round 10.
+func overlordVoice() voiceProfile {
+	return voiceProfile{voice: flagOverlordVoice, speed: flagTTSSpeed, instructions: styleOverlord,
+		eleven: elevenVoice{ID: flagElevenOverlord, Name: "Overlord Actual", Stability: 0.45, Style: 0.4, Speed: 1.05}}
+}

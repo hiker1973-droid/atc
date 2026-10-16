@@ -76,7 +76,10 @@ const (
 	// Lets do Hitman on 62.00 ... use command_5_9JbYHzFp74No6NSJoI0w".
 	elNora     = "iV1OKYxbmgRtpzJ2q8kx" // "Nora Vale - Mission Control", mature woman, calm authority (Command c0fccab only, reverted same day)
 	elHitman21 = "9JbYHzFp74No6NSJoI0w" // "George - Casual, Laid-Back", young American man (Hitman 2-1)
-	elHank        = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
+	// elBrad is round 10's "command_3_Brad-calm-commanding", picked 2026-10-16 for
+	// Overlord Actual, who answers permission requests on Command's net.
+	elBrad = "d7KZ4gJXiEWKJV0PMsGG" // "Brad", American man, calm, commanding (Overlord Actual)
+	elHank = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
 )
 
 // elFlash is ElevenLabs' cheaper model, about half the credits a character.
@@ -107,6 +110,7 @@ func elCommand(id string) elevenVoice {
 func elMarshal(id string) elevenVoice {
 	return elevenVoice{ID: id, Name: "Marshal", Stability: 0.6, Style: 0.2, Speed: 1.05, Model: elFlash}
 }
+
 // Deckboss alone is on the premium model at 1.05 since 2026-10-15 (operator:
 // "deckboss speaks very fast ... slow down like 5% or change the updated model
 // since we have overhead", picked the premium sample in round 17). Flash

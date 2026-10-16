@@ -117,3 +117,54 @@ func TestRangeAreaNineLineToJTAC(t *testing.T) {
 		t.Errorf("India without JTAC = %q", got)
 	}
 }
+
+// "Permission to proceed" goes up to Overlord Actual: Command stands the
+// flight by, Overlord comes up with Irene, the copy gets Command's brief.
+func TestRangeAreaOverlord(t *testing.T) {
+	r, clock := newTestAreaBoard(nil)
+	r.pending = make(map[string]*overlordRequest)
+	var queued []func()
+	var delay time.Duration
+	r.after = func(d time.Duration, f func()) { delay = d; queued = append(queued, f) }
+	var sent []string
+	r.overlordTX = func(text string) { sent = append(sent, text) }
+
+	if got := r.Response("Command, Raider 302, permission to proceed to Alpha", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, stand by for Overlord Actual." {
+		t.Fatalf("permission = %q", got)
+	}
+	if delay != overlordDelay || len(queued) != 1 {
+		t.Fatalf("Overlord scheduled %v x%d", delay, len(queued))
+	}
+	// A copy before Overlord has spoken is not the copy of Irene.
+	if got := r.Response("Command, Raider 302, copy", "Raider 302", "Command", nil, noMagVar); got != "" {
+		t.Errorf("early copy = %q", got)
+	}
+	*clock = clock.Add(overlordDelay)
+	queued[0]()
+	if len(sent) != 1 || sent[0] != "Raider 302, Overlord Actual, you are Irene for Alpha, report copy." {
+		t.Fatalf("Overlord = %v", sent)
+	}
+	got := r.Response("Overlord Actual, Raider 302, copy Irene", "Raider 302", "Command", nil, noMagVar)
+	if want := "Raider 302, Command, copy Irene. Alpha, Maykop airfield, SA-6 site and parked aircraft. Threat SA-6. Report off target."; got != want {
+		t.Errorf("after Irene = %q", got)
+	}
+	// Someone already there: Overlord says no.
+	r.Response("Command, Venom 21, permission to proceed to Alpha", "Venom 21", "Command", nil, noMagVar)
+	queued[1]()
+	if len(sent) != 2 || sent[1] != "Venom 21, Overlord Actual, negative Irene, Raider 302 working Alpha. Request another area." {
+		t.Errorf("busy area = %v", sent)
+	}
+	if got := r.Response("Command, Venom 21, copy", "Venom 21", "Command", nil, noMagVar); got != "" {
+		t.Errorf("copy after negative = %q", got)
+	}
+	// A 9-line area: Irene, then the JTAC handoff.
+	r.Response("Command, Venom 21, request permission to proceed to Delta", "Venom 21", "Command", nil, noMagVar)
+	queued[2]()
+	if got := r.Response("Command, Venom 21, copies", "Venom 21", "Command", nil, noMagVar); got != "Venom 21, Command, copy Irene. Delta is nine-line targets 1 and 2. Request tasking." {
+		t.Errorf("9-line after Irene = %q", got)
+	}
+	// Telling, not asking, still gets the brief straight away.
+	if got := r.Response("Command, Hawk 11, proceeding to Golf", "Hawk 11", "Command", nil, noMagVar); !strings.HasPrefix(got, "Hawk 11, Command, copy Golf") {
+		t.Errorf("no permission asked = %q", got)
+	}
+}
