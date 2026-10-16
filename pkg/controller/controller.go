@@ -223,6 +223,9 @@ type ATCController struct {
 	// Comms report and traffic alerts (safety.go); guarded by mu.
 	reportFn        func(CommsEvent)
 	originCallsigns map[string]originSeen
+	// lastNoCallsignReply limits the "say again with full callsign" reply to
+	// a call with no callsign to one per radio per noCallsignReplyGap.
+	lastNoCallsignReply map[string]time.Time
 	trafficAlerts   bool
 	trafficAlertAt  map[string]time.Time
 }

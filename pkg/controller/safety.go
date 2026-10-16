@@ -137,15 +137,43 @@ func callsignName(cs string) string {
 	return strings.Join(words, " ")
 }
 
+// noCallsignReplyGap: one "say again with full callsign" per radio in this
+// window, so a garbled or repeated call can't make the tower nag.
+const noCallsignReplyGap = 20 * time.Second
+
+// leadingNumberRe is a bare modex right after the address: "201" in
+// "Tower, 201 airborne." (Senaki 2026-10-15 19:57). Only the first word, so a
+// runway ("clear active 09") is never taken for one.
+var leadingNumberRe = regexp.MustCompile(`^\s*(\d{2,4})\b`)
+
 // resolveNoCallsign handles a call that parsed without a callsign. Returns
 // true when the call is dealt with here. A flight name from a radio that
 // already called in under that name is that jet; any other flight name gets
-// "say again with full callsign"; no name at all stays unanswered. Caller
-// holds mu.
+// "say again with full callsign". A call with no name at all is not acted on
+// and gets a firm "say again with full callsign" (operator 2026-10-15: "Tower
+// needs to tell them repeat or something stern"), addressed to the callsign
+// that radio last used, else the bare number heard, else "Station calling".
+// Caller holds mu.
 func (c *ATCController) resolveNoCallsign(ctx context.Context, req *ATCRequest) bool {
 	name := flightOnlyName(req.Raw)
 	if name == "" {
-		c.report(CommsEvent{Kind: EventNoCallsign, Detail: "call with no callsign - not answered", Text: req.Raw})
+		who := ""
+		if seen, ok := c.originCallsigns[req.Origin]; ok && req.Origin != "" && time.Since(seen.at) < originMemory {
+			who = seen.callsign
+		} else if n := bareModex(req.Raw); n != "" {
+			who = "Aircraft " + n
+		}
+		key := req.Origin
+		if c.lastNoCallsignReply == nil {
+			c.lastNoCallsignReply = make(map[string]time.Time)
+		}
+		if time.Since(c.lastNoCallsignReply[key]) < noCallsignReplyGap {
+			c.report(CommsEvent{Kind: EventNoCallsign, Callsign: who, Detail: "call with no callsign - not answered (asked moments ago)", Text: req.Raw})
+			return true
+		}
+		c.lastNoCallsignReply[key] = time.Now()
+		c.report(CommsEvent{Kind: EventNoCallsign, Callsign: who, Detail: "call with no callsign - told to say again with full callsign", Text: req.Raw})
+		c.transmit(ctx, c.composer.NoCallsign(who))
 		return true
 	}
 	if seen, ok := c.originCallsigns[req.Origin]; ok && req.Origin != "" &&
@@ -405,4 +433,26 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// bareModex is the number a call opened with when it gave no squadron name:
+// "201" for "Tower, 201 airborne." The address (up to the first comma, or a
+// leading "<field> tower/traffic") is skipped first.
+func bareModex(raw string) string {
+	rest := raw
+	if i := strings.Index(rest, ","); i >= 0 {
+		rest = rest[i+1:]
+	} else {
+		l := strings.ToLower(rest)
+		for _, a := range []string{"tower", "traffic"} {
+			if i := strings.Index(l, a); i >= 0 {
+				rest = rest[i+len(a):]
+				break
+			}
+		}
+	}
+	if m := leadingNumberRe.FindStringSubmatch(rest); m != nil {
+		return m[1]
+	}
+	return ""
 }

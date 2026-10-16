@@ -122,15 +122,42 @@ func TestFlightNameWithoutNumber(t *testing.T) {
 		}
 	})
 
-	t.Run("no name at all stays unanswered", func(t *testing.T) {
+	// Operator 2026-10-15: "Tower needs to tell them repeat or something stern."
+	t.Run("no name at all is told to say again with full callsign", func(t *testing.T) {
 		c, sent := proactiveController(t)
 		evs := recordReports(c)
 		callFrom(t, c, ctx, "radioZ", "Test traffic, clear active 09.")
-		if len(*sent) != 0 {
-			t.Fatalf("answered a call with no callsign: %q", *sent)
+		if len(*sent) != 1 || !strings.Contains((*sent)[0], "full callsign") ||
+			!strings.HasPrefix((*sent)[0], "Station calling") && !strings.HasPrefix((*sent)[0], "Aircraft calling") {
+			t.Fatalf("want one 'say again with full callsign' to the unknown station: %q", *sent)
 		}
 		if !hasKind(*evs, EventNoCallsign) {
 			t.Errorf("not reported: %+v", *evs)
+		}
+		callFrom(t, c, ctx, "radioZ", "Test traffic, clear active 09.")
+		if len(*sent) != 1 {
+			t.Errorf("asked again within %v: %q", noCallsignReplyGap, *sent)
+		}
+	})
+
+	t.Run("a bare number is addressed by that number", func(t *testing.T) {
+		c, sent := proactiveController(t)
+		callFrom(t, c, ctx, "radioY", "Tower, 201 airborne.")
+		if len(*sent) != 1 || !strings.HasPrefix((*sent)[0], "Aircraft 201, Test Tower,") || !strings.Contains((*sent)[0], "full callsign") {
+			t.Fatalf("Senaki 19:57 'Tower, 201 airborne.': %q", *sent)
+		}
+		if a := c.airfieldState.Get("201"); a != nil {
+			t.Errorf("the call was acted on: tracked %+v", a)
+		}
+	})
+
+	t.Run("a known radio is addressed by its callsign and not acted on", func(t *testing.T) {
+		c, sent := proactiveController(t)
+		callFrom(t, c, ctx, "radioX", "Tower, Venom 201, request taxi.")
+		n := len(*sent)
+		callFrom(t, c, ctx, "radioX", "Tower, 201 airborne.")
+		if len(*sent) != n+1 || !strings.HasPrefix((*sent)[n], "Venom 201, Test Tower,") || !strings.Contains((*sent)[n], "full callsign") {
+			t.Fatalf("want Venom 201 told to use the full callsign: %q", (*sent)[n:])
 		}
 	})
 }

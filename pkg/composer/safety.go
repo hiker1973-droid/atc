@@ -17,6 +17,24 @@ func (c *ATCComposer) SayAgainFullCallsign(flight string) string {
 	})
 }
 
+// NoCallsign answers a call that gave no callsign at all (Senaki 2026-10-15
+// 19:57, "Tower, 201 airborne."). Firm on purpose (operator: "tell them
+// repeat or something stern"); the call itself is not acted on. who is the
+// callsign that radio last used, "Aircraft 201" for a bare number, or ""
+// when there is nothing to go on.
+func (c *ATCComposer) NoCallsign(who string) string {
+	if who == "" {
+		return pick([]string{
+			fmt.Sprintf("Station calling %s, say again with full callsign.", c.towerCallsign),
+			fmt.Sprintf("Aircraft calling %s, no callsign received. Say again with full callsign.", c.towerCallsign),
+		})
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, say again with full callsign. Squadron name and number on every call.", who, c.towerCallsign),
+		fmt.Sprintf("%s, %s, no callsign received. Say again with your full callsign.", who, c.towerCallsign),
+	})
+}
+
 // TrafficAlert warns one aircraft of another converging on it: clock is the
 // traffic's clock position from the aircraft's nose, altDiffFt the traffic's
 // altitude minus the aircraft's.

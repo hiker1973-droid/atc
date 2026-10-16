@@ -19,7 +19,9 @@ func TestCallsignWithoutCommaAfterTraffic(t *testing.T) {
 	}
 }
 
-// A call with no callsign at all is not answered.
+// A call with no callsign at all is never answered with a blank callsign
+// (", Senaki Tower, ..."); since the operator's 2026-10-15 ruling it gets one
+// "say again with full callsign" and is not acted on.
 func TestNoCallsignNoTransmission(t *testing.T) {
 	_, sent, handle := newRecordingController(t)
 	handle("Senaki traffic, clear active 09.")
@@ -28,8 +30,8 @@ func TestNoCallsignNoTransmission(t *testing.T) {
 			t.Errorf("transmitted with a blank callsign: %q", s)
 		}
 	}
-	if len(*sent) != 0 {
-		t.Errorf("answered a call with no callsign: %q", *sent)
+	if len(*sent) != 1 || !strings.Contains((*sent)[0], "full callsign") {
+		t.Errorf("want only 'say again with full callsign': %q", *sent)
 	}
 }
 
