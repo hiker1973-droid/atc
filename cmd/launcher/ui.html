@@ -165,6 +165,10 @@
   .el-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.72rem; color: var(--label); }
   .el-chip b { color: var(--text); font-weight: 600; }
   .el-chip.bad { border-color: var(--red); color: var(--red); }
+  .build-badge { position: fixed; right: 0.6rem; bottom: 0.5rem; z-index: 50; font: 0.7rem/1.4 ui-monospace, Consolas, monospace;
+                 color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+                 padding: 0.15rem 0.45rem; opacity: 0.85; pointer-events: auto; }
+  .build-badge.warn { color: var(--amber, #d9a400); border-color: var(--amber, #d9a400); }
   .cr-list { max-height: 18rem; overflow-y: auto; margin-top: 0.5rem; border-top: 1px solid var(--border); }
   .cr-row { display: grid; grid-template-columns: 4.2rem 9.5rem 1fr; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--label); }
   .cr-row b { color: var(--text); font-weight: 600; }
@@ -298,6 +302,7 @@
 </style>
 </head>
 <body>
+<div class="build-badge" id="buildBadge" title="Build this rig is running">build …</div>
 <header>
   <div class="brand">
     <img class="patch" src="/logo.png" alt="vSFG-7 squadron patch">
@@ -533,6 +538,7 @@ async function switchRig(name) {
   await followRunningTheatre();
   refreshAll();
   openLogStreams();
+  refreshBuild();
 }
 
 // Rig and theatre are separate choices, and each rig runs whatever theatre its
@@ -1557,7 +1563,28 @@ async function refreshComms() {
     `<div class="el-line" style="color:var(--muted);margin-top:0.4rem">Red = safety (also spoken when there was traffic). The rest are for debriefs and for finding SkyEye's own recognition faults, and are not said on the radio.</div>`;
 }
 
+// Build badge (bottom-right): the selected rig's launcher build, and
+// atc.exe's when it differs (amber - the roles run atc.exe).
+async function refreshBuild() {
+  const el = $('buildBadge');
+  try {
+    const v = await fetch(api('/api/version'), { cache: 'no-store' }).then(r => r.json());
+    const rig = ($('rigSel') || {}).selectedOptions?.[0]?.textContent || 'this rig';
+    const split = v.atcShort && v.atcShort !== v.short;
+    el.textContent = split ? `build ${v.short} · atc ${v.atcShort}` : `build ${v.short}`;
+    el.classList.toggle('warn', !!split);
+    el.title = `${rig}: launcher ${v.version || v.short}` + (v.atcShort ? `, atc.exe ${v.atcShort}` : '') +
+      (v.time ? `\ncommitted ${new Date(v.time).toLocaleString()}` : '') +
+      (split ? '\nlauncher and atc.exe differ - press Update' : '');
+  } catch (e) {
+    el.textContent = 'build ?';
+    el.classList.remove('warn');
+  }
+}
+
 // Boot
+refreshBuild();
+setInterval(refreshBuild, 60000);
 refreshEleven();
 refreshComms();
 setInterval(refreshComms, 60000);

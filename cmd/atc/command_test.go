@@ -81,3 +81,28 @@ func TestCommandCallsFlown20261015(t *testing.T) {
 		t.Errorf("callsign = %q, want Raider 302", cs)
 	}
 }
+
+// Operator ruling 2026-10-15: a Marshal call on Command's frequency is told
+// where Marshal is (Raider 302, 282, 14:56).
+func TestCommandSendsMarshalCallsToMarshal(t *testing.T) {
+	defer func(f float64, n string) { flagHandoffMarshalFreq, flagHandoffMarshalName = f, n }(flagHandoffMarshalFreq, flagHandoffMarshalName)
+	flagHandoffMarshalFreq, flagHandoffMarshalName = 306.3, "Marshal"
+	for _, call := range []string{
+		"Union Marshall, Raider 302, comcheck.",
+		"Marshal, Raider 302, checking in, angels 7, state 6.2.",
+		"marshall Raider 302 radio check",
+	} {
+		got := commandReply(call, "Raider 302", "vSFG-7-Command", nil)
+		if !strings.HasPrefix(got, "Raider 302, vSFG-7-Command, you are on Command. You need to tune to Marshal, three zero six point three") {
+			t.Errorf("%q -> %q", call, got)
+		}
+	}
+	for _, call := range []string{
+		"Command, Raider 302, radio check.",
+		"Command, Raider 302, request handoff to marshal.",
+	} {
+		if got := commandReply(call, "Raider 302", "vSFG-7-Command", nil); strings.Contains(got, "tune to Marshal") {
+			t.Errorf("%q is Command's own call -> %q", call, got)
+		}
+	}
+}

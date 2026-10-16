@@ -54,6 +54,9 @@ func isTankerRequest(lower string) bool {
 // bullseye / tanker replies first, then the tasking exchange, then the
 // text-only intents.
 func commandReply(text, callsign, channelName string, store *tacviewPositions) string {
+	if resp := wrongRadioMarshal(text, callsign, channelName); resp != "" {
+		return resp
+	}
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
 	}
@@ -113,4 +116,29 @@ func commandPositionResponse(text, callsign, channelName string, store *tacviewP
 	brg, nm := bearingRangeFromRef(bull, pos[0], pos[1])
 	return fmt.Sprintf("%s, %s, bullseye %s for %d.",
 		callsign, channelName, spokenBearing(toMagnetic(brg, magVar(bull))), int(nm+0.5))
+}
+
+// marshalAddresses open a call meant for Marshal (Whisper's spellings too).
+var marshalAddresses = []string{"union marshall", "union marshal", "unit marshall", "marshall", "marshal"}
+
+// wrongRadioMarshal answers a call that opens with Marshal's address on
+// Command's frequency with where Marshal is (operator ruling 2026-10-15, after
+// Raider 302 called "Union Marshall" on 282 at 14:56). "" when the call is
+// not addressed to Marshal, or Command has no Marshal frequency.
+func wrongRadioMarshal(text, callsign, channelName string) string {
+	if flagHandoffMarshalFreq <= 0 {
+		return ""
+	}
+	lower := strings.TrimLeft(strings.ToLower(text), " ,.")
+	for _, a := range marshalAddresses {
+		if strings.HasPrefix(lower, a) && (len(lower) == len(a) || strings.ContainsRune(" ,.", rune(lower[len(a)]))) {
+			who := callsign
+			if who == "" {
+				who = "Station calling"
+			}
+			return fmt.Sprintf("%s, %s, you are on Command. You need to tune to %s, %s.", who, channelName,
+				flagHandoffMarshalName, formatFreqMHz(flagHandoffMarshalFreq))
+		}
+	}
+	return ""
 }

@@ -418,6 +418,9 @@ type VersionInfo struct {
 	Version  string `json:"version"` // human: git-describe (e.g. "v1.5.0-18-g6603c5b")
 	Revision string `json:"revision"`
 	Short    string `json:"short"`
+	// AtcShort is the commit atc.exe (what the roles run) was built from;
+	// filled per request, since an update can swap it under this launcher.
+	AtcShort string `json:"atcShort,omitempty"`
 	Time     string `json:"time"`
 	Modified bool   `json:"modified"`
 	Go       string `json:"go"`
@@ -476,7 +479,11 @@ func computeVersion() VersionInfo {
 }
 
 func handleVersion(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, cachedVersion)
+	v := cachedVersion
+	if rev, _, err := exeRevision(filepath.Join(rootDir, "atc.exe")); err == nil {
+		v.AtcShort = shortRev(rev)
+	}
+	writeJSON(w, v)
 }
 
 // ── Fault alerts ────────────────────────────────────────────────────────────
