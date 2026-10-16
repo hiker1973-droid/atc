@@ -72,16 +72,26 @@ func TestRangeAreaReply(t *testing.T) {
 	if got := r.Response("Command, Raider 302, proceeding to Foxtrot", "Raider 302", "Command", nil, noMagVar); !strings.Contains(got, "armour and infantry. No radar threat.") {
 		t.Errorf("Foxtrot = %q", got)
 	}
-	// Off: only the area the flight called, or "off target".
-	if got := r.Response("Command, Raider 302, off Alpha", "Raider 302", "Command", nil, noMagVar); got != "" {
-		t.Errorf("off the wrong area = %q, want silence", got)
+	// Off: always answered. Naming another area does not free the one held.
+	if got := r.Response("Command, Raider 302, off Alpha", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, copy off Alpha. Say intentions." {
+		t.Errorf("off another area = %q", got)
 	}
-	if got := r.Response("Command, Raider 302, off target", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, copy off Foxtrot." {
+	if got := r.Response("Command, Raider 302, off target", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, copy off Foxtrot. Say intentions." {
 		t.Errorf("off target = %q", got)
 	}
-	if got := r.Response("Command, Raider 302, off target", "Raider 302", "Command", nil, noMagVar); got != "" {
-		t.Errorf("second off = %q, want silence", got)
+	if got := r.Response("Command, Raider 302, off target", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, copy off target. Say intentions." {
+		t.Errorf("second off = %q", got)
 	}
+	for _, c := range []string{"Command, Hawk 11, off and egressing", "Command, Hawk 11, off, egress north", "Command, Hawk 11, off safe", "Command, Hawk 11, coming off target", "Command, Hawk 11, egressing target area"} {
+		if got := r.Response(c, "Hawk 11", "Command", nil, noMagVar); got != "Hawk 11, Command, copy off target. Say intentions." {
+			t.Errorf("%q -> %q", c, got)
+		}
+	}
+	r.intn = func(int) int { return 1 }
+	if got := r.Response("Command, Hawk 11, off target", "Hawk 11", "Command", nil, noMagVar); got != "Hawk 11, Command, copy off target. Report RTB or request further tasking." {
+		t.Errorf("second wording = %q", got)
+	}
+	r.intn = nil
 	// Past the hold nobody is still working it.
 	*clock = clock.Add(rangeAreaHold + time.Minute)
 	if got := r.Response("Command, Raider 11, proceeding to Alpha", "Raider 11", "Command", nil, noMagVar); strings.Contains(got, "Be advised") {

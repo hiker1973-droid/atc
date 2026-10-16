@@ -81,7 +81,14 @@ var (
 	rangeAreaLetterRe = regexp.MustCompile(`\b(?:area|target|range)\s+([a-o])\b`)
 	// rangeAreaOffRe: done with an area ("off Alpha", "off target", "egressing area Bravo").
 	rangeAreaOffRe = regexp.MustCompile(`\b(?:off|leaving|departing|egressing|clear of)\s+(?:the\s+)?(?:target\s+area\s+|area\s+|range\s+)?(target|alpha|alfa|bravo|charlie|delta|echo|foxtrot|golf|hotel|india|juliet|juliett|kilo|lima|mike|november|oscar)\b`)
+	// rangeAreaOffAnyRe: the other ways a pilot calls off without naming the
+	// area: "off and egressing", "off, egress north", "off safe".
+	rangeAreaOffAnyRe = regexp.MustCompile(`\b(?:off(?:,)?\s+(?:and\s+)?egress(?:ing)?|off safe|off hot|off cold|off dry)\b`)
 )
+
+// After "copy off", what Command wants next (operator 2026-10-16: "how do
+// we handle 'Command, Raider 302, off target'").
+var rangeAreaOffNext = []string{"Say intentions.", "Report RTB or request further tasking."}
 
 // rangeAreaIn finds the area a call names, -1 for none.
 func rangeAreaIn(areas []rangeArea, lower string) int {
@@ -197,17 +204,28 @@ func (r *rangeAreaBoard) Response(text, callsign, channelName string, pic jtacPi
 	defer r.mu.Unlock()
 	now := r.now()
 
-	if m := rangeAreaOffRe.FindStringSubmatch(lower); m != nil {
+	// Off target. Always answered: the pilot expects an acknowledgement
+	// whether or not he called an area first. Frees the area for the next
+	// flight and asks what he wants next.
+	m := rangeAreaOffRe.FindStringSubmatch(lower)
+	if m != nil || rangeAreaOffAnyRe.MatchString(lower) {
+		named := -1
+		if m != nil && m[1] != "target" {
+			named = rangeAreaIn(r.areas, m[1])
+		}
+		next := rangeAreaOffNext[0]
+		if r.intn != nil {
+			next = rangeAreaOffNext[r.intn(len(rangeAreaOffNext))%len(rangeAreaOffNext)]
+		}
 		w, ok := r.working[key]
-		if !ok || now.Sub(w.at) > rangeAreaHold {
-			return ""
+		if ok && now.Sub(w.at) <= rangeAreaHold && (named < 0 || named == w.area) {
+			delete(r.working, key)
+			return say("copy off %s. %s", r.areas[w.area].Word, next)
 		}
-		a := r.areas[w.area]
-		if m[1] != "target" && rangeAreaIn(r.areas, "to "+m[1]) != w.area {
-			return ""
+		if named >= 0 {
+			return say("copy off %s. %s", r.areas[named].Word, next)
 		}
-		delete(r.working, key)
-		return say("copy off %s.", a.Word)
+		return say("copy off target. %s", next)
 	}
 
 	// The copy of Overlord's Irene: Command passes the area brief.
