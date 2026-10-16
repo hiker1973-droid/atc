@@ -70,6 +70,11 @@ type Airfield struct {
 	// by the ramp/terminal location relative to that runway's approach heading.
 	// Missing key → composer falls back to "left".
 	BreakDirections map[string]string
+	// ParkingAreas are the ramp areas the tower hands out in turn to landing
+	// traffic, as spoken ("Foxtrot"), and ParkingVia the taxiway to them.
+	// Empty = the plain "taxi to parking".
+	ParkingAreas []string
+	ParkingVia   string
 }
 
 // ThresholdFor returns the landing threshold of the runway with the given

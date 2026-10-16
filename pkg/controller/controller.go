@@ -229,6 +229,10 @@ type ATCController struct {
 	lastNoCallsignReply map[string]time.Time
 	trafficAlerts   bool
 	trafficAlertAt  map[string]time.Time
+
+	// Parking areas handed to landing traffic (parking.go); guarded by mu.
+	parking     map[string]parkingSlot
+	parkingNext int
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -510,6 +514,13 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		response = c.composer.StartupApproval(req.Callsign, s.AltimeterInHg)
 
 	case RequestTaxiClear:
+		if wantsParking(req.Raw) {
+			// "request taxi to parking" after landing: not a departure.
+			s.Remove(req.Callsign)
+			area := c.assignParking(req.Callsign, s.Airfield.ParkingAreas, time.Now())
+			response = c.composer.TaxiToParking(req.Callsign, area, s.Airfield.ParkingVia)
+			break
+		}
 		s.EnqueueDeparture(ac)
 		response = c.composer.TaxiClearance(req.Callsign, s.ActiveRunway, s.AltimeterInHg)
 
@@ -625,7 +636,11 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 				Detail: "called clear of the runway without a landing clearance: " + why, Text: req.Raw})
 		}
 		s.Remove(req.Callsign)
-		response = c.composer.RunwayVacated(req.Callsign, s.ActiveRunway)
+		if area := c.assignParking(req.Callsign, s.Airfield.ParkingAreas, time.Now()); area != "" {
+			response = c.composer.RunwayVacatedParking(req.Callsign, s.ActiveRunway, area, s.Airfield.ParkingVia)
+		} else {
+			response = c.composer.RunwayVacated(req.Callsign, s.ActiveRunway)
+		}
 
 
 	case RequestEmergency:

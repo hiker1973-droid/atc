@@ -26,6 +26,10 @@ var UGKS = &Airfield{
 		"09": "left", // TODO verify pattern side against ramp location
 		"27": "left",
 	},
+	// Operator 2026-10-16, off the Senaki aerodrome chart (kneeboard 204):
+	// "Assign F, G, A B C D area via N."
+	ParkingAreas: []string{"Foxtrot", "Golf", "Alpha", "Bravo", "Charlie", "Delta"},
+	ParkingVia:   "November",
 	RunwayPairs: []RunwayPair{
 		{
 			Primary:    Runway{Designator: "09", MagneticHeading: 88.0, ThresholdLatLon: orb.Point{42.0342, 42.2419}},
