@@ -713,6 +713,18 @@ func (c *ATCComposer) RunwayVacated(callsign, activeRunway string) string {
 	})
 }
 
+// TouchdownAck answers "wheels down" / "touchdown": landed, not yet clear of
+// the runway (operator 2026-10-16: "Raider XXX, Tower copy report clear
+// active" or variation) — 3 variations.
+func (c *ATCComposer) TouchdownAck(callsign, activeRunway string) string {
+	rwy := spellRunway(activeRunway)
+	return pick([]string{
+		fmt.Sprintf("%s, %s, copy, report clear of the active.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, roger wheels down, report clear of runway %s.", callsign, c.towerCallsign, rwy),
+		fmt.Sprintf("%s, %s, copy, report runway vacated.", callsign, c.towerCallsign),
+	})
+}
+
 // EmergencyAck acknowledges emergency — 3 variations.
 func (c *ATCComposer) EmergencyAck(callsign, activeRunway string, windFromMag, windKts, altimeterInHg float64) string {
 	rwy := spellRunway(activeRunway)

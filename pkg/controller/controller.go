@@ -100,6 +100,7 @@ const (
 	RequestSayAgain                 // "say again" — repeat the tower's last transmission to this callsign
 	RequestWindCheck                // "wind check" / "say altimeter" — current wind and altimeter
 	RequestHungOrdnance             // "hung ordnance" / "hung store" — straight in, dearm after landing
+	RequestTouchdown                // "wheels down" / "touchdown" / "landed" — on the runway, not yet clear of it
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -594,6 +595,11 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		s.EnqueueLanding(ac)
 		response = c.composer.StraightInApproved(req.Callsign, s.ActiveRunway, s.AltimeterInHg)
 
+	case RequestTouchdown:
+		// On the runway, not clear of it yet: ask for the clear call, and stop
+		// the automatic "report clear" chase from asking a second time.
+		ac.RunwayChased = true
+		response = c.composer.TouchdownAck(req.Callsign, s.ActiveRunway)
 
 	case RequestRunwayVacated:
 		// "Clear the active (09)" is also what some pilots say once airborne
@@ -1426,6 +1432,13 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// Phonetic mishears
 		"clear active runway", "clear of active"):
 		req.Type = RequestRunwayVacated
+	case containsAny(lower, "wheels down", "touchdown", "touch down", "touched down", "landed",
+		"on deck", "on the deck", "on the ground", "down and safe", "safe on deck", "wheels on the ground") &&
+		!containsAny(lower, "final", "base", "downwind", "initial", "mile", "dme", "overhead", "break", "request", "approach", "straight in"):
+		// Operator 2026-10-16: "'Tower, Raider 303, wheels down' - this means he
+		// landed but not clear the runway yet". Not with approach words: "3 mile
+		// final, wheels down" is still the landing call, gear volunteered.
+		req.Type = RequestTouchdown
 	case containsAny(lower, "straight in", "straight-in", "instrument approach", "rnav", "visual approach") ||
 		containsWord(lower, "ils", "i l s", "request visual"):
 		// "ils" whole-word only — as a substring it hit "details" / "fails".
