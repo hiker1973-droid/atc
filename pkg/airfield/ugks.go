@@ -26,10 +26,13 @@ var UGKS = &Airfield{
 		"09": "left", // TODO verify pattern side against ramp location
 		"27": "left",
 	},
-	// Operator 2026-10-16, off the Senaki aerodrome chart (kneeboard 204):
-	// "Assign F, G, A B C D area via N."
-	ParkingAreas: []string{"Foxtrot", "Golf", "Alpha", "Bravo", "Charlie", "Delta"},
-	ParkingVia:   "November",
+	// Operator 2026-10-16, off the Senaki Taxi Parking kneeboard page (003):
+	// "Assign 1 58 via Charlie or Bravo via N[ovember]". Spots 1-30 are Ramp 1
+	// along Bravo; 31-47 sit on Charlie and 48-58 on November east of it.
+	ParkingRoutes: []ParkingRoute{
+		{First: 1, Last: 30, Via: "Bravo, November"},
+		{First: 31, Last: 58, Via: "Charlie, November"},
+	},
 	RunwayPairs: []RunwayPair{
 		{
 			Primary:    Runway{Designator: "09", MagneticHeading: 88.0, ThresholdLatLon: orb.Point{42.0342, 42.2419}},

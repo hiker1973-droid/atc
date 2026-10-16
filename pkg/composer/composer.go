@@ -713,21 +713,22 @@ func (c *ATCComposer) RunwayVacated(callsign, activeRunway string) string {
 	})
 }
 
-// RunwayVacatedParking is RunwayVacated with a parking area assigned
-// (airfield.ParkingAreas) — 3 variations.
-func (c *ATCComposer) RunwayVacatedParking(callsign, activeRunway, area, via string) string {
+// RunwayVacatedParking is RunwayVacated with a parking spot assigned
+// (airfield.ParkingRoutes); via is the taxi route ("Bravo, November") — 3
+// variations.
+func (c *ATCComposer) RunwayVacatedParking(callsign, activeRunway string, spot int, via string) string {
 	rwy := spellRunway(activeRunway)
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s clear, taxi to parking area %s via %s.", callsign, c.towerCallsign, rwy, area, via),
-		fmt.Sprintf("%s, %s, roger clear of runway %s, taxi via %s to parking area %s.", callsign, c.towerCallsign, rwy, via, area),
-		fmt.Sprintf("%s, %s, welcome back, taxi to parking area %s via %s.", callsign, c.towerCallsign, area, via),
+		fmt.Sprintf("%s, %s, runway %s clear, taxi to parking spot %d via %s.", callsign, c.towerCallsign, rwy, spot, via),
+		fmt.Sprintf("%s, %s, roger clear of runway %s, parking spot %d, taxi via %s.", callsign, c.towerCallsign, rwy, spot, via),
+		fmt.Sprintf("%s, %s, welcome back, taxi to spot %d via %s.", callsign, c.towerCallsign, spot, via),
 	})
 }
 
-// TaxiToParking answers "request taxi to parking". area == "" when the field
-// has no parking areas — 3 variations.
-func (c *ATCComposer) TaxiToParking(callsign, area, via string) string {
-	if area == "" {
+// TaxiToParking answers "request taxi to parking". spot == 0 when the field
+// has no parking spots — 3 variations.
+func (c *ATCComposer) TaxiToParking(callsign string, spot int, via string) string {
+	if spot == 0 {
 		return pick([]string{
 			fmt.Sprintf("%s, %s, taxi to parking at your discretion.", callsign, c.towerCallsign),
 			fmt.Sprintf("%s, %s, roger, taxi to parking.", callsign, c.towerCallsign),
@@ -735,9 +736,9 @@ func (c *ATCComposer) TaxiToParking(callsign, area, via string) string {
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, taxi to parking area %s via %s.", callsign, c.towerCallsign, area, via),
-		fmt.Sprintf("%s, %s, roger, taxi via %s to parking area %s.", callsign, c.towerCallsign, via, area),
-		fmt.Sprintf("%s, %s, welcome back, taxi to parking area %s via %s.", callsign, c.towerCallsign, area, via),
+		fmt.Sprintf("%s, %s, taxi to parking spot %d via %s.", callsign, c.towerCallsign, spot, via),
+		fmt.Sprintf("%s, %s, roger, parking spot %d, taxi via %s.", callsign, c.towerCallsign, spot, via),
+		fmt.Sprintf("%s, %s, welcome back, taxi to spot %d via %s.", callsign, c.towerCallsign, spot, via),
 	})
 }
 

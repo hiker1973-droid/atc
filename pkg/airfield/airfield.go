@@ -70,11 +70,38 @@ type Airfield struct {
 	// by the ramp/terminal location relative to that runway's approach heading.
 	// Missing key → composer falls back to "left".
 	BreakDirections map[string]string
-	// ParkingAreas are the ramp areas the tower hands out in turn to landing
-	// traffic, as spoken ("Foxtrot"), and ParkingVia the taxiway to them.
-	// Empty = the plain "taxi to parking".
-	ParkingAreas []string
-	ParkingVia   string
+	// ParkingRoutes are the numbered parking spots the tower hands out in turn
+	// to landing traffic, each range with the taxi route to it. Empty = the
+	// plain "taxi to parking".
+	ParkingRoutes []ParkingRoute
+}
+
+// ParkingRoute is a run of parking spots, First to Last, reached via Via
+// (as spoken: "Bravo, November").
+type ParkingRoute struct {
+	First, Last int
+	Via         string
+}
+
+// ParkingSpot returns the n-th spot (0-based, wrapping) across the routes
+// and its taxi route; ok is false when the field has none.
+func (a *Airfield) ParkingSpot(n int) (spot int, via string, ok bool) {
+	total := 0
+	for _, r := range a.ParkingRoutes {
+		total += r.Last - r.First + 1
+	}
+	if total <= 0 {
+		return 0, "", false
+	}
+	n %= total
+	for _, r := range a.ParkingRoutes {
+		if size := r.Last - r.First + 1; n < size {
+			return r.First + n, r.Via, true
+		} else {
+			n -= size
+		}
+	}
+	return 0, "", false
 }
 
 // ThresholdFor returns the landing threshold of the runway with the given

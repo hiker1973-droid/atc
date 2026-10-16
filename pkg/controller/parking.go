@@ -3,18 +3,22 @@ package controller
 import (
 	"strings"
 	"time"
+
+	"github.com/vsfg7/atc/pkg/airfield"
 )
 
-// Parking areas on landing (operator 2026-10-16, Senaki: "Lets assign parking
-// on landing ... Assign F, G, A B C D area via N"). The tower hands the areas
-// out in turn when a jet reports clear of the runway or asks to taxi to
-// parking; a flight asking again gets the area it already has.
+// Parking spots on landing (operator 2026-10-16, Senaki: "Lets assign parking
+// on landing", then off the Taxi Parking page "Assign 1 58 via Charlie or
+// Bravo via N[ovember]"). The tower hands the spots out in turn when a jet
+// reports clear of the runway or asks to taxi to parking; a flight asking
+// again gets the spot it already has.
 
-// parkingHold is how long an assigned area stays with a callsign.
+// parkingHold is how long an assigned spot stays with a callsign.
 const parkingHold = 45 * time.Minute
 
 type parkingSlot struct {
-	area string
+	spot int
+	via  string
 	at   time.Time
 }
 
@@ -23,26 +27,30 @@ func wantsParking(raw string) bool {
 	return containsAny(strings.ToLower(raw), "parking", "to park", "the ramp", "to ramp", "chocks", "the line", "hangar")
 }
 
-// assignParking returns the parking area for callsign, the next one in turn
-// on a first call. "" when the field has none. Caller holds c.mu.
-func (c *ATCController) assignParking(callsign string, areas []string, now time.Time) string {
-	if len(areas) == 0 {
-		return ""
+// assignParking returns the parking spot and taxi route for callsign, the
+// next spot in turn on a first call. spot == 0 when the field has none.
+// Caller holds c.mu.
+func (c *ATCController) assignParking(callsign string, af *airfield.Airfield, now time.Time) (int, string) {
+	if af == nil || len(af.ParkingRoutes) == 0 {
+		return 0, ""
 	}
 	if c.parking == nil {
 		c.parking = make(map[string]parkingSlot)
 	}
 	key := compactCallsign(callsign)
 	if p, ok := c.parking[key]; ok && now.Sub(p.at) < parkingHold {
-		return p.area
+		return p.spot, p.via
 	}
 	for k, p := range c.parking {
 		if now.Sub(p.at) >= parkingHold {
 			delete(c.parking, k)
 		}
 	}
-	area := areas[c.parkingNext%len(areas)]
+	spot, via, ok := af.ParkingSpot(c.parkingNext)
+	if !ok {
+		return 0, ""
+	}
 	c.parkingNext++
-	c.parking[key] = parkingSlot{area: area, at: now}
-	return area
+	c.parking[key] = parkingSlot{spot: spot, via: via, at: now}
+	return spot, via
 }
