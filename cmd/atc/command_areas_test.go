@@ -287,3 +287,47 @@ func TestOverlordWordings(t *testing.T) {
 		t.Errorf("negative = %q", sent[1])
 	}
 }
+
+// Closing out a run in brevity: Winchester, Bingo, Joker, RTB.
+func TestCommandBrevityCloseOut(t *testing.T) {
+	saveMap := flagMap
+	flagMap = "caucasus"
+	defer func() { flagMap = saveMap }()
+	commandRangeAreaBoard() // built for Caucasus
+	b := commandRangeAreaBoard()
+	b.mu.Lock()
+	saveAreas, saveWork := b.areas, b.working
+	b.areas, b.working = caucasusRangeAreas, map[string]rangeWork{"raider 302": {area: 0, at: b.now()}}
+	b.mu.Unlock()
+	defer func() { b.mu.Lock(); b.areas, b.working = saveAreas, saveWork; b.mu.Unlock() }()
+
+	got := commandBrevityResponse("Command, Raider 302, off Alpha, Winchester, RTB", "Raider 302", "Command", nil, noMagVar)
+	if !strings.HasPrefix(got, "Raider 302, Command, copy off Alpha, Winchester, RTB.") || !strings.HasSuffix(got, "Expect recovery handoff at three zero miles.") {
+		t.Errorf("off + Winchester = %q", got)
+	}
+	if b.Leave("Raider 302") != "" {
+		t.Error("Alpha still held after Winchester")
+	}
+	if got := commandBrevityResponse("Command, Raider 302, Winchester RTB", "Raider 302", "Command", nil, noMagVar); !strings.HasPrefix(got, "Raider 302, Command, copy Winchester, RTB.") {
+		t.Errorf("Winchester RTB = %q", got)
+	}
+	if got := commandBrevityResponse("Command, Raider 302, Bingo, RTB", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, copy Bingo, RTB. Expect recovery handoff at three zero miles." {
+		t.Errorf("Bingo = %q", got)
+	}
+	if got := commandBrevityResponse("Command, Raider 302, off target, RTB", "Raider 302", "Command", nil, noMagVar); got != "Raider 302, Command, copy off target, RTB. Expect recovery handoff at three zero miles." {
+		t.Errorf("off target RTB = %q", got)
+	}
+	if got := commandBrevityResponse("Command, Raider 302, Joker", "Raider 302", "Command", nil, noMagVar); !strings.Contains(got, "Joker") {
+		t.Errorf("Joker = %q", got)
+	}
+	// Plain RTB keeps commandResponse's reply; a fuel state keeps the fuel reply.
+	if got := commandBrevityResponse("Command, Raider 302, RTB", "Raider 302", "Command", nil, noMagVar); got != "" {
+		t.Errorf("plain RTB = %q, want it left to commandResponse", got)
+	}
+	if got := commandBrevityResponse("Command, Raider 302, bingo, state 1.8", "Raider 302", "Command", nil, noMagVar); got != "" {
+		t.Errorf("bingo with state = %q", got)
+	}
+	if got := commandReply("Command, Raider 302, RTB", "Raider 302", "Command", nil); !strings.Contains(got, "RTB") && !strings.Contains(got, "returning to base") {
+		t.Errorf("plain RTB through commandReply = %q", got)
+	}
+}

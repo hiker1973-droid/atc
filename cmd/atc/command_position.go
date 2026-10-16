@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 
 	"github.com/paulmach/orb"
@@ -60,6 +61,9 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
 	}
+	if resp := commandBrevityResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
+		return resp
+	}
 	var pic jtacPicture
 	if store != nil {
 		pic = tacviewJTAC{store: store}
@@ -76,6 +80,82 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 		return resp
 	}
 	return commandResponse(text, callsign, channelName)
+}
+
+var (
+	winchesterRe = regexp.MustCompile(`\bwinchester\b`)
+	bingoRe      = regexp.MustCompile(`\bbingo\b`)
+	jokerRe      = regexp.MustCompile(`\bjoker\b`)
+)
+
+// commandBrevityResponse answers the calls that close out a range run
+// (operator 2026-10-16: after "copy off Alpha, say intentions" the pilot
+// says "RTB" or "Winchester, RTB" - copy it, in brevity):
+//
+//	Winchester  out of ordnance: done, RTB, handoff at 30 nm
+//	Bingo       fuel to get home: RTB, the nearest tanker if Tacview has one
+//	Joker       fuel to keep working a little: copy, call Bingo
+//
+// Any of these, or RTB / fence out, frees the range area the flight held.
+// A plain RTB with no "off" in it is left to commandResponse.
+func commandBrevityResponse(text, callsign, channelName string, store *tacviewPositions, magVar magVarFn) string {
+	lower := strings.ToLower(text)
+	win, bingo, joker := winchesterRe.MatchString(lower), bingoRe.MatchString(lower), jokerRe.MatchString(lower)
+	recovery := isRecoveryCall(lower)
+	if !win && !bingo && !joker && !recovery {
+		return ""
+	}
+	if extractFuelStateMarshal(lower) > 0 && !win {
+		return "" // "bingo, state 1.8": the fuel state reply has it
+	}
+	board := commandRangeAreaBoard()
+	if joker && !win && !bingo && !recovery {
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, copy Joker.", callsign, channelName),
+			fmt.Sprintf("%s, %s, copy Joker, call Bingo.", callsign, channelName),
+			fmt.Sprintf("%s, %s, roger Joker.", callsign, channelName),
+		})
+	}
+	// "off Alpha, Winchester, RTB" answers the off call too.
+	off := ""
+	if word := board.Leave(callsign); word != "" && (rangeAreaOffRe.MatchString(lower) || rangeAreaOffAnyRe.MatchString(lower)) {
+		off = fmt.Sprintf("copy off %s, ", word)
+	} else if rangeAreaOffRe.MatchString(lower) || rangeAreaOffAnyRe.MatchString(lower) {
+		off = "copy off target, "
+	}
+	handoff := "Expect recovery handoff at three zero miles."
+	switch {
+	case win:
+		lead := "copy Winchester, RTB."
+		if off != "" {
+			lead = off + "Winchester, RTB."
+		}
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, %s Good work. %s", callsign, channelName, lead, handoff),
+			fmt.Sprintf("%s, %s, %s Cleared off the range. %s", callsign, channelName, lead, handoff),
+			fmt.Sprintf("%s, %s, %s Good shooting. %s", callsign, channelName, lead, handoff),
+		})
+	case bingo:
+		lead := "copy Bingo, RTB."
+		if off != "" {
+			lead = off + "Bingo, RTB."
+		}
+		tanker := ""
+		if store != nil {
+			if pos, ok := store.Get(callsign); ok {
+				if tk, ok := store.NearestTanker(pos, store.Info(callsign).Coalition); ok {
+					brg, nm := bearingRangeFromRef(pos, tk.pos[0], tk.pos[1])
+					tanker = fmt.Sprintf(" Nearest tanker %s bears %s for %d, angels %d.", tk.callsign,
+						spokenBearing(toMagnetic(brg, magVar(pos))), int(nm+0.5), int(tk.info.AltFt/1000+0.5))
+				}
+			}
+		}
+		return fmt.Sprintf("%s, %s, %s%s %s", callsign, channelName, lead, tanker, handoff)
+	case off != "":
+		// "off target, RTB"
+		return fmt.Sprintf("%s, %s, %sRTB. %s", callsign, channelName, off, handoff)
+	}
+	return "" // plain RTB / fence out: commandResponse, area already freed
 }
 
 // commandPositionResponse answers "say bullseye" and "request tanker" from the

@@ -353,8 +353,24 @@ func (r *rangeAreaBoard) brief(i int, key, callsign string, say func(string, ...
 	return strings.Join(parts, " ")
 }
 
+// Leave frees the area the flight holds, returning its word ("" = none).
+func (r *rangeAreaBoard) Leave(callsign string) string {
+	key := strings.ToLower(strings.TrimSpace(callsign))
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	w, ok := r.working[key]
+	if !ok || len(r.areas) == 0 {
+		return ""
+	}
+	delete(r.working, key)
+	if r.now().Sub(w.at) > rangeAreaHold {
+		return ""
+	}
+	return r.areas[w.area].Word
+}
+
 // rangeAreaWhisperWords: the area names for Command's Whisper prompt.
-const rangeAreaWhisperWords = "permission to proceed to Alpha, Bravo, Charlie, Delta, Echo, Foxtrot, Golf, Hotel, India, Juliet, Kilo, Lima, Mike, November, Oscar, off target, Overlord Actual, Irene"
+const rangeAreaWhisperWords = "permission to proceed to Alpha, Bravo, Charlie, Delta, Echo, Foxtrot, Golf, Hotel, India, Juliet, Kilo, Lima, Mike, November, Oscar, off target, Overlord Actual, Irene, Winchester, Bingo, Joker, RTB"
 
 // overlordVoice is Overlord Actual: Brad at the steadier read he was
 // auditioned on in round 10.
