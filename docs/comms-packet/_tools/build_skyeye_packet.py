@@ -28,6 +28,11 @@ call now only hands the flight to Hitman; Hitman picks the 9-line target. Preset
 Caucasus Training V1.23 cards: Hornet COMM 2 CH 12, Viper COMM 2 CH 8. Cards 12 - 19 of
 v1.21 are now 14 - 21. The Marshal frequencies were NOT re-checked for v1.22.
 
+v1.24 (user asked 2026-10-16 "rebuild the comms packet PDFs") follows origin/main 74c6260:
+the training V1.25 9-line range north of the ridge (cards 12 - 13: Valley Road Bridge
+checkpoint, Kuban no-strike road bridge) and IP inbound accepted within 20 nm (jtac.go
+jtacIPInboundNm, 2026-10-15), with "run in heading NNN" when you call it off the line.
+
 Every call and reply below was read out of the SkyeyeATC code on origin/main —
 cmd/atc/{command,deckboss,marshal,command_handoff}.go, pkg/composer/composer.go,
 pkg/state/state.go — and the start_*.bat files. The *_responses.md docs were used as a map
@@ -63,8 +68,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.23"
-DATE = "15 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.24"
+DATE = "16 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -507,7 +512,7 @@ def c11_command():
 # ---------------------------------------------------------------- JTAC (cmd/atc/jtac.go)
 def c12_jtac_flow():
     c = card("HITMAN ", "1-1", ["JTAC  ·  %s FM  ·  Hornet %s  ·  Viper %s" % (JTAC_F, H_JTAC, V_JTAC),
-                               "Black Sea (Caucasus) training  ·  the five 9-line cards"], 12)
+                               "Black Sea (Caucasus) training  ·  five 9-line cards, north of the ridge"], 12)
     NK.band(c, "THE RUN", "every call starts \"Hitman, Raider 1, ...\"")
     NK.steps(c, [
         ("COMMAND", "request tasking  ->  contact Hitman 1-1 on 61.0"),
@@ -535,8 +540,9 @@ def c13_jtac_checks():
                                   "Bearings and headings magnetic."], 13)
     NK.band(c, "HITMAN CHECKS", "or tells you why not")
     c.kv([
-        ("IP inbound", "within 5 nm of the IP"),
+        ("IP inbound", "within 20 nm of the IP"),
         ("  not there", "negative - IP bears NNN for NN"),
+        ("  off the run-in line", "continue, run in heading NNN"),
         ("  nose off the target", "continue, check heading"),
         ("In call", "inside the final attack heading"),
         ("  and", "0.5 - 15 nm from the target"),
@@ -557,8 +563,8 @@ def c13_jtac_checks():
          ("Where you hit against the aim point, then what is destroyed, priority targets "
           "first. \"request BDA\" repeats it.", False)],
         [("Bridges cannot be assessed", True),
-         ("- Hitman gives impacts, Enguri's checkpoint, and any hit on the Rioni no-strike "
-          "road bridge.", False)],
+         ("- Hitman gives impacts, the Valley Road Bridge checkpoint, and any hit on the Kuban "
+          "no-strike road bridge.", False)],
     ])
     NK.band(c, "ALSO", "any time")
     c.kv([("abort", "copy abort, re-attack from the IP"),
@@ -845,7 +851,7 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 404e399, 15 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 74c6260, 16 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 

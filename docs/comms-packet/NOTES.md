@@ -1,11 +1,28 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 15 OCT 2026.  v1.23.  Product = one full-screen 16:9 PDF, 22 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.23.pdf` — cover + 21 cards: How it works · Frequencies ·
+**Built 16 OCT 2026.  v1.24.  Product = one full-screen 16:9 PDF, 22 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.24.pdf` — cover + 21 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · **Marshal calls 1 · 2 · 3** ·
 Off the boat · Command · **Hitman 1-1 · Cleared hot?** ·
 A full sortie · **Airfield ATC · Tower radios · Syria towers · Departure · Arrival ·
 Tower calls** · No answer?
+
+## v1.24 (16 OCT 2026) — Hitman on the training V1.25 north range, from origin/main `74c6260`
+
+Operator 2026-10-16: "rebuild the comms packet PDFs" after the north-range merge.
+- **Card 12:** subtitle "five 9-line cards, north of the ridge".
+- **Card 13:** IP inbound accepted **within 20 nm** (`jtacIPInboundNm`, operator 2026-10-15; the
+  v1.23 card still said 5 nm); new row "off the run-in line -> continue, run in heading NNN".
+  BDA bridge line now names the Valley Road Bridge checkpoint and the Kuban no-strike road bridge
+  (was Enguri / Rioni, the old Senaki range).
+- Build stamp (card 21): origin/main 74c6260. Phraseology Reference **v2.2** carries the same
+  (section 5 example + `phrases.json` readback now target 4, Indigo, matching
+  `docs_test.go docReadbackTarget`; "100-127 nm north of Senaki"; 20 nm callout).
+- `TestDoc*` green. Not deployed at build time: post `DISCORD_POST.md` only after the Caucasus
+  rig runs 74c6260 and Training V1.25 is on the server.
+- Not touched: `Desktop\SKYEYE ATC Dev\Documentation\Hitman 1-1 JTAC Comms Flow.pdf` (ReportLab
+  one-off, no builder in git, SkyEye a00f12e). It uses placeholders, not target names, and already
+  says 20 nm, but lacks the "run in heading" reply.
 
 ## v1.23 (15 OCT 2026) — the tower's 7-mile departure call, from origin/main `404e399`
 

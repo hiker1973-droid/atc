@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.1"
-DATE = "15 OCT 2026"          # change together with VER
+VER = "v2.2"
+DATE = "16 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 LOGO = r"C:\Users\afhin\Saved Games\DCS\Missions\New Pilot packs\VMFA225_patch.png"
@@ -144,8 +144,9 @@ def table_rows(role, rows, address, tower=""):
     for intent, say, reply, want in rows:
         for alt in say.split("  /  "):
             spoken = alt.replace("N mile", "10 mile").replace("NN", "13").replace("cat N", "cat 2")
-            # Hitman readback: a real card target (command_tasking.go target 3, IP Cobra).
-            spoken = spoken.replace("target N", "target 3").replace("<IP>", "Cobra")
+            # Hitman readback: a real card target (command_tasking.go target 4, IP Indigo;
+            # training V1.25 north range - docs_test.go docReadbackTarget).
+            spoken = spoken.replace("target N", "target 4").replace("<IP>", "Indigo")
             PHRASES.append({"role": role, "say": "%s, %s, %s." % (address, CS, spoken),
                             "tower": tower, "want": want})
         quoted = " ".join('"...%s"' % a for a in say.split("  /  "))
@@ -460,12 +461,13 @@ def build():
     # 5. Hitman
     d.h1("5. Hitman 1-1 - %s FM (JTAC)" % f3(TH["caucasus"]["jtac"]))
     d.para("Black Sea training 9-lines. Hornet COMM 2 CH 12, Viper COMM 2 CH 8. Command hands you over; Hitman "
-           "picks the target from the five 9-line cards in your kneeboard. Lead with \"Hitman\".")
+           "picks the target from the five 9-line cards in your kneeboard - 100-127 nm north of Senaki, past the "
+           "main ridge. Lead with \"Hitman\".")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("jtac", JTAC, "Hitman"), (0.18, 0.4, 0.42))
     d.dialogue([("Pilot", "Hitman 1-1, Raider 1-1, checking in."),
-                ("Hitman", "Raider 1-1, Hitman one one, target 3, Fuel Depot, IP Cobra. Read back."),
-                ("Pilot", "Hitman, Raider 1-1, target 3, Cobra."),
+                ("Hitman", "Raider 1-1, Hitman one one, target 4, Fuel Depot, IP Indigo. Read back."),
+                ("Pilot", "Hitman, Raider 1-1, target 4, Indigo."),
                 ("Hitman", "Raider 1-1, Hitman one one, good readback. Report IP inbound."),
                 ("Pilot", "Hitman, Raider 1-1, IP inbound."),
                 ("Hitman", "Raider 1-1, Hitman one one, continue."),
@@ -474,7 +476,7 @@ def build():
                 ("Hitman", "Raider 1-1, Hitman one one, BDA. Impact on the aim point. Large tanks, 2 of 4 destroyed. "
                            "3 of 14 on target destroyed.")])
     d.callout("What Hitman checks (Tacview, against your 9-line card)", [
-        "IP inbound: within 5 nm of the IP, nose on the target.",
+        "IP inbound: within 20 nm of the IP, nose on the target. Off the run-in line you hear \"continue, run in heading NNN\".",
         "In call: inside the card's final attack heading and 0.5 - 15 nm from the target - otherwise abort, abort, abort.",
         "After cleared hot: a run that swings 10 deg outside the window before release is aborted.",
         "BDA about 15 s after impact. The bridges cannot be assessed - impacts only.",
