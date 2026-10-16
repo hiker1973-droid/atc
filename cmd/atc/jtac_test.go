@@ -50,7 +50,7 @@ const hitman = "Hitman one one"
 func newJTACBoard(t *testing.T) (*taskingBoard, *time.Time) {
 	t.Helper()
 	b, clock := newTestTaskingBoard(caucasusTaskingTargets) // always target 1, Falcon
-	b.jtac = &jtacNet{Spoken: hitman, FreqMHz: 61.0}
+	b.jtacs = []*jtacNet{{Spoken: hitman, FreqMHz: 61.0}}
 	return b, clock
 }
 
@@ -562,5 +562,93 @@ func TestMiniTacviewGroundKillsAndImpacts(t *testing.T) {
 	p.handleLine("0,ReferenceTime=2026-10-14T12:00:00Z")
 	if len(store.GroundObjects()) != 0 || len(store.Impacts(time.Time{})) != 0 {
 		t.Error("new mission kept the old picture")
+	}
+}
+
+// Two JTACs, one sector each (operator 2026-10-16: Hitman 2-1 on 62.000).
+func newTwoJTACBoard(t *testing.T) (cmd, kuban, cherkessk *taskingBoard) {
+	t.Helper()
+	cmd, clock := newTestTaskingBoard(caucasusTaskingTargets)
+	kuban, _ = newTestTaskingBoard(sectorTargets(caucasusTaskingTargets, "Kuban Valley"))
+	cherkessk, _ = newTestTaskingBoard(sectorTargets(caucasusTaskingTargets, "Cherkessk"))
+	kuban.now = func() time.Time { return *clock }
+	cherkessk.now = kuban.now
+	cmd.jtacs = []*jtacNet{
+		{Spoken: hitman, FreqMHz: 61.0, board: kuban},
+		{Spoken: "Hitman two one", FreqMHz: 62.0, board: cherkessk},
+	}
+	return cmd, kuban, cherkessk
+}
+
+func TestSectorTargets(t *testing.T) {
+	if got := len(sectorTargets(caucasusTaskingTargets, "Kuban Valley")); got != 3 {
+		t.Errorf("Kuban Valley targets = %d, want 3", got)
+	}
+	ch := sectorTargets(caucasusTaskingTargets, "cherkessk")
+	if len(ch) != 2 || ch[0].Number != 4 || ch[1].Number != 5 {
+		t.Errorf("Cherkessk targets = %+v, want 4 and 5", ch)
+	}
+}
+
+// Each JTAC only ever briefs its own sector, and Command names the JTAC it
+// picked in both the handoff and the "switch" readback.
+func TestTwoJTACsSplitBySector(t *testing.T) {
+	cmd, kuban, cherkessk := newTwoJTACBoard(t)
+	pic := &fakePicture{}
+	// intn always 0: the first JTAC with a free target, Hitman 1-1.
+	if got := cmd.Response("Command, Raider 11, request tasking", "Raider 11", "Command"); !strings.Contains(got, "contact Hitman one one on six one") {
+		t.Fatalf("first handoff = %q", got)
+	}
+	if got := cmd.Response("Command, Raider 11, copy", "Raider 11", "Command"); got != "Raider 11, Command, switch Hitman one one, good hunting." {
+		t.Errorf("readback = %q", got)
+	}
+	if got := kuban.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic); !strings.Contains(got, "target 1,") {
+		t.Fatalf("Hitman 1-1 brief = %q", got)
+	}
+	// Coming back for more moves the flight to the other sector and frees its
+	// Kuban target.
+	if got := cmd.Response("Command, Raider 11, request tasking", "Raider 11", "Command"); !strings.Contains(got, "contact Hitman two one on six two") {
+		t.Fatalf("second handoff = %q, want Hitman 2-1", got)
+	}
+	if got := cmd.Response("Command, Raider 11, copy", "Raider 11", "Command"); got != "Raider 11, Command, switch Hitman two one, good hunting." {
+		t.Errorf("second readback = %q", got)
+	}
+	if _, ok := kuban.flights["raider 11"]; ok {
+		t.Error("Raider 11 still holds a Kuban Valley target after moving to Hitman 2-1")
+	}
+	got := cherkessk.JTACResponse("Hitman 2-1, Raider 11, checking in", "Raider 11", "Hitman two one", pic)
+	if !strings.HasPrefix(got, "Raider 11, Hitman two one, target 4, Fuel Depot, IP Indigo.") {
+		t.Errorf("Hitman 2-1 brief = %q", got)
+	}
+	// Checking straight in on 62.000 without Command still gets a Cherkessk card.
+	if got := cherkessk.JTACResponse("Hitman 2-1, Venom 21, checking in", "Venom 21", "Hitman two one", pic); !strings.Contains(got, "target 5, Command Post") {
+		t.Errorf("direct check-in = %q, want target 5", got)
+	}
+}
+
+// A sector with every target held sends the next flight to the other JTAC.
+func TestTwoJTACsFullSectorGoesToOther(t *testing.T) {
+	cmd, kuban, _ := newTwoJTACBoard(t)
+	pic := &fakePicture{}
+	for _, cs := range []string{"Raider 11", "Raider 12", "Raider 13"} {
+		kuban.JTACResponse("Hitman 1-1, "+cs+", checking in", cs, hitman, pic)
+	}
+	if got := cmd.Response("Command, Venom 21, request tasking", "Venom 21", "Command"); !strings.Contains(got, "Hitman two one") {
+		t.Errorf("handoff with Kuban Valley full = %q, want Hitman 2-1", got)
+	}
+}
+
+func TestJTACCallsignTwoOne(t *testing.T) {
+	for _, in := range []string{"Hitman 2-1, Raider 11, checking in", "Hitman two one, Raider 11, IP inbound"} {
+		if got := jtacCallsign(in); got != "Raider 11" {
+			t.Errorf("jtacCallsign(%q) = %q", in, got)
+		}
+	}
+}
+
+func TestJTACWhisperPrompt(t *testing.T) {
+	got := jtacWhisperPrompt("Hitman-2-1", sectorTargets(caucasusTaskingTargets, "Cherkessk"))
+	if !strings.HasPrefix(got, "Hitman 2-1, Raider,") || !strings.HasSuffix(got, "request BDA, Indigo, Javelin") {
+		t.Errorf("prompt = %q", got)
 	}
 }

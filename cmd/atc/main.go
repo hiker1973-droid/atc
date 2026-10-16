@@ -106,6 +106,14 @@ var (
 	flagJTACVoice       string
 	flagVoiceStyleJTAC  string
 	flagJTACRadioIntensity string
+	flagJTACSector         string
+	flagJTAC2Freq          float64
+	flagJTAC2Name          string
+	flagJTAC2Spoken        string
+	flagJTAC2Voice         string
+	flagJTAC2Sector        string
+	flagVoiceStyleJTAC2    string
+	flagElevenJTAC2Voice   string
 	flagElevenLabs         bool
 	flagElevenLabsKey      string
 	flagElevenLabsModel    string
@@ -197,6 +205,17 @@ func main() {
 	f.StringVar(&flagJTACSpoken, "jtac-spoken", "Hitman one one", "JTAC callsign as spoken on the radio")
 	f.StringVar(&flagJTACVoice, "jtac-voice", "ash", "OpenAI TTS voice for the JTAC")
 	f.StringVar(&flagVoiceStyleJTAC, "voice-style-jtac", styleJTAC, "TTS delivery instructions for the JTAC (empty=none)")
+	// Hitman 2-1 (operator 2026-10-16: "Lets do Hitman on 62.00"), split by
+	// sector: with both JTACs up, each runs one range_north sector.
+	f.StringVar(&flagJTACSector, "jtac-sector", "Kuban Valley", "With --jtac2-freq: the range sector Hitman 1-1 runs (targets 1-3 on Caucasus)")
+	f.Float64Var(&flagJTAC2Freq, "jtac2-freq", 0,
+		"With --jtac-freq: run a second JTAC on this frequency in MHz, e.g. 62.0; each JTAC then runs one sector and Command picks the one with a free target. 0=disabled")
+	f.StringVar(&flagJTAC2Name, "jtac2-name", "Hitman-2-1", "Second JTAC SRS client name (no spaces)")
+	f.StringVar(&flagJTAC2Spoken, "jtac2-spoken", "Hitman two one", "Second JTAC callsign as spoken on the radio")
+	f.StringVar(&flagJTAC2Voice, "jtac2-voice", "echo", "OpenAI TTS voice for the second JTAC (the ElevenLabs fallback)")
+	f.StringVar(&flagJTAC2Sector, "jtac2-sector", "Cherkessk", "The range sector the second JTAC runs (targets 4-5 on Caucasus)")
+	f.StringVar(&flagVoiceStyleJTAC2, "voice-style-jtac2", styleJTAC2, "TTS delivery instructions for the second JTAC (empty=none)")
+	f.StringVar(&flagElevenJTAC2Voice, "elevenlabs-jtac2-voice", elHitman21, "ElevenLabs voice ID for the second JTAC (default round 18 \"George\", library)")
 	f.BoolVar(&flagElevenLabs, "elevenlabs", true,
 		"Speak Command, Hitman, the towers, Marshal and Deckboss with ElevenLabs when a key is set (ELEVENLABS_API_KEY or --elevenlabs-key); OpenAI is the fallback. ATIS stays on OpenAI.")
 	f.StringVar(&flagElevenLabsKey, "elevenlabs-key", "", "ElevenLabs API key (default: ELEVENLABS_API_KEY)")
@@ -205,7 +224,7 @@ func main() {
 	// not hear the difference on the round 15 A/B ("Do flash I cannot tell the
 	// difference"). eleven_multilingual_v2 is the richer, 2x-cost model.
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elNora, "ElevenLabs voice ID for Command (default round 18 \"Nora Vale\", library)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",
 		"ElevenLabs voice ID of this tower's alternate controller; the two swap every --tower-shift once the frequency has been quiet 5 min (\"\" = one controller)")
@@ -721,7 +740,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 
 		if flagJTACFreq > 0 {
-			startJTAC(ctx, apiKey, store)
+			startJTACs(ctx, apiKey, store)
 		}
 
 		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio, tracker, store)
@@ -1883,6 +1902,10 @@ const (
 	styleJTAC = "Speak as a JTAC on the ground, an Australian man with a clear, natural Australian accent, " +
 		"talking on a manpack radio from a covered position near the target. " +
 		"Low, calm, clipped and deliberate, slightly hushed as if keeping your voice down. Crisp on every number. No emotion."
+	// styleJTAC2: Hitman 2-1, the OpenAI fallback for its American ElevenLabs voice.
+	styleJTAC2 = "Speak as a JTAC on the ground, a young American man with a clear, neutral General American accent, " +
+		"talking on a manpack radio from a covered position near the target. " +
+		"Calm, relaxed and confident, clipped on the radio. Crisp on every number. No emotion."
 
 	styleATIS = "Read as a recorded automated terminal information broadcast. " +
 		"Even, neutral, unhurried, identical inflection on every phrase. No emphasis anywhere."
@@ -2524,7 +2547,8 @@ func txIntensity(callsign string) string {
 		return flagTowerRadioIntensity
 	case strings.HasSuffix(callsign, " ATIS"):
 		return flagATISRadioIntensity
-	case flagJTACName != "" && callsign == flagJTACName:
+	case flagJTACName != "" && callsign == flagJTACName,
+		flagJTAC2Freq > 0 && flagJTAC2Name != "" && callsign == flagJTAC2Name:
 		return flagJTACRadioIntensity
 	}
 	return flagRadioIntensity

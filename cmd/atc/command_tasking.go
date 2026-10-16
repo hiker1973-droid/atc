@@ -22,7 +22,7 @@ type taskingTarget struct {
 	Number  int
 	Name    string
 	Control string // "type 1" / "type 2", as the card prints it
-	Sector  string // range_north sector; one JTAC per sector once Hitman 1-2 exists (unused today)
+	Sector  string // range_north sector; with two JTACs each runs one (--jtac-sector, --jtac2-sector)
 	IPPos   orb.Point // lon, lat
 	TgtPos  orb.Point // lon, lat
 	MagVar  float64   // east, degrees, at the target
@@ -100,21 +100,38 @@ type taskingBoard struct {
 	now     func() time.Time
 	intn    func(int) int
 
-	// jtac, when set, is the JTAC Command hands the flight to. Command then
-	// only sends the flight to the IP; the JTAC passes the 9-line and clears
+	// jtacs, when set, are the JTACs Command hands the flight to. Command then
+	// only sends the flight to the JTAC; the JTAC passes the 9-line and clears
 	// it hot (jtac.go). Unset, Command clears hot on the readback itself.
-	jtac     *jtacNet
-	handoffs map[string]time.Time // flights Command sent to the JTAC, for the readback
+	jtacs    []*jtacNet
+	handoffs map[string]jtacHandoff // flights Command sent to a JTAC, for the readback
 }
 
 // jtacNet is the JTAC as Command names it on the radio.
 type jtacNet struct {
 	Spoken  string  // "Hitman one one"
 	FreqMHz float64 // 61.000
+	// board is the JTAC's own board, holding its sector's targets, when there
+	// is more than one JTAC (operator 2026-10-16: Hitman 2-1 on 62.000, split
+	// by sector). nil = the JTAC works Command's board, the whole range.
+	board *taskingBoard
+}
+
+// workBoard is the board the JTAC works: its own, or Command's.
+func (n *jtacNet) workBoard(command *taskingBoard) *taskingBoard {
+	if n.board != nil {
+		return n.board
+	}
+	return command
+}
+
+type jtacHandoff struct {
+	at  time.Time
+	net *jtacNet
 }
 
 func newTaskingBoard(targets []taskingTarget) *taskingBoard {
-	return &taskingBoard{targets: targets, flights: make(map[string]*taskingAssignment), handoffs: make(map[string]time.Time), now: time.Now, intn: rand.Intn}
+	return &taskingBoard{targets: targets, flights: make(map[string]*taskingAssignment), handoffs: make(map[string]jtacHandoff), now: time.Now, intn: rand.Intn}
 }
 
 // commandTasking is the board for the running theatre, built on first use
@@ -168,13 +185,24 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 		// target and passes the 9-line, IP included (operator, 2026-10-14 -
 		// the real flow). A flight coming back for more gets a fresh draw
 		// at its next check-in.
-		if b.jtac != nil {
-			if cur != nil {
-				cur.redraw = true
+		if len(b.jtacs) > 0 {
+			n := b.chooseJTAC(key, now)
+			if jb := n.workBoard(b); jb == b {
+				if cur != nil {
+					cur.redraw = true
+				}
+			} else {
+				jb.markRedraw(key)
 			}
-			b.handoffs[key] = now
+			// Moving sectors frees the target the flight held on the other net.
+			for _, o := range b.jtacs {
+				if o != n && o.board != nil {
+					o.board.release(key)
+				}
+			}
+			b.handoffs[key] = jtacHandoff{at: now, net: n}
 			return fmt.Sprintf("%s, %s, contact %s on %s for tasking.", callsign, channelName,
-				b.jtac.Spoken, formatFreqMHz(b.jtac.FreqMHz))
+				n.Spoken, formatFreqMHz(n.FreqMHz))
 		}
 		// Asking again before the readback repeats the same tasking; asking
 		// after it means the flight is done and wants the next target.
@@ -187,10 +215,10 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 		return fmt.Sprintf("%s, %s, proceed to IP %s, target %d, %s.", callsign, channelName, t.IP, t.Number, t.Name)
 	}
 
-	if b.jtac != nil {
-		if at, ok := b.handoffs[key]; ok && now.Sub(at) <= taskingAckWindow && isTaskingAck(lower) {
+	if len(b.jtacs) > 0 {
+		if h, ok := b.handoffs[key]; ok && now.Sub(h.at) <= taskingAckWindow && isTaskingAck(lower) {
 			delete(b.handoffs, key)
-			return fmt.Sprintf("%s, %s, switch %s, good hunting.", callsign, channelName, b.jtac.Spoken)
+			return fmt.Sprintf("%s, %s, switch %s, good hunting.", callsign, channelName, h.net.Spoken)
 		}
 		return ""
 	}
@@ -208,22 +236,7 @@ func (b *taskingBoard) Response(text, callsign, channelName string) string {
 // and the one this flight has just worked. With nothing else free it falls
 // back to the flight's own last target, then to any target at all.
 func (b *taskingBoard) pick(key string, now time.Time) int {
-	held := make(map[int]bool)
-	for k, a := range b.flights {
-		if k != key && now.Sub(a.issued) < taskingHoldTime {
-			held[a.target] = true
-		}
-	}
-	last := -1
-	if a := b.flights[key]; a != nil {
-		last = a.target
-	}
-	var free []int
-	for i := range b.targets {
-		if !held[i] && i != last {
-			free = append(free, i)
-		}
-	}
+	free, last, held := b.free(key, now)
 	switch {
 	case len(free) > 0:
 		return free[b.intn(len(free))]
@@ -231,4 +244,87 @@ func (b *taskingBoard) pick(key string, now time.Time) int {
 		return last
 	}
 	return b.intn(len(b.targets))
+}
+
+// free lists the targets no other flight holds, less the one this flight has
+// just worked (last, -1 for none). Caller holds b.mu.
+func (b *taskingBoard) free(key string, now time.Time) (free []int, last int, held map[int]bool) {
+	held = make(map[int]bool)
+	for k, a := range b.flights {
+		if k != key && now.Sub(a.issued) < taskingHoldTime {
+			held[a.target] = true
+		}
+	}
+	last = -1
+	if a := b.flights[key]; a != nil {
+		last = a.target
+	}
+	for i := range b.targets {
+		if !held[i] && i != last {
+			free = append(free, i)
+		}
+	}
+	return free, last, held
+}
+
+// chooseJTAC picks the JTAC Command sends a flight to. With one sector per
+// JTAC: one with a free target the flight has not just been working, so a
+// flight coming back for more changes sector; then any with a free target;
+// then any. Caller holds b.mu; takes each JTAC board's lock in turn.
+func (b *taskingBoard) chooseJTAC(key string, now time.Time) *jtacNet {
+	if len(b.jtacs) == 1 {
+		return b.jtacs[0]
+	}
+	var fresh, open []*jtacNet
+	for _, n := range b.jtacs {
+		jb := n.workBoard(b)
+		if jb != b {
+			jb.mu.Lock()
+		}
+		free, _, _ := jb.free(key, now)
+		_, worked := jb.flights[key]
+		if jb != b {
+			jb.mu.Unlock()
+		}
+		if len(free) > 0 {
+			open = append(open, n)
+			if !worked {
+				fresh = append(fresh, n)
+			}
+		}
+	}
+	for _, c := range [][]*jtacNet{fresh, open, b.jtacs} {
+		if len(c) > 0 {
+			return c[b.intn(len(c))]
+		}
+	}
+	return b.jtacs[0]
+}
+
+// markRedraw: the flight asked Command for more, so its next check-in on this
+// board draws a new target.
+func (b *taskingBoard) markRedraw(key string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if cur := b.flights[key]; cur != nil {
+		cur.redraw = true
+	}
+}
+
+// release drops the flight from this board, freeing its target.
+func (b *taskingBoard) release(key string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.flights, key)
+}
+
+// sectorTargets is the part of the range one JTAC runs.
+func sectorTargets(all []taskingTarget, sector string) []taskingTarget {
+	var out []taskingTarget
+	for _, t := range all {
+		if strings.EqualFold(t.Sector, sector) {
+			out = append(out, t)
+		}
+	}
+	return out
 }

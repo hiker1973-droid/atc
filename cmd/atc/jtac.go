@@ -14,7 +14,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// JTAC: Hitman 1-1 on 61.000 FM. Command hands a flight asking for tasking to
+// JTAC: Hitman 1-1 on 61.000 FM, and Hitman 2-1 on 62.000 FM when
+// --jtac2-freq is set (one range_north sector each). Command hands a flight asking for tasking to
 // the JTAC (command_tasking.go); the JTAC draws one of the 9-line cards at
 // random, passes it (IP included, as in the real flow), hears
 // the run called and clears it hot - or waves it off - from the Tacview
@@ -68,7 +69,9 @@ const (
 	jtacWatchStopNm   = 1.5  // inside this the run is over either way
 	jtacReleaseRadius = 1.5  // a weapon first seen this close to the jet is its release
 	jtacContactMaxAge = 30 * time.Second
-	jtacWhisperPrompt = "Hitman 1-1, Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, Falcon, Granite, Hammer, Indigo, Javelin"
+	// jtacWhisperCalls: the net's calls, between its callsign and its IP
+	// names in jtacWhisperPrompt.
+	jtacWhisperCalls = "Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -448,7 +451,8 @@ func displayCallsign(key string) string {
 // jtacCallsign trims what the generic extractor leaves after a JTAC call's
 // callsign: "Raider 11 in from the north" -> "Raider 11".
 func jtacCallsign(text string) string {
-	cs := extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11", "hitman")
+	cs := extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
+		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21", "hitman")
 	lower := strings.ToLower(cs)
 	cut := len(cs)
 	for _, v := range []string{" in ", " ip", " off", " abort", " at ", " rolling", " tally", " visual", " good "} {
@@ -482,34 +486,83 @@ func inWindow(hdg, low, high, slack float64) bool {
 	return hdg >= low || hdg <= high
 }
 
-// startJTAC runs the JTAC net beside Command, in the same process so both work
-// one tasking board: Command assigns the target, the JTAC works it. store may
-// be nil (no Tacview), which leaves the JTAC without its checks.
-func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions) {
+// jtacConfig is one JTAC net as the flags describe it.
+type jtacConfig struct {
+	FreqMHz float64
+	Name    string // SRS client name, "Hitman-1-1"
+	Spoken  string // "Hitman one one"
+	Sector  string // with two JTACs, the range_north sector this one runs
+	Voice   voiceProfile
+}
+
+// jtacConfigs: Hitman 1-1 (--jtac-freq), plus Hitman 2-1 when --jtac2-freq is set.
+func jtacConfigs() []jtacConfig {
+	cfgs := []jtacConfig{{FreqMHz: flagJTACFreq, Name: flagJTACName, Spoken: flagJTACSpoken, Sector: flagJTACSector, Voice: jtacVoice()}}
+	if flagJTAC2Freq > 0 {
+		cfgs = append(cfgs, jtacConfig{FreqMHz: flagJTAC2Freq, Name: flagJTAC2Name, Spoken: flagJTAC2Spoken, Sector: flagJTAC2Sector, Voice: jtac2Voice()})
+	}
+	return cfgs
+}
+
+// startJTACs runs the JTAC nets beside Command, in the same process so they
+// share the tasking: Command hands the flight over, the JTAC works it. One
+// JTAC works Command's board, the whole range; with two, each gets its own
+// board of its sector's targets and Command picks between them
+// (taskingBoard.chooseJTAC). store may be nil (no Tacview), which leaves the
+// JTACs without their checks.
+func startJTACs(ctx context.Context, apiKey string, store *tacviewPositions) {
 	board := commandTaskingBoard()
-	board.jtac = &jtacNet{Spoken: flagJTACSpoken, FreqMHz: flagJTACFreq}
+	cfgs := jtacConfigs()
+	for _, c := range cfgs {
+		n := &jtacNet{Spoken: c.Spoken, FreqMHz: c.FreqMHz}
+		if len(cfgs) > 1 {
+			ts := sectorTargets(board.targets, c.Sector)
+			if len(ts) == 0 {
+				log.Warn().Str("jtac", c.Name).Str("sector", c.Sector).Msg("JTAC sector has no targets on this map - giving it the whole range")
+				ts = board.targets
+			}
+			n.board = newTaskingBoard(ts)
+		}
+		board.jtacs = append(board.jtacs, n)
+		startJTAC(ctx, apiKey, store, c, n.workBoard(board))
+	}
+}
+
+// startJTAC runs one JTAC net working board.
+func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jtacConfig, board *taskingBoard) {
 	pic := tacviewJTAC{store: store}
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 	tx := func(text string) {
-		mp3, err := synthesizeSpeech(ctx, apiKey, text, jtacVoice())
+		mp3, err := synthesizeSpeech(ctx, apiKey, text, c.Voice)
 		if err != nil {
-			log.Error().Err(err).Msg("JTAC TTS failed")
+			log.Error().Err(err).Str("jtac", c.Name).Msg("JTAC TTS failed")
 			return
 		}
 		broadcastLog("tx", fmt.Sprintf("JTAC TX → %q", text))
 		// Same message as a reply so the tail shows the watch's BDA and aborts;
 		// before 2026-10-15 they went to the dashboard only.
-		log.Info().Str("text", text).Float64("freq", flagJTACFreq).Msg("Command TX")
-		noteOwnTX(flagJTACFreq, text)
-		transmitExternalAudioFile(ctx, mp3, flagJTACFreq, flagJTACName, srsHost, srsPort, flagExternalAudio)
+		log.Info().Str("text", text).Float64("freq", c.FreqMHz).Msg("Command TX")
+		noteOwnTX(c.FreqMHz, text)
+		transmitExternalAudioFile(ctx, mp3, c.FreqMHz, c.Name, srsHost, srsPort, flagExternalAudio)
 	}
-	go voiceNetLoop(ctx, flagSRSAddr, flagJTACFreq, flagJTACName, apiKey, flagEAMPassword, jtacVoice(), flagExternalAudio,
-		jtacWhisperPrompt, nil, func(text string) (string, string) {
+	go voiceNetLoop(ctx, flagSRSAddr, c.FreqMHz, c.Name, apiKey, flagEAMPassword, c.Voice, flagExternalAudio,
+		jtacWhisperPrompt(c.Name, board.targets), nil, func(text string) (string, string) {
 			cs := jtacCallsign(text)
-			return cs, board.JTACResponse(text, cs, flagJTACSpoken, pic)
+			return cs, board.JTACResponse(text, cs, c.Spoken, pic)
 		})
-	go runJTACWatch(ctx, board, flagJTACSpoken, pic, tx)
-	log.Info().Float64("freq", flagJTACFreq).Str("name", flagJTACName).Bool("tacview", store != nil).Msg("JTAC net starting")
+	go runJTACWatch(ctx, board, c.Spoken, pic, tx)
+	log.Info().Float64("freq", c.FreqMHz).Str("name", c.Name).Str("sector", c.Sector).Int("targets", len(board.targets)).
+		Bool("tacview", store != nil).Msg("JTAC net starting")
+}
+
+// jtacWhisperPrompt biases Whisper towards the net's calls: its own callsign
+// as pilots write it ("Hitman-2-1" -> "Hitman 2-1") and its IP names.
+func jtacWhisperPrompt(srsName string, targets []taskingTarget) string {
+	ips := make([]string, len(targets))
+	for i, t := range targets {
+		ips[i] = t.IP
+	}
+	return strings.Replace(srsName, "-", " ", 1) + ", " + jtacWhisperCalls + ", " + strings.Join(ips, ", ")
 }
 
 // bdaDue returns the flight's BDA once its weapons are down and have settled,
@@ -543,4 +596,12 @@ func (b *taskingBoard) bdaDue(key string, cur *taskingAssignment, name string, p
 func jtacVoice() voiceProfile {
 	return voiceProfile{voice: flagJTACVoice, speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC,
 		eleven: elHard(flagElevenJTACVoice, "Hitman", 1.0)}
+}
+
+// jtac2Voice is Hitman 2-1's: the read the operator picked it on (round 18,
+// Command's settings), an American OpenAI fallback.
+func jtac2Voice() voiceProfile {
+	ev := elCommand(flagElevenJTAC2Voice)
+	ev.Name = "Hitman 2-1"
+	return voiceProfile{voice: flagJTAC2Voice, speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC2, eleven: ev}
 }

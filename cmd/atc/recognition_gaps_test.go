@@ -27,7 +27,7 @@ func TestTaskingHeardAsTaxiing(t *testing.T) {
 	if !isTaskingRequest("command, raider 302, request taxiing") {
 		t.Error(`"request taxiing" is not taken as a tasking request`)
 	}
-	if !strings.Contains(jtacWhisperPrompt, "request tasking") {
+	if !strings.Contains(jtacWhisperCalls, "request tasking") {
 		t.Error("Hitman's Whisper prompt lacks \"request tasking\"")
 	}
 }
