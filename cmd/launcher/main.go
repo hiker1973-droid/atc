@@ -133,6 +133,8 @@ func main() {
 	mux.HandleFunc("/api/log-stream", handleLogStream)
 	mux.HandleFunc("/api/elevenlabs-usage", handleElevenUsage)
 	mux.HandleFunc("/api/elevenlabs-fleet", handleElevenFleet)
+	mux.HandleFunc("/api/comms-report", handleCommsReport)
+	mux.HandleFunc("/api/comms-fleet", handleCommsFleet)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(handleStart))

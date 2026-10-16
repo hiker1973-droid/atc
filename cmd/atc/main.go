@@ -141,6 +141,7 @@ var (
 	flagUnknownTraffic      bool
 	flagRunwayVacateChase   bool
 	flagDepartureCall       bool
+	flagTrafficAlerts       bool
 )
 
 func main() {
@@ -330,6 +331,8 @@ func main() {
 		"Tower asks a landed aircraft to \"report clear of the runway\" when it has sat on the field below 40 kt for 90 s after its landing clearance without calling vacated. Once per landing. Off by default.")
 	f.BoolVar(&flagDepartureCall, "departure-handoff-call", true,
 		"Tower calls a departure itself at the field's departure distance (7 nm): \"<callsign>, Senaki Departure, seven miles, angels five, leaving my airspace, contact Command ...\". A pilot \"seven DME\" report after that gets \"copy\". --departure-handoff-call=false = the pilot's report only.")
+	f.BoolVar(&flagTrafficAlerts, "traffic-alerts", true,
+		"Tower warns two airborne aircraft within 10 nm of the field that are converging to a close pass (inside 0.25 nm and 500 ft within 30 s, 80+ kt closure, headings 45+ degrees apart): \"traffic alert, two o'clock, one mile, same altitude\". Formations and rejoins stay quiet. Each alert also goes to the comms report. --traffic-alerts=false turns them off.")
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -490,6 +493,14 @@ func run(cmd *cobra.Command, args []string) error {
 		atcCtrl.SetDepartureCalls(true, departureSignOff(flagAirfield))
 		log.Info().Msg("departure handoff call enabled - tower calls departures at the departure distance")
 	}
+	// Towers only: Marshal and Deckboss run this controller's monitor too.
+	towerMode := !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly &&
+		(flagDeckbossFreq == "0" || flagDeckbossFreq == "")
+	if flagTrafficAlerts && towerMode {
+		atcCtrl.SetTrafficAlerts(true)
+		log.Info().Msg("traffic alerts enabled - tower warns aircraft converging near the field")
+	}
+	atcCtrl.SetReportFn(func(ev controller.CommsEvent) { recordCommsEvent(callsign, ev) })
 	// Seed weather. Priority: explicit --miz-path > newest .miz in --miz-dir >
 	// --static-* flags. .miz wind is true degrees (controller applies MagVar
 	// internally). IsNight always comes from --static-night until Tacview's
@@ -1439,7 +1450,7 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 							log.Info().Str("origin", origin).Int("frames", len(frames)).Msg("flushing transmission to Whisper")
 							delete(transmissions, origin)
 							txMu.Unlock()
-							go transcribeAndHandle(ctx, apiKey, flagFFmpeg, frames, callsign, atcCtrl)
+							go transcribeAndHandle(ctx, apiKey, flagFFmpeg, frames, callsign, origin, atcCtrl)
 							txMu.Lock()
 						}
 					}
@@ -1673,7 +1684,7 @@ func buildSync(guid, callsign string, freqHz float64) []byte {
 }
 
 // transcribeAndHandle wraps Opus frames in OGG, sends to Whisper, then routes to ATC.
-func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames [][]byte, callsign string, atcCtrl *controller.ATCController) {
+func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames [][]byte, callsign, origin string, atcCtrl *controller.ATCController) {
 	log.Info().Int("frames", len(frames)).Msg("converting and sending to Whisper")
 	ogg := wrapOpusInOGG(frames)
 	log.Debug().Int("oggBytes", len(ogg)).Msg("OGG container built")
@@ -1711,6 +1722,7 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 		log.Info().Str("text", text).Str("tower", callsign).Msg("not addressed to this tower — ignored")
 		return
 	}
+	req.Origin = origin
 	log.Info().Str("callsign", req.Callsign).Int("type", int(req.Type)).Msg("ATC request")
 	atcCtrl.HandleRequest(ctx, req)
 }

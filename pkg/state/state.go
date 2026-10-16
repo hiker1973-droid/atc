@@ -1301,3 +1301,56 @@ func filterQueue(q []*AircraftState, callsign string) []*AircraftState {
 	}
 	return out
 }
+
+// Rename moves the aircraft tracked as from to the callsign to, keeping its
+// place in both queues. Used when one radio called in under two callsigns
+// (Whisper heard "Veta 201" for "Venom 201", Senaki 2026-10-15): one jet, so
+// one entry. If to is already tracked, from is dropped instead. Returns false
+// when from is not tracked.
+func (s *AirfieldState) Rename(from, to string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ac, ok := s.tracked[from]
+	if !ok || from == to {
+		return false
+	}
+	delete(s.tracked, from)
+	if _, exists := s.tracked[to]; exists {
+		s.LandingQueue = filterQueue(s.LandingQueue, from)
+		s.DepartureQueue = filterQueue(s.DepartureQueue, from)
+		for i, q := range s.LandingQueue {
+			q.SequenceNumber = i + 1
+		}
+		return true
+	}
+	ac.Callsign = to
+	s.tracked[to] = ac
+	return true
+}
+
+// NextReadyDeparture is the first queued departure that has called holding
+// short and is not yet cleared: the one the tower releases next. A jet still
+// taxiing does not hold up one that is waiting at the runway - the queue
+// head that blocked Venom 201 at Senaki (2026-10-15 18:36) had only been
+// cleared to taxi.
+func (s *AirfieldState) NextReadyDeparture() *AircraftState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, ac := range s.DepartureQueue {
+		if ac.HoldingShort && !ac.TakeoffCleared {
+			return ac
+		}
+	}
+	return nil
+}
+
+// TrackedCallsigns lists every callsign the tower is tracking.
+func (s *AirfieldState) TrackedCallsigns() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.tracked))
+	for cs := range s.tracked {
+		out = append(out, cs)
+	}
+	return out
+}

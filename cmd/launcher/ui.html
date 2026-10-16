@@ -165,6 +165,15 @@
   .el-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.72rem; color: var(--label); }
   .el-chip b { color: var(--text); font-weight: 600; }
   .el-chip.bad { border-color: var(--red); color: var(--red); }
+  .cr-list { max-height: 18rem; overflow-y: auto; margin-top: 0.5rem; border-top: 1px solid var(--border); }
+  .cr-row { display: grid; grid-template-columns: 4.2rem 9.5rem 1fr; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--label); }
+  .cr-row b { color: var(--text); font-weight: 600; }
+  .cr-row .cr-said { color: var(--muted); font-style: italic; }
+  .cr-kind { border-radius: 4px; padding: 0 0.35rem; border: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: start; }
+  .cr-kind.safety { border-color: var(--red); color: var(--red); }
+  .cr-kind.discipline { border-color: var(--amber, #d9a400); color: var(--amber, #d9a400); }
+  .cr-hours { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 0.72rem; margin-left: 0.5rem; }
+  @media (max-width: 640px) { .cr-row { grid-template-columns: 1fr; gap: 0.1rem; } }
   .pill-state { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 500; }
   .pill-state.cleared    { background: rgba(63,185,80,0.15);  color: var(--green);  border: 1px solid var(--green-dim); }
   .pill-state.luaw       { background: rgba(240,136,62,0.20); color: var(--orange); border: 1px solid var(--orange); }
@@ -335,6 +344,17 @@
     <div class="panel">
       <h3>ElevenLabs Credits — all rigs <span class="sub" id="elSub">—</span></h3>
       <div id="elBody"><div class="empty">No usage recorded yet.</div></div>
+    </div>
+  </section>
+
+  <!-- Comms report, fleet-wide: near misses and comms discipline -->
+  <section class="row-departures">
+    <div class="panel">
+      <h3>Comms Report — all rigs <span class="sub" id="crSub">—</span>
+        <select class="cr-hours" id="crHours" onchange="refreshComms()" title="How far back">
+          <option value="3">3 h</option><option value="24" selected>24 h</option><option value="72">3 days</option><option value="168">7 days</option>
+        </select></h3>
+      <div id="crBody"><div class="empty">Nothing reported yet.</div></div>
     </div>
   </section>
 
@@ -1493,8 +1513,53 @@ git pull, build, then restart the running theatre (about 30 s off the air) and t
   btn.disabled = false;
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Comms report: what the towers flagged (near misses, departures / landings
+// without a clearance, calls with no callsign, callsigns that changed, calls
+// not understood). Local launcher's /api/comms-fleet, every rig merged.
+// ──────────────────────────────────────────────────────────────────────────
+const CR_KINDS = {
+  near_miss: ['Near miss', 'safety'],
+  departed_without_clearance: ['Took off, no clearance', 'safety'],
+  landed_without_clearance: ['Landed, no clearance', 'discipline'],
+  flight_only: ['No flight number', 'discipline'],
+  no_callsign: ['No callsign', 'discipline'],
+  callsign_changed: ['Callsign changed', ''],
+  not_understood: ['Not understood', ''],
+};
+async function refreshComms() {
+  const hours = ($('crHours') || {}).value || 24;
+  let r;
+  try { r = await fetch('/api/comms-fleet?hours=' + hours, { cache: 'no-store' }).then(x => x.json()); }
+  catch (e) { $('crSub').textContent = 'unavailable'; return; }
+  const total = Object.values(r.counts || {}).reduce((a, b) => a + b, 0);
+  $('crSub').textContent = `${total} event${total === 1 ? '' : 's'} · last ${hours >= 48 ? (hours / 24) + ' days' : hours + ' h'}`;
+  const order = Object.keys(CR_KINDS);
+  const chips = Object.entries(r.counts || {}).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+    .map(([k, n]) => `<span class="el-chip">${elEsc((CR_KINDS[k] || [k])[0])} <b>${n}</b></span>`).join('');
+  const rigs = (r.rigs || []).filter(x => x.err)
+    .map(x => `<span class="el-chip bad" title="${elEsc(x.err)}">${elEsc(x.label || x.rig)} ${/404/.test(x.err) ? 'needs a launcher update' : 'unreachable'}</span>`).join('');
+  const rows = (r.events || []).map(e => {
+    const [label, cls] = CR_KINDS[e.kind] || [e.kind, ''];
+    const t = new Date(e.t);
+    const when = t.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const day = t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const who = [e.callsign, e.other].filter(Boolean).map(elEsc).join(' / ');
+    return `<div class="cr-row">
+      <span title="${elEsc(t.toString())}">${day}<br>${when}</span>
+      <span class="cr-kind ${cls}" title="${elEsc(label)}">${elEsc(label)}</span>
+      <span>${who ? `<b>${who}</b> · ` : ''}${elEsc(e.tower || e.airfield || '')}${e.rig ? ' · ' + elEsc(e.rig) : ''}<br>${elEsc(e.detail || '')}${e.text ? `<br><span class="cr-said">"${elEsc(e.text)}"</span>` : ''}</span>
+    </div>`;
+  }).join('');
+  $('crBody').innerHTML = (chips || rigs ? `<div class="el-chips">${chips}${rigs}</div>` : '') +
+    (rows ? `<div class="cr-list">${rows}</div>` : '<div class="empty">Nothing reported in this window.</div>') +
+    `<div class="el-line" style="color:var(--muted);margin-top:0.4rem">Red = safety (also spoken when there was traffic). The rest are for debriefs and for finding SkyEye's own recognition faults, and are not said on the radio.</div>`;
+}
+
 // Boot
 refreshEleven();
+refreshComms();
+setInterval(refreshComms, 60000);
 setInterval(refreshEleven, 60000);
 updateRegionButtons();
 loadIdentity();

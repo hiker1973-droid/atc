@@ -116,6 +116,9 @@ type ATCRequest struct {
 	// none was given. Used by the inbound flow to choose between a far-out
 	// "continue inbound" reply and a pattern-entry field-info reply.
 	DistanceNm int
+	// Origin is the SRS client the call came from ("" when unknown). One
+	// radio is one aircraft (safety.go reconcileOrigin).
+	Origin string
 }
 
 // ── Controller ────────────────────────────────────────────────────────────────
@@ -216,6 +219,12 @@ type ATCController struct {
 	// departureTransmitFn speaks as "<field> Departure" in its own voice;
 	// nil = the tower's transmitFn.
 	departureTransmitFn func(ctx context.Context, text string)
+
+	// Comms report and traffic alerts (safety.go); guarded by mu.
+	reportFn        func(CommsEvent)
+	originCallsigns map[string]originSeen
+	trafficAlerts   bool
+	trafficAlertAt  map[string]time.Time
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -445,15 +454,25 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	// ", Senaki Tower, runway zero niner is clear, welcome back" (DCS3
 	// 2026-10-15 16:03:14), and an empty name also files the call under a
 	// blank aircraft, so a departure's "clear active" read as a landing.
-	if strings.TrimSpace(req.Callsign) == "" {
-		log.Info().Str("text", req.Raw).Int("type", int(req.Type)).Msg("no callsign in call - not answered")
-		return
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if strings.TrimSpace(req.Callsign) == "" {
+		log.Info().Str("text", req.Raw).Int("type", int(req.Type)).Msg("no callsign in call - not answered")
+		if c.resolveNoCallsign(ctx, req) {
+			return
+		}
+	}
+	c.reconcileOrigin(req)
 
 	s := c.airfieldState
+	wasTracked := s.Get(req.Callsign) != nil
 	ac := s.GetOrCreate(req.Callsign)
+	// Taken before the switch: the airborne cases remove the aircraft.
+	jet := &departingJet{callsign: req.Callsign, raw: req.Raw,
+		queued:       s.DeparturePosition(req.Callsign) > 0 || ac.HoldingShort,
+		holdingShort: ac.HoldingShort,
+		cleared:      ac.TakeoffCleared || ac.Phase == state.PhaseClearedTakeoff}
+	var extra string // a safety call spoken before the reply
 	ac.LastContact = time.Now()
 	if req.Airframe != "" {
 		ac.Airframe = req.Airframe
@@ -578,6 +597,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		// (operator 2026-10-15, last night's logs). From a departure it is the
 		// airborne call and gets the departure release, not "roger, clear".
 		if c.isDepartureCall(ac) {
+			extra = c.departedWithoutClearance(jet)
 			c.watchDeparture(req.Callsign)
 			s.Remove(req.Callsign)
 			response = c.composer.DepartureRelease(
@@ -586,6 +606,14 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 				s.Airfield.DepartureAngels,
 			)
 			break
+		}
+		if ac.LandingClearedAt.IsZero() {
+			why := "never called the tower before landing"
+			if wasTracked {
+				why = "was in the pattern but never cleared to land (no base or final call)"
+			}
+			c.report(CommsEvent{Kind: EventLandedNoClear, Callsign: req.Callsign,
+				Detail: "called clear of the runway without a landing clearance: " + why, Text: req.Raw})
 		}
 		s.Remove(req.Callsign)
 		response = c.composer.RunwayVacated(req.Callsign, s.ActiveRunway)
@@ -619,6 +647,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	case RequestClearTraffic:
 		// Pilot called clear of traffic (CTAF departure) — issue departure release and remove from tracking.
+		extra = c.departedWithoutClearance(jet)
 		c.watchDeparture(req.Callsign)
 		s.Remove(req.Callsign)
 		response = c.composer.DepartureRelease(
@@ -719,9 +748,14 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 
 	default:
 		c.recordIntentMiss(req.Callsign, req.Raw)
+		c.report(CommsEvent{Kind: EventNotUnderstood, Callsign: req.Callsign,
+			Detail: "call not understood - asked to say again", Text: req.Raw})
 		response = c.composer.UnableToUnderstand(req.Callsign)
 	}
 
+	if extra != "" {
+		c.transmitTo(ctx, req.Callsign, extra)
+	}
 	if response != "" {
 		c.transmitTo(ctx, req.Callsign, response)
 	}
@@ -935,12 +969,15 @@ func (c *ATCController) scheduleAutoRelease(ctx context.Context, callsign string
 		log.Info().Str("callsign", callsign).Int("inbounds", len(inbounds)).Msg("auto-release skipped — inbound traffic within hold-short radius")
 		return
 	}
-	if next := s.NextDeparture(); next == nil || next.Callsign != callsign {
+	// The first jet waiting at the runway goes, not the queue head: a head
+	// that was only cleared to taxi (or a phantom from a misheard callsign)
+	// held Venom 201 at Senaki until it left without a clearance (2026-10-15).
+	if next := s.NextReadyDeparture(); next == nil || next.Callsign != callsign {
 		queueHead := "<nil>"
 		if next != nil {
 			queueHead = next.Callsign
 		}
-		log.Info().Str("callsign", callsign).Str("queueHead", queueHead).Msg("auto-release skipped — not at departure-queue head")
+		log.Info().Str("callsign", callsign).Str("queueHead", queueHead).Msg("auto-release skipped — not first ready at the runway")
 		return
 	}
 	ac.TakeoffCleared = true
@@ -1100,7 +1137,7 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 	if s.DepartureQueueLen() > 0 && s.TimeSinceLastDeparture() >= DepartureSpacingSec {
 		inboundsNear := s.InboundsWithinNm(HoldShortRadiusNm)
 		if len(inboundsNear) == 0 {
-			next := s.NextDeparture()
+			next := s.NextReadyDeparture()
 			if next != nil && c.positionCheck && !c.isPilotAtHoldShort(next.Callsign, s.ActiveRunway) {
 				// Skip: position-check gate says queue head isn't at hold-short.
 				next = nil
@@ -1142,6 +1179,9 @@ func (c *ATCController) checkConflicts(ctx context.Context) {
 	}
 	if c.departureCalls {
 		c.checkDepartures(ctx)
+	}
+	if c.trafficAlerts {
+		c.checkTrafficAlerts(ctx)
 	}
 }
 
