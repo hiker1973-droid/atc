@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"sync"
@@ -68,10 +69,14 @@ func rangeAreasForMap(mapName string) []rangeArea {
 const rangeAreaHold = 45 * time.Minute
 
 var (
-	// rangeAreaMoveRe: the pilot is on his way somewhere.
-	rangeAreaMoveRe = regexp.MustCompile(`\b(proceed|proceeding|heading|en ?route|enroute|inbound|going|moving|pushing|tracking|vectoring|on the way|working|setting up)\b`)
-	// rangeAreaWordRe: a phonetic letter after "to", "for", "area" etc.
-	rangeAreaWordRe = regexp.MustCompile(`\b(?:to|for|towards?|area|target|range|inbound|working)\s+(?:the\s+)?(?:target\s+area\s+|area\s+|target\s+|range\s+)?(alpha|alfa|bravo|charlie|delta|echo|foxtrot|golf|hotel|india|juliet|juliett|kilo|lima|mike|november|oscar)\b`)
+	// rangeAreaMoveRe: the pilot says he is on his way ("proceeding to
+	// Alpha", "pushing Alpha", "entering area Bravo").
+	rangeAreaMoveRe = regexp.MustCompile(`\b(proceeding|heading|en ?route|enroute|inbound|going|moving|pushing|entering|tracking|vectoring|on the way|working|setting up|rolling)\b`)
+	// rangeAreaWordRe: a phonetic letter anywhere in the call. Pilots ask for
+	// an area every way there is ("request Alpha", "request to work Alpha",
+	// "request clearance into Alpha", "permission to proceed Alpha"), so the
+	// word alone names it; the call still needs a move or an ask word.
+	rangeAreaWordRe = regexp.MustCompile(`\b(alpha|alfa|bravo|charlie|delta|echo|foxtrot|golf|hotel|india|juliet|juliett|kilo|lima|mike|november|oscar)\b`)
 	// rangeAreaLetterRe: a bare letter only after "area", "target" or "range".
 	rangeAreaLetterRe = regexp.MustCompile(`\b(?:area|target|range)\s+([a-o])\b`)
 	// rangeAreaOffRe: done with an area ("off Alpha", "off target", "egressing area Bravo").
@@ -113,6 +118,7 @@ type rangeAreaBoard struct {
 	pending    map[string]*overlordRequest
 	after      func(time.Duration, func()) // time.AfterFunc; tests run it by hand
 	overlordTX func(text string)           // speaks as Overlord Actual; nil = no Overlord
+	intn       func(int) int               // picks Overlord's wording; nil = the first
 }
 
 type rangeWork struct {
@@ -127,6 +133,7 @@ type overlordRequest struct {
 	callsign string // as the pilot said it
 	at       time.Time
 	spoken   bool // Overlord has answered; the copy is now awaited
+	wording  overlordWording
 }
 
 const (
@@ -136,8 +143,24 @@ const (
 	overlordCopyWindow = 5 * time.Minute
 )
 
-// rangeAreaPermissionRe: the pilot asks, rather than tells.
-var rangeAreaPermissionRe = regexp.MustCompile(`\b(permission|request(?:ing)?\s+(?:to\s+)?(?:proceed|push|go)|request(?:ing)?\s+clearance|clearance\s+to|cleared\s+to\s+proceed)\b`)
+// overlordWording is one way Overlord says yes or no, and how Command's brief
+// then opens. Operator 2026-10-16: "you are cleared to engage" as well as
+// Irene, alternating.
+type overlordWording struct {
+	Yes  string // %s = the area
+	No   string
+	Lead string // after "<callsign>, Command, "
+}
+
+var overlordWordings = []overlordWording{
+	{Yes: "you are Irene for %s", No: "negative Irene", Lead: "copy Irene. "},
+	{Yes: "you are cleared to engage %s", No: "negative, not cleared to engage", Lead: "copy, cleared to engage. "},
+}
+
+// rangeAreaPermissionRe: the pilot asks, rather than tells - "request
+// Alpha", "permission to push Alpha", "can we proceed to Alpha?", "are we
+// cleared to Alpha?".
+var rangeAreaPermissionRe = regexp.MustCompile(`\b(permission|request(?:ing)?|clearance|cleared|can (?:we|i)|may (?:we|i))\b`)
 
 var (
 	commandRangeAreas     *rangeAreaBoard
@@ -149,7 +172,8 @@ func commandRangeAreaBoard() *rangeAreaBoard {
 		commandRangeAreas = &rangeAreaBoard{areas: rangeAreasForMap(flagMap), working: make(map[string]rangeWork), now: time.Now,
 			toJTAC:  func(key string, numbers []int) *jtacNet { return commandTaskingBoard().handOffTarget(key, numbers) },
 			pending: make(map[string]*overlordRequest),
-			after:   func(d time.Duration, f func()) { time.AfterFunc(d, f) }}
+			after:   func(d time.Duration, f func()) { time.AfterFunc(d, f) },
+			intn:    rand.Intn}
 	})
 	return commandRangeAreas
 }
@@ -190,22 +214,26 @@ func (r *rangeAreaBoard) Response(text, callsign, channelName string, pic jtacPi
 	if req, ok := r.pending[key]; ok && req.spoken {
 		if now.Sub(req.at) > overlordCopyWindow {
 			delete(r.pending, key)
-		} else if isTaskingAck(lower) && rangeAreaIn(r.areas, lower) < 0 || strings.Contains(lower, "irene") {
+		} else if j := rangeAreaIn(r.areas, strings.Replace(lower, key, "", 1)); (j < 0 || j == req.area) && (isTaskingAck(lower) || strings.Contains(lower, "irene")) {
+			// "copy", "copy Irene", "copies, proceeding Alpha".
 			delete(r.pending, key)
-			return r.brief(req.area, key, callsign, say, pic, magVar, now, "copy Irene. ")
+			return r.brief(req.area, key, callsign, say, pic, magVar, now, req.wording.Lead)
 		}
 	}
 
-	if !rangeAreaMoveRe.MatchString(lower) {
+	// The callsign can hold a phonetic word ("Mike 1-1"); it names no area.
+	body := strings.Replace(lower, key, "", 1)
+	ask := rangeAreaPermissionRe.MatchString(body)
+	if !ask && !rangeAreaMoveRe.MatchString(body) {
 		return ""
 	}
-	i := rangeAreaIn(r.areas, lower)
+	i := rangeAreaIn(r.areas, body)
 	if i < 0 {
 		return ""
 	}
 
 	// Asking permission goes to Overlord Actual, when there is one.
-	if r.overlordTX != nil && r.after != nil && rangeAreaPermissionRe.MatchString(lower) {
+	if r.overlordTX != nil && r.after != nil && ask {
 		if req, ok := r.pending[key]; ok && req.area == i && !req.spoken {
 			return "" // asked again before Overlord came up
 		}
@@ -235,14 +263,18 @@ func (r *rangeAreaBoard) overlordAnswers(key string, req *overlordRequest) {
 			}
 		}
 	}
+	w := overlordWordings[0]
+	if r.intn != nil {
+		w = overlordWordings[r.intn(len(overlordWordings))%len(overlordWordings)]
+	}
 	var text string
 	if len(others) > 0 {
 		delete(r.pending, key)
-		text = fmt.Sprintf("%s, Overlord Actual, negative Irene, %s working %s. Request another area.",
-			req.callsign, strings.Join(others, " and "), a.Word)
+		text = fmt.Sprintf("%s, Overlord Actual, %s, %s working %s. Request another area.",
+			req.callsign, w.No, strings.Join(others, " and "), a.Word)
 	} else {
-		req.spoken, req.at = true, now
-		text = fmt.Sprintf("%s, Overlord Actual, you are Irene for %s, report copy.", req.callsign, a.Word)
+		req.spoken, req.at, req.wording = true, now, w
+		text = fmt.Sprintf("%s, Overlord Actual, "+w.Yes+", report copy.", req.callsign, a.Word)
 	}
 	tx := r.overlordTX
 	r.mu.Unlock()

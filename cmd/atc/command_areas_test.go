@@ -168,3 +168,112 @@ func TestRangeAreaOverlord(t *testing.T) {
 		t.Errorf("no permission asked = %q", got)
 	}
 }
+
+// The ways pilots ask for, or announce, an area (operator 2026-10-16: "lets
+// think of variations to this that people will use").
+func TestRangeAreaPhrasings(t *testing.T) {
+	ask := []string{
+		"Command, Raider 302, permission to proceed to Alpha",
+		"Command, Raider 302, request permission to proceed to Alpha",
+		"Command, Raider 302, requesting permission to proceed to target area Alpha",
+		"Command, Raider 302, permission to proceed Alpha",
+		"Command, Raider 302, request to proceed to Alpha",
+		"Command, Raider 302, request proceed Alpha",
+		"Command, Raider 302, request clearance to Alpha",
+		"Command, Raider 302, request clearance into Alpha",
+		"Command, Raider 302, requesting entry into area Alpha",
+		"Command, Raider 302, request to enter Alpha",
+		"Command, Raider 302, permission to enter range Alpha",
+		"Command, Raider 302, request to push Alpha",
+		"Command, Raider 302, permission to push to Alpha",
+		"Command, Raider 302, request to work Alpha",
+		"Command, Raider 302, request to engage Alpha",
+		"Command, Raider 302, request to attack target Alpha",
+		"Command, Raider 302, request Alpha",
+		"Command, Raider 302, requesting Alpha",
+		"Command, Raider 302, two ship, request area Alpha",
+		"Command, Raider 302, can we proceed to Alpha?",
+		"Command, Raider 302, are we cleared to Alpha?",
+		"Command, Raider 302, request clearance to the Alpha target area",
+		"Command, Raider 302, permission to proceed to area A",
+		"Command, Raider 302, permission to proceed to Alfa",
+		"Command, Raider 302, request weapons free Alpha",
+	}
+	tell := []string{
+		"Command, Raider 302, proceeding to Alpha",
+		"Command, Raider 302, pushing Alpha",
+		"Command, Raider 302, en route Alpha",
+		"Command, Raider 302, heading to the Alpha area",
+		"Command, Raider 302, inbound Alpha",
+		"Command, Raider 302, entering Alpha",
+		"Command, Raider 302, setting up for Alpha",
+	}
+	none := []string{
+		"Command, Raider 302, request tasking",
+		"Command, Raider 302, request tanker",
+		"Command, Raider 302, request bullseye",
+		"Command, Raider 302, proceeding to the tanker",
+		"Command, Raider 302, request vector to Mother",
+	}
+	run := func(call string) string {
+		r, _ := newTestAreaBoard(nil)
+		r.pending = make(map[string]*overlordRequest)
+		r.after = func(time.Duration, func()) {}
+		r.overlordTX = func(string) {}
+		return r.Response(call, "Raider 302", "Command", nil, noMagVar)
+	}
+	for _, c := range ask {
+		if got := run(c); got != "Raider 302, Command, stand by for Overlord Actual." {
+			t.Errorf("%q -> %q, want Overlord", c, got)
+		}
+	}
+	for _, c := range tell {
+		if got := run(c); !strings.HasPrefix(got, "Raider 302, Command, copy Alpha,") {
+			t.Errorf("%q -> %q, want the brief", c, got)
+		}
+	}
+	for _, c := range none {
+		if got := run(c); got != "" {
+			t.Errorf("%q -> %q, want silence", c, got)
+		}
+	}
+	// A phonetic word in the callsign names no area.
+	r, _ := newTestAreaBoard(nil)
+	if got := r.Response("Command, Mike 11, request tanker", "Mike 11", "Command", nil, noMagVar); got != "" {
+		t.Errorf("Mike 11 tanker request = %q", got)
+	}
+	// "copies, proceeding Alpha" is the copy of Irene, not a new call.
+	r.pending = make(map[string]*overlordRequest)
+	var later func()
+	r.after = func(_ time.Duration, f func()) { later = f }
+	r.overlordTX = func(string) {}
+	r.Response("Command, Raider 302, request Alpha", "Raider 302", "Command", nil, noMagVar)
+	later()
+	if got := r.Response("Command, Raider 302 copies, proceeding Alpha", "Raider 302", "Command", nil, noMagVar); !strings.HasPrefix(got, "Raider 302, Command, copy Irene. Alpha,") {
+		t.Errorf("copy with the area = %q", got)
+	}
+}
+
+// Overlord alternates "Irene" and "cleared to engage"; Command's brief follows.
+func TestOverlordWordings(t *testing.T) {
+	r, _ := newTestAreaBoard(nil)
+	r.pending = make(map[string]*overlordRequest)
+	var later []func()
+	r.after = func(_ time.Duration, f func()) { later = append(later, f) }
+	var sent []string
+	r.overlordTX = func(text string) { sent = append(sent, text) }
+	r.intn = func(int) int { return 1 }
+	r.Response("Command, Raider 302, request Bravo", "Raider 302", "Command", nil, noMagVar)
+	later[0]()
+	if sent[0] != "Raider 302, Overlord Actual, you are cleared to engage Bravo, report copy." {
+		t.Errorf("Overlord = %q", sent[0])
+	}
+	if got := r.Response("Command, Raider 302, copy cleared to engage", "Raider 302", "Command", nil, noMagVar); !strings.HasPrefix(got, "Raider 302, Command, copy, cleared to engage. Bravo, Krasnodar Pashkovsky airfield") {
+		t.Errorf("brief = %q", got)
+	}
+	r.Response("Command, Venom 21, request Bravo", "Venom 21", "Command", nil, noMagVar)
+	later[1]()
+	if sent[1] != "Venom 21, Overlord Actual, negative, not cleared to engage, Raider 302 working Bravo. Request another area." {
+		t.Errorf("negative = %q", sent[1])
+	}
+}
