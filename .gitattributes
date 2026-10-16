@@ -1,0 +1,5 @@
+# Binary documents: never line-ending converted (a CRLF checkout breaks a PDF).
+*.pdf binary
+*.png binary
+*.jpg binary
+*.mp3 binary
