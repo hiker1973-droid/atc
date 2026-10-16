@@ -41,6 +41,7 @@ type docTheatre struct {
 	Title    string       `json:"title"`
 	Command  float64      `json:"command"`
 	JTAC     float64      `json:"jtac,omitempty"`
+	JTAC2    float64      `json:"jtac2,omitempty"`
 	Deckboss float64      `json:"deckboss,omitempty"`
 	Marshal  float64      `json:"marshal,omitempty"`
 	Towers   []docStation `json:"towers"`
@@ -115,6 +116,7 @@ func currentDocFacts(t *testing.T) []docTheatre {
 		d := docTheatre{Key: th.key, Title: th.title,
 			Command:  batFreq(t, "start_command"+th.suffix+".bat", "command-freq"),
 			JTAC:     batFreq(t, "start_command"+th.suffix+".bat", "jtac-freq"),
+			JTAC2:    batFreq(t, "start_command"+th.suffix+".bat", "jtac2-freq"),
 			Deckboss: batFreq(t, "start_deckboss"+th.suffix+".bat", "deckboss-freq"),
 			Marshal:  batFreq(t, "start_marshal"+th.suffix+".bat", "marshal-freq"),
 		}
@@ -292,6 +294,31 @@ func TestDocPhrases(t *testing.T) {
 			case "tanker":
 				if isTankerRequest(lower) {
 					got = "tanker"
+				}
+			// Range areas and the run close-out (command_areas.go,
+			// commandBrevityResponse): parsed apart from commandResponse.
+			case "area", "overlord":
+				body := strings.Replace(lower, strings.ToLower(cs), "", 1)
+				if rangeAreaIn(caucasusRangeAreas, body) >= 0 {
+					switch {
+					case rangeAreaPermissionRe.MatchString(body):
+						got = "overlord"
+					case rangeAreaMoveRe.MatchString(body):
+						got = "area"
+					}
+				}
+			case "off_target":
+				if rangeAreaOffRe.MatchString(lower) || rangeAreaOffAnyRe.MatchString(lower) {
+					got = "off_target"
+				}
+			case "winchester", "bingo", "joker":
+				switch {
+				case winchesterRe.MatchString(lower):
+					got = "winchester"
+				case bingoRe.MatchString(lower):
+					got = "bingo"
+				case jokerRe.MatchString(lower):
+					got = "joker"
 				}
 			default:
 				if commandResponse(p.Say, cs, "Command") != "" {

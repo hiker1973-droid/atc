@@ -306,6 +306,78 @@
   "want": "tasking"
  },
  {
+  "role": "command",
+  "say": "Command, Raider 1-1, proceeding to Alpha.",
+  "tower": "",
+  "want": "area"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, pushing Alpha.",
+  "tower": "",
+  "want": "area"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, inbound Alpha.",
+  "tower": "",
+  "want": "area"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, request Alpha.",
+  "tower": "",
+  "want": "overlord"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, permission to proceed to Alpha.",
+  "tower": "",
+  "want": "overlord"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, request to work Alpha.",
+  "tower": "",
+  "want": "overlord"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, off target.",
+  "tower": "",
+  "want": "off_target"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, off Alpha.",
+  "tower": "",
+  "want": "off_target"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, off and egressing.",
+  "tower": "",
+  "want": "off_target"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, Winchester, RTB.",
+  "tower": "",
+  "want": "winchester"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, Bingo, RTB.",
+  "tower": "",
+  "want": "bingo"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, Joker.",
+  "tower": "",
+  "want": "joker"
+ },
+ {
   "role": "jtac",
   "say": "Hitman, Raider 1-1, checking in.",
   "tower": "",

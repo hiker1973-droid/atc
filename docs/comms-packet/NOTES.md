@@ -1,11 +1,37 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 16 OCT 2026.  v1.24.  Product = one full-screen 16:9 PDF, 22 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.24.pdf` — cover + 21 cards: How it works · Frequencies ·
-Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · **Marshal calls 1 · 2 · 3** ·
-Off the boat · Command · **Hitman 1-1 · Cleared hot?** ·
-A full sortie · **Airfield ATC · Tower radios · Syria towers · Departure · Arrival ·
-Tower calls** · No answer?
+**Built 16 OCT 2026.  v1.25.  Product = one full-screen 16:9 PDF, 24 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.25.pdf` — cover + 23 cards: How it works · Frequencies ·
+Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
+Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · **Range areas · Overlord Actual** ·
+A full sortie · Airfield ATC · Tower radios · Syria towers · Departure · Arrival ·
+Tower calls · No answer?
+
+## v1.25 (16 OCT 2026) — Hitman 2-1, BDA calls, range areas + Overlord, from origin/main `15c969b`
+
+Operator 2026-10-16: "update pdf" after the day's SkyEye work (all live on Day/Night/Foothold
+13:36, `15c969b`).
+- **Card 1:** roles list Hitman 1-1 / 2-1 (61 / 62 FM) and range areas + Overlord (cards 14 - 15).
+- **Card 11 Command:** tasking row "contact Hitman 1-1 or 2-1"; new row "proceeding to / request
+  Alpha -> cards 14 - 15".
+- **Card 12:** HITMAN 1-1 / 2-1 — 2-1 on 62.000 FM, **no kneeboard preset yet (dial it)**; one
+  sector each (Kuban Valley 1-3 / Cherkessk 4-5), Command sends you to the one with a free target.
+  Fixed a stale line: Hitman reads target, name and IP only (since 2026-10-14), not elevation /
+  headings / egress.
+- **Card 13:** BDA band = the four calls (good / partial / no effects + correction / unable ->
+  "say your observed effects").
+- **New card 14 RANGE AREAS:** the A - O table with what Command says and the real threat. Notes
+  that the kneeboard card calls E (SA-10) and G (SA-2) "soft x5" and leaves M (Moskva group) blank.
+- **New card 15 OVERLORD ACTUAL:** the ask -> stand by -> ~10 s Overlord "Irene / cleared to
+  engage" -> copy -> brief -> off target -> Winchester RTB flow, plus the other phrasings.
+- Cards 14 - 21 of v1.24 are now 16 - 23 (`TOWER_CARDS` = cards 17 - 22). Build stamp 15c969b.
+- **Phraseology Reference v2.3:** new section 5 "Range Areas and Overlord Actual" (6 rows,
+  dialogue, callout), Hitman now section 6 "Hitman 1-1 / 2-1" with sectors and the four BDA
+  calls, Hitman 2-1 in the frequency map (facts.json `jtac2`), Deckboss/Marshal/Tips renumbered
+  7-9. `TestDocPhrases` now checks the new Command wants (area, overlord, off_target, winchester,
+  bingo, joker); `TestDocFacts` reads `--jtac2-freq`.
+- Post gate: already met (all rigs on 15c969b at build time). Open: a kneeboard preset for 62.000
+  and the kneeboard threat labels for E / G / M (training builder `targetcard.py`).
 
 ## v1.24 (16 OCT 2026) — Hitman on the training V1.25 north range, from origin/main `74c6260`
 

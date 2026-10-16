@@ -33,6 +33,12 @@ the training V1.25 9-line range north of the ridge (cards 12 - 13: Valley Road B
 checkpoint, Kuban no-strike road bridge) and IP inbound accepted within 20 nm (jtac.go
 jtacIPInboundNm, 2026-10-15), with "run in heading NNN" when you call it off the line.
 
+v1.25 (user asked 2026-10-16 "update pdf") follows origin/main 15c969b: Hitman 2-1 on 62.000
+FM (one sector per JTAC), the four BDA calls (card 13), and two new cards after Hitman -
+14 RANGE AREAS (Command's "proceeding to Alpha" replies, A - O with the real threats) and
+15 OVERLORD ACTUAL (permission flow, Irene / cleared to engage, off target, Winchester /
+Bingo / Joker). Cards 14 - 21 of v1.24 are now 16 - 23.
+
 Every call and reply below was read out of the SkyeyeATC code on origin/main —
 cmd/atc/{command,deckboss,marshal,command_handoff}.go, pkg/composer/composer.go,
 pkg/state/state.go — and the start_*.bat files. The *_responses.md docs were used as a map
@@ -68,7 +74,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.24"
+VER = "v1.25"
 DATE = "16 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -85,12 +91,14 @@ H_MSH = {"PERSIAN GULF": "COMM 1 CH 3", "SYRIA": "COMM 1 CH 3", "BLACK SEA": "CO
 V_CMD = "COMM 1 CH 1"
 # JTAC (cmd/atc/jtac.go, --jtac-freq in start_command_caucasus.bat); Caucasus Training V1.23 presets
 JTAC_F, H_JTAC, V_JTAC = "61.000", "COMM 2 CH 12", "COMM 2 CH 8"
+# Hitman 2-1 (--jtac2-freq, 2026-10-16): no kneeboard preset yet - dial it.
+JTAC2_F = "62.000"
 
-TOTAL = 21
+TOTAL = 23
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
 FACTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                                     "phraseology", "facts.json"), encoding="utf-8"))
-TOWER_CARDS = "cards 15 - 20"
+TOWER_CARDS = "cards 17 - 22"
 
 
 def card(title_plain, title_gold, sublines, n, eyebrow=EYE_ALL):
@@ -122,7 +130,8 @@ def c01_how():
     c.kv([("COMMAND  -  squadron net", "%s AM" % COMMAND_F),
           ("DECKBOSS  -  carrier deck", "%s AM" % DECKBOSS_F),
           ("MARSHAL  -  carrier stack", "306.300 AM  ·  every theatre"),
-          ("HITMAN 1-1  -  JTAC, Black Sea training", "%s FM  ·  cards 12 - 13" % JTAC_F),
+          ("HITMAN 1-1 / 2-1  -  JTAC, Black Sea", "%s / %s FM  ·  cards 12 - 13" % (JTAC_F[:4], JTAC2_F[:4])),
+          ("RANGE AREAS + OVERLORD  -  on Command", "cards 14 - 15"),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
     NK.band(c, "HOW TO BE HEARD", "every call")
     c.bullets([
@@ -161,7 +170,7 @@ def c02_freqs():
         [("LIVE LSO 128.100 (COMM 2 CH 2) is silent.", True),
          ("SkyEye has no LSO - fly the ball yourself.", False)],
     ])
-    NK.subtle(c, "Voices: towers British or Australian  ·  Command, Marshal, Deckboss American  ·  Hitman Australian.")
+    NK.subtle(c, "Voices: towers British or Australian  ·  Command, Marshal, Deckboss American  ·  Hitman 1-1 Australian.")
     return save(c, "02_freqs.jpg")
 
 
@@ -478,7 +487,8 @@ def c11_command():
         ("state 5.2", "copy state"),
         ("say bullseye  /  request bullseye", "bullseye NNN for NN"),
         ("request tanker  /  say texaco", "bearing, range, angels"),
-        ("request tasking  (Black Sea training)", "contact Hitman 1-1, 61.0  -  card 12"),
+        ("request tasking  (Black Sea training)", "contact Hitman 1-1 or 2-1  -  card 12"),
+        ("proceeding to / request Alpha  (Black Sea)", "range areas  -  cards 14 - 15"),
     ])
     c.bullets([
         [("\"RTB, fence out\" is read as RTB.", True),
@@ -511,11 +521,11 @@ def c11_command():
 
 # ---------------------------------------------------------------- JTAC (cmd/atc/jtac.go)
 def c12_jtac_flow():
-    c = card("HITMAN ", "1-1", ["JTAC  ·  %s FM  ·  Hornet %s  ·  Viper %s" % (JTAC_F, H_JTAC, V_JTAC),
-                               "Black Sea (Caucasus) training  ·  five 9-line cards, north of the ridge"], 12)
+    c = card("HITMAN ", "1-1 / 2-1", ["1-1  %s FM  ·  Hornet %s  ·  Viper %s" % (JTAC_F, H_JTAC, V_JTAC),
+                                     "2-1  %s FM  ·  no preset yet - dial it" % JTAC2_F], 12)
     NK.band(c, "THE RUN", "every call starts \"Hitman, Raider 1, ...\"")
     NK.steps(c, [
-        ("COMMAND", "request tasking  ->  contact Hitman 1-1 on 61.0"),
+        ("COMMAND", "request tasking  ->  contact Hitman 1-1 or 2-1"),
         ("CHECK IN", "checking in  ->  Hitman picks the target, 9-line"),
         ("COPY", "copy  ->  report IP inbound"),
         ("IP INBOUND", "IP inbound  ->  continue"),
@@ -524,10 +534,13 @@ def c12_jtac_flow():
     ], split=190)
     NK.band(c, "THE 9-LINE", "by reference to your kneeboard card")
     c.bullets([
+        [("Two JTACs, one sector each.", True),
+         ("Hitman 1-1 runs Kuban Valley (1 - 3), Hitman 2-1 Cherkessk (4 - 5). Command sends "
+          "you to the one with a free target - the other sector when you come back for more.", False)],
         [("Hitman picks the target, at random.", True),
-         ("Not one another flight is working, not the one you just did. Find that card in "
-          "your kneeboard - Hitman reads you its number, name, elevation, final attack "
-          "heading and egress, and the IP's bearing if you are not there yet.", False)],
+         ("Not one another flight is working, not the one you just did. Hitman reads its "
+          "number, name and IP, and the IP's bearing if you are not there yet - elevation, "
+          "attack headings and egress are on that kneeboard card.", False)],
         [("Another target:", True),
          ("after \"off\", say \"request tasking\" to Hitman - or ask Command again.", False)],
     ])
@@ -558,13 +571,14 @@ def c13_jtac_checks():
          ("(Tacview down, callsign not matched): no checks - still cleared hot.", False)],
     ])
     NK.band(c, "BDA", "about 15 s after your bombs land")
+    c.kv([("good effects  /  good hits  /  shack", "egress, ready for more tasking"),
+          ("partial effects", "kills so far, re-attack approved"),
+          ("no effects", "correct <dir> <metres>, re-attack"),
+          ("unable to assess  (the bridges)", "say your observed effects")])
     c.bullets([
-        [("Impacts, then kills.", True),
-         ("Where you hit against the aim point, then what is destroyed, priority targets "
-          "first. \"request BDA\" repeats it.", False)],
-        [("Bridges cannot be assessed", True),
-         ("- Hitman gives impacts, the Valley Road Bridge checkpoint, and any hit on the Kuban "
-          "no-strike road bridge.", False)],
+        [("Asked for your effects?", True),
+         ("\"bridge dropped\" or \"good hits\" closes it; \"no effects\" gets a re-attack. "
+          "\"request BDA\" repeats the call.", False)],
     ])
     NK.band(c, "ALSO", "any time")
     c.kv([("abort", "copy abort, re-attack from the IP"),
@@ -572,9 +586,64 @@ def c13_jtac_checks():
     return save(c, "13_jtac_checks.jpg")
 
 
+# ---------------------------------------------- range areas (cmd/atc/command_areas.go)
+def c14_range_areas():
+    c = card("RANGE ", "AREAS", ["Command  ·  %s AM  ·  Black Sea training" % COMMAND_F,
+                                 "Letters match the kneeboard TARGET RANGES card."], 14)
+    NK.band(c, "WHAT COMMAND TELLS YOU", "threat")
+    c.kv([
+        ("A   Maykop airfield  ·  SA-6, parked aircraft", "SA-6"),
+        ("B   Krasnodar Pashkovsky  ·  SA-6, aircraft", "SA-6"),
+        ("C   22 nm NE Maykop  ·  SA-6, armour, infantry", "SA-6"),
+        ("D   9-line targets 1 + 2", "Hitman 1-1"),
+        ("E   191 nm NW Anapa  ·  SA-10 site", "SA-10"),
+        ("F   14 nm SW Krasnodar  ·  armour, infantry", "none"),
+        ("G   9 nm N Krymsk  ·  SA-2 site", "SA-2"),
+        ("H / I   9-line targets 4 / 5", "Hitman 2-1"),
+        ("J   9 nm SW Krymsk  ·  armour, trucks", "none"),
+        ("K   104 nm N Anapa  ·  Kuznetsov, 2 corvettes", "SA-N-9, SA-15"),
+        ("L   36 nm NE Krasnodar  ·  train", "none"),
+        ("M   187 nm W Anapa  ·  cruiser Moskva group", "SA-N-6, SA-N-9"),
+        ("N / O   Anapa trucks  /  Kutaisi boats", "none"),
+    ], size=14, rh=27)
+    c.bullets([
+        [("The kneeboard card under-reports three:", True),
+         ("E and G are listed \"soft x5\" - they are an SA-10 and an SA-2 site. M is blank - "
+          "it is the Moskva's group.", False)],
+    ])
+    return save(c, "14_range_areas.jpg")
+
+
+def c15_overlord():
+    c = card("OVERLORD ", "ACTUAL", ["Ask for an area, close out the run  ·  Command %s AM" % COMMAND_F,
+                                     "Overlord is a second voice on Command's frequency."], 15)
+    NK.band(c, "THE EXCHANGE", "\"Command, Raider 1, ...\"")
+    NK.steps(c, [
+        ("ASK", "permission to proceed to Alpha  ->  stand by for Overlord"),
+        ("~10 S", "Overlord: you are Irene for Alpha, report copy"),
+        ("COPY", "copy Irene  ->  Command: what is there, threat, bearing"),
+        ("OFF", "off target  ->  copy off Alpha, say intentions"),
+        ("HOME", "Winchester, RTB  ->  handoff at 30 nm"),
+    ], split=150)
+    NK.band(c, "ALSO", "Command replies")
+    c.kv([
+        ("request Alpha  /  request to work Alpha", "goes to Overlord"),
+        ("proceeding / pushing / inbound Alpha", "brief at once, no Overlord"),
+        ("negative Irene", "another flight has it - ask again"),
+        ("Bingo, RTB", "nearest tanker, handoff at 30 nm"),
+        ("Joker", "copy Joker"),
+    ])
+    c.bullets([
+        [("\"Irene\" and \"cleared to engage\" both mean go.", True),
+         ("Overlord uses either. A flight already on your area is called out - call off target "
+          "when you are done so it frees up.", False)],
+    ])
+    return save(c, "15_overlord.jpg")
+
+
 def c12_sortie():
     c = card("A FULL ", "SORTIE", ["Off the boat and back  ·  every SkyEye call, in order",
-                                  "Hornet, Case I, Persian Gulf frequencies."], 14, EYE_CVN)
+                                  "Hornet, Case I, Persian Gulf frequencies."], 16, EYE_CVN)
     NK.band(c, "OUTBOUND")
     NK.steps(c, [
         ("DECKBOSS 128.6", "request taxi  ·  ready cat N  ·  airborne"),
@@ -607,7 +676,7 @@ def c12_sortie():
 def c13_towers():
     c = card("AIRFIELD ", "ATC", ["One AI tower per field  ·  UHF AM  ·  Gulf, Black Sea, Syria",
                                   "Same calls at every field; only name and frequency change."],
-             15, EYE_TWR)
+             17, EYE_TWR)
     NK.band(c, "HOW TO BE HEARD", "every tower call")
     c.bullets([
         [("Open with the field name, then your callsign.", True),
@@ -644,7 +713,7 @@ def c13_towers():
 def c14_tower_radios():
     c = card("TOWER ", "RADIOS", ["Gulf and Black Sea  ·  tower, ATIS, COMM 1 preset",
                                   "Presets read off the squadron Hornet and Viper cards."],
-             16, EYE_TWR)
+             18, EYE_TWR)
     NK.band(c, "PERSIAN GULF", "Hornet  /  Viper")
     c.kv([
         ("AL DHAFRA TOWER  251.100  ·  ATIS 248.200", "CH 8  /  CH 12"),
@@ -681,7 +750,7 @@ def c15_syria_towers():
     atis = {a["icao"]: a["freq"] for a in th["atis"]}
     c = card("SYRIA ", "TOWERS", ["Eastern Med  ·  Foothold  ·  %d fields  ·  tower and ATIS" % len(th["towers"]),
                                   "Read from the start scripts - dial the frequency."],
-             17, EYE_TWR)
+             19, EYE_TWR)
     NK.band(c, "THE TOWERS", "tower  ·  ATIS")
     c.kv([(t["name"].upper(), "%.3f   ATIS %.3f" % (t["freq"], atis[t["icao"]]) if t["icao"] in atis
            else "%.3f" % t["freq"]) for t in th["towers"]])
@@ -700,7 +769,7 @@ def c15_syria_towers():
 
 def c16_tower_departure():
     c = card("DEPART", "URE", ["Parking to Command  ·  every SkyEye field",
-                               "Wait for each reply before the next call."], 18, EYE_TWR)
+                               "Wait for each reply before the next call."], 20, EYE_TWR)
     NK.band(c, "THE DEPARTURE", "in order")
     NK.steps(c, [
         ("REQUEST TAXI", "Minhad Tower, Raider 1, request taxi."),
@@ -741,7 +810,7 @@ def c16_tower_departure():
 
 def c17_tower_arrival():
     c = card("ARRI", "VAL", ["Overhead or straight in  ·  one call per leg",
-                             "Give your distance with inbound, initial or final."], 19, EYE_TWR)
+                             "Give your distance with inbound, initial or final."], 21, EYE_TWR)
     NK.band(c, "THE OVERHEAD", "VMC")
     NK.steps(c, [
         ("INBOUND", "Minhad Tower, Raider 1, 10 mile initial."),
@@ -789,7 +858,7 @@ def c17_tower_arrival():
 
 def c18_tower_calls():
     c = card("TOWER ", "CALLS", ["Every call a tower answers  ·  lead with the field name",
-                                 "Silent calls are heard but get no reply."], 20, EYE_TWR)
+                                 "Silent calls are heard but get no reply."], 22, EYE_TWR)
     NK.band(c, "GROUND AND DEPARTURE", "tower replies")
     c.kv([
         ("request taxi  /  ready to taxi", "taxi, hold short"),
@@ -827,7 +896,7 @@ def c18_tower_calls():
 
 def c19_trouble():
     c = card("NO ", "ANSWER?", ["Work down the list  ·  most misses are the first three",
-                                "Tell the operator what you said, word for word."], 21)
+                                "Tell the operator what you said, word for word."], 23)
     NK.band(c, "CHECK", "in order")
     NK.steps(c, [
         ("1", "Waited 2 - 3 seconds?"),
@@ -851,14 +920,14 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 74c6260, 16 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 15c969b, 16 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
 CARD_FUNCS = [c01_how, c02_freqs, c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1,
               c06_marshal_case3, c07_marshal_calls_inbound, c08_marshal_calls_stack,
               c09_marshal_calls_case3, c10_departure, c11_command, c12_jtac_flow,
-              c13_jtac_checks, c12_sortie, c13_towers,
+              c13_jtac_checks, c14_range_areas, c15_overlord, c12_sortie, c13_towers,
               c14_tower_radios, c15_syria_towers, c16_tower_departure, c17_tower_arrival,
               c18_tower_calls, c19_trouble]
 

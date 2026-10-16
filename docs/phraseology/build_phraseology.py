@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.2"
+VER = "v2.3"
 DATE = "16 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -101,7 +101,18 @@ COMMAND = [
     ("State", "state 5.2", "Copy state; under 2.0 bingo", "state"),
     ("Bullseye", "say bullseye", "Bullseye NNN for NN", "bullseye"),
     ("Tanker", "request tanker", "Bearing, range, angels", "tanker"),
-    ("Tasking", "request tasking", "Black Sea: contact Hitman 1-1 on 61.0", "tasking"),
+    ("Tasking", "request tasking", "Black Sea: contact Hitman 1-1 (61.0) or 2-1 (62.0)", "tasking"),
+]
+# Black Sea training range areas A-O (command_areas.go), and closing out a run
+# (commandBrevityResponse). Section 5.
+RANGE = [
+    ("Going to an area", "proceeding to Alpha  /  pushing Alpha  /  inbound Alpha", "What is there, threat, bearing; report off target", "area"),
+    ("Asking for an area", "request Alpha  /  permission to proceed to Alpha  /  request to work Alpha",
+     "Stand by for Overlord Actual", "overlord"),
+    ("Off target", "off target  /  off Alpha  /  off and egressing", "Copy off; say intentions", "off_target"),
+    ("Out of weapons", "Winchester, RTB", "Copy Winchester, RTB, handoff at 30 nm", "winchester"),
+    ("Fuel to get home", "Bingo, RTB", "Copy Bingo, RTB, nearest tanker", "bingo"),
+    ("Fuel low, still working", "Joker", "Copy Joker", "joker"),
 ]
 JTAC = [
     ("Check in", "checking in  /  request tasking", "target N, <name>, IP <IP>, read back", "check_in"),
@@ -109,7 +120,7 @@ JTAC = [
     ("IP inbound", "IP inbound", "Continue (or where the IP is)", "ip_inbound"),
     ("In", "in from the south  /  in heading 330", "Cleared hot  -  or abort, abort, abort", "in"),
     ("Off", "off  /  off safe", "Egress per line 9", "off"),
-    ("BDA", "request BDA", "Impacts, then kills", "bda"),
+    ("BDA", "request BDA", "Effects, then re-attack, correction or home", "bda"),
     ("Abort", "abort", "Copy abort, re-attack from the IP", "abort"),
     ("Radio check", "radio check", "Loud and clear", "radio_check"),
 ]
@@ -361,7 +372,7 @@ def build():
 
     # 1. Frequency map
     d.h1("1. Frequency Map")
-    d.para("Where SkyEye listens, read from the start scripts. All AM, except Hitman 1-1 (FM). "
+    d.para("Where SkyEye listens, read from the start scripts. All AM, except Hitman (FM). "
            "Mission preset channels differ - check the frequency, not only the channel.", 9, MUTE)
     for t in FACTS:
         d.h2(t["title"])
@@ -370,7 +381,10 @@ def build():
             rows.append((tw["name"], f3(tw["freq"]), "Two-way", "Callsign: %s" % tw["name"]))
         rows.append(("Command", f3(t["command"]), "Two-way", "Callsign: vSFG-7-Command"))
         if t.get("jtac"):
-            rows.append(("Hitman 1-1  -  JTAC", f3(t["jtac"]) + " FM", "Two-way", "9-line training targets"))
+            note = "9-line targets 1-3" if t.get("jtac2") else "9-line training targets"
+            rows.append(("Hitman 1-1  -  JTAC", f3(t["jtac"]) + " FM", "Two-way", note))
+        if t.get("jtac2"):
+            rows.append(("Hitman 2-1  -  JTAC", f3(t["jtac2"]) + " FM", "Two-way", "9-line targets 4-5"))
         if t.get("deckboss"):
             rows.append(("Deckboss  -  Carrier", f3(t["deckboss"]), "Two-way", "CVN-72 launch ops"))
         if t.get("marshal"):
@@ -458,11 +472,36 @@ def build():
         "carrier if you launched from it - it calls you once with the tower or Marshal frequency.",
         "Bullseye and tanker need the radar picture; without it you hear \"unable\". Tasking is Black Sea training only."])
 
-    # 5. Hitman
-    d.h1("5. Hitman 1-1 - %s FM (JTAC)" % f3(TH["caucasus"]["jtac"]))
-    d.para("Black Sea training 9-lines. Hornet COMM 2 CH 12, Viper COMM 2 CH 8. Command hands you over; Hitman "
-           "picks the target from the five 9-line cards in your kneeboard - 100-127 nm north of Senaki, past the "
-           "main ridge. Lead with \"Hitman\".")
+    # 5. Range areas (command_areas.go)
+    d.h1("5. Range Areas and Overlord Actual - Command")
+    d.para("Black Sea training. The lettered areas A - O on the kneeboard's TARGET RANGES card. Tell Command where you "
+           "are going and it tells you what is there; ask, and Overlord Actual (a second voice on Command's frequency) "
+           "clears you. The 9-line areas D, H and I go to Hitman.")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("command", RANGE, "Command"), (0.2, 0.44, 0.36))
+    d.dialogue([("Pilot", "Command, Raider 1-1, permission to proceed to Alpha."),
+                ("Cmd", "Raider 1-1, Command, stand by for Overlord Actual."),
+                ("Ovrld", "Raider 1-1, Overlord Actual, you are Irene for Alpha, report copy."),
+                ("Pilot", "Raider 1-1, copy Irene."),
+                ("Cmd", "Raider 1-1, Command, copy Irene. Alpha, Maykop airfield, SA-6 site and parked aircraft. "
+                        "Threat SA-6. Alpha bears three-four-zero for 85. Report off target."),
+                ("Pilot", "Command, Raider 1-1, off Alpha, Winchester, RTB."),
+                ("Cmd", "Raider 1-1, Command, copy off Alpha, Winchester, RTB. Good work. "
+                        "Expect recovery handoff at three zero miles.")])
+    d.callout("How the areas work", [
+        "Overlord comes up about 10 s after Command's stand by. He says \"you are Irene\" or \"you are cleared to "
+        "engage\" - both mean go. \"Negative\" means another flight is working it: ask for another area.",
+        "Command gives the threat from what is actually there: E is an SA-10 site, G an SA-2 site, M the cruiser "
+        "Moskva's group, K the Kuznetsov with SA-15 corvettes. The kneeboard card under-reports E, G and M.",
+        "Another flight on the same area is called out (\"be advised, Venom 2-1 working Alpha\"). Call off target "
+        "when done so the area frees up.",
+        "Bingo: Command adds the nearest tanker when the rig has Tacview. The bearing needs Tacview too."])
+
+    # 6. Hitman
+    d.h1("6. Hitman 1-1 / 2-1 - %s and %s FM (JTAC)" % (f3(TH["caucasus"]["jtac"]), f3(TH["caucasus"]["jtac2"])))
+    d.para("Black Sea training 9-lines, 100-127 nm north of Senaki past the main ridge. Hitman 1-1 (61.0, Hornet "
+           "COMM 2 CH 12, Viper COMM 2 CH 8) runs Kuban Valley, targets 1-3; Hitman 2-1 (62.0, dial it - no preset "
+           "yet) runs Cherkessk, targets 4-5. Command sends you to whichever has a free target. Lead with \"Hitman\".")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("jtac", JTAC, "Hitman"), (0.18, 0.4, 0.42))
     d.dialogue([("Pilot", "Hitman 1-1, Raider 1-1, checking in."),
@@ -473,17 +512,19 @@ def build():
                 ("Hitman", "Raider 1-1, Hitman one one, continue."),
                 ("Pilot", "Hitman, Raider 1-1, in from the east."),
                 ("Hitman", "Raider 1-1, Hitman one one, cleared hot."),
-                ("Hitman", "Raider 1-1, Hitman one one, BDA. Impact on the aim point. Large tanks, 2 of 4 destroyed. "
-                           "3 of 14 on target destroyed.")])
+                ("Hitman", "Raider 1-1, Hitman one one, BDA. Impact on the aim point. Partial effects. Large tanks, "
+                           "2 of 4 destroyed. 3 of 14 on target destroyed. Re-attack approved, report IP inbound from Indigo.")])
     d.callout("What Hitman checks (Tacview, against your 9-line card)", [
         "IP inbound: within 20 nm of the IP, nose on the target. Off the run-in line you hear \"continue, run in heading NNN\".",
         "In call: inside the card's final attack heading and 0.5 - 15 nm from the target - otherwise abort, abort, abort.",
         "After cleared hot: a run that swings 10 deg outside the window before release is aborted.",
-        "BDA about 15 s after impact. The bridges cannot be assessed - impacts only.",
+        "BDA about 15 s after impact, one of four: good effects (go home or ask for more), partial effects (re-attack), "
+        "no effects (a correction, e.g. \"correct south 300\", then re-attack), or unable to assess - the bridges - "
+        "when Hitman asks \"say your observed effects\": answer \"bridge dropped\" or \"no effects\".",
         "No radar picture of you: no checks, and you are still cleared hot. JTAC LIVE 60.000 is a human JTAC."])
 
-    # 6. Deckboss
-    d.h1("6. Deckboss - %s MHz (Carrier Launch)" % f3(TH["pg"]["deckboss"]))
+    # 7. Deckboss
+    d.h1("7. Deckboss - %s MHz (Carrier Launch)" % f3(TH["pg"]["deckboss"]))
     d.para("Manages cats 1-4 on CVN-72. If all cats are taken you join the conga line (six). Lead with \"Deckboss\"; "
            "the airborne call needs no address.")
     d.table(("Intent", "Say something like", "What Happens"),
@@ -495,8 +536,8 @@ def build():
                 ("Pilot", "Raider 1-1, airborne."),
                 ("Deck", "Raider 1-1, Deckboss, copy airborne, push Marshal, three zero six point three.")])
 
-    # 7. Marshal
-    d.h1("7. Marshal - %s MHz (Carrier Recovery)" % f3(TH["pg"]["marshal"]))
+    # 8. Marshal
+    d.h1("8. Marshal - %s MHz (Carrier Recovery)" % f3(TH["pg"]["marshal"]))
     d.para("Manages the recovery stack. Marshal ignores a call that does not start with \"Marshal\" or has no number "
            "in your callsign. The case (I, II or III) is set from time and weather.")
     d.table(("Intent", "Say something like", "Response"),
@@ -513,7 +554,7 @@ def build():
         "Radial = BRC + 180. Final bearing = BRC - 9. All magnetic."])
 
     # 8. Tips
-    d.h1("8. General Tips")
+    d.h1("9. General Tips")
     d.tips([
         ("Always say your callsign.", "Address first, then your full callsign with its number. Raider and Venom are "
          "auto-corrected from common mishearings."),

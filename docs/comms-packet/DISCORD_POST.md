@@ -1,28 +1,38 @@
 <!--
-Release post for vSFG-7_SkyEye_ATC_Comms_v1.24.pdf + Phraseology Reference v2.2 (16 OCT 2026):
-Hitman 1-1 on the Caucasus Training V1.25 north range (74c6260) + IP inbound within 20 nm.
-The v1.23 post (7-mile handoff) is in git history.
+Release post for vSFG-7_SkyEye_ATC_Comms_v1.25.pdf + Phraseology Reference v2.3 (16 OCT 2026):
+Hitman 2-1, BDA calls, range areas, Overlord Actual, run close-out (origin/main 15c969b).
+The v1.24 post (Hitman north range) is in git history.
 Paste everything below the line into Discord, then attach both PDFs.
-Post only after the Caucasus rig runs 74c6260 AND Caucasus Training V1.25 is on the server.
+Gate met at build time: Day, Night and Foothold all run 15c969b.
 -->
 ---
-**SkyEye ATC: Hitman has moved north** 🎯
+**SkyEye ATC: a second JTAC, real BDA, and Command now runs the ranges** 🎯
 
-**New 9-line range (Caucasus Training V1.25)**
-The five 9-line targets are now past the main ridge, **100-127 nm north of Senaki**, in two sectors:
+**Hitman 2-1, 62.000 FM**
+Two JTACs now, one sector each:
 ```
-KUBAN VALLEY   TGT 1 Valley Road Bridge  IP FALCON
-               TGT 2 Artillery Park      IP GRANITE
-               TGT 3 Kuban Rail Bridge   IP HAMMER   (road bridge 640 m NW = NO STRIKE)
-CHERKESSK      TGT 4 Fuel Depot          IP INDIGO
-               TGT 5 Command Post        IP JAVELIN
+HITMAN 1-1   61.000 FM   KUBAN VALLEY   TGT 1-3   (Hornet C2 CH12, Viper C2 CH8)
+HITMAN 2-1   62.000 FM   CHERKESSK      TGT 4-5   (no preset yet - dial it)
 ```
-Your kneeboard 9-line cards have the full data. Hitman 1-1 is still 61.000 FM (Hornet COMM 2 CH 12, Viper COMM 2 CH 8). Plan your fuel: it's a long way there and back.
+Ask Command for tasking and you're sent to whichever has a free target. Come back for more and you get the other sector.
 
-**IP inbound**
-• Hitman takes your "IP inbound" anywhere **within 20 nm** of the IP.
-• If you're off the run-in line he tells you: *"continue. Run in heading two niner seven from Indigo."*
+**BDA that tells you what to do next**
+• *Good effects / Good hits / Shack*: egress, report ready for further tasking
+• *Partial effects*: kill count, re-attack approved
+• *No effects*: a correction (*"correct south 300"*), re-attack
+• *Unable to assess* (the bridges): Hitman asks *"say your observed effects"*. Answer "bridge dropped" or "no effects"
+
+**Range areas A to O on Command (282.0)**
+Tell Command where you're going: *"Command, Raider 1, proceeding to Alpha"*. It answers with what's there, the threat, a bearing and range, and anyone else already working it.
+Ask instead (*"permission to proceed to Alpha"*, *"request Alpha"*, *"request to work Alpha"*) and **Overlord Actual** comes up about 10 s later: *"you are Irene for Alpha"* or *"you are cleared to engage Alpha"*. Both mean go. Answer "copy Irene" and Command gives you the brief.
+⚠️ The kneeboard under-reports three areas: **E is an SA-10, G is an SA-2, M is the cruiser Moskva's group.** Command tells you the real threat.
+
+**Closing out**
+• *"off target"* gets *"copy off Alpha, say intentions"*
+• *"Winchester, RTB"* gets copy plus the 30 nm recovery handoff
+• *"Bingo, RTB"* gets copy plus the nearest tanker
+• *"Joker"* gets copy
 
 **Updated docs** 📄
-• **SkyEye ATC Comms Packet v1.24**: Hitman and Cleared Hot? cards
-• **ATC Phraseology Reference v2.2**: Hitman section, example now target 4, Indigo
+• **SkyEye ATC Comms Packet v1.25**: Hitman 1-1 / 2-1, Cleared Hot? (BDA), new Range Areas and Overlord Actual cards
+• **ATC Phraseology Reference v2.3**: new section 5 (range areas + Overlord), Hitman section updated
