@@ -240,6 +240,41 @@ func TestMarshalCallsFlown20261015(t *testing.T) {
 	}
 }
 
+// Raiders 302 and 312 back to the boat, DCS3 2026-10-17 10:40-11:05. Signal
+// Charlie never came: both stack calls were read as fuel-state reports.
+func TestMarshalCallsFlown20261017(t *testing.T) {
+	cases := []struct {
+		text   string
+		intent marshalIntent
+	}{
+		// Answered "state 6.4, copy".
+		{"Union Marshal, Raider 312 is 221 for 59, Angels 28, state 6.4.", marshalMarkingMom},
+		// Readbacks answered "BRC 096" again.
+		{"Union Marshal, Raider 312, understands BRC 096, altimeter 3000, Marshal, angels 2, I'll call you at 10.", marshalNone},
+		{"Union Marshal Raider 302 BRC 096 marshalling at angels 3, will report CU at 10.", marshalNone},
+		// Answered "state, copy": never holding, so no Charlie.
+		{"Union Marshal Raider 302 entering stack position 3, fuel state 4.9.", marshalEstablished},
+		{"Union Marshal, Raider 312, established angels 2, entry point 1, state 5.3.", marshalEstablished},
+		// Intent miss.
+		{"Union Marshal, Raider 312, request Charlie.", marshalEstablished},
+		// Answered "contact 3 DME, continue" instead of paddles.
+		{"Union Marshal Raider 3-0-2, three mile initial.", marshalInitial},
+		{"Union Marshall, Raider 312, 3-mile initial, 4.7.", marshalInitial},
+		// Still a BRC question and still a state report.
+		{"Union Marshall Raider 302 current BRC.", marshalBRCRequest},
+		{"Union Marshal, Raider 302, request BRC.", marshalBRCRequest},
+		{"Union Marshal Raider 302 entering stack position 3, fuel state 4.9, 15 miles.", marshalEstablished},
+	}
+	for _, tc := range cases {
+		t.Run(tc.text, func(t *testing.T) {
+			lower := strings.ToLower(tc.text)
+			if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != tc.intent {
+				t.Errorf("intent = %d, want %d", got, tc.intent)
+			}
+		})
+	}
+}
+
 // "Tac boss, Raider 302 airborne" was answered "Tac boss, Deckboss, copy
 // airborne" (DCS3 2026-10-15 14:49:43).
 func TestDeckbossCallsignFlown20261015(t *testing.T) {

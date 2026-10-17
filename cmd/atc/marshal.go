@@ -173,6 +173,16 @@ var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b|\bentering (?:the )
 // "B.R.C.", and Whisper's "VRC".
 var brcWordRe = regexp.MustCompile(`\b(?:brc|vrc|b\.?\s?r\.?\s?c)\b`)
 
+// brcReadbackRe is a BRC word followed by a heading: the pilot reading the BRC
+// back, not asking for it ("understands BRC 096, altimeter 3000").
+var brcReadbackRe = regexp.MustCompile(`\b(?:brc|vrc)\b,? (?:is )?\d{2,3}\b`)
+
+// charlieRequestRe is a holding jet asking for Charlie.
+var charlieRequestRe = regexp.MustCompile(`\b(?:request|requesting|ready for|say) charlie\b`)
+
+// unlabelledMarkingMomRe is "<radial> for <range>" with no "marking mom's".
+var unlabelledMarkingMomRe = regexp.MustCompile(`\b\d{3} for \d{1,3}\b`)
+
 // classifyMarshalCall maps a lowercased, address-led call to its intent. Order
 // matters and mirrors the original switch: e.g. the departure check must beat
 // the DME report, and a BRC word inside a marking-mom's call is still a
@@ -208,12 +218,25 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		// is a jet leaving, and was answered "contact 7 DME, continue" (DCS3
 		// 2026-10-15 14:50:46). A bare distance is still a DME report.
 		return marshalPushCommand
+	case establishedRe.MatchString(lower) || charlieRequestRe.MatchString(lower):
+		// Ahead of the DME and state reports: DCS3 2026-10-17 10:52 "entering
+		// stack position 3, fuel state 4.9" and "established angels 2, entry
+		// point 1, state 5.3" were both answered "state, copy", so neither jet
+		// was ever holding and the Charlie watcher had nobody to signal.
+		// "request Charlie" (10:53:18, an intent miss) is the same call.
+		return marshalEstablished
+	case containsAny(lower, "initial"):
+		// Ahead of the DME report: "three mile initial" (DCS3 2026-10-17
+		// 11:04:31) got "contact 3 DME, continue" instead of paddles.
+		return marshalInitial
+	case unlabelledMarkingMomRe.MatchString(lower) && strings.Contains(lower, "angels"):
+		// "Raider 312 is 221 for 59, Angels 28, state 6.4" (DCS3 2026-10-17
+		// 10:40:44) is a marking mom's without the words; it got "state, copy".
+		return marshalMarkingMom
 	case containsAny(lower, " dme", " mile") || rangeDistanceRe.MatchString(lower):
 		return marshalDME
 	case containsAny(lower, "state") && fuelState > 0:
 		return marshalState
-	case establishedRe.MatchString(lower):
-		return marshalEstablished
 	case containsAny(lower, "commencing"):
 		return marshalCommencing
 	case containsAny(lower, "platform", "passing five thousand", "passing 5000", "at platform"):
@@ -221,8 +244,10 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 	case containsAny(lower, "pushing paddles", "switching paddles", "push paddles", "switch paddles",
 		"pushing lso", "switching lso", "pushing button", "pushing channel"):
 		return marshalPushPaddles
-	case containsAny(lower, "initial"):
-		return marshalInitial
+	case brcReadbackRe.MatchString(lower):
+		// The pilot reading back "BRC 096 ... Marshal at angels 2" - DCS3
+		// 2026-10-17 10:42:17 and 10:45:53 were both answered "BRC 096" again.
+		return marshalNone
 	case brcWordRe.MatchString(lower):
 		return marshalBRCRequest
 	case containsAny(lower, "checking in", "check in", "checkin"):
