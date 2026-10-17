@@ -29,6 +29,11 @@ type Params struct {
 	LandingLateralM float64 // landing point offset from the centreline, starboard positive
 	GlideslopeDeg   float64
 	HookBelowRefM   float64 // jet's Tacview reference point above its hook; the glideslope is flown by the hook
+	// HookAftOfRefM is the hook behind the jet's reference point. Without it
+	// Raider 302's 13:57 trap on 2026-10-17 was estimated a 2 wire, touching
+	// 6 m short of the aim point; DCS's LSO (Tactical Paddles) gave it the 1
+	// wire. A Hornet's hook is ~7 m behind its centre.
+	HookAftOfRefM float64
 	// HookTouchFromSternM is where the lens puts the hook: 230 ft from the
 	// stern for the 3 wire, crossing the ramp at 14.1 ft (DCS Supercarrier
 	// guide, LSO station). 3.5 deg over 70 m is that 14.1 ft.
@@ -45,6 +50,7 @@ func NimitzParams() Params {
 		LandingLateralM: -4, // 5 passes in the 2026-10-17 Day recording touched 0-8 m port
 		GlideslopeDeg:   3.5,
 		HookBelowRefM:   2.5,
+		HookAftOfRefM:   7,
 
 		HookTouchFromSternM: 70.1,
 	}
@@ -101,15 +107,22 @@ func unit(deg float64) (float64, float64) {
 	return math.Sin(r), math.Cos(r) // east, north
 }
 
-// toGroove puts a sample in the landing frame.
-func (p Params) toGroove(s Ship, smp Sample) groovePos {
-	e, n := local(s, smp.Lat, smp.Lon)
-	// Landing point: along the ship's centreline from the reference point,
-	// then sideways.
+// landingPoint is where a jet's Tacview reference point is when its hook is
+// on the aim point (east, north metres from the ship): along the ship's
+// centreline from its reference point, sideways, then the hook's distance
+// back up the landing axis.
+func (p Params) landingPoint(s Ship) (float64, float64) {
 	se, sn := unit(s.HeadingDeg)
 	re, rn := unit(s.HeadingDeg + 90)
-	le := se*p.landingFromRefM() + re*p.LandingLateralM
-	ln := sn*p.landingFromRefM() + rn*p.LandingLateralM
+	ae, an := unit(s.HeadingDeg + p.AngledDeckDeg)
+	return se*p.landingFromRefM() + re*p.LandingLateralM + ae*p.HookAftOfRefM,
+		sn*p.landingFromRefM() + rn*p.LandingLateralM + an*p.HookAftOfRefM
+}
+
+// toGroove puts a sample in the landing frame (the hook's position).
+func (p Params) toGroove(s Ship, smp Sample) groovePos {
+	e, n := local(s, smp.Lat, smp.Lon)
+	le, ln := p.landingPoint(s)
 	de, dn := e-le, n-ln
 	ae, an := unit(s.HeadingDeg + p.AngledDeckDeg)
 	be, bn := unit(s.HeadingDeg + p.AngledDeckDeg + 90)
@@ -185,7 +198,7 @@ const (
 	onDeckM         = 1.0 // hook height above the deck
 	trapRelKts      = 20.0
 	bolterRelKts    = 60.0
-	bolterPastM     = 90.0 // past the 4 wire, beyond a trap's run-out
+	bolterPastM     = 115.0 // past the 4 wire, beyond a trap's run-out (4-wire traps stopped ~100 m past it)
 	hornetOnSpeed   = 8.1
 )
 

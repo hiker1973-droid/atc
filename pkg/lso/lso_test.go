@@ -20,10 +20,7 @@ type flight struct {
 }
 
 func world(p Params, s Ship, astern, right, height float64) (lat, lon, altM float64) {
-	se, sn := unit(s.HeadingDeg)
-	re, rn := unit(s.HeadingDeg + 90)
-	le := se*p.landingFromRefM() + re*p.LandingLateralM
-	ln := sn*p.landingFromRefM() + rn*p.LandingLateralM
+	le, ln := p.landingPoint(s)
 	ae, an := unit(s.HeadingDeg + p.AngledDeckDeg)
 	be, bn := unit(s.HeadingDeg + p.AngledDeckDeg + 90)
 	e := le - ae*astern + be*right

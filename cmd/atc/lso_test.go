@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/vsfg7/atc/pkg/lso"
 )
 
@@ -104,10 +105,19 @@ func TestLSOReplay(t *testing.T) {
 	start := time.Now()
 	clock := start
 	tv.now = func() time.Time { return clock }
+	// Log lines carry the recording's clock, so a pass can be matched to a
+	// pilot's debrief (Tactical Paddles) by time.
+	zerolog.TimestampFunc = func() time.Time { return clock }
+	defer func() { zerolog.TimestampFunc = time.Now }()
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	for sc.Scan() {
 		line := sc.Text()
+		if v, ok := strings.CutPrefix(line, "0,RecordingTime="); ok {
+			if rt, err := time.Parse(time.RFC3339Nano, v); err == nil {
+				start, clock = rt.Local(), rt.Local()
+			}
+		}
 		if strings.HasPrefix(line, "#") {
 			// A recording carries frame times; a raw capture may not.
 			if s, err := strconv.ParseFloat(line[1:], 64); err == nil {
