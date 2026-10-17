@@ -315,6 +315,8 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		}
 	}()
 
+	go watchCharlie(ctx, stack, comp, transmit, atcCtrl) // marshal_charlie.go
+
 	// DEBUG: with --marshal-test-tx, transmit "test" every 30s to verify the
 	// outbound SRS path independently of pilot audio. Leave the flag off in
 	// production — every tick blocks the cooldown window for a few seconds.
@@ -672,8 +674,9 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			}
 			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Msg("Marshal: Case 3 established in hold")
 			transmit(comp.MarshalEstablishedAckCase3(callsign, angels, radial, eat.Minute()))
-		} else if atcCtrl.IsDeckClear() {
+		} else if atcCtrl.IsDeckClear() && marshalCharlie.nextCharlie(stack.GetAll(), time.Now()) == callsign {
 			stack.SetPhase(callsign, "charlie")
+			marshalCharlie.given(time.Now())
 			transmit(comp.MarshalSignalCharlie(callsign))
 		} else {
 			transmit(comp.MarshalEstablishedAck(callsign, angels, position))

@@ -1485,10 +1485,12 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		if !containsAny(lower, "radio", "check") {
 			req.Type = RequestBreak
 		}
-	case (containsAny(lower, "inbound") || containsWord(lower, "rtb", "returning to base", "return to base")) &&
+	case (containsAny(lower, "inbound", "intent to land", "intend to land", "intending to land", "intention to land", "intentions to land") ||
+		containsWord(lower, "rtb", "returning to base", "return to base")) &&
 		!containsAny(lower, "initial", "mile"):
 		// "...inbound" / "returning to base" alone — treat as distance initial
-		// at unknown distance
+		// at unknown distance. "Raider 312 is 020 for 38, intent to land" went
+		// unanswered twice at Senaki (Day 2026-10-16 19:32).
 		req.Type = RequestDistanceInitial
 	case containsAny(lower, "holding short", "hold short", "short of runway", "at the hold"):
 		req.Type = RequestHoldingShort
@@ -2508,18 +2510,28 @@ func (c *ATCController) AssignMarshalAngels(minAngels, maxAngels int, reservedAn
 	return maxAngels
 }
 
-// IsDeckClear returns true if no aircraft are on final or the runway at the carrier.
+// IsDeckClear returns true if no aircraft is flying close in at the carrier:
+// in the groove, on a bolter or waving off. The carrier itself, its escorts and
+// jets parked or taxiing on deck (slower than DeckFoulKts) don't count; they
+// did before, so the deck was never clear and Marshal never gave Charlie
+// (Day 2026-10-16).
 func (c *ATCController) IsDeckClear() bool {
-	carLon, carLat, found := c.GetCarrierPosition()
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	carrierCS, carrier, found := c.findCarrierContact()
 	if !found {
 		return true // no carrier data — assume clear
 	}
-	carrierPt := orb.Point{carLon, carLat}
-	c.allPositionsMu.RLock()
-	defer c.allPositionsMu.RUnlock()
-	for _, contact := range c.allPositions {
-		if time.Since(contact.UpdatedAt) > 30*time.Second {
+	carrierPt := orb.Point{carrier.Lon, carrier.Lat}
+	for cs, contact := range c.allPositions {
+		if cs == carrierCS || time.Since(contact.UpdatedAt) > 30*time.Second {
 			continue
+		}
+		if contact.ObjType != "" && !strings.HasPrefix(contact.ObjType, "Air+") {
+			continue // ships
+		}
+		if contact.SpeedKts < DeckFoulKts {
+			continue // parked or taxiing on deck
 		}
 		dist := haversineNm(orb.Point{contact.Lon, contact.Lat}, carrierPt)
 		if dist < 1.0 && contact.AltFt < 1000 {
@@ -2528,6 +2540,9 @@ func (c *ATCController) IsDeckClear() bool {
 	}
 	return true
 }
+
+// DeckFoulKts: below this a contact at the boat is on deck, not flying.
+const DeckFoulKts = 60
 
 // Deck geometry. A Nimitz/Ford hull is ~333m long, so anything Tacview reports
 // within DeckRadiusNm of the carrier's own contact point and below DeckAltFt is

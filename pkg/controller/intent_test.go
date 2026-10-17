@@ -51,6 +51,8 @@ func TestParseIntentClassification(t *testing.T) {
 		{"request low approach", "Senaki Tower, Raider 11, request low approach", RequestLandingClear},
 		{"request the option", "Senaki Tower, Raider 11, request the option", RequestLandingClear},
 		{"full stop", "Senaki Tower, Raider 11, full stop", RequestLandingClear},
+		{"intent to land", "Senaki Tower, Raider 312 is 020 for 38, intent to land.", RequestDistanceInitial},
+		{"intend to land", "Senaki Tower, Raider 312 is 020 for 38, intend to land.", RequestDistanceInitial},
 		{"base with touch and go stays base", "Senaki Tower, Raider 11, turning base, touch and go", RequestBase},
 
 		// Distances. "15 miles" held "5 miles" as a substring and was answered
