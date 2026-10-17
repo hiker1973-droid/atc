@@ -123,7 +123,7 @@ const (
 	CallHigh        Call = "You're high."
 	CallLittleHigh  Call = "A little high."
 	CallLow         Call = "You're low."
-	CallPower       Call = "Power."
+	CallPower       Call = "Power!" // stern (operator 2026-10-17)
 	CallRight       Call = "Right for lineup."
 	CallLeft        Call = "Come left."
 	CallFast        Call = "You're fast."

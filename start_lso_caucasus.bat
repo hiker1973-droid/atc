@@ -32,4 +32,6 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: voice for now. Paddles reads Tacview itself and talks in the groove: roger ball,
 :: high/low, power, lineup, fast/slow (Hornet), wave off, bolter. Every pass is
 :: logged to atc-lso.log with where it touched down, for calibration.
-start "Paddles (Caucasus)" cmd /c "%~dp0atc.exe --lso-only --lso-freq 128.3 --lso-voice ash --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"
+:: Speed 1.38 = the 1.20 default +15% (operator 2026-10-17); "Power!" has its own
+:: sterner delivery (lso.go styleLSOPower).
+start "Paddles (Caucasus)" cmd /c "%~dp0atc.exe --lso-only --lso-freq 128.3 --lso-voice ash --tts-speed 1.38 --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"

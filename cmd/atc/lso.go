@@ -47,8 +47,22 @@ func registerLSOFlags(f *flag.FlagSet) {
 const styleLSO = "Speak as a US Navy landing signal officer on the platform. " +
 	"Calm, firm, very short. Even and steady for corrections; urgent and loud for wave off and bolter."
 
+// styleLSOPower is take B of three (operator 2026-10-17: "be more stern with
+// power", then "B").
+const styleLSOPower = "Speak as a US Navy landing signal officer on the platform. " +
+	"Stern and urgent. The pilot is settling low in close. Bark the word like an order, loud and firm, with a hard edge."
+
 func lsoVoice() voiceProfile {
 	return voiceProfile{voice: flagLSOVoice, speed: flagTTSSpeed, instructions: styleLSO}
+}
+
+// lsoVoiceFor is the delivery for one call: "Power!" gets its own.
+func lsoVoiceFor(text string) voiceProfile {
+	vp := lsoVoice()
+	if lso.Call(text) == lso.CallPower {
+		vp.instructions = styleLSOPower
+	}
+	return vp
 }
 
 // lsoTX is one queued call. Calls older than their limit when the radio frees
@@ -74,7 +88,7 @@ func runLSO(ctx context.Context, apiKey string) {
 
 	// Render every fixed call now so a call costs only the ExternalAudio start.
 	for _, c := range lso.AllCalls {
-		if _, err := synthesizeSpeech(ctx, apiKey, string(c), vp); err != nil {
+		if _, err := synthesizeSpeech(ctx, apiKey, string(c), lsoVoiceFor(string(c))); err != nil {
 			log.Warn().Err(err).Str("text", string(c)).Msg("Paddles: TTS prewarm failed")
 		}
 	}
@@ -91,7 +105,7 @@ func runLSO(ctx context.Context, apiKey string) {
 					log.Info().Str("text", tx.text).Dur("late", age).Msg("Paddles: call dropped, too late")
 					continue
 				}
-				mp3, err := synthesizeSpeech(ctx, apiKey, tx.text, vp)
+				mp3, err := synthesizeSpeech(ctx, apiKey, tx.text, lsoVoiceFor(tx.text))
 				if err != nil {
 					log.Error().Err(err).Str("text", tx.text).Msg("Paddles: TTS failed")
 					continue
