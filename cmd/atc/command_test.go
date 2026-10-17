@@ -106,3 +106,17 @@ func TestCommandSendsMarshalCallsToMarshal(t *testing.T) {
 		}
 	}
 }
+
+// Calls a tower-handed departure makes to Command instead of "checking in"
+// (Day 2026-10-16, all unanswered then).
+func TestCommandResponseDepartureCheckIn(t *testing.T) {
+	for _, text := range []string{
+		"Command, Venom 021 entering airspace.",
+		"Command, Venom 021, entering airspace.",
+		"Command, Venom 021, airborne.",
+	} {
+		if got := commandResponse(text, "Venom 021", "vSFG-7-Command"); !strings.HasPrefix(got, "Venom 021, vSFG-7-Command, ") {
+			t.Errorf("%q -> %q", text, got)
+		}
+	}
+}

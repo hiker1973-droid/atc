@@ -50,8 +50,11 @@ func commandResponse(text, callsign, channelName string) string {
 		})
 	}
 
-	// Check-in
-	if containsAny(lower, "check in", "checking in", "check-in") {
+	// Check-in. A departure handed over by the tower often says "entering
+	// airspace" or "airborne" instead; Venom 021's three such calls went
+	// unanswered on Day 2026-10-16 21:55 until he said "checking in".
+	if containsAny(lower, "check in", "checking in", "check-in", "entering airspace", "entering the airspace",
+		"entering your airspace", "airborne", "with you") {
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, read you loud and clear, proceed mission.", callsign, channelName),
 			fmt.Sprintf("%s, %s, loud and clear, you are cleared to proceed, good hunting.", callsign, channelName),

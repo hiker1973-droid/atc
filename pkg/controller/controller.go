@@ -826,6 +826,17 @@ func (c *ATCController) handleTakeoffRequest(
 	// spacing waited for a second call that nothing asked the pilot to make.
 	ac.HoldingShort = true
 
+	// Already cleared (the LUAW auto-release, or an earlier call): say the
+	// clearance again. The spacing gate below counts from this jet's own
+	// clearance, so it held Venom 021 at Senaki with "departure spacing zero
+	// seconds" a minute after clearing it (Day 2026-10-16 21:52).
+	if ac.TakeoffCleared || ac.Phase == state.PhaseClearedTakeoff {
+		log.Info().Str("callsign", callsign).Msg("takeoff request from a jet already cleared — clearance repeated")
+		return c.composer.ClearedForTakeoff(
+			callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.LandingQueueLen(), len(s.ActiveDepartures()),
+		)
+	}
+
 	// Check for inbounds within the hold-short radius.
 	inbounds := s.InboundsWithinNm(HoldShortRadiusNm)
 
@@ -853,7 +864,7 @@ func (c *ATCController) handleTakeoffRequest(
 	// monitor can clear them once the window expires.
 	if elapsed := s.TimeSinceLastDeparture(); elapsed < DepartureSpacingSec {
 		s.EnqueueDeparture(ac) // idempotent
-		secsLeft := int((DepartureSpacingSec - elapsed).Seconds())
+		secsLeft := int(math.Ceil((DepartureSpacingSec - elapsed).Seconds()))
 		log.Info().
 			Str("callsign", callsign).
 			Int("secondsLeft", secsLeft).
@@ -940,7 +951,7 @@ func (c *ATCController) handleHoldingShortRequest(
 	// path that fired yesterday's 19:30:44 / 19:31:07 double-clear (23s
 	// apart) which then cascaded into the Venom 211 go-around storm.
 	if elapsed := s.TimeSinceLastDeparture(); elapsed < DepartureSpacingSec {
-		secsLeft := int((DepartureSpacingSec - elapsed).Seconds())
+		secsLeft := int(math.Ceil((DepartureSpacingSec - elapsed).Seconds()))
 		log.Info().
 			Str("callsign", callsign).
 			Int("secondsLeft", secsLeft).
