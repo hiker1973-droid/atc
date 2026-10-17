@@ -34,6 +34,10 @@ type Params struct {
 	// 6 m short of the aim point; DCS's LSO (Tactical Paddles) gave it the 1
 	// wire. A Hornet's hook is ~7 m behind its centre.
 	HookAftOfRefM float64
+	// TouchdownCalM moves the estimated touchdown aft. Against DCS's wire
+	// for five traps on 2026-10-17 (11:00 W2, 11:11 W4, 13:06 W3, 13:46 W1,
+	// 13:57 W1) every value from 10 to 13 m gets all five right.
+	TouchdownCalM float64
 	// HookTouchFromSternM is where the lens puts the hook: 230 ft from the
 	// stern for the 3 wire, crossing the ramp at 14.1 ft (DCS Supercarrier
 	// guide, LSO station). 3.5 deg over 70 m is that 14.1 ft.
@@ -51,6 +55,7 @@ func NimitzParams() Params {
 		GlideslopeDeg:   3.5,
 		HookBelowRefM:   2.5,
 		HookAftOfRefM:   7,
+		TouchdownCalM:   11.5,
 
 		HookTouchFromSternM: 70.1,
 	}
@@ -420,6 +425,10 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 				td.g.astern -= g.height * dx / dh
 			}
 		}
+		// Calibrated against DCS's wire (Tactical Paddles, 5 traps on
+		// 2026-10-17): the hook meets the deck TouchdownCalM before the
+		// point the track says.
+		td.g.astern += t.P.TouchdownCalM
 		p.touchdown = &td
 	}
 	if p.touchdown != nil {

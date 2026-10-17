@@ -31,6 +31,7 @@ func world(p Params, s Ship, astern, right, height float64) (lat, lon, altM floa
 func (f flight) run(t *testing.T) (calls []Call, summary string) {
 	t.Helper()
 	p := NimitzParams()
+	p.TouchdownCalM = 0 // corrects real Tacview tracks; these are exact
 	tr := NewTracker(p)
 	tr.Done = func(s string) { summary = s }
 	t0 := time.Date(2026, 10, 17, 14, 0, 0, 0, time.UTC)
