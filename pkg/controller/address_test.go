@@ -36,6 +36,11 @@ func TestParseIntentAddressing(t *testing.T) {
 		{"tbilisi as lochini", "Tbilisi Tower", "Lochini, Raider 302, request taxi", true},
 		{"tbilisi is not kutaisi", "Kutaisi Tower", "Double-Ace Tower, Raider 302, radio check", false},
 
+		// Senaki misses on DCS3 2026-10-17.
+		{"senaki as snarky", "Senaki Tower", "Snarky Tower, Raider 303, request taxi.", true},
+		{"senaki as select ski", "Senaki Tower", "Select Ski traffic, Raider 306, request taxi.", true},
+		{"snarky is not kutaisi", "Kutaisi Tower", "Snarky Tower, Raider 303, request taxi.", false},
+
 		// Other shapes of the field-name address.
 		{"misspelt without tower", "Incirlik Tower", "Injirlik, Raider 11, request taxi", true},
 		{"pg short name", "Al Minhad Tower", "Minhad, Raider 11, request taxi", true},
