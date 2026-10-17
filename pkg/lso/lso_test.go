@@ -206,6 +206,20 @@ func TestOverheadIsNotAGroove(t *testing.T) {
 	}
 }
 
+// Settling a metre low over the ramp is a landing, not a wave-off (three good
+// passes in the 2026-10-17 recordings were waved off 35-50 m from the aim point).
+func TestLowOverRampIsNotWavedOff(t *testing.T) {
+	calls, sum := flight{gsErr: func(a float64) float64 {
+		if a < 60 {
+			return -1.2
+		}
+		return 0
+	}, luErr: zero, finish: "trap", ball: true}.run(t)
+	if has(calls, CallWaveOff) || !strings.Contains(sum, ": trap") {
+		t.Errorf("calls = %v, summary %q: want a trap, no wave off", calls, sum)
+	}
+}
+
 func TestFoulDeckWaveOff(t *testing.T) {
 	calls, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, foulFrom: 900}.run(t)
 	if !has(calls, CallWaveOffFoul) {

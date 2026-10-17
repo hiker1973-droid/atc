@@ -171,9 +171,11 @@ const (
 	grooveMaxHeight = 450.0  // and below ~1,500 ft
 	grooveMaxLineup = 12.0   // and within this many degrees of centreline
 	grooveMaxHdgOff = 35.0   // and pointing roughly down the landing axis
-	grooveMaxGS     = 2.5    // and within this many degrees of the glideslope
+	grooveMaxGS     = 2.5    // and no more than this many degrees above the glideslope
+	grooveMaxLow    = 3.4    // or below it (3.5 below is on the water)
 	closeInM        = 300.0  // inside this, lineup is judged in metres
 	waveOffRightM   = 10.0   // off the landing axis this far in close
+	waveOffLowM     = 3.0    // or this far below the glideslope (the hook clears the ramp by ~4.3 m)
 	callsFromM      = 1500.0 // deviation calls from ~0.8 nm (earlier after a ball call)
 	callsUntilM     = 70.0   // nothing but wave off over the ramp
 	callTheBallM    = 1100.0
@@ -300,8 +302,10 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 	if pass == nil {
 		axis := math.Mod(s.HeadingDeg+t.P.AngledDeckDeg+360, 360)
 		// A groove descends near the glideslope; the overhead break and
-		// upwind fly-bys (level, several degrees high) are not passes.
-		if !haveTrack || !descending || math.Abs(gs) > grooveMaxGS || g.astern > grooveStartM || g.astern < grooveMinM || g.height > grooveMaxHeight ||
+		// upwind fly-bys (level, several degrees high) are not passes. A jet
+		// low and flat is: that is the dangerous one (15:38 Day, GS -2.9).
+		high := gs > 0 && (!descending || gs > grooveMaxGS)
+		if !haveTrack || high || gs < -grooveMaxLow || g.astern > grooveStartM || g.astern < grooveMinM || g.height > grooveMaxHeight ||
 			g.height < 0 || math.Abs(lineup) > grooveMaxLineup || angleDiff(trackDeg, axis) > grooveMaxHdgOff {
 			return ""
 		}
@@ -464,13 +468,20 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		p.waveOff, p.foulDeck = true, true
 		return t.say(p, CallWaveOffFoul, s.at)
 	}
-	// Wave off: dangerously low or badly lined up in close.
-	// Lineup in degrees grows as range closes, so in close it is metres.
-	badLineup := math.Abs(lineup) > 5
-	if g.astern < closeInM {
-		badLineup = math.Abs(g.right) > waveOffRightM
+	// Wave off: dangerously low or badly lined up in close. Degrees grow as
+	// range closes, so in close it is metres; past the ramp he is landing
+	// (the 2026-10-17 recordings had three good passes waved off 35-50 m
+	// short of the aim point, a metre low).
+	var waveOff bool
+	switch {
+	case g.astern <= t.P.HookTouchFromSternM:
+	case g.astern < closeInM:
+		low := g.height - math.Tan(t.P.GlideslopeDeg*math.Pi/180)*g.astern
+		waveOff = low < -waveOffLowM || math.Abs(g.right) > waveOffRightM
+	case g.astern < 600:
+		waveOff = gs < -1.3 || math.Abs(lineup) > 5
 	}
-	if (g.astern < 600 && (gs < -1.3 || badLineup)) || (g.astern < closeInM && gs < -0.9) {
+	if waveOff {
 		p.waveOff = true
 		return t.say(p, CallWaveOff, s.at)
 	}
@@ -589,6 +600,8 @@ var segments = []struct {
 	from, to float64
 }{{"X", 2400, 1390}, {"IM", 1390, 740}, {"IC", 740, 370}, {"AR", 370, 0}}
 
+const arRefM = 200.0
+
 func (t *Tracker) finish(p *Pass) {
 	delete(t.passes, p.Callsign)
 	delete(t.prev, p.Callsign)
@@ -662,8 +675,15 @@ func (t *Tracker) segMeans(p *Pass) []segMeans {
 		var n, na int
 		for _, s := range p.samples {
 			if s.g.astern <= seg.from && s.g.astern > seg.to {
-				m.gs += s.gs
-				m.lu += s.lineup
+				gs, lu := s.gs, s.lineup
+				if seg.name == "AR" {
+					// Degrees blow up over the ramp: take metres, as degrees
+					// at 200 m (a jet 4 m right was "LUR" at the ramp).
+					low := s.g.height - math.Tan(t.P.GlideslopeDeg*math.Pi/180)*s.g.astern
+					gs, lu = math.Atan2(low, arRefM)*180/math.Pi, math.Atan2(s.g.right, arRefM)*180/math.Pi
+				}
+				m.gs += gs
+				m.lu += lu
 				n++
 				if s.hasAoA {
 					m.aoa += s.aoa
