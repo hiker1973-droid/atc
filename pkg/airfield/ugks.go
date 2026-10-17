@@ -30,6 +30,12 @@ var UGKS = &Airfield{
 	// spots 1-58, "just assign a parking number".
 	ParkingFirst: 1,
 	ParkingLast:  58,
+	// Operator 2026-10-16: "via Bravo then November if land on 27, Charlie
+	// then November if land 09".
+	ParkingVia: map[string]string{
+		"27": "Bravo, then November",
+		"09": "Charlie, then November",
+	},
 	RunwayPairs: []RunwayPair{
 		{
 			Primary:    Runway{Designator: "09", MagneticHeading: 88.0, ThresholdLatLon: orb.Point{42.0342, 42.2419}},

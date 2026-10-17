@@ -523,7 +523,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 			// "request taxi to parking" after landing: not a departure.
 			s.Remove(req.Callsign)
 			ground = c.groundTransmitFn != nil
-			response = c.composer.TaxiToParking(req.Callsign, c.groundSpeaker(), c.assignParking(req.Callsign, s.Airfield, time.Now()))
+			response = c.composer.TaxiToParking(req.Callsign, c.groundSpeaker(), c.assignParking(req.Callsign, s.Airfield, time.Now()), s.Airfield.ParkingVia[s.ActiveRunway])
 			break
 		}
 		s.EnqueueDeparture(ac)
@@ -643,7 +643,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		s.Remove(req.Callsign)
 		if spot := c.assignParking(req.Callsign, s.Airfield, time.Now()); spot != 0 {
 			ground = c.groundTransmitFn != nil
-			response = c.composer.RunwayVacatedParking(req.Callsign, c.groundSpeaker(), s.ActiveRunway, spot)
+			response = c.composer.RunwayVacatedParking(req.Callsign, c.groundSpeaker(), s.ActiveRunway, spot, s.Airfield.ParkingVia[s.ActiveRunway])
 		} else {
 			response = c.composer.RunwayVacated(req.Callsign, s.ActiveRunway)
 		}

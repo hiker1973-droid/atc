@@ -715,22 +715,24 @@ func (c *ATCComposer) RunwayVacated(callsign, activeRunway string) string {
 
 // RunwayVacatedParking is RunwayVacated with a parking spot assigned
 // (airfield.ParkingFirst..ParkingLast), spoken by speaker ("Senaki Ground";
-// "" = the tower) — 3 variations.
-func (c *ATCComposer) RunwayVacatedParking(callsign, speaker, activeRunway string, spot int) string {
+// "" = the tower); via is the taxi route ("Bravo, then November", "" = none)
+// — 3 variations.
+func (c *ATCComposer) RunwayVacatedParking(callsign, speaker, activeRunway string, spot int, via string) string {
 	if speaker == "" {
 		speaker = c.towerCallsign
 	}
 	rwy := spellRunway(activeRunway)
+	route := parkingRoute(via)
 	return pick([]string{
-		fmt.Sprintf("%s, %s, runway %s clear, taxi to parking spot %d.", callsign, speaker, rwy, spot),
-		fmt.Sprintf("%s, %s, roger clear of runway %s, parking spot %d.", callsign, speaker, rwy, spot),
-		fmt.Sprintf("%s, %s, welcome back, taxi to spot %d.", callsign, speaker, spot),
+		fmt.Sprintf("%s, %s, runway %s clear, taxi to parking spot %d%s.", callsign, speaker, rwy, spot, route),
+		fmt.Sprintf("%s, %s, roger clear of runway %s, parking spot %d%s.", callsign, speaker, rwy, spot, route),
+		fmt.Sprintf("%s, %s, welcome back, taxi to spot %d%s.", callsign, speaker, spot, route),
 	})
 }
 
 // TaxiToParking answers "request taxi to parking", spoken by speaker ("" =
 // the tower). spot == 0 when the field has no parking spots — 3 variations.
-func (c *ATCComposer) TaxiToParking(callsign, speaker string, spot int) string {
+func (c *ATCComposer) TaxiToParking(callsign, speaker string, spot int, via string) string {
 	if speaker == "" {
 		speaker = c.towerCallsign
 	}
@@ -741,11 +743,19 @@ func (c *ATCComposer) TaxiToParking(callsign, speaker string, spot int) string {
 			fmt.Sprintf("%s, %s, welcome back, taxi to parking.", callsign, speaker),
 		})
 	}
+	route := parkingRoute(via)
 	return pick([]string{
-		fmt.Sprintf("%s, %s, taxi to parking spot %d.", callsign, speaker, spot),
-		fmt.Sprintf("%s, %s, roger, parking spot %d.", callsign, speaker, spot),
-		fmt.Sprintf("%s, %s, welcome back, taxi to spot %d.", callsign, speaker, spot),
+		fmt.Sprintf("%s, %s, taxi to parking spot %d%s.", callsign, speaker, spot, route),
+		fmt.Sprintf("%s, %s, roger, parking spot %d%s.", callsign, speaker, spot, route),
+		fmt.Sprintf("%s, %s, welcome back, taxi to spot %d%s.", callsign, speaker, spot, route),
 	})
+}
+
+func parkingRoute(via string) string {
+	if via == "" {
+		return ""
+	}
+	return " via " + via
 }
 
 // TouchdownAck answers "wheels down" / "touchdown": landed, not yet clear of

@@ -91,3 +91,26 @@ func TestSenakiParkingSpots(t *testing.T) {
 func hasSpot(got string, n int) bool {
 	return regexp.MustCompile(fmt.Sprintf(`spot %d\b`, n)).MatchString(got)
 }
+
+// The route follows the landing runway: Bravo then November off 27, Charlie
+// then November off 09 (operator 2026-10-16).
+func TestParkingRouteByRunway(t *testing.T) {
+	c, sent, handle := departureController(t)
+	c.mu.Lock()
+	af := c.airfieldState.Airfield
+	af.ParkingFirst, af.ParkingLast = 1, 58
+	af.ParkingVia = airfield.UGKS.ParkingVia
+	c.airfieldState.ActiveRunway = "27"
+	c.mu.Unlock()
+	handle("Test Tower, Raider 302, clear of the active")
+	if got := (*sent)[len(*sent)-1]; !strings.HasSuffix(got, "spot 1 via Bravo, then November.") {
+		t.Errorf("runway 27 -> %q", got)
+	}
+	c.mu.Lock()
+	c.airfieldState.ActiveRunway = "09"
+	c.mu.Unlock()
+	handle("Test Tower, Raider 303, request taxi to parking")
+	if got := (*sent)[len(*sent)-1]; !strings.HasSuffix(got, "spot 2 via Charlie, then November.") {
+		t.Errorf("runway 09 -> %q", got)
+	}
+}

@@ -73,6 +73,9 @@ type Airfield struct {
 	// ParkingFirst..ParkingLast are the numbered parking spots the tower
 	// hands out in turn to landing traffic. Zero = the plain "taxi to parking".
 	ParkingFirst, ParkingLast int
+	// ParkingVia is the taxi route to parking by landing runway, as spoken
+	// ("Bravo, then November"); a runway not listed gets no route.
+	ParkingVia map[string]string
 }
 
 // ParkingSpot returns the n-th spot (0-based, wrapping); ok is false when the
