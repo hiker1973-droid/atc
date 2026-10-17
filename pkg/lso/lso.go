@@ -42,7 +42,7 @@ func NimitzParams() Params {
 		SternM:          -164,
 		WiresFromSternM: [4]float64{55, 67, 79, 92},
 		AngledDeckDeg:   -9.14,
-		LandingLateralM: 0,
+		LandingLateralM: -4, // 5 passes in the 2026-10-17 Day recording touched 0-8 m port
 		GlideslopeDeg:   3.5,
 		HookBelowRefM:   2.5,
 
@@ -171,15 +171,19 @@ const (
 	grooveMaxHeight = 450.0  // and below ~1,500 ft
 	grooveMaxLineup = 12.0   // and within this many degrees of centreline
 	grooveMaxHdgOff = 35.0   // and pointing roughly down the landing axis
+	grooveMaxGS     = 2.5    // and within this many degrees of the glideslope
+	closeInM        = 300.0  // inside this, lineup is judged in metres
+	waveOffRightM   = 10.0   // off the landing axis this far in close
 	callsFromM      = 1500.0 // deviation calls from ~0.8 nm (earlier after a ball call)
 	callsUntilM     = 70.0   // nothing but wave off over the ramp
 	callTheBallM    = 1100.0
 	gapMin          = 2 * time.Second
-	sameCallGap     = 4500 * time.Millisecond
+	sameCallGap     = 8 * time.Second // "a little high" every 4.5 s was nagging
 	lostAfter       = 6 * time.Second
 	onDeckM         = 1.0 // hook height above the deck
 	trapRelKts      = 20.0
 	bolterRelKts    = 60.0
+	bolterPastM     = 90.0 // past the 4 wire, beyond a trap's run-out
 	hornetOnSpeed   = 8.1
 )
 
@@ -270,7 +274,7 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 
 	ps := passSample{at: smp.At, g: g, gs: gs, lineup: lineup}
 	var trackDeg float64
-	haveTrack := false
+	haveTrack, descending := false, false
 	if havePrev {
 		dt := smp.At.Sub(prev.At).Seconds()
 		if dt > 0.05 && dt < 3 {
@@ -283,6 +287,7 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 			gsMps := math.Hypot(ve, vn)
 			if gsMps > 20 {
 				trackDeg, haveTrack = bearingDeg(ve, vn), true
+				descending = smp.AltM-prev.AltM < -math.Tan(0.5*math.Pi/180)*gsMps*dt
 			}
 			if smp.HasPitch && gsMps > 20 {
 				gamma := math.Atan2((smp.AltM-prev.AltM)/dt, gsMps) * 180 / math.Pi
@@ -294,7 +299,9 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 	pass := t.passes[callsign]
 	if pass == nil {
 		axis := math.Mod(s.HeadingDeg+t.P.AngledDeckDeg+360, 360)
-		if !haveTrack || g.astern > grooveStartM || g.astern < grooveMinM || g.height > grooveMaxHeight ||
+		// A groove descends near the glideslope; the overhead break and
+		// upwind fly-bys (level, several degrees high) are not passes.
+		if !haveTrack || !descending || math.Abs(gs) > grooveMaxGS || g.astern > grooveStartM || g.astern < grooveMinM || g.height > grooveMaxHeight ||
 			g.height < 0 || math.Abs(lineup) > grooveMaxLineup || angleDiff(trackDeg, axis) > grooveMaxHdgOff {
 			return ""
 		}
@@ -403,7 +410,10 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		switch {
 		case s.relSpeedKts > 0 && s.relSpeedKts < trapRelKts && g.height < onDeckM:
 			p.outcome, p.trapStopFwd = "trap", fwd
-		case !p.bolterSaid && fwd > t.wireFwd(3)+40 && s.relSpeedKts > bolterRelKts:
+		// The 2026-10-17 Day recording: a trap still rolls at touchdown speed
+		// 30 m past the 4 wire and stops ~100 m past the aim point; a bolter
+		// is still at 120+ kt there.
+		case !p.bolterSaid && fwd > t.wireFwd(4)+bolterPastM && s.relSpeedKts > bolterRelKts:
 			p.bolterSaid = true
 			if !p.waveOff {
 				p.outcome = "bolter"
@@ -422,7 +432,8 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		}
 		return ""
 	}
-	if g.astern > grooveStartM+600 || g.height > grooveMaxHeight+150 || math.Abs(s.lineup) > grooveMaxLineup+8 {
+	if g.astern > grooveStartM+600 || g.height > grooveMaxHeight+150 ||
+		(g.astern > closeInM && math.Abs(s.lineup) > grooveMaxLineup+8) {
 		if p.waveOff {
 			p.outcome = "wave off"
 		} else {
@@ -454,7 +465,12 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		return t.say(p, CallWaveOffFoul, s.at)
 	}
 	// Wave off: dangerously low or badly lined up in close.
-	if (g.astern < 600 && (gs < -1.3 || math.Abs(lineup) > 5)) || (g.astern < 300 && gs < -0.9) {
+	// Lineup in degrees grows as range closes, so in close it is metres.
+	badLineup := math.Abs(lineup) > 5
+	if g.astern < closeInM {
+		badLineup = math.Abs(g.right) > waveOffRightM
+	}
+	if (g.astern < 600 && (gs < -1.3 || badLineup)) || (g.astern < closeInM && gs < -0.9) {
 		p.waveOff = true
 		return t.say(p, CallWaveOff, s.at)
 	}

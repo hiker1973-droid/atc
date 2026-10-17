@@ -187,6 +187,25 @@ func TestDownwindIsNotAGroove(t *testing.T) {
 	}
 }
 
+// Running in for the break, level at 800 ft straight up the landing axis, is
+// not a pass (the 2026-10-17 Day recording had one before every recovery,
+// each "waved off").
+func TestOverheadIsNotAGroove(t *testing.T) {
+	p := NimitzParams()
+	tr := NewTracker(p)
+	ship := Ship{Lat: 42, Lon: 41, HeadingDeg: 100, SpeedMps: 15}
+	t0 := time.Now()
+	for i := 0; i < 160; i++ {
+		lat, lon, alt := world(p, ship, 2300-float64(i)*20, 0, 245)
+		if c := tr.Update("Raider 302", "FA-18C_hornet", ship, Sample{At: t0.Add(time.Duration(i) * 200 * time.Millisecond), Lat: lat, Lon: lon, AltM: alt}); c != "" {
+			t.Fatalf("call %q on the run-in", c)
+		}
+	}
+	if len(tr.InGroove()) != 0 {
+		t.Errorf("in groove: %v", tr.InGroove())
+	}
+}
+
 func TestFoulDeckWaveOff(t *testing.T) {
 	calls, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, foulFrom: 900}.run(t)
 	if !has(calls, CallWaveOffFoul) {

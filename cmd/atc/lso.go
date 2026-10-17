@@ -40,7 +40,7 @@ func registerLSOFlags(f *flag.FlagSet) {
 	f.Float64Var(&flagLSOFreq, "lso-freq", 128.3, "Paddles frequency in MHz")
 	f.StringVar(&flagLSOName, "lso-name", "Paddles", "Paddles SRS client name")
 	f.StringVar(&flagLSOVoice, "lso-voice", "ash", "Paddles OpenAI TTS voice")
-	f.Float64Var(&flagLSOLateral, "lso-landing-lateral-m", 0,
+	f.Float64Var(&flagLSOLateral, "lso-landing-lateral-m", -4,
 		"Landing point offset from the carrier centreline in metres, starboard positive (calibrate from logged traps)")
 }
 
@@ -396,7 +396,7 @@ func (t *lsoTacview) handleLine(line string) {
 	}
 	cs := strings.TrimSpace(o.pilot[:strings.Index(o.pilot, "|")])
 	t.feed.lock()
-	t.feed.tr.SetDeckFoul(t.deckFoul(now))
+	t.feed.tr.SetDeckFoul(t.deckFoul(now, id))
 	c := t.feed.tr.Update(cs, o.name, s, smp)
 	if now.Sub(t.lastExpire) > time.Second {
 		t.feed.tr.Expire(now)
@@ -409,14 +409,16 @@ func (t *lsoTacview) handleLine(line string) {
 	}
 }
 
-// deckFoul: something has been on the landing area in the last 3 s, and not
-// so long that it is parked there.
-func (t *lsoTacview) deckFoul(now time.Time) bool {
+// deckFoul: something other than the jet in the groove (self) has been on the
+// landing area in the last 3 s, and not so long that it is parked there. Over
+// the ramp the landing jet itself is inside the area.
+func (t *lsoTacview) deckFoul(now time.Time, self string) bool {
 	foul := ""
 	for id, seen := range t.onDeck {
 		switch {
 		case now.Sub(seen[1]) > 3*time.Second:
 			delete(t.onDeck, id) // left the picture
+		case id == self:
 		case now.Sub(seen[0]) < foulMaxAge:
 			foul = id
 		}

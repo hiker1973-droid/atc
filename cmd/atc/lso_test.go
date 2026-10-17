@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -100,14 +101,20 @@ func TestLSOReplay(t *testing.T) {
 	defer fh.Close()
 	f := newLSOFeed(lso.NimitzParams(), func(c lso.Call) { t.Logf("call %q", c) })
 	tv := newLSOTacview(f)
-	clock := time.Now()
+	start := time.Now()
+	clock := start
 	tv.now = func() time.Time { return clock }
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	for sc.Scan() {
 		line := sc.Text()
 		if strings.HasPrefix(line, "#") {
-			clock = clock.Add(70 * time.Millisecond)
+			// A recording carries frame times; a raw capture may not.
+			if s, err := strconv.ParseFloat(line[1:], 64); err == nil {
+				clock = start.Add(time.Duration(s * float64(time.Second)))
+			} else {
+				clock = clock.Add(70 * time.Millisecond)
+			}
 		}
 		tv.handleLine(line)
 	}
@@ -124,15 +131,21 @@ func TestLSODeckFoul(t *testing.T) {
 	tv := newLSOTacview(newLSOFeed(lso.NimitzParams(), func(lso.Call) {}))
 	now := time.Date(2026, 10, 17, 15, 0, 0, 0, time.UTC)
 	tv.onDeck["a1"] = [2]time.Time{now.Add(-10 * time.Second), now}
-	if !tv.deckFoul(now) {
+	if !tv.deckFoul(now, "") {
 		t.Error("jet that just trapped: want foul")
 	}
 	tv.onDeck["a1"] = [2]time.Time{now.Add(-2 * time.Minute), now}
-	if tv.deckFoul(now) {
+	if tv.deckFoul(now, "") {
 		t.Error("parked for 2 min: want clear")
 	}
 	tv.onDeck["a1"] = [2]time.Time{now.Add(-20 * time.Second), now.Add(-5 * time.Second)}
-	if tv.deckFoul(now) || len(tv.onDeck) != 0 {
+	if tv.deckFoul(now, "") || len(tv.onDeck) != 0 {
 		t.Error("left the area 5 s ago: want clear and forgotten")
+	}
+	// Over the ramp the landing jet itself is in the area (every trap in the
+	// 2026-10-17 Day recording was waved off "foul deck" by itself).
+	tv.onDeck["a2"] = [2]time.Time{now.Add(-time.Second), now}
+	if tv.deckFoul(now, "a2") {
+		t.Error("only the landing jet itself: want clear")
 	}
 }
