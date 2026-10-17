@@ -42,6 +42,8 @@ func registerLSOFlags(f *flag.FlagSet) {
 	f.StringVar(&flagLSOVoice, "lso-voice", "ash", "Paddles OpenAI TTS voice")
 	f.Float64Var(&flagLSOLateral, "lso-landing-lateral-m", -4,
 		"Landing point offset from the carrier centreline in metres, starboard positive (calibrate from logged traps)")
+	f.StringVar(&flagLSOGrpcAddr, "lso-grpc-addr", "localhost:50051",
+		`DCS-gRPC for DCS's own LSO grades and wires, logged beside Paddles' ("" = off; Night is :50053)`)
 }
 
 const styleLSO = "Speak as a US Navy landing signal officer on the platform. " +
@@ -145,6 +147,7 @@ func runLSO(ctx context.Context, apiKey string) {
 			return feed.heard(text)
 		})
 	go runLSOTacview(ctx, flagTacviewAddr, feed)
+	go runLSOGrpc(ctx, flagLSOGrpcAddr, feed.truth)
 	log.Info().Float64("freq", flagLSOFreq).Str("name", flagLSOName).Str("voice", flagLSOVoice).
 		Float64("lateralM", flagLSOLateral).Msg("Paddles starting")
 	<-ctx.Done()
@@ -164,14 +167,18 @@ var (
 // lsoFeed is the shared state: the tracker (Tacview goroutine) and the radio
 // (voiceNetLoop goroutine) both touch it.
 type lsoFeed struct {
-	mu  sync.Mutex
-	tr  *lso.Tracker
-	say func(lso.Call)
+	mu    sync.Mutex
+	tr    *lso.Tracker
+	say   func(lso.Call)
+	truth *lsoTruth
 }
 
 func newLSOFeed(p lso.Params, say func(lso.Call)) *lsoFeed {
-	f := &lsoFeed{tr: lso.NewTracker(p), say: say}
-	f.tr.Done = func(summary string) { log.Info().Str("pass", summary).Msg("Paddles: pass") }
+	f := &lsoFeed{tr: lso.NewTracker(p), say: say, truth: newLSOTruth()}
+	f.tr.Done = func(summary string) {
+		log.Info().Str("pass", summary).Msg("Paddles: pass")
+		f.truth.pass(summary, time.Now())
+	}
 	return f
 }
 

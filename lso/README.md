@@ -78,9 +78,10 @@ contact and BRC the same way Marshal finds them (`findCarrierContact`).
 ## Data source options
 
 - **Tacview (chosen for step 1):** already connected on every rig; no DCS change.
-- **DCS-gRPC:** the v1.3 plan's source (AoA, gear, hook). It was disabled over a
-  LotATC Export.lua conflict, and that plan predates the rigs — revisit only
-  if Tacview lacks AoA.
+- **DCS-gRPC:** the v1.3 plan's source (AoA, gear, hook). Live on the rigs
+  (Tactical Paddles reads it): Day :50051, Night :50053, Foothold :50052.
+  Paddles reads only DCS's landing grade (grade + wire) from it and logs it
+  beside its own pass ("Paddles: vs DCS LSO") to calibrate against.
 - **DCS server hook / mission script:** landing events, fast positions; no AoA,
   no wire number.
 - **MOOSE AIRBOSS:** full LSO with grading, but brings its own Marshal —

@@ -25,6 +25,13 @@ set GOMEMLIMIT=256MiB
 set MIZ_FLAG=
 if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
+:: DCS-gRPC for DCS's own LSO grade and wire (what Tactical Paddles reads):
+:: Day (SRS :5008) is :50051, Night (SRS :5004) is :50053 (operator's server
+:: list 2026-10-17). SKYEYE_GRPC overrides.
+set GRPC=localhost:50051
+if "%SRS%"=="localhost:5004" set GRPC=localhost:50053
+if defined SKYEYE_GRPC set GRPC=%SKYEYE_GRPC%
+
 :: Caucasus / Black Sea Paddles (LSO) -- CVN-72 Abe.
 ::
 :: 128.300 = Hornet COMM2 CH4, Paddles only (operator 2026-10-17: "Put it on
@@ -34,4 +41,4 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: logged to atc-lso.log with where it touched down, for calibration.
 :: Speed 1.66 = 1.38 +20% (operator 2026-10-17; was 1.20 +15%); "Power!" has its own
 :: sterner delivery (lso.go styleLSOPower).
-start "Paddles (Caucasus)" cmd /c "%~dp0atc.exe --lso-only --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"
+start "Paddles (Caucasus)" cmd /c "%~dp0atc.exe --lso-only --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%"
