@@ -364,6 +364,9 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
 							cs, resp := handle(text)
+							if resp == netHandled {
+								return
+							}
 							if resp == "" {
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command intent miss")
 								return

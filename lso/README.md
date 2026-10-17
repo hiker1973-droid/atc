@@ -1,16 +1,36 @@
 # SkyEye LSO ("Paddles")
 
-Status: **planning — nothing built.** Operator 2026-10-16: "Start a separate
-folder for LSO. It will have its own radio channel, not on Marshal."
+Status: **v1 built 2026-10-17, talking, not yet flown.** Operator 2026-10-17:
+"Lets do LSO but use open AI for now. Put it on Channel 4 (Strike) Comm 2 at
+128.3." Rulings: live calls from the first build (no silent step), 128.300 is
+Paddles only, Day + Night (Abe) first.
 
-## Decisions so far
+## What v1 does
 
-- **Own role, own frequency.** Paddles is a separate SkyEye role (its own
-  `atc.exe` process, launcher entry and dashboard port), not part of Marshal.
-  Marshal stays on 306.3; Paddles gets its own channel — **frequency TBD**
-  (the 2026 v1.3 plan below proposed 128.100).
-- **Silent first.** Step 1 only logs what Paddles would have said; nothing is
-  transmitted until the data proves good enough.
+- Role `--lso-only` (`cmd/atc/lso.go`), bat `start_lso_caucasus.bat`, started by
+  `start_region_caucasus.bat` / `start_all_caucasus.bat`; log `atc-lso.log`.
+- 128.300 AM, SRS name "Paddles", OpenAI voice `ash`; every fixed call is
+  rendered at start-up so a call costs only the ExternalAudio start.
+- Own Tacview reader: carrier (CVN_*) heading and speed from its last 15 s;
+  player jets (Pilot "X | name") within ~3 nm. Feed measured 2026-10-17 on Day:
+  ~4.7 Hz per aircraft, no AoA/IAS in the stream (AoA = pitch - flight path).
+- `pkg/lso`: Nimitz deck (AIRBOSS values: stern -164 m, wires 55/67/79/92 m from
+  the stern, angled deck -9.14 deg, deck 20.1 m), 3.5 deg glideslope to the 3 wire
+  flown by the hook (2.5 m below the jet's reference point).
+- Calls: roger ball / Clara (on the pilot's ball call), call the ball (none by
+  ~0.6 nm), high / a little high, low / power, right for lineup / come left,
+  fast / slow (Hornet only, AoA estimate +/-2 deg), wave off (low or badly lined
+  up in close), bolter. Max one call per 2 s, same call not within 4.5 s; stale
+  calls dropped.
+- One log line per pass: outcome, touchdown point vs the 3 wire, est. wire,
+  sample rate and max gap, X/IM/IC/AR glideslope + lineup (+ AoA), calls said.
+
+## Calibrate next
+
+- Landing point: `--lso-landing-lateral-m` and the touchdown numbers in the
+  pass log (traps should centre on 0 m from the 3 wire).
+- Thresholds and call timing from flown passes; ExternalAudio start latency.
+- Not in v1: foul-deck wave off, grades spoken, LSO on Foothold.
 
 ## Steps
 

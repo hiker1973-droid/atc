@@ -28,4 +28,7 @@ call "%~dp0start_marshal_caucasus.bat"
 echo [vSFG-7] Launching Deckboss (128.600)...
 call "%~dp0start_deckboss_caucasus.bat"
 
+echo [vSFG-7] Launching Paddles (128.300)...
+call "%~dp0start_lso_caucasus.bat"
+
 echo [vSFG-7] Caucasus region launched.

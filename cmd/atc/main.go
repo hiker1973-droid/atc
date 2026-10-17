@@ -342,6 +342,7 @@ func main() {
 		"Scudwatch SRS display callsign (dashes between syllables, no spaces — e.g. Darkstar-1-1)")
 	f.StringVar(&flagScudwatchBullseye, "scudwatch-bullseye", "",
 		"Bullseye reference for Scudwatch announcements as 'lat,lon' (default: airfield center)")
+	registerLSOFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
 	f.BoolVar(&flagMarshalTestTx, "marshal-test-tx", false,
@@ -411,6 +412,8 @@ func run(cmd *cobra.Command, args []string) error {
 		logSlug = "command"
 	case flagMarshalOnly:
 		logSlug = "marshal"
+	case flagLSOOnly:
+		logSlug = "lso"
 	case logSlug == "":
 		logSlug = "misc"
 	}
@@ -470,9 +473,10 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagATISOnly      { mode = "atis-only" }
 	if flagScudwatchOnly { mode = "scudwatch" }
 	if flagMarshalOnly   { mode = "marshal-only" }
+	if flagLSOOnly       { mode = "lso-only" }
 	if flagDeckbossFreq != "0" && flagDeckbossFreq != "" { mode = "deckboss" }
 	log.Info().Str("mode", mode).Str("srs", flagSRSAddr).Msg("vsfg7-atc starting")
-	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly {
+	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly && !flagLSOOnly {
 		log.Info().
 			Str("airfield", af.ICAO).
 			Str("callsign", callsign).
@@ -494,6 +498,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	var wg sync.WaitGroup
 
+	// Paddles (lso.go) is self-contained: its own Tacview reader and radio.
+	if flagLSOOnly {
+		runLSO(ctx, apiKey)
+		log.Info().Msg("Paddles offline")
+		return nil
+	}
 
 	// Apply runway-slot override before any AirfieldState is constructed so
 	// the rotation anchor uses the requested cadence from t=0. Logged so any
