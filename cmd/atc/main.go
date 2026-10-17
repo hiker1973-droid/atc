@@ -127,6 +127,7 @@ var (
 	flagElevenDepartVoice  string
 	flagElevenGroundVoice  string
 	flagElevenTowerAltVoice string
+	flagElevenTowerVoice   string
 	flagTowerShift         time.Duration
 	flagElevenDeckbossVoice string
 	flagDeckbossVoice   string
@@ -237,14 +238,16 @@ func main() {
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
+	f.StringVar(&flagElevenTowerVoice, "elevenlabs-tower-voice", "",
+		"ElevenLabs voice ID for this tower, over the accent default (Lisa / Alice / George); Senaki uses round 13 senaki_6 for Tower, Ground and Traffic")
 	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",
 		"ElevenLabs voice ID of this tower's alternate controller; the two swap every --tower-shift once the frequency has been quiet 5 min (\"\" = one controller)")
 	f.DurationVar(&flagTowerShift, "tower-shift", 2*time.Hour,
 		"Shift length for --elevenlabs-tower-alt-voice, counted from the Unix epoch so every rig changes together")
 	f.StringVar(&flagElevenDepartVoice, "elevenlabs-departure-voice", elDeparture11,
 		"ElevenLabs voice ID for the tower's Departure position - the 7-mile handoff call (default round 11 voice 4, library)")
-	f.StringVar(&flagElevenGroundVoice, "elevenlabs-ground-voice", elGround,
-		"ElevenLabs voice ID for the tower's Ground position - parking spots on landing, at fields with parking spots (Senaki)")
+	f.StringVar(&flagElevenGroundVoice, "elevenlabs-ground-voice", "",
+		"ElevenLabs voice ID for the tower's Ground position (parking spots, taxi routes, at Senaki); \"\" = the tower's own voice (operator 2026-10-16: Ground, Tower and Traffic one voice)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elRolando, "ElevenLabs voice ID for Marshal (default Rolando, library)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elDeckboss11,
 		"ElevenLabs voice ID for Deckboss (default round 11 voice 5, library; every theatre)")
@@ -2052,11 +2055,15 @@ type towerTX struct {
 // departureProfile is the tower's Departure position: the tower's delivery and
 // OpenAI fallback, its own ElevenLabs voice (operator 2026-10-15: "maybe have
 // departure a different voice").
-// groundProfile is the tower's Ground position (parking spots): the tower's
-// delivery and OpenAI fallback, its own ElevenLabs voice.
+// groundProfile is the tower's Ground position (parking spots, taxi routes):
+// the tower's own voice unless --elevenlabs-ground-voice gives it another
+// (operator 2026-10-16: "Have Senaki Ground, tower and Traffic all use the
+// same voice").
 func groundProfile(towerVoice string) voiceProfile {
-	p := towerProfile(towerVoice)
-	p.eleven = elTower(flagElevenGroundVoice, "Ground")
+	p := towerShiftProfile(towerVoice, time.Now())
+	if flagElevenGroundVoice != "" {
+		p.eleven = elTower(flagElevenGroundVoice, "Ground")
+	}
 	return p
 }
 

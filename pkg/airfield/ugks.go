@@ -36,6 +36,12 @@ var UGKS = &Airfield{
 		"27": "Bravo, then November",
 		"09": "Charlie, then November",
 	},
+	// Operator 2026-10-16: "if 27 taxi via November", "if 09 then taxi via
+	// November to Alpha".
+	TaxiVia: map[string]string{
+		"27": "November",
+		"09": "November to Alpha",
+	},
 	RunwayPairs: []RunwayPair{
 		{
 			Primary:    Runway{Designator: "09", MagneticHeading: 88.0, ThresholdLatLon: orb.Point{42.0342, 42.2419}},

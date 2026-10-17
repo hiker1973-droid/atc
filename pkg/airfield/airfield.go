@@ -76,6 +76,9 @@ type Airfield struct {
 	// ParkingVia is the taxi route to parking by landing runway, as spoken
 	// ("Bravo, then November"); a runway not listed gets no route.
 	ParkingVia map[string]string
+	// TaxiVia is the taxi route out to the active runway, by runway, as
+	// spoken ("November to Alpha"); a runway not listed gets no route.
+	TaxiVia map[string]string
 }
 
 // ParkingSpot returns the n-th spot (0-based, wrapping); ok is false when the

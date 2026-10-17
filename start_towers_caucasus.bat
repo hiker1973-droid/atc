@@ -36,9 +36,9 @@ start "Kobuleti Tower" cmd /c "%~dp0atc.exe --airfield UG5X --srs-addr %SRS% --e
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
 :: Senaki Tower — UGKS, 261.0, dashboard 6013
-:: Two controllers on 2-hour shifts (operator 2026-10-15): Lisa, and the
-:: alternate irzJNDCo2SzXrIpo6Yd6 (round 13 voice 2). Handover waits for 5 min quiet.
-start "Senaki Tower" cmd /c "%~dp0atc.exe --airfield UGKS --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --elevenlabs-tower-alt-voice irzJNDCo2SzXrIpo6Yd6 --dashboard-port 6013 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: One voice for Senaki Tower, Ground and Traffic (operator 2026-10-16):
+:: X1WtgMmQUBwtiAPn4j1P, round 13 senaki_6. Was Lisa + irzJNDCo2SzXrIpo6Yd6 on 2-hour shifts.
+start "Senaki Tower" cmd /c "%~dp0atc.exe --airfield UGKS --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --elevenlabs-tower-voice X1WtgMmQUBwtiAPn4j1P --dashboard-port 6013 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
 :: Kutaisi Tower — UGKO, 263.0, dashboard 6014

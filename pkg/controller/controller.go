@@ -527,7 +527,9 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 			break
 		}
 		s.EnqueueDeparture(ac)
-		response = c.composer.TaxiClearance(req.Callsign, s.ActiveRunway, s.AltimeterInHg)
+		// Fields with a Ground position (Senaki) give the taxi route, as Ground.
+		ground = c.groundTransmitFn != nil
+		response = c.composer.TaxiClearance(req.Callsign, c.groundSpeaker(), s.ActiveRunway, s.AltimeterInHg, s.Airfield.TaxiVia[s.ActiveRunway])
 
 	case RequestTakeoffClear:
 		response = c.handleTakeoffRequest(ctx, req.Callsign, ac, s)

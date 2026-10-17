@@ -112,6 +112,10 @@ func towerProfile(voice string) voiceProfile {
 	if flagVoiceStyleTower != styleTower {
 		accent = accentBritish
 	}
+	eleven := elevenTowerVoice(accent, voiceIsMale(voice))
+	if flagElevenTowerVoice != "" {
+		eleven = elTower(flagElevenTowerVoice, "Tower")
+	}
 	return voiceProfile{voice: voice, speed: flagTTSSpeed, instructions: towerStyleFor(flagAirfield, voice),
-		eleven: elevenTowerVoice(accent, voiceIsMale(voice))}
+		eleven: eleven}
 }

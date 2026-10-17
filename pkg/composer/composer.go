@@ -152,13 +152,20 @@ func (c *ATCComposer) ReportClearOfRunway(callsign string) string {
 }
 
 // TaxiClearance issues taxi instructions — 3 variations.
-func (c *ATCComposer) TaxiClearance(callsign, activeRunway string, altimeterInHg float64) string {
+//
+// speaker is who says it ("Senaki Ground"; "" = the tower) and via the route
+// ("November to Alpha"; "" = none).
+func (c *ATCComposer) TaxiClearance(callsign, speaker, activeRunway string, altimeterInHg float64, via string) string {
+	if speaker == "" {
+		speaker = c.towerCallsign
+	}
 	alt := formatAltimeter(altimeterInHg)
 	rwy := spellRunway(activeRunway)
+	route := parkingRoute(via)
 	return pick([]string{
-		fmt.Sprintf("%s, %s, taxi to runway %s, altimeter %s, hold short, advise ready.", callsign, c.towerCallsign, rwy, alt),
-		fmt.Sprintf("%s, %s, altimeter %s, cleared to taxi runway %s, hold short and call ready.", callsign, c.towerCallsign, alt, rwy),
-		fmt.Sprintf("%s, %s, roger, altimeter %s, taxi runway %s, hold short of the runway, advise when ready for takeoff.", callsign, c.towerCallsign, alt, rwy),
+		fmt.Sprintf("%s, %s, taxi to runway %s%s, altimeter %s, hold short, advise ready.", callsign, speaker, rwy, route, alt),
+		fmt.Sprintf("%s, %s, altimeter %s, cleared to taxi runway %s%s, hold short and call ready.", callsign, speaker, alt, rwy, route),
+		fmt.Sprintf("%s, %s, roger, altimeter %s, taxi runway %s%s, hold short of the runway, advise when ready for takeoff.", callsign, speaker, alt, rwy, route),
 	})
 }
 

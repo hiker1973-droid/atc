@@ -58,7 +58,7 @@ const (
 const (
 	elScotty  = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
 	elLisa    = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
-	elGround  = "X1WtgMmQUBwtiAPn4j1P" // Senaki Ground: round 13 senaki_6, operator 2026-10-16 "use this one"
+	elGround  = "X1WtgMmQUBwtiAPn4j1P" // Senaki Tower/Ground/Traffic: round 13 senaki_6, operator 2026-10-16
 	elGideon  = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command until round 10)
 	elSpartan = "S75jVZ0i3J6Xa5BbK8CE" // American man, calm, grounded baritone (Command, then Marshal, on 2026-10-15)
 	elRolando = "6PBHdlpKVQ70t6tnDUYF" // American man, crisp, military (Marshal; operator 2026-10-15: "change marshall to this command_2_Rolando-crisp-military")
