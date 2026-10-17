@@ -15,6 +15,8 @@ type flight struct {
 	// after the landing point: "trap" stops, "bolter" carries on.
 	finish string
 	ball   bool
+	// foulFrom, when set, fouls the deck once the jet is this close (m astern).
+	foulFrom float64
 }
 
 func world(p Params, s Ship, astern, right, height float64) (lat, lon, altM float64) {
@@ -62,6 +64,9 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 			ballDone = true
 			calls = append(calls, tr.BallCall("302", false, now))
 		}
+		if f.foulFrom > 0 && astern < f.foulFrom {
+			tr.SetDeckFoul(true)
+		}
 		c := tr.Update("Raider 302", "FA-18C_hornet", ship, Sample{At: now, Lat: lat, Lon: lon, AltM: alt})
 		if c != "" {
 			calls = append(calls, c)
@@ -100,7 +105,7 @@ func TestOnGlideslopeTrap(t *testing.T) {
 			t.Errorf("unexpected call %q on a perfect pass (all %v)", c, calls)
 		}
 	}
-	if !strings.Contains(sum, ": trap") || !strings.Contains(sum, "est. 3 wire") {
+	if !strings.Contains(sum, ": trap") || !strings.Contains(sum, "est. 3 wire") || !strings.Contains(sum, "grade _OK_: 3 wire") {
 		t.Errorf("summary = %q, want a 3-wire trap", sum)
 	}
 }
@@ -179,5 +184,44 @@ func TestDownwindIsNotAGroove(t *testing.T) {
 	}
 	if len(tr.InGroove()) != 0 {
 		t.Errorf("in groove: %v", tr.InGroove())
+	}
+}
+
+func TestFoulDeckWaveOff(t *testing.T) {
+	calls, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, foulFrom: 900}.run(t)
+	if !has(calls, CallWaveOffFoul) {
+		t.Errorf("calls = %v, want %q", calls, CallWaveOffFoul)
+	}
+	if !strings.Contains(sum, "WO (foul deck)") {
+		t.Errorf("summary = %q, want WO (foul deck)", sum)
+	}
+}
+
+// High all the way down: "You're high", then "bring it down" while it lasts.
+func TestStaysHigh(t *testing.T) {
+	calls, sum := flight{gsErr: func(a float64) float64 {
+		if a > 300 {
+			return 1.5
+		}
+		return 0
+	}, luErr: zero, finish: "trap", ball: true}.run(t)
+	if !has(calls, CallHigh) || !has(calls, CallHighBring) {
+		t.Errorf("calls = %v, want high then bring it down", calls)
+	}
+	if !strings.Contains(sum, "HX") || !strings.Contains(sum, "HIM") {
+		t.Errorf("summary = %q, want H in X and IM", sum)
+	}
+}
+
+// Low and settling in close: power, then the urgent power.
+func TestPowerEscalates(t *testing.T) {
+	calls, _ := flight{gsErr: func(a float64) float64 {
+		if a > 1050 || a < 450 {
+			return 0
+		}
+		return -0.8
+	}, luErr: zero, finish: "trap", ball: true}.run(t)
+	if !has(calls, CallPower) || !has(calls, CallPowerUrgent) {
+		t.Errorf("calls = %v, want power then POWER", calls)
 	}
 }

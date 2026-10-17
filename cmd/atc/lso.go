@@ -52,15 +52,24 @@ const styleLSO = "Speak as a US Navy landing signal officer on the platform. " +
 const styleLSOPower = "Speak as a US Navy landing signal officer on the platform. " +
 	"Stern and urgent. The pilot is settling low in close. Bark the word like an order, loud and firm, with a hard edge."
 
+// styleLSOPowerUrgent is the repeat ("POWER!") and the sinking call: take B,
+// louder (DCS: "Power" with more urgent inflection, then "power, Power, POWER").
+const styleLSOPowerUrgent = "Speak as a US Navy landing signal officer on the platform. " +
+	"Very urgent and loud, almost shouting. The pilot is still low and sinking at the ramp. " +
+	"Each word harder than the last, a hard edge, no softness."
+
 func lsoVoice() voiceProfile {
 	return voiceProfile{voice: flagLSOVoice, speed: flagTTSSpeed, instructions: styleLSO}
 }
 
-// lsoVoiceFor is the delivery for one call: "Power!" gets its own.
+// lsoVoiceFor is the delivery for one call: the power calls get their own.
 func lsoVoiceFor(text string) voiceProfile {
 	vp := lsoVoice()
-	if lso.Call(text) == lso.CallPower {
+	switch lso.Call(text) {
+	case lso.CallPower:
 		vp.instructions = styleLSOPower
+	case lso.CallPowerUrgent, lso.CallPowerSink:
+		vp.instructions = styleLSOPowerUrgent
 	}
 	return vp
 }
@@ -220,10 +229,18 @@ type lsoTacview struct {
 	track          []shipFix // the carrier's recent positions, for heading and speed
 	lastExpire     time.Time
 	now            func() time.Time
+
+	// onDeck: aircraft on the landing area (object id -> first seen there,
+	// last seen there). One that sits there longer than foulMaxAge is parked,
+	// not fouling the deck.
+	onDeck   map[string][2]time.Time
+	lastFoul bool
 }
 
+const foulMaxAge = 90 * time.Second
+
 func newLSOTacview(feed *lsoFeed) *lsoTacview {
-	return &lsoTacview{feed: feed, objs: make(map[string]*lsoObj), now: time.Now}
+	return &lsoTacview{feed: feed, objs: make(map[string]*lsoObj), onDeck: make(map[string][2]time.Time), now: time.Now}
 }
 
 // isOurCarrier: CVN_72 (Abe) and the other Nimitz hulls, by ACMI Name.
@@ -350,8 +367,7 @@ func (t *lsoTacview) handleLine(line string) {
 		}
 		return
 	}
-	// Player jets only: DCS writes a human's Pilot as "Raider 302 | Jedi".
-	if !strings.Contains(o.typ, "FixedWing") || !strings.Contains(o.pilot, "|") {
+	if !strings.Contains(o.typ, "FixedWing") && !strings.Contains(o.typ, "Rotorcraft") {
 		return
 	}
 	s, ok := t.ship()
@@ -362,9 +378,26 @@ func (t *lsoTacview) handleLine(line string) {
 	if math.Abs(lat-s.Lat) > 0.06 || math.Abs(lon-s.Lon) > 0.08 {
 		return
 	}
+	smp := lso.Sample{At: now, Lat: lat, Lon: lon, AltM: o.altM, PitchDeg: o.pitch, HasPitch: o.hasPitch}
+	// Any aircraft, AI too, on the landing area fouls the deck.
+	if t.feed.tr.P.InLandingArea(s, smp) {
+		seen, ok := t.onDeck[id]
+		if !ok {
+			seen[0] = now
+		}
+		seen[1] = now
+		t.onDeck[id] = seen
+	} else {
+		delete(t.onDeck, id)
+	}
+	// Player jets only fly passes: DCS writes a human's Pilot as "Raider 302 | Jedi".
+	if !strings.Contains(o.typ, "FixedWing") || !strings.Contains(o.pilot, "|") {
+		return
+	}
 	cs := strings.TrimSpace(o.pilot[:strings.Index(o.pilot, "|")])
 	t.feed.lock()
-	c := t.feed.tr.Update(cs, o.name, s, lso.Sample{At: now, Lat: lat, Lon: lon, AltM: o.altM, PitchDeg: o.pitch, HasPitch: o.hasPitch})
+	t.feed.tr.SetDeckFoul(t.deckFoul(now))
+	c := t.feed.tr.Update(cs, o.name, s, smp)
 	if now.Sub(t.lastExpire) > time.Second {
 		t.feed.tr.Expire(now)
 		t.lastExpire = now
@@ -374,6 +407,29 @@ func (t *lsoTacview) handleLine(line string) {
 		log.Info().Str("callsign", cs).Str("call", string(c)).Msg("Paddles: groove call")
 		t.feed.say(c)
 	}
+}
+
+// deckFoul: something has been on the landing area in the last 3 s, and not
+// so long that it is parked there.
+func (t *lsoTacview) deckFoul(now time.Time) bool {
+	foul := ""
+	for id, seen := range t.onDeck {
+		switch {
+		case now.Sub(seen[1]) > 3*time.Second:
+			delete(t.onDeck, id) // left the picture
+		case now.Sub(seen[0]) < foulMaxAge:
+			foul = id
+		}
+	}
+	if (foul != "") != t.lastFoul {
+		t.lastFoul = foul != ""
+		name := ""
+		if o := t.objs[foul]; o != nil {
+			name = o.pilot
+		}
+		log.Info().Bool("foul", t.lastFoul).Str("by", name).Msg("Paddles: landing area")
+	}
+	return t.lastFoul
 }
 
 // runLSOTacview mirrors runMiniTacview's connection and handshake.

@@ -117,3 +117,22 @@ func TestLSOReplay(t *testing.T) {
 	s, ok := tv.ship()
 	t.Logf("carrier %s: %+v (%v), in groove %v", tv.carrierID, s, ok, f.tr.InGroove())
 }
+
+// An aircraft on the landing area fouls the deck; one that sits there past
+// foulMaxAge is parked and does not.
+func TestLSODeckFoul(t *testing.T) {
+	tv := newLSOTacview(newLSOFeed(lso.NimitzParams(), func(lso.Call) {}))
+	now := time.Date(2026, 10, 17, 15, 0, 0, 0, time.UTC)
+	tv.onDeck["a1"] = [2]time.Time{now.Add(-10 * time.Second), now}
+	if !tv.deckFoul(now) {
+		t.Error("jet that just trapped: want foul")
+	}
+	tv.onDeck["a1"] = [2]time.Time{now.Add(-2 * time.Minute), now}
+	if tv.deckFoul(now) {
+		t.Error("parked for 2 min: want clear")
+	}
+	tv.onDeck["a1"] = [2]time.Time{now.Add(-20 * time.Second), now.Add(-5 * time.Second)}
+	if tv.deckFoul(now) || len(tv.onDeck) != 0 {
+		t.Error("left the area 5 s ago: want clear and forgotten")
+	}
+}

@@ -29,6 +29,10 @@ type Params struct {
 	LandingLateralM float64 // landing point offset from the centreline, starboard positive
 	GlideslopeDeg   float64
 	HookBelowRefM   float64 // jet's Tacview reference point above its hook; the glideslope is flown by the hook
+	// HookTouchFromSternM is where the lens puts the hook: 230 ft from the
+	// stern for the 3 wire, crossing the ramp at 14.1 ft (DCS Supercarrier
+	// guide, LSO station). 3.5 deg over 70 m is that 14.1 ft.
+	HookTouchFromSternM float64
 }
 
 // NimitzParams are the defaults for CVN-72 Abe.
@@ -41,12 +45,22 @@ func NimitzParams() Params {
 		LandingLateralM: 0,
 		GlideslopeDeg:   3.5,
 		HookBelowRefM:   2.5,
+
+		HookTouchFromSternM: 70.1,
 	}
 }
 
-// landingFromRefM is the target touchdown point (the 3 wire), metres along the
-// ship's centreline from its reference point.
-func (p Params) landingFromRefM() float64 { return p.SternM + p.WiresFromSternM[2] }
+// landingFromRefM is the target hook touchdown point (for the 3 wire), metres
+// along the ship's centreline from its reference point.
+func (p Params) landingFromRefM() float64 { return p.SternM + p.HookTouchFromSternM }
+
+// InLandingArea reports whether an aircraft is on the landing area (stern to
+// past the 4 wire's run-out, on the angled deck): a foul deck for the next jet.
+func (p Params) InLandingArea(s Ship, smp Sample) bool {
+	g := p.toGroove(s, smp)
+	fwd := -g.astern
+	return fwd > -p.HookTouchFromSternM && fwd < 190 && math.Abs(g.right) < 18 && g.height < 8
+}
 
 // Ship is the carrier at one instant.
 type Ship struct {
@@ -116,26 +130,39 @@ func (p Params) deviations(g groovePos) (gs, lineup float64) {
 // Call is something Paddles says.
 type Call string
 
+// The lines follow the DCS Supercarrier LSO (Supercarrier Operations Guide,
+// Case I "Inside 3/4 mile"), checked 2026-10-17.
 const (
-	CallRogerBall   Call = "Roger ball."
-	CallClara       Call = "Paddles contact, keep it coming."
-	CallCallTheBall Call = "Call the ball."
-	CallHigh        Call = "You're high."
-	CallLittleHigh  Call = "A little high."
-	CallLow         Call = "You're low."
-	CallPower       Call = "Power!" // stern (operator 2026-10-17)
-	CallRight       Call = "Right for lineup."
-	CallLeft        Call = "Come left."
-	CallFast        Call = "You're fast."
-	CallSlow        Call = "You're slow."
-	CallWaveOff     Call = "Wave off, wave off."
-	CallBolter      Call = "Bolter, bolter, bolter."
+	CallRogerBall    Call = "Roger ball."
+	CallClara        Call = "Paddles contact, keep it coming."
+	CallCallTheBall  Call = "Call the ball."
+	CallHigh         Call = "You're high."
+	CallHighBring    Call = "You're high, bring it down." // high for more than 3 s
+	CallLittleHigh   Call = "A little high."
+	CallLowPower     Call = "You're low, power."   // far out
+	CallPower        Call = "Power!"               // in close; stern (operator 2026-10-17, take B)
+	CallPowerUrgent  Call = "POWER!"               // still low 2 s after a power call
+	CallPowerSink    Call = "Power, power, POWER!" // far below and sinking
+	CallEasy         Call = "Easy with it."        // over-correcting after a power call
+	CallRight        Call = "Right for lineup."
+	CallLeft         Call = "Come left."
+	CallLinedUpLeft  Call = "You're lined up left." // far left, farther out
+	CallLinedUpRight Call = "You're lined up right."
+	CallFast         Call = "You're fast."
+	CallSlow         Call = "You're slow."
+	CallWaveOff      Call = "Wave off, wave off, wave off."
+	CallWaveOffFoul  Call = "Wave off, wave off, wave off, foul deck."
+	CallBolter       Call = "Bolter, bolter, bolter."
 )
 
 // AllCalls lists every fixed line, so the role can render them at start-up
 // and speak them without waiting for TTS.
-var AllCalls = []Call{CallRogerBall, CallClara, CallCallTheBall, CallHigh, CallLittleHigh, CallLow, CallPower,
-	CallRight, CallLeft, CallFast, CallSlow, CallWaveOff, CallBolter}
+var AllCalls = []Call{CallRogerBall, CallClara, CallCallTheBall, CallHigh, CallHighBring, CallLittleHigh,
+	CallLowPower, CallPower, CallPowerUrgent, CallPowerSink, CallEasy, CallRight, CallLeft, CallLinedUpLeft,
+	CallLinedUpRight, CallFast, CallSlow, CallWaveOff, CallWaveOffFoul, CallBolter}
+
+// IsWaveOff reports a wave-off call (either form).
+func IsWaveOff(c Call) bool { return c == CallWaveOff || c == CallWaveOffFoul }
 
 // Thresholds. Distances are metres astern of the landing point.
 const (
@@ -173,6 +200,8 @@ type Pass struct {
 	waveOff   bool
 
 	waveOffRepeated bool
+	foulDeck        bool
+	highSince       time.Time
 
 	touchdown   *passSample
 	bolterSaid  bool
@@ -195,6 +224,8 @@ type Tracker struct {
 	P      Params
 	passes map[string]*Pass
 	prev   map[string]Sample
+	// foul is set by the feed when another aircraft is on the landing area.
+	foul bool
 	// Done receives each finished pass's summary line.
 	Done func(summary string)
 }
@@ -203,6 +234,9 @@ type Tracker struct {
 func NewTracker(p Params) *Tracker {
 	return &Tracker{P: p, passes: make(map[string]*Pass), prev: make(map[string]Sample)}
 }
+
+// SetDeckFoul tells the tracker whether the landing area is foul.
+func (t *Tracker) SetDeckFoul(foul bool) { t.foul = foul }
 
 // InGroove reports the callsigns with a pass in progress.
 func (t *Tracker) InGroove() []string {
@@ -340,7 +374,7 @@ func smoothed(ss []passSample) (gs, lineup float64) {
 }
 
 func (t *Tracker) say(p *Pass, c Call, now time.Time) Call {
-	if c != CallWaveOff && c != CallBolter {
+	if !IsWaveOff(c) && c != CallBolter {
 		if now.Sub(p.lastCall) < gapMin || now.Sub(p.lastSaid[c]) < sameCallGap {
 			return ""
 		}
@@ -398,9 +432,13 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 	}
 	if p.waveOff {
 		// Repeat once if he is still coming in close.
-		if !p.waveOffRepeated && g.astern > 0 && g.astern < 500 && s.at.Sub(p.lastSaid[CallWaveOff]) > 3*time.Second {
+		c := CallWaveOff
+		if p.foulDeck {
+			c = CallWaveOffFoul
+		}
+		if !p.waveOffRepeated && g.astern > 0 && g.astern < 500 && s.at.Sub(p.lastSaid[c]) > 3*time.Second {
 			p.waveOffRepeated = true
-			return t.say(p, CallWaveOff, s.at)
+			return t.say(p, c, s.at)
 		}
 		return ""
 	}
@@ -408,7 +446,13 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		return ""
 	}
 	gs, lineup := smoothed(p.samples)
+	rate := gsRate(p.samples)
 
+	// Foul deck: another aircraft on the landing area as he comes in close.
+	if t.foul && g.astern < 550 {
+		p.waveOff, p.foulDeck = true, true
+		return t.say(p, CallWaveOffFoul, s.at)
+	}
 	// Wave off: dangerously low or badly lined up in close.
 	if (g.astern < 600 && (gs < -1.3 || math.Abs(lineup) > 5)) || (g.astern < 300 && gs < -0.9) {
 		p.waveOff = true
@@ -427,19 +471,45 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 			return c
 		}
 	}
+	if gs > 0.7 {
+		if p.highSince.IsZero() {
+			p.highSince = s.at
+		}
+	} else {
+		p.highSince = time.Time{}
+	}
 	if g.astern > start {
 		return ""
 	}
+	lastPower := latest(p.lastSaid, CallPower, CallPowerUrgent, CallPowerSink, CallLowPower)
+	// Easy with it: coming up through the glideslope fast after a power call.
+	if !lastPower.IsZero() && s.at.Sub(lastPower) < 4*time.Second && rate > 0.6 && gs > -0.3 {
+		return t.say(p, CallEasy, s.at)
+	}
 	switch {
 	case gs < -0.6 && g.astern < 1100:
+		switch {
+		case gs < -1.0 && rate < -0.3:
+			return t.say(p, CallPowerSink, s.at)
+		case !lastPower.IsZero() && s.at.Sub(lastPower) < 3500*time.Millisecond:
+			return t.say(p, CallPowerUrgent, s.at)
+		}
 		return t.say(p, CallPower, s.at)
 	case gs < -0.6:
-		return t.say(p, CallLow, s.at)
+		return t.say(p, CallLowPower, s.at)
+	case lineup < -3.0 && g.astern > 700:
+		return t.say(p, CallLinedUpLeft, s.at)
+	case lineup > 3.0 && g.astern > 700:
+		return t.say(p, CallLinedUpRight, s.at)
 	case lineup < -1.5:
 		return t.say(p, CallRight, s.at)
 	case lineup > 1.5:
 		return t.say(p, CallLeft, s.at)
 	case gs > 1.2:
+		// Still high 3 s after being told: bring it down.
+		if !p.lastSaid[CallHigh].IsZero() && s.at.Sub(p.highSince) > 3*time.Second {
+			return t.say(p, CallHighBring, s.at)
+		}
 		return t.say(p, CallHigh, s.at)
 	case gs > 0.7:
 		return t.say(p, CallLittleHigh, s.at)
@@ -455,16 +525,42 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 	return ""
 }
 
-// wireFwd is wire n (1-4) in metres forward of the landing point.
-func (t *Tracker) wireFwd(n int) float64 {
-	return t.P.WiresFromSternM[n-1] - t.P.WiresFromSternM[2]
+// gsRate is how fast the jet is moving through the glideslope, degrees per
+// second over about the last second (+ = going up).
+func gsRate(ss []passSample) float64 {
+	n := len(ss)
+	if n < 2 {
+		return 0
+	}
+	last := ss[n-1]
+	for i := n - 2; i >= 0; i-- {
+		if dt := last.at.Sub(ss[i].at).Seconds(); dt >= 0.9 {
+			return (last.gs - ss[i].gs) / dt
+		}
+	}
+	return 0
 }
 
-// EstimateWire guesses the wire from where the jet first touched: the nearest
-// wire forward of the touchdown point (the hook skips along the deck to it).
+func latest(m map[Call]time.Time, cs ...Call) time.Time {
+	var t time.Time
+	for _, c := range cs {
+		if m[c].After(t) {
+			t = m[c]
+		}
+	}
+	return t
+}
+
+// wireFwd is wire n (1-4) in metres forward of the hook touchdown point.
+func (t *Tracker) wireFwd(n int) float64 {
+	return t.P.WiresFromSternM[n-1] - t.P.HookTouchFromSternM
+}
+
+// EstimateWire guesses the wire from where the hook first touched: the first
+// wire at or forward of the touchdown point (the hook skips along to it).
 func (t *Tracker) EstimateWire(touchFwd float64) int {
 	for n := 1; n <= 4; n++ {
-		if touchFwd <= t.wireFwd(n)+4 {
+		if t.wireFwd(n) >= touchFwd-2 {
 			return n
 		}
 	}
@@ -485,9 +581,12 @@ func (t *Tracker) finish(p *Pass) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s (%s): %s", p.Callsign, p.Model, p.outcome)
+	if g := t.Grade(p); g != "" {
+		fmt.Fprintf(&b, ", grade %s", g)
+	}
 	if p.touchdown != nil {
 		fwd := -p.touchdown.g.astern
-		fmt.Fprintf(&b, ", touched %+.0f m from the 3 wire, %+.0f m right", fwd, p.touchdown.g.right)
+		fmt.Fprintf(&b, ", hook touched %+.0f m from the aim point, %+.0f m right", fwd, p.touchdown.g.right)
 		if w := t.EstimateWire(fwd); w > 0 && p.outcome == "trap" {
 			fmt.Fprintf(&b, ", est. %d wire", w)
 		}
@@ -531,4 +630,143 @@ func (t *Tracker) finish(p *Pass) {
 		fmt.Fprintf(&b, "; said: %s", strings.Join(p.calls, ", "))
 	}
 	t.Done(b.String())
+}
+
+// segMeans is one segment's mean glideslope, lineup and AoA error.
+type segMeans struct {
+	name          string
+	gs, lu, aoa   float64
+	hasGS, hasAoA bool
+}
+
+func (t *Tracker) segMeans(p *Pass) []segMeans {
+	var out []segMeans
+	for _, seg := range segments {
+		m := segMeans{name: seg.name}
+		var n, na int
+		for _, s := range p.samples {
+			if s.g.astern <= seg.from && s.g.astern > seg.to {
+				m.gs += s.gs
+				m.lu += s.lineup
+				n++
+				if s.hasAoA {
+					m.aoa += s.aoa
+					na++
+				}
+			}
+		}
+		if n > 0 {
+			m.gs /= float64(n)
+			m.lu /= float64(n)
+			m.hasGS = true
+		}
+		if na > 0 {
+			m.aoa /= float64(na)
+			m.hasAoA = true
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// Grade is the pass in the DCS LSO's notation (Supercarrier guide, Landing):
+// grade, errors with where they were (X, IM, IC, AR; "(H)" = a little high,
+// "[BC]" = no ball call) and the wire. "" for a pass that never got to a
+// trap, bolter or wave-off.
+func (t *Tracker) Grade(p *Pass) string {
+	var errs []string
+	major, majorInClose := false, false
+	hornet := strings.Contains(strings.ToLower(p.Model), "fa-18")
+	for _, m := range t.segMeans(p) {
+		if !m.hasGS {
+			continue
+		}
+		add := func(code string, big bool) {
+			if !big {
+				errs = append(errs, "("+code+")"+m.name)
+				return
+			}
+			errs = append(errs, code+m.name)
+			major = true
+			if m.name == "IC" || m.name == "AR" {
+				majorInClose = true
+			}
+		}
+		switch {
+		case m.gs > 1.2:
+			add("H", true)
+		case m.gs > 0.6:
+			add("H", false)
+		case m.gs < -0.6:
+			add("LO", true)
+		case m.gs < -0.3:
+			add("LO", false)
+		}
+		switch {
+		case m.lu < -1.5:
+			add("LUL", true)
+		case m.lu < -0.75:
+			add("LUL", false)
+		case m.lu > 1.5:
+			add("LUR", true)
+		case m.lu > 0.75:
+			add("LUR", false)
+		}
+		if hornet && m.hasAoA {
+			switch {
+			case m.aoa < hornetOnSpeed-1.5:
+				add("F", true)
+			case m.aoa < hornetOnSpeed-0.75:
+				add("F", false)
+			case m.aoa > hornetOnSpeed+1.5:
+				add("SLO", true)
+			case m.aoa > hornetOnSpeed+0.75:
+				add("SLO", false)
+			}
+		}
+	}
+	if p.ballAt.IsZero() {
+		errs = append([]string{"[BC]"}, errs...)
+	}
+	with := func(g, extra string) string {
+		parts := errs
+		if extra != "" {
+			parts = append(append([]string{}, errs...), extra)
+		}
+		if len(parts) == 0 {
+			return g
+		}
+		return g + ": " + strings.Join(parts, " ")
+	}
+	// A waved-off pass is graded WO even if he landed anyway.
+	switch outcome := p.outcome; {
+	case p.waveOff || outcome == "wave off":
+		if p.foulDeck {
+			return "WO (foul deck)"
+		}
+		return with("WO", "")
+	case outcome == "bolter":
+		return with("B", "")
+	case outcome == "trap":
+	default:
+		return ""
+	}
+	wire := 0
+	if p.touchdown != nil {
+		wire = t.EstimateWire(-p.touchdown.g.astern)
+	}
+	g := "OK"
+	switch {
+	case majorInClose || wire == 1:
+		g = "---"
+	case major:
+		g = "(OK)"
+	case len(errs) == 0 && wire == 3:
+		g = "_OK_"
+	}
+	w := ""
+	if wire > 0 {
+		w = fmt.Sprintf("%d wire", wire)
+	}
+	return with(g, w)
 }
