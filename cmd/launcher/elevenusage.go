@@ -202,9 +202,18 @@ func fleetUsage(maxAge time.Duration) FleetUsage {
 	fu.SkyEyeCredits, fu.SkyEyeToday, fu.SkyEyeProjected = fu.Credits, fu.Today, fu.Projected
 	fu.SkyEyeByVoice, fu.SkyEyeByDay = fu.ByVoice, fu.ByDay
 	if a, err := fetchElevenAccount(now); err == nil {
+		saveLastAccount(a)
 		applyAccount(&fu, a, now)
 	} else {
 		fu.AccountErr = err.Error()
+		// Keep the account's figures over a failed read: right after the
+		// launcher restarted (Update, 2026-10-17 14:24) Day and Foothold fell
+		// back to the servers' own count and showed "10,615 used, resets 13 Nov"
+		// while Night read the account's 21,912 / 14 Nov.
+		if last := loadLastAccount(); last != nil && last.Reset.After(now) {
+			applyAccount(&fu, last, now)
+			fu.AccountErr += " - showing the last good account reading"
+		}
 	}
 	fleetUsageCache = &fu
 	return fu

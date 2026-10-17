@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -160,4 +161,26 @@ func sortedDays(m map[string]int) []string {
 	}
 	sort.Strings(d)
 	return d
+}
+
+// lastAccountFile keeps the last good account reading across launcher restarts.
+func lastAccountFile() string { return filepath.Join(usageDir(), "account_last.json") }
+
+func saveLastAccount(a *elevenAccount) {
+	if b, err := json.Marshal(a); err == nil {
+		_ = os.MkdirAll(usageDir(), 0o755)
+		_ = os.WriteFile(lastAccountFile(), b, 0o644)
+	}
+}
+
+func loadLastAccount() *elevenAccount {
+	b, err := os.ReadFile(lastAccountFile())
+	if err != nil {
+		return nil
+	}
+	var a elevenAccount
+	if json.Unmarshal(b, &a) != nil || a.Reset.IsZero() {
+		return nil
+	}
+	return &a
 }
