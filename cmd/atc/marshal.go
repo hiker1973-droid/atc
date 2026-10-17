@@ -672,7 +672,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		}
 		_, _, _, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		log.Info().Str("callsign", callsign).Int("distNm", dist).Bool("radarFound", rFound).Msg("Marshal: DME position report")
-		transmit(comp.MarshalAckDME(callsign, dist, rFound))
+		transmit(comp.MarshalAckDME(callsign, dist, rFound, fuelState))
 
 	case marshalState:
 		transmit(comp.MarshalCopyState(callsign, fuelState))

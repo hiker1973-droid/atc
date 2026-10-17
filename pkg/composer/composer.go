@@ -1349,13 +1349,14 @@ func (c *ATCComposer) MarshalSayBRC(callsign string, brc float64) string {
 
 // MarshalRadarContact — acknowledges the pilot's visual-on-mother call
 // ("see you at 10") and asks for an altitude + range report so Marshal can
-// confirm the inbound's slot before assigning angels.
+// confirm the inbound's slot before assigning angels. Asks for the fuel state
+// too (operator 2026-10-17).
 func (c *ATCComposer) MarshalRadarContact(callsign string, distNm int) string {
 	dist := numberWord(distNm)
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", visual carrier at %s miles, report altitude and range.", callsign, dist),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", roger visual on mother at %s, say altitude and range.", callsign, dist),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", copy visual at %s miles, report your altitude and range.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", visual carrier at %s miles, report altitude, range and state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger visual on mother at %s, say altitude, range and state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy visual at %s miles, report your altitude, range and state.", callsign, dist),
 	})
 }
 
@@ -1378,9 +1379,23 @@ func (c *ATCComposer) MarshalCopyState(callsign string, fuelState float64) strin
 
 // MarshalAckDME — pilot reports current DME from mother (e.g. "Marshal,
 // Raider 39, 7 DME"). Pure ack; if Tacview has the caller, the response
-// confirms radar contact.
-func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool) string {
+// confirms radar contact. A fuel state in the same call (the answer to "say
+// altitude, range and state") is read back with the DME; 0 means none given.
+func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool, fuelState float64) string {
 	d := fmt.Sprintf("%d", distNm)
+	if fuelState > 0 {
+		s := fmt.Sprintf("%.1f", fuelState)
+		if fuelState < 2.0 {
+			return fmt.Sprintf("%s, "+c.towerCallsign+", %s DME, state %s, expedite recovery.", callsign, d, s)
+		}
+		if radar {
+			return pick([]string{
+				fmt.Sprintf("%s, "+c.towerCallsign+", radar contact, %s DME, state %s, continue.", callsign, d, s),
+				fmt.Sprintf("%s, "+c.towerCallsign+", contact %s DME, copy state %s, continue.", callsign, d, s),
+			})
+		}
+		return fmt.Sprintf("%s, "+c.towerCallsign+", roger, %s DME, state %s, continue.", callsign, d, s)
+	}
 	if radar {
 		return pick([]string{
 			fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s DME, continue.", callsign, d),

@@ -275,6 +275,35 @@ func TestMarshalCallsFlown20261017(t *testing.T) {
 	}
 }
 
+// The answer to "say altitude, range and state" is a DME report carrying the
+// state, which the DME ack reads back (Day 2026-10-17 13:41:12, 10:50:54).
+func TestMarshalAltRangeStateAnswer(t *testing.T) {
+	cases := []struct {
+		text  string
+		dist  int
+		state float64
+	}{
+		{"Union Marshal, Raider 302, Angels 3, range 17.6, state 7.7.", 17, 7.7},
+		{"Union Marshal, Raider 312, angels 2, 9 miles, state 5.5.", 9, 5.5},
+		{"Union Marshal, Raider 319, angels 2, 10 miles range.", 10, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.text, func(t *testing.T) {
+			lower := strings.ToLower(tc.text)
+			fs := extractFuelStateMarshal(lower)
+			if got := classifyMarshalCall(lower, fs); got != marshalDME {
+				t.Errorf("intent = %d, want DME", got)
+			}
+			if d := extractDMEDistance(lower); d != tc.dist {
+				t.Errorf("dist = %d, want %d", d, tc.dist)
+			}
+			if fs != tc.state {
+				t.Errorf("state = %v, want %v", fs, tc.state)
+			}
+		})
+	}
+}
+
 // "Tac boss, Raider 302 airborne" was answered "Tac boss, Deckboss, copy
 // airborne" (DCS3 2026-10-15 14:49:43).
 func TestDeckbossCallsignFlown20261015(t *testing.T) {
