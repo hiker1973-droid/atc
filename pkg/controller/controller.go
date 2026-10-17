@@ -231,8 +231,12 @@ type ATCController struct {
 	trafficAlertAt  map[string]time.Time
 
 	// Parking spots handed to landing traffic (parking.go); guarded by mu.
-	parking     map[string]parkingSlot
-	parkingNext int
+	// groundTransmitFn speaks them as groundName ("Senaki Ground") in the
+	// Ground voice; nil = the tower says them.
+	parking          map[string]parkingSlot
+	parkingNext      int
+	groundName       string
+	groundTransmitFn func(ctx context.Context, text string)
 }
 
 // NewATCController creates a controller for the given airfield.
@@ -490,6 +494,7 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	}
 
 	var response string
+	ground := false // a parking reply, spoken by Ground (parking.go)
 
 	switch req.Type {
 
@@ -517,8 +522,8 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 		if wantsParking(req.Raw) {
 			// "request taxi to parking" after landing: not a departure.
 			s.Remove(req.Callsign)
-			spot, via := c.assignParking(req.Callsign, s.Airfield, time.Now())
-			response = c.composer.TaxiToParking(req.Callsign, spot, via)
+			ground = c.groundTransmitFn != nil
+			response = c.composer.TaxiToParking(req.Callsign, c.groundSpeaker(), c.assignParking(req.Callsign, s.Airfield, time.Now()))
 			break
 		}
 		s.EnqueueDeparture(ac)
@@ -636,8 +641,9 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 				Detail: "called clear of the runway without a landing clearance: " + why, Text: req.Raw})
 		}
 		s.Remove(req.Callsign)
-		if spot, via := c.assignParking(req.Callsign, s.Airfield, time.Now()); spot != 0 {
-			response = c.composer.RunwayVacatedParking(req.Callsign, s.ActiveRunway, spot, via)
+		if spot := c.assignParking(req.Callsign, s.Airfield, time.Now()); spot != 0 {
+			ground = c.groundTransmitFn != nil
+			response = c.composer.RunwayVacatedParking(req.Callsign, c.groundSpeaker(), s.ActiveRunway, spot)
 		} else {
 			response = c.composer.RunwayVacated(req.Callsign, s.ActiveRunway)
 		}
@@ -780,7 +786,9 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	if extra != "" {
 		c.transmitTo(ctx, req.Callsign, extra)
 	}
-	if response != "" {
+	if response != "" && ground {
+		c.transmitGroundTo(ctx, req.Callsign, response)
+	} else if response != "" {
 		c.transmitTo(ctx, req.Callsign, response)
 	}
 }

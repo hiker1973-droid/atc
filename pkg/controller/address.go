@@ -64,7 +64,7 @@ func addressedByFieldName(lower, primaryKey string, aliases []string) bool {
 	if budget == 0 {
 		return false
 	}
-	if next := word(1); next == "tower" || next == "traffic" {
+	if next := word(1); next == "tower" || next == "traffic" || next == "ground" {
 		budget++ // the address word confirms what the first word is meant to be
 	}
 	return levenshtein(word(0), primaryKey) <= budget

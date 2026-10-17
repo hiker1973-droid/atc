@@ -125,6 +125,7 @@ var (
 	flagElevenJTACVoice    string
 	flagElevenMarshalVoice string
 	flagElevenDepartVoice  string
+	flagElevenGroundVoice  string
 	flagElevenTowerAltVoice string
 	flagTowerShift         time.Duration
 	flagElevenDeckbossVoice string
@@ -242,6 +243,8 @@ func main() {
 		"Shift length for --elevenlabs-tower-alt-voice, counted from the Unix epoch so every rig changes together")
 	f.StringVar(&flagElevenDepartVoice, "elevenlabs-departure-voice", elDeparture11,
 		"ElevenLabs voice ID for the tower's Departure position - the 7-mile handoff call (default round 11 voice 4, library)")
+	f.StringVar(&flagElevenGroundVoice, "elevenlabs-ground-voice", elGround,
+		"ElevenLabs voice ID for the tower's Ground position - parking spots on landing, at fields with parking spots (Senaki)")
 	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elRolando, "ElevenLabs voice ID for Marshal (default Rolando, library)")
 	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elDeckboss11,
 		"ElevenLabs voice ID for Deckboss (default round 11 voice 5, library; every theatre)")
@@ -775,6 +778,16 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	})
 
+	if af.ParkingFirst > 0 {
+		atcCtrl.SetGroundTransmitFn(af.Name+" Ground", func(ctx context.Context, text string) {
+			select {
+			case txChan <- towerTX{text: text, ground: true}:
+			default:
+				log.Warn().Str("text", text).Msg("TX queue full")
+			}
+		})
+	}
+
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 	var marshalCooldown, deckbossCooldown int64
 	var txCooldown int64  // unix nano when cooldown expires
@@ -793,6 +806,9 @@ func run(cmd *cobra.Command, args []string) error {
 				profile := towerShiftProfile(voice, time.Now())
 				if tx.departure {
 					profile = departureProfile(voice)
+				}
+				if tx.ground {
+					profile = groundProfile(voice)
 				}
 				log.Info().Str("text", text).Str("voice", voice).Bool("departure", tx.departure).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
 				// 10s ceiling on TTS: OpenAI is either fast (~2s) or hung. No
@@ -2030,11 +2046,20 @@ func deckbossVoice(v string) voiceProfile {
 type towerTX struct {
 	text      string
 	departure bool
+	ground    bool // "<field> Ground": parking spots (pkg/controller/parking.go)
 }
 
 // departureProfile is the tower's Departure position: the tower's delivery and
 // OpenAI fallback, its own ElevenLabs voice (operator 2026-10-15: "maybe have
 // departure a different voice").
+// groundProfile is the tower's Ground position (parking spots): the tower's
+// delivery and OpenAI fallback, its own ElevenLabs voice.
+func groundProfile(towerVoice string) voiceProfile {
+	p := towerProfile(towerVoice)
+	p.eleven = elTower(flagElevenGroundVoice, "Ground")
+	return p
+}
+
 func departureProfile(towerVoice string) voiceProfile {
 	p := towerProfile(towerVoice)
 	p.eleven = elTower(flagElevenDepartVoice, "Departure")

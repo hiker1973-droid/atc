@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -9,21 +10,18 @@ import (
 	"github.com/vsfg7/atc/pkg/airfield"
 )
 
-// Senaki hands out parking spots 1-58 in turn, 1-30 via Bravo and 31-58 via
-// Charlie, both then November (operator 2026-10-16), on the clear-of-runway
-// call and on "request taxi to parking"; a flight asking twice keeps its spot.
+// Senaki hands out parking spots 1-58 in turn (operator 2026-10-16) on the
+// clear-of-runway call and on "request taxi to parking"; a flight asking twice
+// keeps its spot. The tower says them until Ground is wired.
 func TestParkingAssignedOnLanding(t *testing.T) {
 	c, sent, handle := departureController(t)
 	c.mu.Lock()
-	c.airfieldState.Airfield.ParkingRoutes = []airfield.ParkingRoute{
-		{First: 1, Last: 2, Via: "Bravo, November"},
-		{First: 31, Last: 31, Via: "Charlie, November"},
-	}
+	c.airfieldState.Airfield.ParkingFirst, c.airfieldState.Airfield.ParkingLast = 1, 3
 	c.mu.Unlock()
 	last := func() string { return (*sent)[len(*sent)-1] }
 
 	handle("Test Tower, Raider 302, clear of the active")
-	if got := last(); !hasSpot(got, 1) || !strings.Contains(got, "Bravo, November") {
+	if got := last(); !strings.HasPrefix(got, "Raider 302, Test Tower, ") || !hasSpot(got, 1) {
 		t.Errorf("first clear call -> %q", got)
 	}
 	handle("Test Tower, Raider 303, runway vacated")
@@ -35,7 +33,7 @@ func TestParkingAssignedOnLanding(t *testing.T) {
 		t.Errorf("Raider 302 asking again -> %q, want spot 1 again", got)
 	}
 	handle("Test Tower, Venom 201, request taxi to parking")
-	if got := last(); !hasSpot(got, 31) || !strings.Contains(got, "Charlie, November") || strings.Contains(got, "hold short") {
+	if got := last(); !hasSpot(got, 3) || strings.Contains(got, "hold short") {
 		t.Errorf("taxi to parking -> %q", got)
 	}
 	handle("Test Tower, Venom 202, request taxi to parking")
@@ -49,6 +47,30 @@ func TestParkingAssignedOnLanding(t *testing.T) {
 	}
 }
 
+// With Ground wired the parking reply is spoken by "<field> Ground" in its own
+// voice; everything else stays with the tower.
+func TestParkingSpokenByGround(t *testing.T) {
+	c, sent, handle := departureController(t)
+	var ground []string
+	c.mu.Lock()
+	c.airfieldState.Airfield.ParkingFirst, c.airfieldState.Airfield.ParkingLast = 1, 58
+	c.mu.Unlock()
+	c.SetGroundTransmitFn("Test Ground", func(_ context.Context, text string) { ground = append(ground, text) })
+
+	n := len(*sent)
+	handle("Test Tower, Raider 302, clear of the active")
+	if len(ground) != 1 || !strings.HasPrefix(ground[0], "Raider 302, Test Ground, ") || !hasSpot(ground[0], 1) {
+		t.Errorf("Ground said %q", ground)
+	}
+	if len(*sent) != n {
+		t.Errorf("the tower also spoke: %q", (*sent)[n:])
+	}
+	handle("Test Tower, Venom 203, request taxi")
+	if len(ground) != 1 || len(*sent) == n {
+		t.Errorf("outbound taxi went to Ground: ground %q", ground)
+	}
+}
+
 func TestParkingNoSpots(t *testing.T) {
 	_, sent, handle := departureController(t)
 	handle("Test Tower, Raider 302, request taxi to parking")
@@ -59,13 +81,9 @@ func TestParkingNoSpots(t *testing.T) {
 
 func TestSenakiParkingSpots(t *testing.T) {
 	af := airfield.UGKS
-	for _, c := range []struct {
-		n, spot int
-		via     string
-	}{{0, 1, "Bravo, November"}, {29, 30, "Bravo, November"}, {30, 31, "Charlie, November"}, {57, 58, "Charlie, November"}, {58, 1, "Bravo, November"}} {
-		spot, via, ok := af.ParkingSpot(c.n)
-		if !ok || spot != c.spot || via != c.via {
-			t.Errorf("ParkingSpot(%d) = %d %q, want %d %q", c.n, spot, via, c.spot, c.via)
+	for _, c := range []struct{ n, spot int }{{0, 1}, {57, 58}, {58, 1}} {
+		if spot, ok := af.ParkingSpot(c.n); !ok || spot != c.spot {
+			t.Errorf("ParkingSpot(%d) = %d, want %d", c.n, spot, c.spot)
 		}
 	}
 }
