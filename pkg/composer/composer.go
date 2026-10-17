@@ -1348,15 +1348,14 @@ func (c *ATCComposer) MarshalSayBRC(callsign string, brc float64) string {
 }
 
 // MarshalRadarContact — acknowledges the pilot's visual-on-mother call
-// ("see you at 10") and asks for an altitude + range report so Marshal can
-// confirm the inbound's slot before assigning angels. Asks for the fuel state
-// too (operator 2026-10-17).
+// ("see you at 10") and asks for the fuel state only (operator 2026-10-17:
+// "just say state", altitude and range dropped).
 func (c *ATCComposer) MarshalRadarContact(callsign string, distNm int) string {
 	dist := numberWord(distNm)
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", visual carrier at %s miles, report altitude, range and state.", callsign, dist),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", roger visual on mother at %s, say altitude, range and state.", callsign, dist),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", copy visual at %s miles, report your altitude, range and state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", visual carrier at %s miles, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger visual on mother at %s, say state.", callsign, dist),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy visual at %s miles, say state.", callsign, dist),
 	})
 }
 
@@ -1379,8 +1378,8 @@ func (c *ATCComposer) MarshalCopyState(callsign string, fuelState float64) strin
 
 // MarshalAckDME — pilot reports current DME from mother (e.g. "Marshal,
 // Raider 39, 7 DME"). Pure ack; if Tacview has the caller, the response
-// confirms radar contact. A fuel state in the same call (the answer to "say
-// altitude, range and state") is read back with the DME; 0 means none given.
+// confirms radar contact. A fuel state in the same call ("angels 3, range 17,
+// state 7.7") is read back with the DME; 0 means none given.
 func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool, fuelState float64) string {
 	d := fmt.Sprintf("%d", distNm)
 	if fuelState > 0 {

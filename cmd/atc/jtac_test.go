@@ -367,6 +367,11 @@ func TestJTACCallsign(t *testing.T) {
 		"Hitman one one, Venom 21 off":           "Venom 21",
 		"Hitman 1-1, Raider 11 in":               "Raider 11",
 		"Hitman 1-1 Raider 11 abort abort abort": "Raider 11",
+		// DCS3 2026-10-17.
+		"Hitman 1-1 and Raider 3-0-3, checking in.": "Raider 303",
+		"Hitman 1-1, ready with 303, IP inbound.":   "Raider 303",
+		"Hey man 1-1, Raider 303, IP inbound.":      "Raider 303",
+		"Hitman 3-306, IP inbound for Falcon.":      "",
 	} {
 		if got := jtacCallsign(in); got != want {
 			t.Errorf("jtacCallsign(%q) = %q, want %q", in, got, want)

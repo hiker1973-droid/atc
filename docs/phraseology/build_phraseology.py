@@ -137,7 +137,7 @@ MARSHAL = [
     ("Marking moms", "marking moms, angels 12, state 6.5", "Weather, case, BRC, Marshal at angels N", "marking_moms"),
     ("BRC", "say BRC", "Mother's BRC, magnetic", "brc"),
     ("DME report", "20 DME", "Radar contact, continue", "dme"),
-    ("Inbound 10 nm", "see you at ten", "Visual at ten, report altitude, range and state", "see_you_at_ten"),
+    ("Inbound 10 nm", "see you at ten", "Visual at ten, say state", "see_you_at_ten"),
     ("Fuel state", "state 5.2", "Copy state; under 2.0 expedite", "state"),
     ("Established", "established angels 2", "Signal Charlie, or hold", "established"),
     ("Commencing", "commencing", "Check in three mile initial", "commencing"),

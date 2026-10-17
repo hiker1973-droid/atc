@@ -456,11 +456,31 @@ func displayCallsign(key string) string {
 	return strings.Join(words, " ")
 }
 
+// jtacReadyWithRe is Whisper's "ready with 303" for "Raider 303".
+var jtacReadyWithRe = regexp.MustCompile(`(?i)^(?:ready with|reader|rider|raider with)\s+(\d)`)
+
+// jtacBareNumberRe is a callsign with no name ("Hitman 3-306" -> "3306").
+var jtacBareNumberRe = regexp.MustCompile(`^[\d\s-]+$`)
+
 // jtacCallsign trims what the generic extractor leaves after a JTAC call's
-// callsign: "Raider 11 in from the north" -> "Raider 11".
+// callsign: "Raider 11 in from the north" -> "Raider 11". DCS3 2026-10-17
+// replies opened "and Raider 303", "ready with 303", "Hey man 11" and "3306";
+// a bare number gets no reply rather than being read out as a callsign.
 func jtacCallsign(text string) string {
 	cs := extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
-		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21", "hitman")
+		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21",
+		"hey man one-one", "hey man one one", "hey man 1-1", "hey man 1 1", "hey man 11",
+		"hey man two-one", "hey man two one", "hey man 2-1", "hey man 2 1", "hey man 21", "hey man", "hitman")
+	cs = strings.TrimSpace(cs)
+	for _, filler := range []string{"and ", "this is "} {
+		if len(cs) > len(filler) && strings.EqualFold(cs[:len(filler)], filler) {
+			cs = cs[len(filler):]
+		}
+	}
+	cs = jtacReadyWithRe.ReplaceAllString(cs, "Raider $1")
+	if jtacBareNumberRe.MatchString(cs) {
+		return ""
+	}
 	lower := strings.ToLower(cs)
 	cut := len(cs)
 	for _, v := range []string{" in ", " ip", " off", " abort", " at ", " rolling", " tally", " visual", " good "} {

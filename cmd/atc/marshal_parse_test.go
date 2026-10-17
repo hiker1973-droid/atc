@@ -275,8 +275,37 @@ func TestMarshalCallsFlown20261017(t *testing.T) {
 	}
 }
 
-// The answer to "say altitude, range and state" is a DME report carrying the
-// state, which the DME ack reads back (Day 2026-10-17 13:41:12, 10:50:54).
+// Day 2026-10-17 afternoon: calls dropped as not addressed, and a readback
+// answered as the real "see you at ten".
+func TestMarshalCallsFlown20261017Afternoon(t *testing.T) {
+	if cs := marshalCallsignFromText("You and your marshal, Raider 312, angels 2000, 8.8 DME."); cs != "Raider 312" {
+		t.Errorf("garbled address: callsign = %q, want Raider 312", cs)
+	}
+	if cs := unaddressedStackCallsign("Raider 312, established, angels 2, entry point 3, state 6.5."); cs != "Raider 312" {
+		t.Errorf("unaddressed established: callsign = %q, want Raider 312", cs)
+	}
+	for _, s := range []string{
+		// Our own acks, with and without the address surviving Whisper.
+		"Raider 312, Union Marshal, copy established, angels two, position one in the stack.",
+		"Raider 312, entering stack at angels two, position one, hold for Charlie.",
+		"Raider 312, onion martial, roger, in the stack angels two at position one, stand by for Charlie.",
+		// Not a stack call, or no callsign up front.
+		"312, Hornet ball, 5.5.",
+		"Raider 312, three mile initial.",
+		"Well, established angels 2, Raider 312.",
+	} {
+		if cs := unaddressedStackCallsign(s); cs != "" {
+			t.Errorf("accepted %q as a stack call from %q", s, cs)
+		}
+	}
+	lower := strings.ToLower("Union Marshall Raider 302, BRC 08096, Angels stack at Angels 3, will call, see you at 10.")
+	if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != marshalNone {
+		t.Errorf("readback intent = %d, want none", got)
+	}
+}
+
+// A DME report carrying a state has the state read back with the DME (Day
+// 2026-10-17 13:41:12, 10:50:54).
 func TestMarshalAltRangeStateAnswer(t *testing.T) {
 	cases := []struct {
 		text  string

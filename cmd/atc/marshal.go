@@ -88,8 +88,28 @@ func isDepartureClearCall(lower string) bool {
 // Marshal", "Inner Marshall" and "Ma- either Marshal". So up to two short filler words may precede
 // "Marshal"/"Marshall". The filler list is closed on purpose — our own TX comes
 // back as "<callsign>, Union Marshal, …" and a callsign is never one of these
-// words, so the echo still fails to match.
-var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|inner|leader|you|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,2}marshall?\b\W*`)
+// words, so the echo still fails to match. Up to three since DCS3 2026-10-17
+// 12:56:19 "You and your marshal, Raider 312, angels 2000, 8.8 DME".
+var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|inner|leader|you|your|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,3}marshall?\b\W*`)
+
+// unaddressedStackCallsign accepts one call that skips the address: a
+// callsign-led "Raider 312, established, angels 2, entry point 3, state 6.5"
+// (DCS3 2026-10-17 12:57:14 - dropped, so the jet never got Charlie). Only an
+// established/entering-stack call, and never one that names Marshal: every
+// Marshal TX is "<callsign>, Union Marshal, ...", so its echo stays out.
+func unaddressedStackCallsign(text string) string {
+	lower := strings.ToLower(text)
+	// The ack's own words too, in case Whisper garbles "Union Marshal" in an echo.
+	if containsAny(lower, "marshal", "union", "onion", "copy", "roger", "charlie", "hold for", "in the stack") ||
+		!establishedRe.MatchString(lower) {
+		return ""
+	}
+	m := callsignTokenRe.FindStringSubmatchIndex(text)
+	if m == nil || strings.TrimLeft(text[:m[0]], " ,.") != "" || notCallsignWords[strings.ToLower(text[m[2]:m[3]])] {
+		return ""
+	}
+	return marshalCallsignFromText("Marshal, " + text)
+}
 
 // splitMarshalAddress reports whether text opens with the Marshal address and
 // returns what follows it.
@@ -201,7 +221,10 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		// DCS3 2026-10-15 14:53:37: "marker mom's 300 for 27" got only "state 7.6, copy".
 		"marker mom", "marker mum", "marker bomb"):
 		return marshalMarkingMom
-	case containsAny(lower, "report see you at", "report see me at", "wilco see you at", "wilco see me at"):
+	case containsAny(lower, "report see you at", "report see me at", "wilco see you at", "wilco see me at",
+		// DCS3 2026-10-17 13:35:03 at 72 nm: "BRC 08096, Angels stack at
+		// Angels 3, will call, see you at 10" got "roger visual on mother".
+		"will call see you at", "will call, see you at", "will call you at", "call you at 10", "call you at ten"):
 		// The pilot reading back "report see me at ten", not making the call.
 		// DCS3 2026-10-15 14:54:27: "BRC 96, Marshalling at Angels 2, we'll
 		// report see you at 10" at 29 nm was answered "copy visual at ten
@@ -564,8 +587,13 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	// again). Logged at info: at debug these drops were invisible, and on
 	// 2026-09-14 they read in the log as Marshal ignoring the pilot.
 	if _, ok := splitMarshalAddress(text); !ok {
-		log.Info().Str("text", text).Msg("Marshal: not addressed to Marshal — ignored")
-		return
+		cs := unaddressedStackCallsign(text)
+		if cs == "" {
+			log.Info().Str("text", text).Msg("Marshal: not addressed to Marshal — ignored")
+			return
+		}
+		log.Info().Str("callsign", cs).Str("text", text).Msg("Marshal: stack call without the address - accepted")
+		callsign = cs
 	}
 	// Every response leads with the callsign. Without one the TX would open
 	// ", Union Marshal, …" and its echo would pass the guard above.
@@ -646,6 +674,11 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		transmit(comp.MarshalCheckIn(callsign, rAng, rDist, rBrg, rFound))
 
 	case marshalSeeYouAtTen:
+		if fuelState > 0 {
+			// "see you at 10, state 6.6": the state is already given, don't ask.
+			transmit(comp.MarshalCopyState(callsign, fuelState))
+			break
+		}
 		transmit(comp.MarshalRadarContact(callsign, 10))
 
 	case marshalDepartureClear:

@@ -12,7 +12,10 @@ import "strings"
 //   - Beirut (OLBA): the airport's own name is Rafic Hariri.
 //   - Tbilisi (UGTB): Whisper wrote "Double-Ace" and "To Velocity" on DCS3
 //     2026-10-14 and the calls were dropped; DCS names the field Lochini.
+//   - Senaki (UGKS): "Snarky Tower" (twice) and "Select Ski traffic" were
+//     dropped on DCS3 2026-10-17.
 var fieldSpokenAliases = map[string][]string{
+	"senaki tower":          {"snarky", "select ski", "senacky", "senaky"},
 	"tbilisi tower":         {"tbilissi", "tiblisi", "tibilisi", "t bilisi", "lochini", "double ace", "double-ace", "to velocity"},
 	"mafraq tower":          {"king hussein", "hussein"},
 	"h4 tower":              {"h 4", "h-4", "h four"},
