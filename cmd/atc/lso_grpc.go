@@ -99,18 +99,39 @@ func runLSOGrpc(ctx context.Context, addr string, truth *lsoTruth) {
 	if addr == "" {
 		return
 	}
+	// One warning per outage and one line when it is back, not a warning per
+	// 30 s retry: a mission restart was 2-6 warnings, and a Paddles dialling
+	// a port with no DCS-gRPC behind it (Foothold 2026-10-18) 271.
+	var downSince time.Time
+	connected := func() {
+		if downSince.IsZero() {
+			log.Info().Str("addr", addr).Msg("Paddles: DCS-gRPC events connected")
+			return
+		}
+		log.Info().Str("addr", addr).Dur("down", time.Since(downSince).Round(time.Second)).
+			Msg("Paddles: DCS-gRPC events back")
+		downSince = time.Time{}
+	}
 	for {
-		err := streamLSOGrades(ctx, addr, truth)
+		err := streamLSOGrades(ctx, addr, truth, connected)
+		if ctx.Err() != nil {
+			return
+		}
+		if downSince.IsZero() {
+			downSince = time.Now()
+			log.Warn().Err(err).Str("addr", addr).Msg("Paddles: DCS-gRPC events lost, reconnecting")
+		} else {
+			log.Debug().Err(err).Str("addr", addr).Msg("Paddles: DCS-gRPC still down")
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(30 * time.Second):
 		}
-		log.Warn().Err(err).Str("addr", addr).Msg("Paddles: DCS-gRPC events lost, reconnecting")
 	}
 }
 
-func streamLSOGrades(ctx context.Context, addr string, truth *lsoTruth) error {
+func streamLSOGrades(ctx context.Context, addr string, truth *lsoTruth, connected func()) error {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
@@ -120,7 +141,7 @@ func streamLSOGrades(ctx context.Context, addr string, truth *lsoTruth) error {
 	if err != nil {
 		return err
 	}
-	log.Info().Str("addr", addr).Msg("Paddles: DCS-gRPC events connected")
+	connected()
 	for {
 		ev, err := stream.Recv()
 		if err != nil {

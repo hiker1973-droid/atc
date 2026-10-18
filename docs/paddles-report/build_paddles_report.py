@@ -52,8 +52,8 @@ small = ParagraphStyle("sm", parent=cell, alignment=1, textColor=GREY)
 
 # LSO grade points (the usual squadron scale). A foul-deck wave-off is not the
 # pilot's: no points.
-POINTS = OrderedDict([("_OK_", 5.0), ("OK", 4.0), ("(OK)", 3.0), ("B", 2.5), ("--", 2.0), ("WO", 1.0),
-                      ("C", 0.0)])
+POINTS = OrderedDict([("_OK_", 5.0), ("OK", 4.0), ("(OK)", 3.0), ("B", 2.5), ("---", 2.0), ("--", 2.0),
+                      ("WO", 1.0), ("C", 0.0)])
 SEGMENTS = ["X", "IM", "IC", "AR"]
 
 
@@ -157,7 +157,9 @@ def collect(logs, start, end):
                 ev["abeam"].append(o)
             elif msg == "Command intent miss" and o.get("channel") == "Paddles":
                 ev["miss"].append(o)
-            elif msg in ("Paddles: Tacview disconnected, reconnecting in 5s", "Paddles: DCS-gRPC events lost, reconnecting",
+            elif msg.startswith("Paddles: DCS-gRPC events"):
+                ev["grpc"].append(o)
+            elif msg in ("Paddles: Tacview disconnected, reconnecting in 5s",
                          "Paddles: call dropped, too late", "Paddles: TTS failed", "Paddles: TX queue full"):
                 ev["health"].append(o)
     for k in ev:
@@ -227,6 +229,42 @@ def dcs_for(p, ev):
     return None, None
 
 
+def grpc_outages(lines):
+    """Per rig: outages (a "lost" after being up - older logs repeat "lost"
+    every 30 s retry), the longest, and whether the day ended down."""
+    out = {}
+    state = {}
+    addrs = defaultdict(set)
+    for o in lines:
+        addrs[o["_rig"]].add(o.get("addr", ""))
+    for o in lines:
+        # Two Paddles in one log (one rig running both theatres) are told
+        # apart by the DCS-gRPC address each dials.
+        rg, msg = o["_rig"], o["message"]
+        if len(addrs[rg]) > 1:
+            rg += " (%s)" % o.get("addr", "")
+        n, longest, _ = out.get(rg, (0, 0.0, False))
+        if msg.startswith("Paddles: DCS-gRPC events lost"):
+            if rg not in state or state[rg] is None:
+                state[rg] = o["_t"]
+                n += 1
+        elif state.get(rg) is not None:
+            longest = max(longest, (o["_t"] - state[rg]).total_seconds())
+            state[rg] = None
+        else:
+            state[rg] = None
+        out[rg] = (n, longest, state.get(rg) is not None)
+    return {rg: v for rg, v in out.items() if v[0]}
+
+
+def mins(sec):
+    if sec < 60:
+        return "%d s" % sec
+    if sec < 3600:
+        return "%d min" % round(sec / 60)
+    return "%.1f h" % (sec / 3600)
+
+
 def build(ev, start, end, rigs, out_path, sample=False, problems=()):
     passes = ev["pass"]
     real = [p for p in passes if p["outcome"] in ("trap", "bolter", "wave off")]
@@ -256,7 +294,7 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=()):
                             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f5f7fa")),
                             ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
     S.append(tt)
-    S.append(Paragraph("Grade points: _OK_ 5 &middot; OK 4 &middot; (OK) 3 &middot; B 2.5 &middot; -- 2 &middot; "
+    S.append(Paragraph("Grade points: _OK_ 5 &middot; OK 4 &middot; (OK) 3 &middot; B 2.5 &middot; --- (no grade) 2 &middot; "
                        "WO 1 &middot; C 0. A foul-deck wave-off is not scored. Boarding rate = traps / (traps + "
                        "bolters).", note))
 
@@ -335,7 +373,11 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=()):
     hc = defaultdict(int)
     for o in ev["health"]:
         hc[(o["_rig"], o["message"].replace("Paddles: ", "").split(",")[0])] += 1
-    health = "<br/>".join("%s: %s &times;%d" % (rg, k, n) for (rg, k), n in sorted(hc.items())) or "clean"
+    lines = ["%s: %s &times;%d" % (rg, k, n) for (rg, k), n in sorted(hc.items())]
+    for rg, (n, longest, still) in sorted(grpc_outages(ev["grpc"]).items()):
+        lines.append("%s: DCS-gRPC down &times;%d, longest %s%s" % (rg, n, mins(longest),
+                                                                   ", still down at the end" if still else ""))
+    health = "<br/>".join(sorted(lines)) or "clean"
     S.append(KeepTogether([Paragraph("Radio and Paddles health", h), table(["Item", "Count / detail"], [
         ["Abeam replies (\"Paddles contact ... call the ball\")", str(abeam)],
         ["Ball calls answered (Clara)", "%d (%d)" % (len(balls), clara)],
