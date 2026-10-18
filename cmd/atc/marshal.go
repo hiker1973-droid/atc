@@ -235,7 +235,10 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 	case isDepartureClearCall(lower):
 		return marshalDepartureClear
 	case containsAny(lower, "pushing command", "switching command", "push command", "switch command",
-		"pushing strike", "switching strike"):
+		"pushing strike", "switching strike",
+		// Day 2026-10-18 06:52:02: "Raider 303 leaving airspace, signing out
+		// for command" was an intent miss.
+		"leaving airspace", "leaving the airspace", "signing out", "signing off", "checking out"):
 		// After the departure-clear call ("clear Mother's, push command" is
 		// that) but ahead of the DME report: "seven miles out, pushing command"
 		// is a jet leaving, and was answered "contact 7 DME, continue" (DCS3

@@ -304,6 +304,20 @@ func TestMarshalCallsFlown20261017Afternoon(t *testing.T) {
 	}
 }
 
+// A jet signing out of Marshal for Command (Day 2026-10-18 06:52:02, an intent
+// miss) gets the handoff ack.
+func TestMarshalSignOut20261018(t *testing.T) {
+	for _, s := range []string{
+		"Marshall, Raider 303 leaving airspace, signing out for command.",
+		"Union Marshal, Raider 303, checking out, switching to Command.",
+	} {
+		lower := strings.ToLower(s)
+		if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != marshalPushCommand {
+			t.Errorf("%q: intent = %d, want push command", s, got)
+		}
+	}
+}
+
 // A DME report carrying a state has the state read back with the DME (Day
 // 2026-10-17 13:41:12, 10:50:54).
 func TestMarshalAltRangeStateAnswer(t *testing.T) {
