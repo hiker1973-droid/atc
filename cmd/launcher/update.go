@@ -172,6 +172,11 @@ func doUpdate(force bool) error {
 	n := refreshKeyEnv()
 	updLog("re-read %d key/setting variable(s) from the registry for the roles", n)
 
+	// Match running processes against the bats just pulled, not the ones the
+	// launcher read at start: on 2026-10-18 Foothold's stale Paddles bats
+	// matched each other and the Update started the Caucasus region there.
+	discoverRoles()
+
 	regions := runningRegions()
 	updMu.Lock()
 	upd.Regions = regions

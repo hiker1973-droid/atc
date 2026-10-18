@@ -6,6 +6,8 @@ import "testing"
 const (
 	batMarshalPG     = `%~dp0atc.exe --marshal-only --airfield OMDM --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%`
 	batMarshalSyria  = `%~dp0atc.exe --marshal-only --airfield LCRA --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%`
+	batLSOCauc       = `%~dp0atc.exe --lso-only --airfield UGSB --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%`
+	batLSOSyria      = `%~dp0atc.exe --lso-only --airfield LCRA --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%`
 	batATISPG        = `%~dp0atc.exe --atis-only --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%`
 	batATISCaucasus  = `%~dp0atc.exe --atis-only --map caucasus --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%`
 	batCommandPG     = `%~dp0atc.exe --command-only --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%`
@@ -21,6 +23,8 @@ const (
 func TestRoleMatchesProcCaucasusCarrier(t *testing.T) {
 	marshalCauc := proc(1, `C:\SkyeyeATC\atc.exe --marshal-only --airfield UGSB --marshal-freq 306.2 --marshal-voice coral --srs-addr localhost:5008 --tacview-addr localhost:42676 --eam-password hunter2 --dashboard-port 6004 --log-level info`)
 	deckCauc := proc(2, `C:\SkyeyeATC\atc.exe --airfield UGSB --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --deckboss-freq 128.6 --deckboss-voice shimmer --handoff-marshal-freq 306.2 --no-atis --dashboard-port 6005 --log-level info`)
+	lsoCauc := proc(4, `C:\SkyeyeATC\atc.exe --lso-only --airfield UGSB --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr localhost:5008 --tacview-addr localhost:42676 --lso-grpc-addr localhost:50051 --eam-password hunter2 --log-level info`)
+	lsoSyria := proc(5, `C:\SkyeyeATC\atc.exe --lso-only --airfield LCRA --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr localhost:5002 --tacview-addr localhost:42676 --lso-grpc-addr localhost:50052 --eam-password hunter2 --log-level info`)
 	batumi := proc(3, `C:\SkyeyeATC\atc.exe --airfield UGSB --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --tts-voice nova --dashboard-port 6011 --runway-rotation=false --log-level info`)
 	cases := []struct {
 		name string
@@ -34,6 +38,12 @@ func TestRoleMatchesProcCaucasusCarrier(t *testing.T) {
 		{"caucasus deckboss matches its bat", batDeckbossCauc, deckCauc, true},
 		{"batumi tower bat is not the deckboss on the same airfield", batBatumiTower, deckCauc, false},
 		{"caucasus deckboss bat is not batumi tower", batDeckbossCauc, batumi, false},
+		// Foothold 2026-10-18: identical Paddles bats made the Update start
+		// the Caucasus region on the Syria rig.
+		{"caucasus paddles matches its bat", batLSOCauc, lsoCauc, true},
+		{"syria paddles matches its bat", batLSOSyria, lsoSyria, true},
+		{"syria paddles bat is not the caucasus paddles", batLSOSyria, lsoCauc, false},
+		{"caucasus paddles bat is not the syria paddles", batLSOCauc, lsoSyria, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

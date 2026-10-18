@@ -36,4 +36,8 @@ if defined SKYEYE_GRPC set GRPC=%SKYEYE_GRPC%
 :: not used. Groove calls need the rig's Tacview feed (offline on Foothold
 :: since 2026-10-15); without it Paddles still answers abeam, ball and radio
 :: check calls.
-start "Paddles (Syria)" cmd /c "%~dp0atc.exe --lso-only --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%"
+:: --airfield (not used by Paddles) tells this role's atc.exe apart from the
+:: other theatre's Paddles: the launcher matches a role to its process by
+:: command line, and the two were identical. On 2026-10-18 Foothold's Update
+:: took its Syria Paddles for the Caucasus one and started the Caucasus region.
+start "Paddles (Syria)" cmd /c "%~dp0atc.exe --lso-only --airfield LCRA --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%"
