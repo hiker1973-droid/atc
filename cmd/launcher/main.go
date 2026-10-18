@@ -135,6 +135,7 @@ func main() {
 	mux.HandleFunc("/api/elevenlabs-fleet", handleElevenFleet)
 	mux.HandleFunc("/api/comms-report", handleCommsReport)
 	mux.HandleFunc("/api/comms-fleet", handleCommsFleet)
+	mux.HandleFunc("/api/lso-log", handleLSOLog)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(handleStart))

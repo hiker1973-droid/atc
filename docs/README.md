@@ -9,6 +9,7 @@ Two generated PDFs for pilots, kept here so they version with the code they desc
 | **SkyEye ATC Comms Packet** | `comms-packet/` | 16:9 slides | `comms-packet/_tools/build_skyeye_packet.py` |
 | **Hitman JTAC Comms Flow** | `hitman-flow/` | one-page sheet (ReportLab) | `hitman-flow/build_hitman_flow.py` |
 | **Paddles LSO Comms Flow** | `paddles-flow/` | one-page sheet (ReportLab) | `paddles-flow/build_paddles_flow.py` |
+| **Paddles Daily Report** | `paddles-report/` | nightly PDF of traps and grades, all rigs (Task Scheduler "SkyEye Paddles Report", 00:05 on the dev box; data from the launcher's `/api/lso-log`) | `paddles-report/run_nightly.py` |
 
 Both need the squadron card kit in
 `C:\Users\afhin\Saved Games\DCS\Missions\_MISSION_TOOLKIT\briefing` (missioncard,
