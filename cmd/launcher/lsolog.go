@@ -11,13 +11,31 @@ import (
 	"time"
 )
 
-// Paddles daily report (operator 2026-10-18: "run a daily paddles report on
-// traps and data collected"). /api/log serves only the last 32 KB; the report
-// (docs/paddles-report, run nightly on the dev box) needs the whole day, so
-// /api/lso-log?date=YYYY-MM-DD returns every non-debug line of that local day
-// from logs\atc-lso.log and its rotated copies (.4 oldest .. .1, then the live
-// file). No date: yesterday.
+// Daily reports on the dev box (docs/paddles-report, docs/health-report)
+// need whole days of logs; /api/log serves only the last 32 KB.
+//
+//	/api/lso-log?date=YYYY-MM-DD            Paddles (operator 2026-10-18: "run a
+//	                                        daily paddles report")
+//	/api/day-log?name=<role>&date=...       any role (operator 2026-10-18: "also
+//	                                        do a daily health report on
+//	                                        ATC/ATIS/Marshall")
+//
+// Every non-debug line of that local day, from the role's log and its rotated
+// copies (.4 oldest .. .1, then the live file). No date: yesterday.
 func handleLSOLog(w http.ResponseWriter, r *http.Request) {
+	serveDayLog(w, r, "atc-lso.log")
+}
+
+func handleDayLog(w http.ResponseWriter, r *http.Request) {
+	role := findRole(r.URL.Query().Get("name"))
+	if role == nil {
+		http.Error(w, "unknown role", http.StatusNotFound)
+		return
+	}
+	serveDayLog(w, r, role.LogFile)
+}
+
+func serveDayLog(w http.ResponseWriter, r *http.Request, file string) {
 	date := r.URL.Query().Get("date")
 	if date == "" {
 		date = time.Now().AddDate(0, 0, -1).Format("2006-01-02")
@@ -27,17 +45,17 @@ func handleLSOLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	if err := writeLSOLog(w, filepath.Join(rootDir, "logs"), date); err != nil {
+	if err := writeDayLog(w, filepath.Join(rootDir, "logs"), file, date); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// writeLSOLog copies the lines of one day (the "time" field's date) from the
-// Paddles logs in dir to w, oldest first.
-func writeLSOLog(w io.Writer, dir, date string) error {
+// writeDayLog copies the lines of one day (the "time" field's date) from the
+// log file in dir and its rotated copies to w, oldest first.
+func writeDayLog(w io.Writer, dir, file, date string) error {
 	want := `"time":"` + date + "T"
 	for i := 4; i >= 0; i-- {
-		path := filepath.Join(dir, "atc-lso.log")
+		path := filepath.Join(dir, file)
 		if i > 0 {
 			path += fmt.Sprintf(".%d", i)
 		}
