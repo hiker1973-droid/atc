@@ -8,7 +8,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Windows: the rigs are Windows and the launcher reads the registry
+    # (golang.org/x/sys/windows/registry), which does not build on Linux.
+    # Every run on ubuntu failed from e1de067 (2026-10-15) on.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
