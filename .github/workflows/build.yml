@@ -28,4 +28,3 @@ jobs:
 
       - name: go test
         run: go test ./...
-        continue-on-error: true
