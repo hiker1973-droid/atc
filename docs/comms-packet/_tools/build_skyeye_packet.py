@@ -456,8 +456,11 @@ def c09_marshal_calls_case3():
 def c10_paddles():
     c = card("PADD", "LES", ["SkyEye LSO  ·  %s AM  ·  Black Sea Day / Night  ·  dial it" % PADDLES_F,
                             "You call the ball; he talks you down. No readbacks."], 10, EYE_CVN)
-    NK.band(c, "THE BALL CALL", "about 3/4 nm, after Marshal's \"contact paddles\"")
+    NK.band(c, "ABEAM AND THE BALL CALL", "after Marshal's \"contact paddles\"")
     NK.steps(c, [
+        ("ABEAM", "302 abeam."),
+        ("PADDLES", "Paddles contact, 302. In the groove at"),
+        ("", "three-quarter mile, call the ball."),
         ("YOU", "302, Hornet ball, 5.5."),
         ("PADDLES", "Roger ball."),
         ("CLARA", "302, Clara, 5.0.  ->  Paddles contact, keep it coming."),

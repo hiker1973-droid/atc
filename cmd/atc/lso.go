@@ -153,7 +153,7 @@ func runLSO(ctx context.Context, apiKey string) {
 	<-ctx.Done()
 }
 
-const lsoWhisperPrompt = "Paddles, Raider, Venom, Hornet ball, Tomcat ball, Clara, ball, radio check, state"
+const lsoWhisperPrompt = "Paddles, Raider, Venom, abeam, Hornet ball, Tomcat ball, Clara, ball, radio check, state"
 
 // lsoBallRe: "302, Hornet ball, 5.5" (Whisper also writes "Hornetball" and,
 // on 306.3 on 2026-10-16/17, "bolt" for "ball").
@@ -162,6 +162,10 @@ var (
 	lsoClaraRe  = regexp.MustCompile(`(?i)\bclara\b|\bclarence\b`)
 	lsoModexRe  = regexp.MustCompile(`\b(\d)[\s-]?(\d)[\s-]?(\d)\b`)
 	lsoRadioChk = regexp.MustCompile(`(?i)radio check|comm check|com check|comms check|how copy`)
+	// lsoAbeamRe: "302 abeam" (Whisper: "a beam", or just "beam").
+	lsoAbeamRe = regexp.MustCompile(`(?i)\ba[\s-]?beam\b|\bbeam\b`)
+	// lsoCallsignRe is a full callsign ("Raider 302"), not a fragment of the call.
+	lsoCallsignRe = regexp.MustCompile(`^[A-Za-z]+ \d{1,3}$`)
 )
 
 // lsoFeed is the shared state: the tracker (Tacview goroutine) and the radio
@@ -201,6 +205,18 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		log.Info().Str("modex", modex).Bool("clara", clara).Str("text", text).Msg("Paddles: ball call")
 		f.say(c)
 		return modex, netHandled
+	case lsoAbeamRe.MatchString(text):
+		// "302 abeam" (operator 2026-10-18): Paddles takes the jet and sets up
+		// the ball call. Needs the modex or callsign, so chatter about the
+		// beam isn't answered.
+		cs := extractCallsignSkippingAddress(text, "paddles", "patels", "paddle")
+		if !lsoCallsignRe.MatchString(cs) {
+			cs = modex
+		}
+		if cs == "" {
+			return "", ""
+		}
+		return cs, "Paddles contact, " + cs + ". In the groove at three-quarter mile, call the ball."
 	case lsoRadioChk.MatchString(text):
 		cs := extractCallsignSkippingAddress(text, "paddles", "patels", "paddle")
 		if cs == "" {

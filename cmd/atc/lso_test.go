@@ -33,7 +33,19 @@ func TestLSOBallCalls(t *testing.T) {
 	if _, resp := f.heard("Paddles, Raider 302, radio check."); resp != "Raider 302, Paddles, loud and clear." {
 		t.Errorf("radio check reply = %q", resp)
 	}
-	for _, in := range []string{"Red deck.", "302 beam.", "Green deck."} {
+	// "302 abeam" (operator 2026-10-18): Paddles contact, set up the ball call.
+	for in, want := range map[string]string{
+		"302 abeam.":                  "Paddles contact, 302. In the groove at three-quarter mile, call the ball.",
+		"302, a beam.":                "Paddles contact, 302. In the groove at three-quarter mile, call the ball.",
+		"Paddles, Raider 302, abeam.": "Paddles contact, Raider 302. In the groove at three-quarter mile, call the ball.",
+		"3-0-2 beam, 5.8.":            "Paddles contact, 302. In the groove at three-quarter mile, call the ball.",
+	} {
+		said = nil
+		if _, resp := f.heard(in); resp != want || len(said) != 0 {
+			t.Errorf("heard(%q) = %q (said %v), want %q", in, resp, said, want)
+		}
+	}
+	for _, in := range []string{"Red deck.", "Abeam.", "Green deck."} {
 		said = nil
 		if _, resp := f.heard(in); resp != "" || len(said) != 0 {
 			t.Errorf("heard(%q) answered %q / %v", in, resp, said)

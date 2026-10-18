@@ -20,7 +20,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Table, TableStyle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = "SkyEye 6208ef8, 18 Oct 2026"
+BUILD = "SkyEye main, 18 Oct 2026"
 OUT_NAME = "Paddles LSO Comms Flow.pdf"
 DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation",
            r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev"]
@@ -74,11 +74,14 @@ S.append(section("1. Marshal (306.300): get handed to Paddles",
     "Switch COMM 2 to 128.300. The rest of the recovery (check-in, stack, Charlie) is in the Comms Packet, "
     "Marshal cards."))
 
-S.append(section("2. Radio check (optional)",
+S.append(section("2. Abeam (the 180)",
     table(["Pilot", "Paddles"], [
+        ["\"<b>302 abeam</b>\" (or \"Paddles, Raider 302, abeam\")",
+         "\"<b>Paddles contact, 302. In the groove at three-quarter mile, call the ball.</b>\""],
         ["\"Paddles, Raider 302, <b>radio check</b>\" (or \"comm check\", \"how copy\")",
          "\"Raider 302, Paddles, loud and clear.\""],
-    ], [3.3, 4.1])))
+    ], [3.3, 4.1]),
+    "Give your modex or full callsign with abeam: Paddles answers with whichever you said."))
 
 S.append(section("3. The ball call (about 3/4 nm, on the glideslope)",
     table(["Pilot", "Paddles"], [
