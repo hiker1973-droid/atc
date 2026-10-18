@@ -111,11 +111,13 @@ def parse_pass(s):
         return None
     p = {"callsign": m["cs"], "model": m["model"], "outcome": m["outcome"].strip(), "grade": "",
          "comments": "", "wire": None, "touch": None, "segs": {}, "said": []}
-    g = re.search(r", grade (.+?)(?:, hook touched|; \d+ samples|$)", s)
+    g = re.search(r", grade (.+?)(?:, hook touched|, ramp |; \d+ samples|$)", s)
     if g:
         gr = g.group(1)
-        if gr.startswith("WO"):
-            p["grade"] = "WO (foul deck)" if "foul deck" in gr else "WO"
+        if gr.startswith("WO") and "foul deck" in gr:
+            p["grade"] = "WO (foul deck)"
+        elif gr.startswith("WO"):
+            p["grade"], _, p["comments"] = gr.partition(": ")
         else:
             p["grade"], _, p["comments"] = gr.partition(": ")
             p["comments"] = re.sub(r"\s*\d wire$", "", p["comments"]).strip()
@@ -479,8 +481,7 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None)
     notes = ["<b>Not reached:</b> %s - this rig's passes are missing." % x for x in problems]
     ic_all = [p["segs"]["IC"][0] for p in traps if "IC" in p["segs"]]
     if ic_all:
-        notes.append("Average glideslope in close on traps: %+.1f&deg; (Paddles' earlier ~0.5&deg; high bias shows "
-                     "here as a steady positive number)." % (sum(ic_all) / len(ic_all)))
+        notes.append("Average glideslope in close on traps: %+.1f&deg;." % (sum(ic_all) / len(ic_all)))
     for m in ev["miss"]:
         if re.search(r"three-quarter mile|3/4 mile", m.get("text", ""), re.I):
             notes.append("A ball call without \"ball\" (\"%s\") went unanswered: say \"Hornet ball\"." % m.get("text", ""))
