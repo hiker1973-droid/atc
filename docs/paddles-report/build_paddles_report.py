@@ -4,7 +4,8 @@
 Reads Paddles' log lines (atc-lso.log, JSON per line; a "Role :: {json}" prefix is
 skipped) from one or more rigs and builds a PDF for a day: every pass with Paddles'
 grade and wire, DCS's own grade beside it, the groove (glideslope and lineup at
-X / IM / IC / AR) as a small plot, a pilot table, and what Paddles heard and said.
+X / IM / IC / AR) as a small plot, a pilot table, what Paddles heard and said, and
+the month's greenie board (every pass so far this month, from --board-dir).
 
 The pass line is pkg/lso Tracker.finish(); the rest are the Msg()s in
 cmd/atc/lso.go and cmd/atc/lso_grpc.go.
@@ -14,7 +15,8 @@ collected"), in the style of docs/paddles-flow.
 
 Run:  python -I docs/paddles-report/build_paddles_report.py --date 2026-10-18 \
           --log Day=atc-lso-day.log --log Night=atc-lso-night.log [--out DIR]
-      --from / --to instead of --date for a range; --sample marks it a sample.
+      --from / --to instead of --date for a range; --sample marks it a sample;
+      --board-dir DIR (files "YYYY-MM-DD Rig.log") adds the month's greenie board.
 """
 import argparse
 import datetime as dt
@@ -24,11 +26,12 @@ import re
 import shutil
 from collections import OrderedDict, defaultdict
 
-from reportlab.graphics.shapes import Drawing, Line, PolyLine, String
+from reportlab.graphics.shapes import Drawing, Line, PolyLine, Rect, String
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"]
@@ -55,6 +58,19 @@ small = ParagraphStyle("sm", parent=cell, alignment=1, textColor=GREY)
 POINTS = OrderedDict([("_OK_", 5.0), ("OK", 4.0), ("(OK)", 3.0), ("B", 2.5), ("---", 2.0), ("--", 2.0),
                       ("WO", 1.0), ("C", 0.0)])
 SEGMENTS = ["X", "IM", "IC", "AR"]
+
+# Greenie board squares (operator 2026-10-18: "add the greenie board to the
+# report"): the usual squadron colours. Text is what goes in the square.
+BOARD = OrderedDict([
+    ("_OK_", ("#00843d", "#ffffff", "perfect, 3 wire")),
+    ("OK", ("#2fb34a", "#ffffff", "pass")),
+    ("(OK)", ("#f2c80f", "#1f3350", "fair")),
+    ("---", ("#8b5a2b", "#ffffff", "no grade")),
+    ("C", ("#c62828", "#ffffff", "cut")),
+    ("B", ("#2f6db5", "#ffffff", "bolter")),
+    ("WO", ("#222222", "#ffffff", "wave-off")),
+    ("WOFD", ("#c8d0db", "#1f3350", "foul-deck wave-off (not scored)")),
+])
 
 
 def table(head, rows, widths, style=()):
@@ -229,6 +245,74 @@ def dcs_for(p, ev):
     return None, None
 
 
+def board_key(p):
+    g = p["grade"]
+    if g.startswith("WO"):
+        return "WOFD" if "foul deck" in g else "WO"
+    if g == "--":
+        return "---"
+    if g in BOARD:
+        return g
+    return {"bolter": "B", "wave off": "WO"}.get(p["outcome"], "---")
+
+
+def board_row(passes, w, sq=0.19 * inch, gap=2):
+    """One pilot's squares, oldest first, wrapping to more rows."""
+    per = max(1, int((w + gap) // (sq + gap)))
+    rows = (len(passes) + per - 1) // per
+    d = Drawing(w, rows * (sq + gap))
+    for i, p in enumerate(passes):
+        fill, ink, _ = BOARD[board_key(p)]
+        x = (i % per) * (sq + gap)
+        y = (rows - 1 - i // per) * (sq + gap) + gap / 2
+        d.add(Rect(x, y, sq, sq, fillColor=colors.HexColor(fill), strokeColor=colors.white, strokeWidth=0.5))
+        txt = str(p["wire"]) if p["outcome"] == "trap" and p["wire"] else {"B": "B", "WO": "W"}.get(board_key(p), "")
+        if txt:
+            d.add(String(x + sq / 2, y + sq / 2 - 2.4, txt, fontSize=6.5, fillColor=colors.HexColor(ink),
+                         textAnchor="middle", fontName="Helvetica-Bold"))
+    return d
+
+
+def greenie_board(passes, month, end):
+    """The month's board: pilots by average grade points, then passes."""
+    by = defaultdict(list)
+    for p in sorted(passes, key=lambda p: p["t"]):
+        if p["outcome"] in ("trap", "bolter", "wave off"):
+            by[p["callsign"]].append(p)
+    if not by:
+        return []
+    sq_w = 4.5 * inch
+    rows = []
+    for cs, ps in by.items():
+        pts = [x for x in (grade_points(p) for p in ps) if x is not None]
+        traps = [p for p in ps if p["outcome"] == "trap"]
+        rows.append((-(sum(pts) / len(pts)) if pts else 0, -len(ps), cs, ps, pts, traps))
+    rows.sort()
+    data = [[Paragraph(x, hdr) for x in ("Pilot", "Avg", "Passes", "Traps", "Passes this month, oldest first")]]
+    for _, _, cs, ps, pts, traps in rows:
+        data.append([Paragraph("<b>%s</b>" % cs, cell), Paragraph("%.2f" % (sum(pts) / len(pts)) if pts else "-", cell),
+                     Paragraph(str(len(ps)), cell), Paragraph(str(len(traps)), cell), board_row(ps, sq_w)])
+    t = Table(data, colWidths=[1.3 * inch, 0.45 * inch, 0.55 * inch, 0.45 * inch, sq_w + 0.15 * inch], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, SHADE]),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#9aa7b8")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6),
+    ]))
+    key = Drawing(7.5 * inch, 0.2 * inch)
+    x = 0
+    for code, (fill, ink, label) in BOARD.items():
+        key.add(Rect(x, 2, 8, 8, fillColor=colors.HexColor(fill), strokeColor=colors.white))
+        text = "%s %s" % ("WO" if code == "WOFD" else code, label)
+        key.add(String(x + 11, 3.5, text, fontSize=6.3, fontName="Helvetica", fillColor=GREY))
+        x += 20 + stringWidth(text, "Helvetica", 6.3)
+    days = "1 - %d %s" % (end.day, month.strftime("%b %Y")) if end.day > 1 else end.strftime("%d %b %Y")
+    return [KeepTogether([Paragraph("Greenie board &middot; %s" % days, h), t, key,
+                          Paragraph("Number in a square: the wire. Ranked by average grade points (foul-deck "
+                                    "wave-offs not scored), then passes. Every rig counts.", note)])]
+
+
 def grpc_outages(lines):
     """Per rig: outages (a "lost" after being up - older logs repeat "lost"
     every 30 s retry), the longest, and whether the day ended down."""
@@ -265,7 +349,7 @@ def mins(sec):
     return "%.1f h" % (sec / 3600)
 
 
-def build(ev, start, end, rigs, out_path, sample=False, problems=()):
+def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None):
     passes = ev["pass"]
     real = [p for p in passes if p["outcome"] in ("trap", "bolter", "wave off")]
     traps = [p for p in real if p["outcome"] == "trap"]
@@ -344,6 +428,9 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=()):
             ["Pilot", "Passes", "Traps", "Bolters", "Wave-offs", "Avg pts", "Avg wire", "Avg GS in close"],
             prow, [1.6, 0.7, 0.7, 0.7, 0.75, 0.75, 0.75, 1.45])]))
 
+    if board is not None:
+        S += greenie_board(board, end.replace(day=1), end)
+
     # DCS's own grades (AI included) and the comparison
     if ev["dcs"]:
         drow = [[d["_t"].strftime("%H:%M"), d["_rig"], d.get("callsign", ""), d.get("type", ""), d.get("grade", ""),
@@ -415,6 +502,7 @@ def main():
     ap.add_argument("--to", dest="end")
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sample", action="store_true")
+    ap.add_argument("--board-dir", help='folder of "YYYY-MM-DD Rig.log" day logs for the greenie board')
     ap.add_argument("--problem", action="append", default=[], help="a rig that could not be read (noted)")
     ap.add_argument("--no-copy", action="store_true", help="don't copy to the Desktop Documentation folder")
     a = ap.parse_args()
@@ -427,7 +515,16 @@ def main():
     ev = collect(logs, start, end)
     name = "Paddles Report %s%s.pdf" % (end.isoformat(), " SAMPLE" if a.sample else "")
     out = os.path.join(a.out, name)
-    build(ev, start, end, rigs, out, a.sample, a.problem)
+    board = None
+    if a.board_dir:
+        month = end.replace(day=1)
+        blogs = []
+        for f in sorted(os.listdir(a.board_dir)):
+            m = re.match(r"(\d{4}-\d{2}-\d{2}) (.+)\.log$", f)
+            if m and month.isoformat() <= m.group(1) <= end.isoformat():
+                blogs.append((m.group(2), os.path.join(a.board_dir, f)))
+        board = collect(blogs + logs, month, end)["pass"]
+    build(ev, start, end, rigs, out, a.sample, a.problem, board)
     if not a.no_copy:
         for d in DESKTOP:
             if os.path.isdir(d):

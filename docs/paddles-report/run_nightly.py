@@ -50,7 +50,7 @@ def main():
         print("no rig answered:", "; ".join(problems), file=sys.stderr)
         return 1
     cmd = [sys.executable, "-I", os.path.join(HERE, "build_paddles_report.py"), "--date", a.date,
-           "--out", a.out, "--no-copy"] + logs
+           "--out", a.out, "--no-copy", "--board-dir", data] + logs
     for p in problems:
         cmd += ["--problem", p]
     return subprocess.call(cmd)
