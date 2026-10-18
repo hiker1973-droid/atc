@@ -1,6 +1,7 @@
 package lso
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -59,10 +60,11 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 		var right, height float64
 		if astern > 0 {
 			gs := p.GlideslopeDeg + f.gsErr(astern)
-			height = math.Tan(gs*math.Pi/180) * astern
+			// A jet never sinks below the deck (real tracks sit at deckLevelM).
+			height = math.Max(math.Tan(gs*math.Pi/180)*astern, deckLevelM)
 			right = math.Tan(f.luErr(astern)*math.Pi/180) * astern
 		} else {
-			height = 0
+			height = deckLevelM
 		}
 		lat, lon, alt := world(p, ship, astern, right, height)
 		if f.ball && !ballDone && astern < 1400 {
@@ -83,9 +85,10 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 		if summary != "" {
 			return calls, summary
 		}
-		// Speed relative to the ship along the axis.
-		if astern <= 0 && f.finish == "trap" {
-			rel = math.Max(rel-25*dt*3, 0)
+		// Speed relative to the ship along the axis. A trap catches the 3
+		// wire and runs out trapRunoutM past it.
+		if wire3 := -(NimitzParams().WiresFromSternM[2] - NimitzParams().HookTouchFromSternM); astern <= wire3 && f.finish == "trap" {
+			rel = math.Max(rel-70*70/(2*trapRunoutM)*dt, 0)
 		}
 		astern -= rel * dt
 		if astern < -400 {
@@ -212,6 +215,60 @@ func TestOverheadIsNotAGroove(t *testing.T) {
 	}
 	if len(tr.InGroove()) != 0 {
 		t.Errorf("in groove: %v", tr.InGroove())
+	}
+}
+
+// Low and flat over the ramp, then down on the 3 wire: not a 1 wire (Raider
+// 302, Day 2026-10-18 14:56: DCS "C ... LOAR ... WIRE# 3", Paddles said 1 wire
+// because the hook was within a metre of deck height at the ramp).
+func TestLowFlatOverRampStillThreeWire(t *testing.T) {
+	_, sum := flight{gsErr: func(a float64) float64 {
+		// About a metre above deck height from 90 m out to the aim point.
+		if a < 90 {
+			return math.Atan2(0.9+0.01*a, a)*180/math.Pi - NimitzParams().GlideslopeDeg
+		}
+		return 0
+	}, luErr: zero, finish: "trap", ball: true}.run(t)
+	var fwd float64
+	if _, err := fmt.Sscanf(sum[strings.Index(sum, "hook touched ")+len("hook touched "):], "%f", &fwd); err != nil ||
+		!strings.Contains(sum, ": trap") || fwd < -15 {
+		t.Errorf("summary = %q, want a trap touching down at the aim point, not over the ramp", sum)
+	}
+}
+
+// The wire is where the jet stopped, less the run-out: seven traps with DCS's
+// wire (2026-10-17/18) stopped 90 - 121 m past the aim point.
+func TestWireFromStop(t *testing.T) {
+	tr := NewTracker(NimitzParams())
+	for _, c := range []struct {
+		stop float64
+		want int
+	}{{90.3, 1}, {90.0, 1}, {99.4, 2}, {111.1, 3}, {115.1, 3}, {116.8, 3}, {121.0, 4}} {
+		if got := tr.WireFromStop(c.stop); got != c.want {
+			t.Errorf("WireFromStop(%.1f) = %d, want %d", c.stop, got, c.want)
+		}
+	}
+}
+
+// Far below the glide path at the ramp is a cut, even on a trap (302, Day
+// 2026-10-18 14:56: DCS "C ... LOAR"); just below it is LOAR.
+func TestRampCut(t *testing.T) {
+	low := func(m float64) func(float64) float64 {
+		return func(a float64) float64 {
+			if a < 300 && a > 40 {
+				gs := NimitzParams().GlideslopeDeg
+				return math.Atan2(math.Tan(gs*math.Pi/180)*a+m, a)*180/math.Pi - gs
+			}
+			return 0
+		}
+	}
+	_, sum := flight{gsErr: low(-2.5), luErr: zero, finish: "trap", ball: true}.run(t)
+	if !strings.Contains(sum, "grade C") || !strings.Contains(sum, "LOAR") {
+		t.Errorf("2.5 m low at the ramp: summary = %q, want grade C with LOAR", sum)
+	}
+	_, sum = flight{gsErr: low(-0.8), luErr: zero, finish: "trap", ball: true}.run(t)
+	if strings.Contains(sum, "grade C") || !strings.Contains(sum, "LOAR") {
+		t.Errorf("0.8 m low at the ramp: summary = %q, want LOAR, not a cut", sum)
 	}
 }
 

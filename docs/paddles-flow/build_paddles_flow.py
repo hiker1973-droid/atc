@@ -105,8 +105,9 @@ S.append(section("4. In the groove: Paddles calls, you fly (no readback)",
         ["Right of the landing line (1.5&deg;+)", "\"Come left.\" Far out and 3&deg;+ right: \"You're lined up right.\""],
         ["Off on-speed AoA by 2&deg; (Hornet only)", "\"You're fast.\" / \"You're slow.\""],
     ], [3.3, 4.1]),
-    "Calls start at about 0.8 nm (1.3 nm once you've called the ball). One call at a time, at least 2 s apart, and "
-    "the same call not again within 8 s. Low and lineup come before high: the most dangerous error gets the call. "
+    "Calls start at about 0.8 nm (1.3 nm once you've called the ball). Before your ball call: at least 2 s apart, "
+    "the same call not again within 8 s. <b>After it: a call every second</b> while you're off, until the ramp. "
+    "Low and lineup come before high: the most dangerous error gets the call. "
     "Over the ramp he says nothing but a wave-off."))
 
 S.append(section("5. Wave-offs and bolters",
@@ -129,9 +130,11 @@ S.append(section("6. After your trap: red deck, green deck",
         ["\"<b>302, red deck</b>\" (as soon as you stop in the wires)",
          "Nothing. The deck is foul: the next jet is waved off at 1/4 nm."],
         ["\"<b>302, green deck</b>\" (once clear of the landing area)",
-         "Nothing. The deck is clear: the next jet lands."],
+         "\"302, Paddles, roger green deck, <b>contact Deckboss, one two eight point six</b>.\" "
+         "The deck is clear: the next jet lands. Switch to Deckboss to taxi."],
     ], [3.3, 4.1]),
-    "Forget \"green deck\" and the jet behind you gets waved off. A red deck with no green lapses after 3 minutes."))
+    "Both calls on Paddles' 128.300, not Marshal. Forget \"green deck\" and the jet behind you gets waved off. "
+    "A red deck with no green lapses after 3 minutes."))
 
 S.append(section("Tips",
     table(["Item", "Detail"], [

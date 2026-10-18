@@ -1039,6 +1039,21 @@ func (c *ATCComposer) DeckbossCopyAirborne(callsign, toName string, freqMHz floa
 	})
 }
 
+// PaddlesGreenDeck answers the landed jet's "green deck" (clear of the landing
+// area) on the Paddles net and sends him to Deckboss for the deck (operator
+// 2026-10-18: "once you say green deck have LSO hand you off to deckboss").
+// callsign "" leaves it out; freqMHz <= 0 leaves the frequency out.
+func PaddlesGreenDeck(callsign string, freqMHz float64) string {
+	dest := "Deckboss"
+	if freqMHz > 0 {
+		dest = fmt.Sprintf("Deckboss, %s", spellFrequency(freqMHz))
+	}
+	if callsign == "" {
+		return fmt.Sprintf("Paddles, roger green deck, contact %s.", dest)
+	}
+	return fmt.Sprintf("%s, Paddles, roger green deck, contact %s.", callsign, dest)
+}
+
 // MarshalDepartureClear answers the departing pilot's "clear seven miles"
 // check-in on the Marshal freq: Marshal releases them from the carrier's
 // control zone and pushes them to Command for tasking. This is the outbound

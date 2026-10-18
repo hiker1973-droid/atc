@@ -55,7 +55,7 @@ func NimitzParams() Params {
 		GlideslopeDeg:   3.5,
 		HookBelowRefM:   2.5,
 		HookAftOfRefM:   7,
-		TouchdownCalM:   11.5,
+		TouchdownCalM:   20,
 
 		HookTouchFromSternM: 70.1,
 	}
@@ -218,12 +218,30 @@ const (
 	redDeckFor      = 3 * time.Minute // a "red deck" with no "green deck" lapses after this
 	gapMin          = 2 * time.Second
 	sameCallGap     = 8 * time.Second // "a little high" every 4.5 s was nagging
-	lostAfter       = 6 * time.Second
-	onDeckM         = 1.0 // hook height above the deck
-	trapRelKts      = 20.0
-	bolterRelKts    = 60.0
-	bolterPastM     = 115.0 // past the 4 wire, beyond a trap's run-out (4-wire traps stopped ~100 m past it)
-	hornetOnSpeed   = 8.1
+	// ballCallGap: once he has called the ball, a call every second while he
+	// is off (operator 2026-10-18: "update my track after call the ball once
+	// a second until landing"; three "right for lineup" 8 s apart were slow).
+	ballCallGap = time.Second
+	lostAfter   = 6 * time.Second
+	onDeckM     = 1.0 // hook height above the deck
+	// deckLevelM is where a jet on deck sits in the track's hook height: the
+	// five 2026-10-17 traps all settled at -0.5 to -0.65 m.
+	deckLevelM = -0.55
+	// trapRunoutM: a trapped jet stops this far past the wire that caught it.
+	// Seven traps with DCS's wire (2026-10-17/18) stopped 90-121 m past the
+	// aim point, 1 wire to 4 wire; 101.4 - 105.6 m fits all seven. The touch
+	// point does not: a hook that skips wires (302's 14:56 cut touched just
+	// past the ramp and caught the 3) fooled it.
+	trapRunoutM = 103.5
+	// rampLowM / rampCutM: the hook's height at the ramp against Paddles'
+	// glide path. DCS called "LOAR" at -0.4 m (312, 10:28) and cut the pass
+	// at -2.8 m (302, 14:56); five passes +0.65 to +1.3 m had no LOAR.
+	rampLowM      = 0.0
+	rampCutM      = -1.8
+	trapRelKts    = 20.0
+	bolterRelKts  = 60.0
+	bolterPastM   = 115.0 // past the 4 wire, beyond a trap's run-out (4-wire traps stopped ~100 m past it)
+	hornetOnSpeed = 8.1
 )
 
 // Pass is one jet's approach, from entering the groove to trap, bolter or
@@ -252,6 +270,10 @@ type Pass struct {
 	outcome     string // "trap", "bolter", "wave off", "no touch", "left"
 	minAstern   float64
 	trapStopFwd float64
+	// rampLow is the hook's height against the glide path as it crossed the
+	// ramp (metres, - = low); hasRamp once it has.
+	rampLow float64
+	hasRamp bool
 }
 
 type passSample struct {
@@ -276,6 +298,10 @@ type Tracker struct {
 	// OnPass, if set, is called with the callsign when a pass starts, so the
 	// role can render his foul-deck call before it is needed.
 	OnPass func(callsign string)
+	// lastTrap is the last jet to trap, and when: his "green deck" may not
+	// carry a callsign.
+	lastTrap   string
+	lastTrapAt time.Time
 	// Done receives each finished pass's summary line.
 	Done func(summary string)
 }
@@ -297,6 +323,15 @@ func (t *Tracker) SetRedDeck(red bool, now time.Time) {
 	} else {
 		t.redDeckAt = time.Time{}
 	}
+}
+
+// LastTrap is the callsign of the jet that trapped within the last few
+// minutes, or "".
+func (t *Tracker) LastTrap(now time.Time) string {
+	if t.lastTrap == "" || now.Sub(t.lastTrapAt) > redDeckFor {
+		return ""
+	}
+	return t.lastTrap
 }
 
 // RedDeck reports a "red deck" still waiting for its "green deck".
@@ -449,7 +484,11 @@ func smoothed(ss []passSample) (gs, lineup float64) {
 
 func (t *Tracker) say(p *Pass, c Call, now time.Time) Call {
 	if !IsWaveOff(c) && c != CallBolter {
-		if now.Sub(p.lastCall) < gapMin || now.Sub(p.lastSaid[c]) < sameCallGap {
+		gap, same := gapMin, sameCallGap
+		if !p.ballAt.IsZero() {
+			gap, same = ballCallGap, ballCallGap
+		}
+		if now.Sub(p.lastCall) < gap || now.Sub(p.lastSaid[c]) < same {
 			return ""
 		}
 	}
@@ -460,19 +499,23 @@ func (t *Tracker) say(p *Pass, c Call, now time.Time) Call {
 
 func (t *Tracker) decide(p *Pass, s passSample) Call {
 	g := s.g
-	// On deck: the hook within a metre of it. The touch point is extrapolated
-	// down the jet's own descent from this sample (4.7 Hz is ~15 m a sample).
-	if p.touchdown == nil && g.height < onDeckM && g.astern < 60 {
-		td := s
-		if n := len(p.samples); n >= 2 && g.height > 0 {
-			pr := p.samples[n-2].g
-			if dx, dh := pr.astern-g.astern, pr.height-g.height; dx > 1 && dh > 0.05 {
-				td.g.astern -= g.height * dx / dh
-			}
+	// On deck: the hook down at deck level. Not "within a metre of it": a jet
+	// low over the ramp (Raider 302, Day 2026-10-18 14:56, DCS "LOAR" cut, 3
+	// wire) is that close long before it lands, and was called a 1 wire. The
+	// touch point is where the jet's last descent meets deck level (4.7 Hz is
+	// ~15 m a sample).
+	if n := len(p.samples); !p.hasRamp && n >= 2 {
+		pr, stern := p.samples[n-2].g, t.P.HookTouchFromSternM
+		if pr.astern > stern && g.astern <= stern {
+			h := pr.height + (g.height-pr.height)*(pr.astern-stern)/(pr.astern-g.astern)
+			p.rampLow, p.hasRamp = h-math.Tan(t.P.GlideslopeDeg*math.Pi/180)*stern, true
 		}
+	}
+	if p.touchdown == nil && g.height < deckLevelM+0.3 && g.astern < 60 {
+		td := s
+		td.g.astern = t.touchdownAstern(p)
 		// Calibrated against DCS's wire (Tactical Paddles, 5 traps on
-		// 2026-10-17): the hook meets the deck TouchdownCalM before the
-		// point the track says.
+		// 2026-10-17; anything from 17.6 to 22.7 m fits all five).
 		td.g.astern += t.P.TouchdownCalM
 		p.touchdown = &td
 	}
@@ -620,6 +663,51 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 	return ""
 }
 
+// touchdownAstern is where a straight line through the last few airborne
+// samples (hook 0 - 5.5 m) reaches deck level, kept between the last sample
+// above the deck and this one on it; this sample's position if there are too
+// few or the descent is flat.
+func (t *Tracker) touchdownAstern(p *Pass) float64 {
+	n := len(p.samples)
+	cur := p.samples[n-1].g.astern
+	above := cur
+	for i := n - 2; i >= 0; i-- {
+		if g := p.samples[i].g; g.height >= deckLevelM+0.3 {
+			above = g.astern
+			break
+		}
+	}
+	var as, hs []float64
+	for i := n - 2; i >= 0 && len(as) < 5; i-- {
+		g := p.samples[i].g
+		if g.astern > 120 {
+			break
+		}
+		if g.height > 0 && g.height < 5.5 {
+			as, hs = append(as, g.astern), append(hs, g.height)
+		}
+	}
+	if len(as) < 2 {
+		return cur
+	}
+	var ma, mh float64
+	for i := range as {
+		ma += as[i]
+		mh += hs[i]
+	}
+	ma /= float64(len(as))
+	mh /= float64(len(as))
+	var num, den float64
+	for i := range as {
+		num += (as[i] - ma) * (hs[i] - mh)
+		den += (as[i] - ma) * (as[i] - ma)
+	}
+	if den == 0 || num/den < 0.01 {
+		return cur
+	}
+	return math.Max(cur, math.Min(above, ma+(deckLevelM-mh)/(num/den)))
+}
+
 // gsRate is how fast the jet is moving through the glideslope, degrees per
 // second over about the last second (+ = going up).
 func gsRate(ss []passSample) float64 {
@@ -651,6 +739,28 @@ func (t *Tracker) wireFwd(n int) float64 {
 	return t.P.WiresFromSternM[n-1] - t.P.HookTouchFromSternM
 }
 
+// WireFromStop is the wire whose run-out ends nearest where the jet stopped.
+func (t *Tracker) WireFromStop(stopFwd float64) int {
+	best, bestD := 0, math.MaxFloat64
+	for n := 1; n <= 4; n++ {
+		if d := math.Abs(stopFwd - trapRunoutM - t.wireFwd(n)); d < bestD {
+			best, bestD = n, d
+		}
+	}
+	return best
+}
+
+// passWire is a trap's wire: from where it stopped, else from the touch point.
+func (t *Tracker) passWire(p *Pass) int {
+	if p.outcome == "trap" && p.trapStopFwd > 0 {
+		return t.WireFromStop(p.trapStopFwd)
+	}
+	if p.touchdown != nil {
+		return t.EstimateWire(-p.touchdown.g.astern)
+	}
+	return 0
+}
+
 // EstimateWire guesses the wire from where the hook first touched: the first
 // wire at or forward of the touchdown point (the hook skips along to it).
 func (t *Tracker) EstimateWire(touchFwd float64) int {
@@ -673,6 +783,9 @@ const arRefM = 200.0
 func (t *Tracker) finish(p *Pass) {
 	delete(t.passes, p.Callsign)
 	delete(t.prev, p.Callsign)
+	if p.outcome == "trap" && len(p.samples) > 0 {
+		t.lastTrap, t.lastTrapAt = p.Callsign, p.samples[len(p.samples)-1].at
+	}
 	if t.Done == nil {
 		return
 	}
@@ -684,12 +797,15 @@ func (t *Tracker) finish(p *Pass) {
 	if p.touchdown != nil {
 		fwd := -p.touchdown.g.astern
 		fmt.Fprintf(&b, ", hook touched %+.0f m from the aim point, %+.0f m right", fwd, p.touchdown.g.right)
-		if w := t.EstimateWire(fwd); w > 0 && p.outcome == "trap" {
+		if w := t.passWire(p); w > 0 && p.outcome == "trap" {
 			fmt.Fprintf(&b, ", est. %d wire", w)
 		}
 		if p.outcome == "trap" {
 			fmt.Fprintf(&b, ", stopped %+.0f m", p.trapStopFwd)
 		}
+	}
+	if p.hasRamp {
+		fmt.Fprintf(&b, ", ramp %+.1f m", p.rampLow)
 	}
 	n := len(p.samples)
 	if n > 1 {
@@ -779,24 +895,31 @@ func (t *Tracker) segMeans(p *Pass) []segMeans {
 // trap, bolter or wave-off.
 func (t *Tracker) Grade(p *Pass) string {
 	var errs []string
-	major, majorInClose := false, false
+	// majors counts the big errors. Seven passes with DCS's grade
+	// (2026-10-17/18): "---" was a 1 wire or (once) four big errors, "(OK)"
+	// one or two - LOAR alone was "(OK)", not "---". Three or more is "---".
+	majors := 0
 	hornet := strings.Contains(strings.ToLower(p.Model), "fa-18")
 	for _, m := range t.segMeans(p) {
 		if !m.hasGS {
 			continue
 		}
 		add := func(code string, big bool) {
+			// Lineup at X is only ever "a little": X starts while he is still
+			// rolling out of the 180, and DCS never called it.
+			if m.name == "X" && (code == "LUL" || code == "LUR") {
+				big = false
+			}
 			if !big {
 				errs = append(errs, "("+code+")"+m.name)
 				return
 			}
 			errs = append(errs, code+m.name)
-			major = true
-			if m.name == "IC" || m.name == "AR" {
-				majorInClose = true
-			}
+			majors++
 		}
 		switch {
+		case m.name == "AR" && p.hasRamp && p.rampLow < rampLowM:
+			add("LO", true)
 		case m.gs > 1.2:
 			add("H", true)
 		case m.gs > 0.6:
@@ -858,15 +981,14 @@ func (t *Tracker) Grade(p *Pass) string {
 	default:
 		return ""
 	}
-	wire := 0
-	if p.touchdown != nil {
-		wire = t.EstimateWire(-p.touchdown.g.astern)
-	}
+	wire := t.passWire(p)
 	g := "OK"
 	switch {
-	case majorInClose || wire == 1:
+	case p.hasRamp && p.rampLow < rampCutM:
+		g = "C" // far below the glide path at the ramp: unsafe
+	case majors >= 3 || wire == 1:
 		g = "---"
-	case major:
+	case majors > 0:
 		g = "(OK)"
 	case len(errs) == 0 && wire == 3:
 		g = "_OK_"

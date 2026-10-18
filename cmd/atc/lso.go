@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	flag "github.com/spf13/pflag"
+	"github.com/vsfg7/atc/pkg/composer"
 	"github.com/vsfg7/atc/pkg/lso"
 )
 
@@ -32,6 +33,8 @@ var (
 	flagLSOName    string
 	flagLSOVoice   string
 	flagLSOLateral float64
+	// flagLSODeckbossFreq is where "green deck" sends the landed jet.
+	flagLSODeckbossFreq float64
 )
 
 // registerLSOFlags is called from the flag block in main.go.
@@ -42,6 +45,8 @@ func registerLSOFlags(f *flag.FlagSet) {
 	f.StringVar(&flagLSOVoice, "lso-voice", "ash", "Paddles OpenAI TTS voice")
 	f.Float64Var(&flagLSOLateral, "lso-landing-lateral-m", -4,
 		"Landing point offset from the carrier centreline in metres, starboard positive (calibrate from logged traps)")
+	f.Float64Var(&flagLSODeckbossFreq, "lso-deckboss-freq", 128.6,
+		`Deckboss frequency in MHz that Paddles hands a landed jet to on "green deck" (0 = name only)`)
 	f.StringVar(&flagLSOGrpcAddr, "lso-grpc-addr", "localhost:50051",
 		`DCS-gRPC for DCS's own LSO grades and wires, logged beside Paddles' ("" = off; Night is :50053)`)
 }
@@ -215,14 +220,26 @@ func (f *lsoFeed) heard(text string) (string, string) {
 	}
 	switch {
 	case lsoRedDeckRe.MatchString(text) || lsoGreenDeckRe.MatchString(text):
-		// No reply: Paddles just keeps the deck state. Green wins if a call
-		// has both ("red deck... green deck").
+		// Red deck: no reply, Paddles keeps the deck foul. Green deck: the
+		// deck is clear, and the landed jet goes to Deckboss (operator
+		// 2026-10-18). Green wins if a call has both ("red deck... green deck").
 		red := !lsoGreenDeckRe.MatchString(text)
 		f.lock()
 		f.tr.SetRedDeck(red, time.Now())
+		last := f.tr.LastTrap(time.Now())
 		f.unlock()
 		log.Info().Bool("red", red).Str("text", text).Msg("Paddles: deck call")
-		return modex, netHandled
+		if red {
+			return modex, netHandled
+		}
+		cs := extractCallsignSkippingAddress(text, "paddles", "patels", "paddle")
+		if !lsoCallsignRe.MatchString(cs) {
+			cs = modex
+		}
+		if cs == "" {
+			cs = last
+		}
+		return cs, composer.PaddlesGreenDeck(cs, flagLSODeckbossFreq)
 	case lsoClaraRe.MatchString(text) || lsoBallRe.MatchString(text):
 		clara := lsoClaraRe.MatchString(text)
 		f.lock()

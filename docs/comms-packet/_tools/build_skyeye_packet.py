@@ -490,7 +490,7 @@ def c10_paddles():
         ("past the wires", "Bolter, bolter, bolter."),
         ("trap", "nothing - the grade goes in the log"),
     ])
-    NK.subtle(c, "After your trap: \"red deck\", then \"green deck\" once clear of the landing area.")
+    NK.subtle(c, "After your trap, on 128.3: \"red deck\", then \"green deck\" once clear - Paddles sends you to Deckboss.")
     NK.subtle(c, "Say the modex first - with two in the groove it is how he knows whose ball.")
     return save(c, "10_paddles.jpg")
 

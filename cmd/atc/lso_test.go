@@ -67,11 +67,28 @@ func TestLSODeckCalls(t *testing.T) {
 		"Deck is green.":        false,
 	} {
 		f.tr.SetRedDeck(!red, time.Now())
-		if _, resp := f.heard(in); resp != netHandled || len(said) != 0 {
-			t.Errorf("heard(%q) = %q, said %v; want handled, silent", in, resp, said)
+		_, resp := f.heard(in)
+		if red && resp != netHandled || !red && !strings.Contains(resp, "roger green deck, contact Deckboss") || len(said) != 0 {
+			t.Errorf("heard(%q) = %q, said %v", in, resp, said)
 		}
 		if got := f.tr.RedDeck(time.Now()); got != red {
 			t.Errorf("heard(%q): red deck = %v, want %v", in, got, red)
+		}
+	}
+}
+
+// "Green deck" hands the landed jet to Deckboss, by the callsign he gave,
+// else his modex (operator 2026-10-18).
+func TestLSOGreenDeckHandoff(t *testing.T) {
+	defer func(v float64) { flagLSODeckbossFreq = v }(flagLSODeckbossFreq)
+	flagLSODeckbossFreq = 128.6
+	f := newLSOFeed(lso.NimitzParams(), func(lso.Call) {})
+	for in, want := range map[string]string{
+		"Paddles, Raider 302, green deck.": "Raider 302, Paddles, roger green deck, contact Deckboss, one two eight point six.",
+		"302, green deck.":                 "302, Paddles, roger green deck, contact Deckboss, one two eight point six.",
+	} {
+		if _, resp := f.heard(in); resp != want {
+			t.Errorf("heard(%q) = %q, want %q", in, resp, want)
 		}
 	}
 }
