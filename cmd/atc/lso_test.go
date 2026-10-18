@@ -45,10 +45,33 @@ func TestLSOBallCalls(t *testing.T) {
 			t.Errorf("heard(%q) = %q (said %v), want %q", in, resp, said, want)
 		}
 	}
-	for _, in := range []string{"Red deck.", "Abeam.", "Green deck."} {
+	for _, in := range []string{"Abeam."} {
 		said = nil
 		if _, resp := f.heard(in); resp != "" || len(said) != 0 {
 			t.Errorf("heard(%q) answered %q / %v", in, resp, said)
+		}
+	}
+}
+
+// "Red deck" / "green deck" from the jet that just landed: no reply, but the
+// tracker holds the deck red until green (operator 2026-10-18).
+func TestLSODeckCalls(t *testing.T) {
+	var said []lso.Call
+	f := newLSOFeed(lso.NimitzParams(), func(c lso.Call) { said = append(said, c) })
+	for in, red := range map[string]bool{
+		"Red deck.":             true,
+		"Raider 312, red deck.": true,
+		"312, read deck.":       true,
+		"Green deck.":           false,
+		"312, green deck.":      false,
+		"Deck is green.":        false,
+	} {
+		f.tr.SetRedDeck(!red, time.Now())
+		if _, resp := f.heard(in); resp != netHandled || len(said) != 0 {
+			t.Errorf("heard(%q) = %q, said %v; want handled, silent", in, resp, said)
+		}
+		if got := f.tr.RedDeck(time.Now()); got != red {
+			t.Errorf("heard(%q): red deck = %v, want %v", in, got, red)
 		}
 	}
 }

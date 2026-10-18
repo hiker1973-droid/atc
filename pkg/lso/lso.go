@@ -169,18 +169,35 @@ const (
 	CallFast         Call = "You're fast."
 	CallSlow         Call = "You're slow."
 	CallWaveOff      Call = "Wave off, wave off, wave off."
-	CallWaveOffFoul  Call = "Wave off, wave off, wave off, foul deck."
 	CallBolter       Call = "Bolter, bolter, bolter."
 )
+
+// FoulDeckCall is the foul-deck wave-off, by modex, sending him round to land
+// again (operator 2026-10-18: "XXX fouled deck wave off wave off proceed to
+// bolter"). "Raider 312" is "312": short, with seconds to the deck. A callsign
+// without a modex is said whole.
+func FoulDeckCall(callsign string) Call {
+	who := callsign
+	if i := strings.LastIndexByte(callsign, ' '); i >= 0 {
+		if m := callsign[i+1:]; m != "" && strings.Trim(m, "0123456789") == "" {
+			who = m
+		}
+	}
+	return Call(who + foulDeckTail)
+}
+
+const foulDeckTail = ", foul deck, wave off, wave off, proceed to bolter pattern."
 
 // AllCalls lists every fixed line, so the role can render them at start-up
 // and speak them without waiting for TTS.
 var AllCalls = []Call{CallRogerBall, CallClara, CallCallTheBall, CallHigh, CallHighBring, CallLittleHigh,
 	CallLowPower, CallPower, CallPowerUrgent, CallPowerSink, CallEasy, CallRight, CallLeft, CallLinedUpLeft,
-	CallLinedUpRight, CallFast, CallSlow, CallWaveOff, CallWaveOffFoul, CallBolter}
+	CallLinedUpRight, CallFast, CallSlow, CallWaveOff, CallBolter}
 
 // IsWaveOff reports a wave-off call (either form).
-func IsWaveOff(c Call) bool { return c == CallWaveOff || c == CallWaveOffFoul }
+func IsWaveOff(c Call) bool {
+	return c == CallWaveOff || strings.HasSuffix(string(c), foulDeckTail)
+}
 
 // Thresholds. Distances are metres astern of the landing point.
 const (
@@ -197,6 +214,8 @@ const (
 	callsFromM      = 1500.0 // deviation calls from ~0.8 nm (earlier after a ball call)
 	callsUntilM     = 70.0   // nothing but wave off over the ramp
 	callTheBallM    = 1100.0
+	foulDeckM       = 463.0           // 1/4 nm: a foul deck here is a wave-off (operator 2026-10-18)
+	redDeckFor      = 3 * time.Minute // a "red deck" with no "green deck" lapses after this
 	gapMin          = 2 * time.Second
 	sameCallGap     = 8 * time.Second // "a little high" every 4.5 s was nagging
 	lostAfter       = 6 * time.Second
@@ -225,6 +244,7 @@ type Pass struct {
 
 	waveOffRepeated bool
 	foulDeck        bool
+	redDeck         bool // the foul deck was a "red deck" with no "green deck" yet
 	highSince       time.Time
 
 	touchdown   *passSample
@@ -250,6 +270,12 @@ type Tracker struct {
 	prev   map[string]Sample
 	// foul is set by the feed when another aircraft is on the landing area.
 	foul bool
+	// redDeckAt is when the last jet to land called "red deck"; zero once he
+	// calls "green deck" (clear of the landing area).
+	redDeckAt time.Time
+	// OnPass, if set, is called with the callsign when a pass starts, so the
+	// role can render his foul-deck call before it is needed.
+	OnPass func(callsign string)
 	// Done receives each finished pass's summary line.
 	Done func(summary string)
 }
@@ -261,6 +287,22 @@ func NewTracker(p Params) *Tracker {
 
 // SetDeckFoul tells the tracker whether the landing area is foul.
 func (t *Tracker) SetDeckFoul(foul bool) { t.foul = foul }
+
+// SetRedDeck records the landed jet's "red deck" (red true) or "green deck"
+// (red false) heard on the net. Until green deck, the next jet is waved off at
+// a quarter mile.
+func (t *Tracker) SetRedDeck(red bool, now time.Time) {
+	if red {
+		t.redDeckAt = now
+	} else {
+		t.redDeckAt = time.Time{}
+	}
+}
+
+// RedDeck reports a "red deck" still waiting for its "green deck".
+func (t *Tracker) RedDeck(now time.Time) bool {
+	return !t.redDeckAt.IsZero() && now.Sub(t.redDeckAt) < redDeckFor
+}
 
 // InGroove reports the callsigns with a pass in progress.
 func (t *Tracker) InGroove() []string {
@@ -329,6 +371,9 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 		}
 		pass = &Pass{Callsign: callsign, Model: model, Started: smp.At, lastSaid: make(map[Call]time.Time), minAstern: g.astern}
 		t.passes[callsign] = pass
+		if t.OnPass != nil {
+			t.OnPass(callsign)
+		}
 	}
 	pass.samples = append(pass.samples, ps)
 	if g.astern < pass.minAstern {
@@ -469,11 +514,9 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 	}
 	if p.waveOff {
 		// Repeat once if he is still coming in close.
+		// The foul-deck call already says it twice.
 		c := CallWaveOff
-		if p.foulDeck {
-			c = CallWaveOffFoul
-		}
-		if !p.waveOffRepeated && g.astern > 0 && g.astern < 500 && s.at.Sub(p.lastSaid[c]) > 3*time.Second {
+		if !p.foulDeck && !p.waveOffRepeated && g.astern > 0 && g.astern < 500 && s.at.Sub(p.lastSaid[c]) > 3*time.Second {
 			p.waveOffRepeated = true
 			return t.say(p, c, s.at)
 		}
@@ -485,10 +528,13 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 	gs, lineup := smoothed(p.samples)
 	rate := gsRate(p.samples)
 
-	// Foul deck: another aircraft on the landing area as he comes in close.
-	if t.foul && g.astern < 550 {
-		p.waveOff, p.foulDeck = true, true
-		return t.say(p, CallWaveOffFoul, s.at)
+	// Foul deck at a quarter mile: another aircraft on the landing area
+	// (Tacview), or the last jet down called "red deck" and not yet "green deck".
+	if g.astern < foulDeckM {
+		if red := t.RedDeck(s.at); t.foul || red {
+			p.waveOff, p.foulDeck, p.redDeck = true, true, red
+			return t.say(p, FoulDeckCall(p.Callsign), s.at)
+		}
 	}
 	// Wave off: dangerously low or badly lined up in close. Degrees grow as
 	// range closes, so in close it is metres; past the ramp he is landing
@@ -799,6 +845,9 @@ func (t *Tracker) Grade(p *Pass) string {
 	// A waved-off pass is graded WO even if he landed anyway.
 	switch outcome := p.outcome; {
 	case p.waveOff || outcome == "wave off":
+		if p.redDeck {
+			return "WO (foul deck, no green deck)"
+		}
 		if p.foulDeck {
 			return "WO (foul deck)"
 		}

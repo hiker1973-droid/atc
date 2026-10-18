@@ -17,6 +17,10 @@ type flight struct {
 	ball   bool
 	// foulFrom, when set, fouls the deck once the jet is this close (m astern).
 	foulFrom float64
+	// redDeck: the jet ahead called "red deck" before this one started;
+	// greenAt, when set, is where (m astern) he calls "green deck".
+	redDeck bool
+	greenAt float64
 }
 
 func world(p Params, s Ship, astern, right, height float64) (lat, lon, altM float64) {
@@ -39,7 +43,10 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 	astern := 2300.0
 	rel := 70.0
 	dt := 0.21
-	ballDone := false
+	ballDone, greenDone := false, false
+	if f.redDeck {
+		tr.SetRedDeck(true, t0.Add(-20*time.Second))
+	}
 	for i := 0; i < 400; i++ {
 		now := t0.Add(time.Duration(float64(i) * dt * float64(time.Second)))
 		// The ship moves.
@@ -64,6 +71,10 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 		}
 		if f.foulFrom > 0 && astern < f.foulFrom {
 			tr.SetDeckFoul(true)
+		}
+		if f.greenAt > 0 && !greenDone && astern < f.greenAt {
+			greenDone = true
+			tr.SetRedDeck(false, now)
 		}
 		c := tr.Update("Raider 302", "FA-18C_hornet", ship, Sample{At: now, Lat: lat, Lon: lon, AltM: alt})
 		if c != "" {
@@ -220,11 +231,36 @@ func TestLowOverRampIsNotWavedOff(t *testing.T) {
 
 func TestFoulDeckWaveOff(t *testing.T) {
 	calls, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, foulFrom: 900}.run(t)
-	if !has(calls, CallWaveOffFoul) {
-		t.Errorf("calls = %v, want %q", calls, CallWaveOffFoul)
+	want := Call("302, foul deck, wave off, wave off, proceed to bolter pattern.")
+	if !has(calls, want) || !IsWaveOff(want) {
+		t.Errorf("calls = %v, want %q", calls, want)
 	}
 	if !strings.Contains(sum, "WO (foul deck)") {
 		t.Errorf("summary = %q, want WO (foul deck)", sum)
+	}
+}
+
+// "Red deck" from the jet that just landed, no "green deck" by a quarter
+// mile: the next jet is waved off (operator 2026-10-18). Green deck in time,
+// or a red deck long forgotten, and he lands.
+func TestRedDeckWaveOff(t *testing.T) {
+	want := FoulDeckCall("Raider 302")
+	calls, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, redDeck: true}.run(t)
+	if !has(calls, want) || !strings.Contains(sum, "WO (foul deck, no green deck)") {
+		t.Errorf("no green deck: calls = %v, summary %q; want %q", calls, sum, want)
+	}
+	calls, sum = flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, redDeck: true, greenAt: 700}.run(t)
+	if has(calls, want) || !strings.Contains(sum, ": trap") {
+		t.Errorf("green deck at 700 m: calls = %v, summary %q; want a trap", calls, sum)
+	}
+	if c := FoulDeckCall("Raider Formation-1"); c != "Raider Formation-1"+foulDeckTail {
+		t.Errorf("FoulDeckCall(no modex) = %q", c)
+	}
+	tr := NewTracker(NimitzParams())
+	now := time.Now()
+	tr.SetRedDeck(true, now.Add(-redDeckFor))
+	if tr.RedDeck(now) {
+		t.Error("red deck still set after redDeckFor")
 	}
 }
 

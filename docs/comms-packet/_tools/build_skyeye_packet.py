@@ -45,6 +45,11 @@ wave-off, bolter - from pkg/lso/lso.go and cmd/atc/lso.go. Same day Paddles was 
 (Foothold, start_lso_syria.bat), same 128.300. Every "no SkyEye LSO" line is gone
 (cards 1, 2, 4, 5, the sortie and No answer?). Cards 10 - 23 of v1.25 are now 11 - 24.
 
+v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
+then "green deck" once clear of the landing area; no green deck by the time the next jet is
+at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
+wave off, wave off, proceed to bolter pattern." Card 10 only.
+
 Every call and reply below was read out of the SkyeyeATC code on origin/main —
 cmd/atc/{command,deckboss,marshal,command_handoff}.go, pkg/composer/composer.go,
 pkg/state/state.go — and the start_*.bat files. The *_responses.md docs were used as a map
@@ -80,7 +85,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.26"
+VER = "v1.27"
 DATE = "18 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -481,10 +486,11 @@ def c10_paddles():
     NK.band(c, "WAVE OFF AND BOLTER")
     c.kv([
         ("low or off line in close", "Wave off, wave off, wave off."),
-        ("deck foul inside 0.3 nm", "Wave off ... foul deck."),
+        ("deck foul at 1/4 nm", "302, foul deck, wave off, wave off, proceed to bolter pattern."),
         ("past the wires", "Bolter, bolter, bolter."),
         ("trap", "nothing - the grade goes in the log"),
     ])
+    NK.subtle(c, "After your trap: \"red deck\", then \"green deck\" once clear of the landing area.")
     NK.subtle(c, "Say the modex first - with two in the groove it is how he knows whose ball.")
     return save(c, "10_paddles.jpg")
 

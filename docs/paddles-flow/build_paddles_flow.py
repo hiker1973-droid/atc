@@ -114,14 +114,24 @@ S.append(section("5. Wave-offs and bolters",
         ["Inside about 300 m (0.16 nm): more than 3 m below the glideslope, or 10 m off the landing line<br/>"
          "(300 - 600 m: 1.3&deg; low or 5&deg; off line)",
          "\"<b>Wave off, wave off, wave off.</b>\""],
-        ["Another aircraft on the landing area as you come inside about 550 m (0.3 nm)",
-         "\"<b>Wave off, wave off, wave off, foul deck.</b>\""],
+        ["Foul deck at 1/4 nm (about 460 m): the jet ahead called \"red deck\" and not yet \"green deck\", "
+         "or another aircraft is on the landing area",
+         "\"<b>302, foul deck, wave off, wave off, proceed to bolter pattern.</b>\""],
         ["Touches down and rolls on well past the 4 wire", "\"<b>Bolter, bolter, bolter.</b>\""],
         ["Trap", "Nothing on the radio. Paddles logs the pass, his grade and the wire."],
     ], [3.3, 4.1]),
     "A wave-off is mandatory: power, climb straight ahead, then back to the pattern. After a bolter, fly the "
     "pattern and call the ball again on the next pass. Grades are not spoken yet; the squadron sees them in the "
     "server log next to DCS's own LSO grade."))
+
+S.append(section("6. After your trap: red deck, green deck",
+    table(["Pilot (on 128.300)", "Paddles"], [
+        ["\"<b>302, red deck</b>\" (as soon as you stop in the wires)",
+         "Nothing. The deck is foul: the next jet is waved off at 1/4 nm."],
+        ["\"<b>302, green deck</b>\" (once clear of the landing area)",
+         "Nothing. The deck is clear: the next jet lands."],
+    ], [3.3, 4.1]),
+    "Forget \"green deck\" and the jet behind you gets waved off. A red deck with no green lapses after 3 minutes."))
 
 S.append(section("Tips",
     table(["Item", "Detail"], [

@@ -84,8 +84,11 @@ type lsoTX struct {
 }
 
 func lsoMaxAge(text string) time.Duration {
+	if lso.IsWaveOff(lso.Call(text)) {
+		return 3 * time.Second
+	}
 	switch lso.Call(text) {
-	case lso.CallWaveOff, lso.CallBolter:
+	case lso.CallBolter:
 		return 3 * time.Second
 	case lso.CallRogerBall, lso.CallClara:
 		return 4 * time.Second
@@ -141,6 +144,16 @@ func runLSO(ctx context.Context, apiKey string) {
 	p := lso.NimitzParams()
 	p.LandingLateralM = flagLSOLateral
 	feed := newLSOFeed(p, say)
+	// The foul-deck wave-off carries his callsign, so render it as his pass
+	// starts: at a quarter mile there is no time to wait for TTS.
+	feed.tr.OnPass = func(cs string) {
+		go func() {
+			c := string(lso.FoulDeckCall(cs))
+			if _, err := synthesizeSpeech(ctx, apiKey, c, lsoVoiceFor(c)); err != nil {
+				log.Warn().Err(err).Str("text", c).Msg("Paddles: TTS prewarm failed")
+			}
+		}()
+	}
 
 	go voiceNetLoop(ctx, flagSRSAddr, flagLSOFreq, flagLSOName, apiKey, flagEAMPassword, vp, flagExternalAudio,
 		lsoWhisperPrompt, nil, func(text string) (string, string) {
@@ -153,7 +166,7 @@ func runLSO(ctx context.Context, apiKey string) {
 	<-ctx.Done()
 }
 
-const lsoWhisperPrompt = "Paddles, Raider, Venom, abeam, Hornet ball, Tomcat ball, Clara, ball, radio check, state"
+const lsoWhisperPrompt = "Paddles, Raider, Venom, abeam, Hornet ball, Tomcat ball, Clara, ball, red deck, green deck, radio check, state"
 
 // lsoBallRe: "302, Hornet ball, 5.5" (Whisper also writes "Hornetball" and,
 // on 306.3 on 2026-10-16/17, "bolt" for "ball").
@@ -166,6 +179,10 @@ var (
 	lsoAbeamRe = regexp.MustCompile(`(?i)\ba[\s-]?beam\b|\bbeam\b`)
 	// lsoCallsignRe is a full callsign ("Raider 302"), not a fragment of the call.
 	lsoCallsignRe = regexp.MustCompile(`^[A-Za-z]+ \d{1,3}$`)
+	// lsoRedDeckRe / lsoGreenDeckRe: the jet that just landed calls "red deck",
+	// then "green deck" once clear of the landing area (operator 2026-10-18).
+	lsoRedDeckRe   = regexp.MustCompile(`(?i)\b(?:red|read)[\s-]?(?:deck|dec|dek)\b|\bdeck (?:is )?red\b`)
+	lsoGreenDeckRe = regexp.MustCompile(`(?i)\bgreen[\s-]?(?:deck|dec|dek)\b|\bdeck (?:is )?green\b`)
 )
 
 // lsoFeed is the shared state: the tracker (Tacview goroutine) and the radio
@@ -197,6 +214,15 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		modex = m[1] + m[2] + m[3]
 	}
 	switch {
+	case lsoRedDeckRe.MatchString(text) || lsoGreenDeckRe.MatchString(text):
+		// No reply: Paddles just keeps the deck state. Green wins if a call
+		// has both ("red deck... green deck").
+		red := !lsoGreenDeckRe.MatchString(text)
+		f.lock()
+		f.tr.SetRedDeck(red, time.Now())
+		f.unlock()
+		log.Info().Bool("red", red).Str("text", text).Msg("Paddles: deck call")
+		return modex, netHandled
 	case lsoClaraRe.MatchString(text) || lsoBallRe.MatchString(text):
 		clara := lsoClaraRe.MatchString(text)
 		f.lock()

@@ -1,11 +1,21 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 18 OCT 2026.  v1.26.  Product = one full-screen 16:9 PDF, 25 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.26.pdf` — cover + 24 cards: How it works · Frequencies ·
+**Built 18 OCT 2026.  v1.27.  Product = one full-screen 16:9 PDF, 25 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.27.pdf` — cover + 24 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 **Paddles** · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · A full sortie · Airfield ATC · Tower radios · Syria towers · Departure ·
 Arrival · Tower calls · No answer?
+
+## v1.27 (18 OCT 2026) — red deck / green deck
+
+Operator 2026-10-18: the landed Hornet calls "red deck", then "green deck" when clear of the
+landing area; no green deck by the time the next Hornet is at 1/4 mile and Paddles calls
+"XXX, foul deck, wave off, wave off, proceed to bolter pattern."
+- **Card 10:** the foul-deck row is now "at 1/4 nm" with the callsign line, plus a note:
+  after your trap, "red deck", then "green deck". From `pkg/lso/lso.go` (`FoulDeckCall`,
+  `foulDeckM`, `redDeckFor` 3 min) and `cmd/atc/lso.go` (`lsoRedDeckRe` / `lsoGreenDeckRe`).
+- Paddles sheet: section 5 updated, new section 6 "After your trap: red deck, green deck".
 
 ## v1.26 (18 OCT 2026) — Paddles, the SkyEye LSO, from origin/main `6208ef8`
 
