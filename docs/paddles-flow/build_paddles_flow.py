@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Paddles (LSO) Comms Flow - one-page pilot sheet (ReportLab).
 
-The quick flow for SkyEye's LSO, Paddles, on 128.300 AM (Caucasus Day / Night,
+The quick flow for SkyEye's LSO, Paddles, on 128.300 AM (Caucasus Day / Night and Foothold Syria,
 CVN-72 Abe). Every call and reply here is read out of pkg/lso/lso.go (the calls
 and when they fire), cmd/atc/lso.go (ball calls, radio check) and the Marshal
 handoff in cmd/atc/marshal.go / pkg/composer.
@@ -55,11 +55,11 @@ def section(heading, tbl, *notes):
 
 S = [
     Paragraph("Paddles (LSO) Comms Flow", title),
-    Paragraph("vSFG7 SkyEye &middot; Caucasus (Day / Night), CVN-72 Abe &middot; Marshal 306.300 &rarr; "
+    Paragraph("vSFG7 SkyEye &middot; Caucasus (Day / Night) + Foothold Syria, CVN-72 Abe &middot; Marshal 306.300 &rarr; "
               "Paddles 128.300 AM &middot; %s" % BUILD, sub),
     Paragraph("<b>Radios:</b> Marshal 306.300 AM (COMM 1 CH 3) &middot; <b>Paddles 128.300 AM</b> "
-              "(no kneeboard preset yet: dial it on COMM 2). Paddles is SkyEye's LSO on the Abe, on Day and Night "
-              "only. He talks you down the glideslope from Tacview: you fly, he calls. "
+              "(no kneeboard preset yet: dial it on COMM 2). Paddles is SkyEye's LSO on the Abe, on Day, Night "
+              "and Foothold. He talks you down the glideslope from Tacview: you fly, he calls. "
               "Replies below use Raider 302.", note),
 ]
 
@@ -129,7 +129,7 @@ S.append(section("Tips",
          "not the full callsign."],
         ["\"Ball\" heard as \"bolt\"", "Speech recognition often writes \"Hornet ball\" as \"Hornet bolt\"; Paddles "
          "accepts it. Speak clearly and don't clip the start of the call."],
-        ["Who is it?", "Paddles is one voice (OpenAI), on 128.300 only, and only on the Caucasus Day and Night servers."],
+        ["Who is it?", "Paddles is one voice (OpenAI), on 128.300 only, on the Caucasus Day and Night servers and Foothold (Syria)."],
         ["No answer?", "Wait 2-3 s, then repeat the ball call once. Check AM on 128.300. Report callsign, "
          "frequency and time on Discord."],
     ], [1.5, 5.9])))

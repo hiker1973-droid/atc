@@ -41,7 +41,8 @@ Bingo / Joker). Cards 14 - 21 of v1.24 are now 16 - 23.
 
 v1.26 (user asked 2026-10-18 "add to master ATC pdf") follows origin/main 6208ef8: SkyEye has
 an LSO. New card 10 PADDLES (128.300 AM, Black Sea Day / Night): ball call, groove calls,
-wave-off, bolter - from pkg/lso/lso.go and cmd/atc/lso.go. Every "no SkyEye LSO" line is gone
+wave-off, bolter - from pkg/lso/lso.go and cmd/atc/lso.go. Same day Paddles was added to Syria
+(Foothold, start_lso_syria.bat), same 128.300. Every "no SkyEye LSO" line is gone
 (cards 1, 2, 4, 5, the sortie and No answer?). Cards 10 - 23 of v1.25 are now 11 - 24.
 
 Every call and reply below was read out of the SkyeyeATC code on origin/main —
@@ -138,7 +139,7 @@ def c01_how():
     c.kv([("COMMAND  -  squadron net", "%s AM" % COMMAND_F),
           ("DECKBOSS  -  carrier deck", "%s AM" % DECKBOSS_F),
           ("MARSHAL  -  carrier stack", "306.300 AM  ·  every theatre"),
-          ("PADDLES  -  LSO, Black Sea", "%s AM  ·  card 10" % PADDLES_F),
+          ("PADDLES  -  LSO, Black Sea + Syria", "%s AM  ·  card 10" % PADDLES_F),
           ("HITMAN 1-1 / 2-1  -  JTAC, Black Sea", "%s / %s FM  ·  cards 13 - 14" % (JTAC_F[:4], JTAC2_F[:4])),
           ("RANGE AREAS + OVERLORD  -  on Command", "cards 15 - 16"),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
@@ -177,7 +178,7 @@ def c02_freqs():
         [("Deckboss 128.600 is shared", True),
          ("with the DCS AI carrier controller - you may hear both.", False)],
         [("SkyEye Paddles is %s - dial it." % PADDLES_F, True),
-         ("Black Sea Day and Night only. LIVE LSO 128.100 (COMM 2 CH 2) is for a human LSO.", False)],
+         ("Black Sea and Syria. LSO 128.100 on the cards is for a human LSO.", False)],
     ])
     NK.subtle(c, "Voices: towers British or Australian  ·  Command, Marshal, Deckboss American  ·  Hitman 1-1 Australian.")
     return save(c, "02_freqs.jpg")
@@ -236,7 +237,7 @@ def c04_deckboss_calls():
         ("DECKBOSS", "Raider 1, Deckboss, copy airborne,"),
         ("", "push Marshal, three zero six point three."),
     ], split=220)
-    NK.subtle(c, "Bolter practice: Deckboss hands you to the LSO - Paddles %s in the Black Sea." % PADDLES_F)
+    NK.subtle(c, "Bolter practice: Deckboss hands you to the LSO - Paddles %s in the Black Sea and Syria." % PADDLES_F)
     return save(c, "04_deckboss_calls.jpg")
 
 
@@ -267,7 +268,7 @@ def c05_marshal_case1():
         [("When someone commences, the stack steps down silently.", True),
          ("There is no radio call for it - keep flying your assigned angels.", False)],
         [("After initial, switch to Paddles.", True),
-         ("Black Sea: SkyEye Paddles on %s, card 10. Elsewhere fly the ball and trap." % PADDLES_F, False)],
+         ("Black Sea and Syria: SkyEye Paddles on %s, card 10. Gulf: fly the ball and trap." % PADDLES_F, False)],
     ])
     NK.band(c, "ANY TIME")
     c.bullets([
@@ -454,7 +455,7 @@ def c09_marshal_calls_case3():
 
 # --------------------------------------------- Paddles, the LSO (pkg/lso, cmd/atc/lso.go)
 def c10_paddles():
-    c = card("PADD", "LES", ["SkyEye LSO  ·  %s AM  ·  Black Sea Day / Night  ·  dial it" % PADDLES_F,
+    c = card("PADD", "LES", ["SkyEye LSO  ·  %s AM  ·  Black Sea + Syria  ·  dial it" % PADDLES_F,
                             "You call the ball; he talks you down. No readbacks."], 10, EYE_CVN)
     NK.band(c, "ABEAM AND THE BALL CALL", "after Marshal's \"contact paddles\"")
     NK.steps(c, [
@@ -706,7 +707,7 @@ def c12_sortie():
         ("MARSHAL 306.3", "marking moms  ·  DME reports  ·  see you at ten"),
         ("MARSHAL 306.3", "state  ·  established angels N  ·  Charlie"),
         ("MARSHAL 306.3", "commencing  ·  initial at 3 nm"),
-        ("PADDLES 128.3", "Black Sea: ball call, fly his calls (card 10)."),
+        ("PADDLES 128.3", "Black Sea + Syria: ball call, fly his calls (card 10)."),
     ], split=280)
     c.bullets([
         [("Syria and Black Sea:", True),

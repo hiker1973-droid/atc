@@ -4,9 +4,10 @@
 :: Does NOT start the launcher (already running when the dashboard fires this).
 ::
 :: CARRIER OPS ARE RUN ON THIS MAP: CVN-72 "ABE", TACAN 72X / ICLS 12 / Link 4
-:: 336.000. Marshal 306.300 (since 2026-09-19), Deckboss 128.600, LSO 128.100 -- the mission's own
-:: AI carrier ATC sits on 128.600, so Deckboss uses 306.200 here. LSO has no
-:: atc.exe role - handoff to it is verbal only. See SYRIA_PLAN.md section 3.
+:: 336.000. Marshal 306.300 (since 2026-09-19), Deckboss 128.600 (shared with the
+:: mission's own AI carrier ATC, operator ruling 2026-09-02), Paddles 128.300
+:: (operator 2026-10-18: "Foothold can use deckboss, Marshall and paddles"; the
+:: same frequency as the Black Sea, not the card's LSO 128.100).
 ::
 :: SRS on the Foothold VM is :5002, not the Training rig's :5008.
 cd /d %~dp0
@@ -23,7 +24,10 @@ call "%~dp0start_command_syria.bat"
 echo [vSFG-7] Launching Marshal (306.300)...
 call "%~dp0start_marshal_syria.bat"
 
-echo [vSFG-7] Launching Deckboss (306.200)...
+echo [vSFG-7] Launching Deckboss (128.600)...
 call "%~dp0start_deckboss_syria.bat"
+
+echo [vSFG-7] Launching Paddles (128.300)...
+call "%~dp0start_lso_syria.bat"
 
 echo [vSFG-7] Syria region launched.

@@ -42,8 +42,11 @@ echo [vSFG-7] Starting Syria ATC system (5 fields)...
 :: DCS terrain's 253.200 -- that is the SHELL 2 tanker (operator ruling
 :: 2026-09-18). Tower frequencies live in pkg/airfield/{oslk,olba}.go.
 
+:: Incirlik speaks as Jodi (ElevenLabs FF59babHL8N8gfTgtBMT, the Command and
+:: Departure voice; operator 2026-10-18: "Change Incirlik ATC to Jodi"). nova
+:: stays the OpenAI fallback.
 echo   Incirlik Tower (LTAG) -^> dashboard 6041   [PRIMARY]
-start "Incirlik Tower" cmd /c "%~dp0atc.exe --airfield LTAG --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6041 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+start "Incirlik Tower" cmd /c "%~dp0atc.exe --airfield LTAG --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --elevenlabs-tower-voice FF59babHL8N8gfTgtBMT --dashboard-port 6041 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 timeout /t 3 /nobreak >nul
 
 echo   Ramat David Tower (LLRD) -^> dashboard 6042   [PRIMARY]
