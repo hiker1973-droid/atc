@@ -56,6 +56,20 @@ func TestRefreshKeyEnvReadsTheRegistry(t *testing.T) {
 	}
 }
 
+// A setting deleted from the registry (reg delete) stops reaching the roles.
+func TestRefreshKeyEnvDropsDeleted(t *testing.T) {
+	if _, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE); err != nil {
+		t.Skip("cannot open HKCU Environment")
+	}
+	const name = "SKYEYE_UPDATE_TEST_GONE"
+	os.Setenv(name, "stale")
+	defer os.Unsetenv(name)
+	refreshKeyEnv()
+	if v, ok := os.LookupEnv(name); ok {
+		t.Errorf("%s = %q, want it unset", name, v)
+	}
+}
+
 // The launcher restarts at the end of an update; the new one shows how it went.
 func TestUpdateStateSurvivesRestart(t *testing.T) {
 	defer func(r string) { rootDir = r }(rootDir)

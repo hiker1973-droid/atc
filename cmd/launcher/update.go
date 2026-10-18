@@ -335,15 +335,19 @@ func restartLauncher() error {
 var keyEnvPrefixes = []string{"ELEVENLABS_", "OPENAI_", "SKYEYE_"}
 
 // refreshKeyEnv copies those variables from the registry (machine, then user,
-// which wins - the same precedence Windows uses) into this process. Returns
-// how many were set.
+// which wins - the same precedence Windows uses) into this process, and drops
+// any it inherited that are no longer there: Day's SKYEYE_MIZ, deleted with
+// reg delete on 2026-10-17, still reached the roles after the 10-18 Update.
+// Returns how many were set.
 func refreshKeyEnv() int {
 	vals := map[string]string{}
+	opened := false
 	read := func(root registry.Key, path string) {
 		k, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
 		if err != nil {
 			return
 		}
+		opened = true
 		defer k.Close()
 		names, _ := k.ReadValueNames(0)
 		for _, name := range names {
@@ -362,5 +366,28 @@ func refreshKeyEnv() int {
 	for k, v := range vals {
 		os.Setenv(k, v)
 	}
+	if !opened {
+		return 0
+	}
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		up := strings.ToUpper(name)
+		for _, p := range keyEnvPrefixes {
+			if strings.HasPrefix(up, p) && !hasFold(vals, name) {
+				os.Unsetenv(name)
+			}
+		}
+	}
 	return len(vals)
+}
+
+// hasFold reports whether m has key name, ignoring case as Windows does for
+// environment variable names.
+func hasFold(m map[string]string, name string) bool {
+	for k := range m {
+		if strings.EqualFold(k, name) {
+			return true
+		}
+	}
+	return false
 }
