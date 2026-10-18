@@ -1,11 +1,25 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 16 OCT 2026.  v1.25.  Product = one full-screen 16:9 PDF, 24 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.25.pdf` — cover + 23 cards: How it works · Frequencies ·
+**Built 18 OCT 2026.  v1.26.  Product = one full-screen 16:9 PDF, 25 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.26.pdf` — cover + 24 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
-Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · **Range areas · Overlord Actual** ·
-A full sortie · Airfield ATC · Tower radios · Syria towers · Departure · Arrival ·
-Tower calls · No answer?
+**Paddles** · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
+Overlord Actual · A full sortie · Airfield ATC · Tower radios · Syria towers · Departure ·
+Arrival · Tower calls · No answer?
+
+## v1.26 (18 OCT 2026) — Paddles, the SkyEye LSO, from origin/main `6208ef8`
+
+Operator 2026-10-18: "Also add to master ATC pdf", with the new one-page
+`docs/paddles-flow/Paddles LSO Comms Flow.pdf`.
+- **New card 10 PADDLES:** 128.300 AM, Black Sea Day / Night only, no kneeboard preset yet
+  (dial it). Ball call / Clara / "call the ball" / radio check; the groove calls (high, low,
+  power, easy, lineup, fast / slow); wave-off, foul deck, bolter; nothing spoken on a trap.
+  From `pkg/lso/lso.go` (calls and thresholds) and `cmd/atc/lso.go` (ball calls).
+- Every "no SkyEye LSO" line replaced: card 1 (roles table + footnote), card 2 (128.300 vs
+  the LIVE LSO 128.100 human preset), card 4 (bolter note), card 5 (after initial), the sortie
+  card and No answer? (frequency check + quirk).
+- Cards 10 - 23 of v1.25 are now 11 - 24 (`TOWER_CARDS` = cards 18 - 23). Build stamp 6208ef8.
+- Not done: Phraseology Reference (no Paddles section yet); kneeboard preset for 128.300.
 
 ## v1.25 (16 OCT 2026) — Hitman 2-1, BDA calls, range areas + Overlord, from origin/main `15c969b`
 

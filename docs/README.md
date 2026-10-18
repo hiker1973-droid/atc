@@ -8,6 +8,7 @@ Two generated PDFs for pilots, kept here so they version with the code they desc
 | **ATC Phraseology Reference** | `phraseology/` | portrait kneeboard pages | `phraseology/build_phraseology.py` |
 | **SkyEye ATC Comms Packet** | `comms-packet/` | 16:9 slides | `comms-packet/_tools/build_skyeye_packet.py` |
 | **Hitman JTAC Comms Flow** | `hitman-flow/` | one-page sheet (ReportLab) | `hitman-flow/build_hitman_flow.py` |
+| **Paddles LSO Comms Flow** | `paddles-flow/` | one-page sheet (ReportLab) | `paddles-flow/build_paddles_flow.py` |
 
 Both need the squadron card kit in
 `C:\Users\afhin\Saved Games\DCS\Missions\_MISSION_TOOLKIT\briefing` (missioncard,
@@ -28,6 +29,7 @@ Older versions are in git history, not in `Old\` folders.
 
        python -I docs/phraseology/build_phraseology.py
        python -I docs/comms-packet/_tools/build_skyeye_packet.py
+       python -I docs/paddles-flow/build_paddles_flow.py
        python -I docs/hitman-flow/build_hitman_flow.py
 
 4. `go test ./cmd/atc -run TestDocPhrases` runs every pilot call the Phraseology
