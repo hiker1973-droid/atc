@@ -184,6 +184,13 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelName, apiKey, eamPassword string, vp voiceProfile, externalAudioPath, prompt string, inFlight *atomic.Int32, handle func(text string) (string, string)) {
 	guidLen := 22
 	var txCooldown int64
+	// Pilots already understood on this net, by SRS origin. While we transmit
+	// the net used to drop everything it heard, and Paddles' groove calls
+	// came every 2 s: Raider 302's ball call (Day 2026-10-18 16:08) was lost
+	// inside one. ExternalAudio connects with a new origin each time, so a
+	// known origin is a pilot, not us, and is heard through our own
+	// transmission (the own-echo text check still applies).
+	pilots := newKnownOrigins()
 	for {
 		select {
 		case <-ctx.Done():
@@ -335,7 +342,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 					silent := now.Sub(tx.lastPacket) > 400*time.Millisecond
 					tooLong := !tx.firstPacket.IsZero() && now.Sub(tx.firstPacket) > 20*time.Second
 					if (silent || tooLong) && len(tx.opusFrames) > 9 {
-						if rxMuted(&txCooldown, freqMHz) {
+						if rxMuted(&txCooldown, freqMHz) && !pilots.known(origin) {
 							delete(transmissions, origin)
 							continue
 						}
@@ -345,7 +352,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 						if inFlight != nil {
 							inFlight.Add(1)
 						}
-						go func(f [][]byte) {
+						go func(f [][]byte, origin string) {
 							if inFlight != nil {
 								defer inFlight.Add(-1)
 							}
@@ -363,6 +370,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 								return
 							}
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
+							pilots.add(origin)
 							cs, resp := handle(text)
 							if resp == netHandled {
 								return
@@ -382,7 +390,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							log.Info().Str("callsign", cs).Str("text", resp).Float64("freq", freqMHz).Msg("Command TX")
 							noteOwnTX(freqMHz, resp)
 							transmitExternalAudioFile(ctx, mp3, freqMHz, channelName, srsHost, srsPort, externalAudioPath)
-						}(frames)
+						}(frames, origin)
 					}
 				}
 			default:

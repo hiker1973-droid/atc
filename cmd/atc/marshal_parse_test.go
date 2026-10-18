@@ -219,7 +219,7 @@ func TestMarshalCallsFlown20261015(t *testing.T) {
 		{"You need Marshall, Raider 302, marking moms, 305, angels not for 25, angels 9.3, state 7.9.", "Raider 302", marshalMarkingMom},
 		// A readback of "report see me at ten", at 29 nm: answered "copy visual
 		// at ten miles". Now no reply.
-		{"Unit Marshall, Raider 302, BRC 96, Marshalling at Angels 2, we'll report see you at 10.", "Raider 302", marshalNone},
+		{"Unit Marshall, Raider 302, BRC 96, Marshalling at Angels 2, we'll report see you at 10.", "Raider 302", marshalReadback},
 		// The real call still lands.
 		{"Union Marshal Raider 302, see you at 10.", "Raider 302", marshalSeeYouAtTen},
 		// A jet leaving: answered "contact 7 DME, continue".
@@ -250,8 +250,8 @@ func TestMarshalCallsFlown20261017(t *testing.T) {
 		// Answered "state 6.4, copy".
 		{"Union Marshal, Raider 312 is 221 for 59, Angels 28, state 6.4.", marshalMarkingMom},
 		// Readbacks answered "BRC 096" again.
-		{"Union Marshal, Raider 312, understands BRC 096, altimeter 3000, Marshal, angels 2, I'll call you at 10.", marshalNone},
-		{"Union Marshal Raider 302 BRC 096 marshalling at angels 3, will report CU at 10.", marshalNone},
+		{"Union Marshal, Raider 312, understands BRC 096, altimeter 3000, Marshal, angels 2, I'll call you at 10.", marshalReadback},
+		{"Union Marshal Raider 302 BRC 096 marshalling at angels 3, will report CU at 10.", marshalReadback},
 		// Answered "state, copy": never holding, so no Charlie.
 		{"Union Marshal Raider 302 entering stack position 3, fuel state 4.9.", marshalEstablished},
 		{"Union Marshal, Raider 312, established angels 2, entry point 1, state 5.3.", marshalEstablished},
@@ -299,8 +299,8 @@ func TestMarshalCallsFlown20261017Afternoon(t *testing.T) {
 		}
 	}
 	lower := strings.ToLower("Union Marshall Raider 302, BRC 08096, Angels stack at Angels 3, will call, see you at 10.")
-	if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != marshalNone {
-		t.Errorf("readback intent = %d, want none", got)
+	if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != marshalReadback {
+		t.Errorf("readback intent = %d, want readback", got)
 	}
 }
 
@@ -314,6 +314,35 @@ func TestMarshalSignOut20261018(t *testing.T) {
 		lower := strings.ToLower(s)
 		if got := classifyMarshalCall(lower, extractFuelStateMarshal(lower)); got != marshalPushCommand {
 			t.Errorf("%q: intent = %d, want push command", s, got)
+		}
+	}
+}
+
+// Day 2026-10-18: readbacks however punctuated, plain "copy"s, and a state
+// given without the word "state" after "say state".
+func TestMarshalReadbackAndBareState20261018(t *testing.T) {
+	for _, c := range []struct {
+		text  string
+		want  marshalIntent
+		state float64
+	}{
+		{"Union Marshall Raider 302 BRC 096 marshaling at Angels 2. Will report. See you at 10.", marshalReadback, 0},
+		{"Union Marshall Raider 302 BRC 09 stick marshalling at Angels 2. We'll report see you at 10.", marshalReadback, 0},
+		{"Marshal, Raider 312 understands. Altimeter 2984, Marshal at angels 2. I'll call you at 10.", marshalReadback, 0},
+		{"Union Marshall, Raider 302, copy.", marshalReadback, 0},
+		{"Unit Marshal Raider 302, copy signal Charlie.", marshalReadback, 0},
+		{"Union Marshall reader 302, 6.6.", marshalState, 6.6},
+		{"Union Marshal, Raider 302, six point four.", marshalNone, 0},
+		{"Union Marshal Raider 302, see you at 10.", marshalSeeYouAtTen, 0},
+		{"Union Marshal Raider 302 commencing 330.", marshalCommencing, 0},
+	} {
+		lower := strings.ToLower(c.text)
+		fuel := extractFuelStateMarshal(lower)
+		if fuel == 0 {
+			fuel = bareMarshalState(lower)
+		}
+		if got := classifyMarshalCall(lower, fuel); got != c.want || fuel != c.state {
+			t.Errorf("%q: intent %d state %.1f, want %d state %.1f", c.text, got, fuel, c.want, c.state)
 		}
 	}
 }

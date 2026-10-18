@@ -89,3 +89,32 @@ func rxMuted(cooldown *int64, freqMHz float64) bool {
 	}
 	return ownTXOnAir(freqMHz)
 }
+
+// knownOrigins remembers the SRS origins a net has understood (pilots), for an
+// hour since last heard, so their calls get through while we transmit.
+type knownOrigins struct {
+	mu   sync.Mutex
+	seen map[string]time.Time
+}
+
+const knownOriginFor = time.Hour
+
+func newKnownOrigins() *knownOrigins { return &knownOrigins{seen: map[string]time.Time{}} }
+
+func (k *knownOrigins) add(origin string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.seen[origin] = time.Now()
+	for o, t := range k.seen {
+		if time.Since(t) > knownOriginFor {
+			delete(k.seen, o)
+		}
+	}
+}
+
+func (k *knownOrigins) known(origin string) bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	t, ok := k.seen[origin]
+	return ok && time.Since(t) <= knownOriginFor
+}

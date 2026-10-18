@@ -62,6 +62,9 @@ const (
 	elGideon  = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command until round 10)
 	elSpartan = "S75jVZ0i3J6Xa5BbK8CE" // American man, calm, grounded baritone (Command, then Marshal, on 2026-10-15)
 	elRolando = "6PBHdlpKVQ70t6tnDUYF" // American man, crisp, military (Marshal; operator 2026-10-15: "change marshall to this command_2_Rolando-crisp-military")
+	// elMatilda is round 6's marshal_2 ("Matilda - Knowledgable, Professional",
+	// premade, American woman), picked for Paddles 2026-10-18.
+	elMatilda = "XrExE9yKIg1WjnnlVkGX"
 	// elCommand11 is voice 3 of round 11, the IDs the operator sent (pick 2026-10-15:
 	// "command_3_XlDdozLmuTofIxK4BjPD"). Its name is not readable with the
 	// rigs' key (no voices_read).
@@ -110,6 +113,12 @@ func elCommand(id string) elevenVoice {
 // measured, Deckboss quicker and punchier.
 func elMarshal(id string) elevenVoice {
 	return elevenVoice{ID: id, Name: "Marshal", Stability: 0.6, Style: 0.2, Speed: 1.05, Model: elFlash}
+}
+
+// elPaddles is the LSO: Flash (the fixed calls are rendered once a start) and
+// ElevenLabs' fastest speed, with a punchy read for "Power!" and the wave-off.
+func elPaddles(id string) elevenVoice {
+	return elevenVoice{ID: id, Name: "Paddles", Stability: 0.35, Style: 0.5, Speed: 1.2, Model: elFlash}
 }
 
 // Deckboss alone is on the premium model at 1.05 since 2026-10-15 (operator:

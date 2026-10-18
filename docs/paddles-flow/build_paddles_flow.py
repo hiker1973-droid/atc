@@ -142,7 +142,7 @@ S.append(section("Tips",
          "not the full callsign."],
         ["\"Ball\" heard as \"bolt\"", "Speech recognition often writes \"Hornet ball\" as \"Hornet bolt\"; Paddles "
          "accepts it. Speak clearly and don't clip the start of the call."],
-        ["Who is it?", "Paddles is one voice (OpenAI), on 128.300 only, on the Caucasus Day and Night servers and Foothold (Syria)."],
+        ["Who is it?", "Paddles is one voice (a woman), on 128.300 only, on Caucasus Day / Night and Foothold (Syria)."],
         ["No answer?", "Wait 2-3 s, then repeat the ball call once. Check AM on 128.300. Report callsign, "
          "frequency and time on Discord."],
     ], [1.5, 5.9])))

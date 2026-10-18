@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/rs/zerolog/log"
 	"github.com/vsfg7/atc/pkg/composer"
@@ -180,6 +181,9 @@ const (
 	marshalPushPaddles
 	marshalInitial
 	marshalCheckIn
+	// marshalReadback is a readback or a plain "copy": no reply, and not an
+	// intent miss in the logs.
+	marshalReadback
 )
 
 // establishedRe covers "established angels 2" and Whisper's flown variants
@@ -200,6 +204,52 @@ var brcReadbackRe = regexp.MustCompile(`\b(?:brc|vrc)\b,? (?:is )?\d{2,3}\b`)
 // charlieRequestRe is a holding jet asking for Charlie.
 var charlieRequestRe = regexp.MustCompile(`\b(?:request|requesting|ready for|say) charlie\b`)
 
+// readbackSeeYouRe is the pilot reading back "report see me at ten" however
+// Whisper punctuates it (Day 2026-10-18 14:40:25 "Will report. See you at
+// 10." was answered "copy visual at ten miles" at 67 nm; 10:09 "I'll call you
+// at 10."). Matched on the call with punctuation turned to spaces.
+var readbackSeeYouRe = regexp.MustCompile(`\b(?:report|wilco|call)\s+(?:see\s+)?(?:you|me)\s+at\s+(?:10|ten)\b`)
+
+// ackOnlyRe is a call that ends in a bare acknowledgement: "Raider 302,
+// copy." / "copy signal Charlie" (Day 2026-10-18 14:46:26, 15:57:40).
+var ackOnlyRe = regexp.MustCompile(`\b(?:copy|copies|roger|wilco)(?:\s+(?:signal\s+)?charlie)?\s*$`)
+
+// bareStateRe is a state with no "state": the modex, then the fuel, and
+// nothing after (Day 2026-10-18 14:45:31 "Union Marshall Raider 302, 6.6."
+// answering "say state").
+var bareStateRe = regexp.MustCompile(`\b\d{3}\s+(\d{1,2}(?:\.| point )\d)\s*$`)
+
+// marshalFlat is a lowercased call with its punctuation turned to spaces,
+// except a decimal point inside a number ("6.6").
+func marshalFlat(lower string) string {
+	var b strings.Builder
+	rs := []rune(lower)
+	for i, r := range rs {
+		switch {
+		case r == '.' && i > 0 && i+1 < len(rs) && unicode.IsDigit(rs[i-1]) && unicode.IsDigit(rs[i+1]):
+			b.WriteRune(r)
+		case r == ',' || r == '.' || r == '!' || r == '?' || r == ';' || r == ':':
+			b.WriteRune(' ')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
+}
+
+// bareMarshalState is the fuel in a state given without the word "state", or 0.
+func bareMarshalState(lower string) float64 {
+	m := bareStateRe.FindStringSubmatch(marshalFlat(lower))
+	if m == nil {
+		return 0
+	}
+	var v float64
+	if _, err := fmt.Sscanf(strings.Replace(m[1], " point ", ".", 1), "%f", &v); err != nil || v <= 0 || v >= 30 {
+		return 0
+	}
+	return v
+}
+
 // unlabelledMarkingMomRe is "<radial> for <range>" with no "marking mom's".
 var unlabelledMarkingMomRe = regexp.MustCompile(`\b\d{3} for \d{1,3}\b`)
 
@@ -208,6 +258,7 @@ var unlabelledMarkingMomRe = regexp.MustCompile(`\b\d{3} for \d{1,3}\b`)
 // the DME report, and a BRC word inside a marking-mom's call is still a
 // check-in.
 func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
+	flat := marshalFlat(lower)
 	switch {
 	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comp check", "comcheck", "how copy"):
 		return marshalRadioCheck
@@ -229,7 +280,9 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		// DCS3 2026-10-15 14:54:27: "BRC 96, Marshalling at Angels 2, we'll
 		// report see you at 10" at 29 nm was answered "copy visual at ten
 		// miles". No reply: the readback needs none.
-		return marshalNone
+		return marshalReadback
+	case readbackSeeYouRe.MatchString(flat):
+		return marshalReadback
 	case containsAny(lower, "see you at 10", "see you at ten", "see me at 10", "see me at ten"):
 		return marshalSeeYouAtTen
 	case isDepartureClearCall(lower):
@@ -263,6 +316,9 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		return marshalDME
 	case containsAny(lower, "state") && fuelState > 0:
 		return marshalState
+	case bareStateRe.MatchString(flat) && fuelState > 0:
+		// "Raider 302, 6.6" answering "say state".
+		return marshalState
 	case containsAny(lower, "commencing"):
 		return marshalCommencing
 	case containsAny(lower, "platform", "passing five thousand", "passing 5000", "at platform"):
@@ -273,11 +329,13 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 	case brcReadbackRe.MatchString(lower):
 		// The pilot reading back "BRC 096 ... Marshal at angels 2" - DCS3
 		// 2026-10-17 10:42:17 and 10:45:53 were both answered "BRC 096" again.
-		return marshalNone
+		return marshalReadback
 	case brcWordRe.MatchString(lower):
 		return marshalBRCRequest
 	case containsAny(lower, "checking in", "check in", "checkin"):
 		return marshalCheckIn
+	case ackOnlyRe.MatchString(flat):
+		return marshalReadback
 	}
 	return marshalNone
 }
@@ -407,8 +465,12 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 
 		guidLen := 22
 		guid := srsClientGUID("vsfg7msh", 14)
-		if len(guid) > guidLen { guid = guid[:guidLen] }
-		for len(guid) < guidLen { guid += "0" }
+		if len(guid) > guidLen {
+			guid = guid[:guidLen]
+		}
+		for len(guid) < guidLen {
+			guid += "0"
+		}
 		// UDP setup — mirror Tower's ResolveUDPAddr + DialUDP path exactly. The
 		// previous string-form net.Dial("udp", "localhost:5008") path bound the
 		// socket via Go's default resolver, which on Windows preferred the IPv6
@@ -605,6 +667,9 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		return
 	}
 	fuelState := extractFuelStateMarshal(lower)
+	if fuelState == 0 {
+		fuelState = bareMarshalState(lower)
+	}
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
 	switch classifyMarshalCall(lower, fuelState) {
@@ -807,6 +872,9 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		// button reference was dropped — pilots know to switch.
 		log.Info().Str("callsign", callsign).Msg("Marshal: 3nm initial, handing off to LSO")
 		transmit(comp.MarshalPushButton(callsign))
+
+	case marshalReadback:
+		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal: readback, no reply")
 
 	default:
 		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal intent miss")

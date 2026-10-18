@@ -64,3 +64,21 @@ func TestEstimateCooldownStillMutes(t *testing.T) {
 		t.Error("the estimate cooldown no longer mutes")
 	}
 }
+
+// A pilot the net has already understood is heard through our own
+// transmission; an origin it has never heard (ExternalAudio, new every time)
+// is not.
+func TestKnownOrigins(t *testing.T) {
+	k := newKnownOrigins()
+	if k.known("pilot302") {
+		t.Fatal("known before heard")
+	}
+	k.add("pilot302")
+	if !k.known("pilot302") || k.known("externalaudio") {
+		t.Errorf("known(pilot302) = %v, known(externalaudio) = %v", k.known("pilot302"), k.known("externalaudio"))
+	}
+	k.seen["pilot302"] = time.Now().Add(-knownOriginFor - time.Minute)
+	if k.known("pilot302") {
+		t.Error("still known after an hour")
+	}
+}

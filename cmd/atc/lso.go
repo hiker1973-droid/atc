@@ -35,6 +35,10 @@ var (
 	flagLSOLateral float64
 	// flagLSODeckbossFreq is where "green deck" sends the landed jet.
 	flagLSODeckbossFreq float64
+	// flagElevenPaddlesVoice: Paddles' ElevenLabs voice (operator 2026-10-18:
+	// "change the paddles to ... marshal_2_EL-Matilda-F.mp3"); OpenAI
+	// --lso-voice is the fallback.
+	flagElevenPaddlesVoice string
 )
 
 // registerLSOFlags is called from the flag block in main.go.
@@ -42,7 +46,9 @@ func registerLSOFlags(f *flag.FlagSet) {
 	f.BoolVar(&flagLSOOnly, "lso-only", false, "Run as the carrier LSO (Paddles) only")
 	f.Float64Var(&flagLSOFreq, "lso-freq", 128.3, "Paddles frequency in MHz")
 	f.StringVar(&flagLSOName, "lso-name", "Paddles", "Paddles SRS client name")
-	f.StringVar(&flagLSOVoice, "lso-voice", "ash", "Paddles OpenAI TTS voice")
+	f.StringVar(&flagLSOVoice, "lso-voice", "ash", "Paddles OpenAI TTS voice (the fallback when ElevenLabs is off)")
+	f.StringVar(&flagElevenPaddlesVoice, "elevenlabs-paddles-voice", elMatilda,
+		`ElevenLabs voice ID for Paddles (default Matilda; "" = OpenAI only)`)
 	f.Float64Var(&flagLSOLateral, "lso-landing-lateral-m", -4,
 		"Landing point offset from the carrier centreline in metres, starboard positive (calibrate from logged traps)")
 	f.Float64Var(&flagLSODeckbossFreq, "lso-deckboss-freq", 128.6,
@@ -66,7 +72,11 @@ const styleLSOPowerUrgent = "Speak as a US Navy landing signal officer on the pl
 	"Each word harder than the last, a hard edge, no softness."
 
 func lsoVoice() voiceProfile {
-	return voiceProfile{voice: flagLSOVoice, speed: flagTTSSpeed, instructions: styleLSO}
+	vp := voiceProfile{voice: flagLSOVoice, speed: flagTTSSpeed, instructions: styleLSO}
+	if flagElevenPaddlesVoice != "" {
+		vp.eleven = elPaddles(flagElevenPaddlesVoice)
+	}
+	return vp
 }
 
 // lsoVoiceFor is the delivery for one call: the power calls get their own.
