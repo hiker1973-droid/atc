@@ -25,6 +25,7 @@
 -- write needs an elevated DCS; if it fails the user value still wins.
 
 local OUT = [[C:\SkyeyeATC\current_mission.txt]]
+local SETX_LOG = [[C:\SkyeyeATC\logs\vsfg7-hook-setx.log]]
 
 local lastPinned = nil
 
@@ -38,9 +39,14 @@ local function pinSkyeyeMiz(path)
         log.write("VSFG7-MIZ", log.WARNING, "SKYEYE_MIZ not updated, path has % or \": " .. path)
         return
     end
-    os.execute('setx SKYEYE_MIZ "' .. path .. '" >nul 2>&1 & setx SKYEYE_MIZ "' .. path .. '" /M >nul 2>&1')
+    -- setx output goes to SETX_LOG, not nul: on Foothold .222 (2026-10-19) the hook
+    -- logged "set to" but neither value changed, and the same command line worked
+    -- from a shell. os.execute's return values and that file say which step failed.
+    local r1, r2, r3 = os.execute('setx SKYEYE_MIZ "' .. path .. '" >>"' .. SETX_LOG .. '" 2>&1 & setx SKYEYE_MIZ "'
+        .. path .. '" /M >>"' .. SETX_LOG .. '" 2>&1')
     lastPinned = path
-    log.write("VSFG7-MIZ", log.INFO, "SKYEYE_MIZ set to " .. path)
+    log.write("VSFG7-MIZ", log.INFO, "SKYEYE_MIZ setx to " .. path .. " - os.execute returned "
+        .. tostring(r1) .. ", " .. tostring(r2) .. ", " .. tostring(r3) .. "; setx output in " .. SETX_LOG)
 end
 
 local cb = {}
