@@ -24,7 +24,7 @@ import (
 // KC-130 has two baskets, one jet on each:
 //
 //	"Texaco 1, Knight 1-1, flight of 2, 15 mile initial for port observation with intent to refuel"
-//	   -> "Knight 11, Texaco one one, cleared port observation, one three thousand, velocity three three six. How much do you request?"
+//	   -> "Knight 11, Texaco one one, cleared port observation, one three thousand, velocity two six zero. How much do you request?"
 //	"Knight 1-1, request 5.0"                       -> "Knight 11, Texaco copies five thousand pounds."
 //	"Knight 1-1, 1 mile trail for port observation" -> "Knight 11, Texaco, continue port observation."
 //	"Knight 1-1, established port observation"      -> "Knight 11, Texaco, copy. Port and starboard baskets open."
@@ -36,8 +36,10 @@ import (
 //	   -> "Knight 11, Texaco, copy, cleared to depart. Good hunting."
 //
 // Texaco 1-1 in V1.31 Training (Day): KC-130, 252.100 AM (Hornet COMM2 CH8),
-// TACAN 51Y TX1, angels 13, two wing drogues. Its speed is the procedure's
-// table: a KC-130 flies 336 at every altitude.
+// TACAN 51Y TX1, angels 13, two wing drogues. Its altitude and speed come
+// live from Tacview (tanker_speed.go: about 260 indicated); --tanker-kias
+// only stands in until the track is long enough. The AAR procedure's table
+// says 336 for a KC-130, but that is not what ours flies.
 
 var (
 	flagTankerFreq        float64
@@ -57,7 +59,7 @@ func registerTankerFlags(f *flag.FlagSet) {
 	f.StringVar(&flagTankerSpoken, "tanker-spoken", "Texaco one one", "Tanker callsign as spoken on the radio")
 	f.StringVar(&flagTankerTacview, "tanker-tacview", "Texaco 1-1", "The tanker's Tacview callsign, for its live altitude")
 	f.IntVar(&flagTankerAngels, "tanker-angels", 13, "The tanker's altitude in thousands of feet when Tacview has no fix")
-	f.IntVar(&flagTankerKIAS, "tanker-kias", 336, "The refuelling speed the tanker reports (vSFG-7 AAR table: KC-130 336 at every altitude)")
+	f.IntVar(&flagTankerKIAS, "tanker-kias", 260, "The tanker's indicated speed until Tacview has its track (Texaco 1-1 measured 18 Oct)")
 	f.StringVar(&flagTankerVoice, "tanker-voice", "echo", "OpenAI TTS voice for the tanker (the ElevenLabs fallback)")
 	f.StringVar(&flagElevenTankerVoice, "elevenlabs-tanker-voice", elEric, "ElevenLabs voice ID for the tanker (default Eric)")
 }
@@ -89,7 +91,7 @@ type tankerNet struct {
 	Spoken string // "Texaco one one"
 	Short  string // "Texaco", after the first call
 	angels func() int
-	kias   int
+	kias   func() int
 
 	mu      sync.Mutex
 	flights map[string]*tankerFlight
@@ -103,7 +105,7 @@ const (
 	tankerBasketAge = 10 * time.Minute
 )
 
-func newTankerNet(spoken string, angels func() int, kias int) *tankerNet {
+func newTankerNet(spoken string, angels, kias func() int) *tankerNet {
 	short := spoken
 	if i := strings.IndexByte(spoken, ' '); i > 0 {
 		short = spoken[:i]
@@ -365,7 +367,7 @@ func (n *tankerNet) Response(text, cs string) string {
 	case checkIn || f.stage == 0:
 		f.stage, f.basket = tankerCheckedIn, ""
 		lead := fmt.Sprintf("%s, %s, cleared port observation, %s thousand, velocity %s.", cs, n.Spoken,
-			spokenDigits(n.angels()), spokenDigits(n.kias))
+			spokenDigits(n.angels()), spokenDigits(n.kias()))
 		switch { // "intent to refuel, request 5.0" in one call
 		case amount < 0:
 			f.stage = tankerGiveSet
@@ -401,7 +403,7 @@ func tankerCallsign(text string) string {
 }
 
 // startTanker runs the tanker net beside Command. store may be nil (no
-// Tacview): the tanker then gives its briefed angels.
+// Tacview): the tanker then gives its briefed angels and speed.
 func startTanker(ctx context.Context, apiKey string, store *tacviewPositions) {
 	angels := func() int {
 		if store != nil {
@@ -411,7 +413,31 @@ func startTanker(ctx context.Context, apiKey string, store *tacviewPositions) {
 		}
 		return flagTankerAngels
 	}
-	tn := newTankerNet(flagTankerSpoken, angels, flagTankerKIAS)
+	var speed tankerSpeed
+	kias := func() int {
+		if v, ok := speed.KIAS(); ok {
+			return v
+		}
+		return flagTankerKIAS
+	}
+	if store != nil {
+		go func() {
+			tick := time.NewTicker(10 * time.Second)
+			defer tick.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-tick.C:
+				}
+				info := store.Info(flagTankerTacview)
+				if pos, ok := store.Get(flagTankerTacview); ok && time.Since(info.UpdatedAt) < 30*time.Second {
+					speed.Add(info.UpdatedAt, pos, info.AltFt)
+				}
+			}
+		}()
+	}
+	tn := newTankerNet(flagTankerSpoken, angels, kias)
 	vp := tankerVoice()
 	prompt := strings.Replace(flagTankerName, "-", " ", 1) + ", Knight, Raider, flight of two, 15 mile initial for port observation, " +
 		"intent to refuel, request, thousand pounds, 1 mile trail, established port observation, moving to starboard basket, " +

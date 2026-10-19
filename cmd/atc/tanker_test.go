@@ -7,7 +7,7 @@ import (
 )
 
 func testTanker() *tankerNet {
-	tn := newTankerNet("Texaco one one", func() int { return 13 }, 336)
+	tn := newTankerNet("Texaco one one", func() int { return 13 }, func() int { return 336 })
 	at := time.Date(2026, 10, 18, 20, 0, 0, 0, time.UTC)
 	tn.now = func() time.Time { return at }
 	return tn

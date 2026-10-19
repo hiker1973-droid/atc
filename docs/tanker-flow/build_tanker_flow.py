@@ -56,7 +56,7 @@ S = [
     Paragraph("vSFG7 SkyEye &middot; Caucasus (Day / Night) &middot; Command 282.000 &rarr; Texaco 1-1 252.100 AM "
               "&middot; training test &middot; %s" % BUILD, sub),
     Paragraph("<b>Texaco 1-1:</b> KC-130, two baskets (port and starboard) &middot; <b>252.100 AM</b> (Hornet COMM 2 CH 8) "
-              "&middot; TACAN <b>51Y TX1</b> &middot; <b>13,000 ft, velocity 336</b>. Calls follow the vSFG-7 AAQ "
+              "&middot; TACAN <b>51Y TX1</b> &middot; <b>13,000 ft, about 260 knots indicated</b>. Calls follow the vSFG-7 AAQ "
               "Aerial Refueling Procedure: observation is always <b>port</b>, reform always <b>starboard</b>. "
               "Say your callsign, with its number, in every call.", note),
 ]
@@ -73,7 +73,7 @@ S.append(section("2. Texaco 1-1 (252.100): initial to checking out",
     table(["Step", "Pilot (SRS)", "Texaco"], [
         ["<b>Initial</b><br/>~20 DME",
          "\"Texaco 1, Knight 1-1, flight of 2, 15 mile initial for <b>port observation</b> with intent to refuel\"",
-         "\"Knight 1-1, Texaco one one, cleared port observation, one three thousand, velocity three three six. "
+         "\"Knight 1-1, Texaco one one, cleared port observation, one three thousand, velocity two six zero. "
          "<b>How much do you request?</b>\""],
         ["<b>Give</b>",
          "\"Knight 1-1, <b>request 5.0</b>\"<br/>(or \"five thousand pounds\", \"full\")",
@@ -106,7 +106,8 @@ S.append(section("2. Texaco 1-1 (252.100): initial to checking out",
     "<b>Each jet</b> makes its own basket and reform calls. "
     "<b>Shortcut:</b> give your amount in the initial (\"...with intent to refuel, request 6.0\"): Texaco copies it "
     "instead of asking.",
-    "Texaco's altitude comes live from Tacview; velocity is the procedure's KC-130 figure, 336 at every altitude."))
+    "Texaco's altitude and velocity come live from Tacview: velocity is its indicated airspeed, worked out from its "
+    "track over the last hour (both legs of the racetrack, so the wind cancels). Match it on your HUD."))
 
 S.append(section("Words Texaco understands",
     table(["Step", "Any of these"], [
