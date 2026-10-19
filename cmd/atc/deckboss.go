@@ -238,6 +238,16 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				}
 			}
 
+		case containsAny(lower, "startup", "start up", "start-up", "request start", "requesting start", "engine start", "ready to start"):
+			if !addressed {
+				log.Debug().Str("text", text).Msg("Deckboss: startup dropped — not address-led")
+				return
+			}
+			// Startup on deck: the towers' Ground answers it, Deckboss was
+			// silent (Day 2026-10-19 17:05:23 "Deck boss Raider 302, request
+			// startup"). After request taxi so "startup and taxi" gets a cat.
+			transmit(fmt.Sprintf("%s, Deckboss, start at your discretion, call green jet.", callsign))
+
 		case (containsAny(lower, "tension", "ready") && containsAny(lower, "cat")) || containsAny(lower, "shoot"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: §2 dropped — not address-led, likely self-echo of under-tension response")

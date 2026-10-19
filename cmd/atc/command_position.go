@@ -80,7 +80,56 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 	if resp := commandTaskingBoard().Response(text, callsign, channelName); resp != "" {
 		return resp
 	}
-	return commandResponse(text, callsign, channelName)
+	if resp := commandResponse(text, callsign, channelName); resp != "" {
+		return resp
+	}
+	return commandShotResponse(text, callsign, channelName, store)
+}
+
+var (
+	foxRe     = regexp.MustCompile(`\bfox[\s-]*(1|2|3|one|two|three)\b`)
+	splashRe  = regexp.MustCompile(`\bsplash(ed)?\b`)
+	bareNumRe = regexp.MustCompile(`^(\d{2,3})\b`)
+)
+
+var foxSpoken = map[string]string{"1": "one", "2": "two", "3": "three", "one": "one", "two": "two", "three": "three"}
+
+// commandShotResponse copies a shot or a kill (Day 2026-10-19 16:59-17:00:
+// "302 Fox 3, 26 for 73", "302, splash MiG-29" were intent misses). Only
+// reached when nothing else answered. Pilots call these with the flight
+// number alone, so "302" becomes the Tacview callsign that ends in it.
+func commandShotResponse(text, callsign, channelName string, store *tacviewPositions) string {
+	lower := strings.ToLower(text)
+	splash := splashRe.MatchString(lower)
+	fox := foxRe.FindStringSubmatch(lower)
+	if !splash && fox == nil {
+		return ""
+	}
+	// "302 Fox 3, 26 for 73" extracts as "302 Fox 3".
+	if m := bareNumRe.FindStringSubmatch(callsign); m != nil {
+		callsign = m[1]
+		if store != nil {
+			if full := store.CallsignByNumber(m[1]); full != "" {
+				callsign = full
+			}
+		}
+	}
+	if callsign == "" {
+		return ""
+	}
+	if splash {
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, copy splash, good kill.", callsign, channelName),
+			fmt.Sprintf("%s, %s, copy splash.", callsign, channelName),
+			fmt.Sprintf("%s, %s, splash copied, good shooting.", callsign, channelName),
+		})
+	}
+	n := foxSpoken[fox[1]]
+	return commandPick([3]string{
+		fmt.Sprintf("%s, %s, copy Fox %s.", callsign, channelName, n),
+		fmt.Sprintf("%s, %s, copy your Fox %s.", callsign, channelName, n),
+		fmt.Sprintf("%s, %s, roger Fox %s.", callsign, channelName, n),
+	})
 }
 
 var (
@@ -187,8 +236,11 @@ func commandPositionResponse(text, callsign, channelName string, store *tacviewP
 			callsign, channelName, tk.callsign,
 			spokenBearing(toMagnetic(brg, magVar(pos))), int(nm+0.5), int(tk.info.AltFt/1000+0.5))
 		// The tanker with a SkyEye net (tanker.go) takes his check-in.
-		if flagTankerFreq > 0 && strings.EqualFold(tk.callsign, flagTankerTacview) {
-			reply += fmt.Sprintf(" Contact %s on %s.", flagTankerSpoken, composer.SpellFrequency(flagTankerFreq))
+		for _, cfg := range tankerConfigs() {
+			if strings.EqualFold(tk.callsign, cfg.Tacview) {
+				reply += fmt.Sprintf(" Contact %s on %s.", cfg.Spoken, composer.SpellFrequency(cfg.FreqMHz))
+				break
+			}
 		}
 		return reply
 	}

@@ -786,9 +786,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if flagJTACFreq > 0 {
 			startJTACs(ctx, apiKey, store)
 		}
-		if flagTankerFreq > 0 {
-			startTanker(ctx, apiKey, store)
-		}
+		startTankers(ctx, apiKey, store)
 
 		commandLoop(ctx, flagSRSAddr, cmdFreq, flagCommandName, apiKey, flagEAMPassword, flagCommandVoice, flagExternalAudio, tracker, store)
 		return nil

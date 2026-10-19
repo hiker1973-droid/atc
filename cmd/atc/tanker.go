@@ -40,6 +40,11 @@ import (
 // live from Tacview (tanker_speed.go: about 260 indicated); --tanker-kias
 // only stands in until the track is long enough. The AAR procedure's table
 // says 336 for a KC-130, but that is not what ours flies.
+//
+// Texaco 3-1 (operator 2026-10-19: "do Texaco 3-1 with a different voice"),
+// --tanker2-freq: KC-135 MPRS, 252.300 AM (Hornet COMM2 CH10), TACAN 53Y TX3,
+// angels 24 at Mach 0.65 (the builder's tankers.py), two wing pods - the same
+// port / starboard flow. Its own net and its own voice (Brian, not Eric).
 
 var (
 	flagTankerFreq        float64
@@ -50,6 +55,15 @@ var (
 	flagTankerKIAS        int
 	flagTankerVoice       string
 	flagElevenTankerVoice string
+
+	flagTanker2Freq        float64
+	flagTanker2Name        string
+	flagTanker2Spoken      string
+	flagTanker2Tacview     string
+	flagTanker2Angels      int
+	flagTanker2KIAS        int
+	flagTanker2Voice       string
+	flagElevenTanker2Voice string
 )
 
 func registerTankerFlags(f *flag.FlagSet) {
@@ -62,6 +76,42 @@ func registerTankerFlags(f *flag.FlagSet) {
 	f.IntVar(&flagTankerKIAS, "tanker-kias", 260, "The tanker's indicated speed until Tacview has its track (Texaco 1-1 measured 18 Oct)")
 	f.StringVar(&flagTankerVoice, "tanker-voice", "echo", "OpenAI TTS voice for the tanker (the ElevenLabs fallback)")
 	f.StringVar(&flagElevenTankerVoice, "elevenlabs-tanker-voice", elEric, "ElevenLabs voice ID for the tanker (default Eric)")
+
+	f.Float64Var(&flagTanker2Freq, "tanker2-freq", 0,
+		"With --command-only: run a second tanker net on this frequency in MHz, e.g. 252.3 (Texaco 3-1). 0=disabled")
+	f.StringVar(&flagTanker2Name, "tanker2-name", "Texaco-3-1", "Second tanker SRS client name (no spaces)")
+	f.StringVar(&flagTanker2Spoken, "tanker2-spoken", "Texaco three one", "Second tanker callsign as spoken on the radio")
+	f.StringVar(&flagTanker2Tacview, "tanker2-tacview", "Texaco 3-1", "The second tanker's Tacview callsign, for its live altitude")
+	f.IntVar(&flagTanker2Angels, "tanker2-angels", 24, "The second tanker's altitude in thousands of feet when Tacview has no fix")
+	f.IntVar(&flagTanker2KIAS, "tanker2-kias", 265, "The second tanker's indicated speed until Tacview has its track (Mach 0.65 at angels 24)")
+	f.StringVar(&flagTanker2Voice, "tanker2-voice", "verse", "OpenAI TTS voice for the second tanker (the ElevenLabs fallback)")
+	f.StringVar(&flagElevenTanker2Voice, "elevenlabs-tanker2-voice", elBrian, "ElevenLabs voice ID for the second tanker (default Brian)")
+}
+
+// tankerConfig is one tanker net: Texaco 1-1 (--tanker-freq) and, when set,
+// Texaco 3-1 (--tanker2-freq).
+type tankerConfig struct {
+	FreqMHz float64
+	Name    string // SRS client name, "Texaco-1-1"
+	Spoken  string // "Texaco one one"
+	Tacview string // "Texaco 1-1"
+	Angels  int
+	KIAS    int
+	Voice   voiceProfile
+}
+
+func tankerConfigs() []tankerConfig {
+	var cfgs []tankerConfig
+	if flagTankerFreq > 0 {
+		cfgs = append(cfgs, tankerConfig{FreqMHz: flagTankerFreq, Name: flagTankerName, Spoken: flagTankerSpoken,
+			Tacview: flagTankerTacview, Angels: flagTankerAngels, KIAS: flagTankerKIAS, Voice: tankerVoice()})
+	}
+	if flagTanker2Freq > 0 {
+		cfgs = append(cfgs, tankerConfig{FreqMHz: flagTanker2Freq, Name: flagTanker2Name, Spoken: flagTanker2Spoken,
+			Tacview: flagTanker2Tacview, Angels: flagTanker2Angels, KIAS: flagTanker2KIAS,
+			Voice: voiceProfile{voice: flagTanker2Voice, speed: flagTTSSpeed, eleven: elTower(flagElevenTanker2Voice, "Texaco 3-1")}})
+	}
+	return cfgs
 }
 
 func tankerVoice() voiceProfile {
@@ -124,6 +174,7 @@ var (
 	tankerReformRe      = regexp.MustCompile(`\b(reform|satisfied|complete|completed|disconnect(ed|ing)?|done)\b`)
 	tankerCheckOutRe    = regexp.MustCompile(`\b(checking out|check out|resuming (navigation|mission|nav)|pushing|departing|leaving|clear(ing)? (of|the) tanker)\b`)
 	tankerFullRe        = regexp.MustCompile(`\b(full|top(ped)? off|fill (it|her|us) up|max)\b`)
+	tankerRadioCheckRe  = regexp.MustCompile(`\b((radio|comms?|com|comp)[\s-]?check|comcheck|how (do you )?copy|five by( five)?)\b`)
 	// "request 5.0", "five point oh", "5000 pounds", "5 thousand".
 	tankerAmountRe = regexp.MustCompile(`(\d+(?:\.\d+)?)\s*(thousand|k\b|pounds|lbs?)?`)
 )
@@ -293,6 +344,13 @@ func (n *tankerNet) Response(text, cs string) string {
 	reform := strings.Contains(lower, "reform")
 
 	switch {
+	// "Texaco 1-1, Raider 302, comm check": loud and clear, and the flight
+	// stays where it is. Day 2026-10-19 16:47 a ramp comm check got "cleared
+	// port observation" (any first call was a check-in) and at 17:09, mid-flow,
+	// two comm checks got nothing.
+	case tankerRadioCheckRe.MatchString(lower) && !checkIn && amount == 0:
+		return fmt.Sprintf("%s, %s, loud and clear.", cs, n.Spoken)
+
 	// "checking out, resuming navigation, pushing 282"
 	case tankerCheckOutRe.MatchString(lower) && !checkIn:
 		f.stage, f.basket = 0, ""
@@ -385,7 +443,8 @@ func (n *tankerNet) Response(text, cs string) string {
 // the address: "Texaco 1-1, Raider 302, one Hornet, 15 miles" -> "Raider 302".
 func tankerCallsign(text string) string {
 	cs := extractCallsignSkippingAddress(text, "texaco one-one", "texaco one one", "texaco 1-1", "texaco 1 1", "texaco 11",
-		"texaco one", "texaco 1", "texaco", "tanker")
+		"texaco three-one", "texaco three one", "texaco 3-1", "texaco 3 1", "texaco 31",
+		"texaco one", "texaco 1", "texaco three", "texaco 3", "texaco", "tanker")
 	cs = strings.TrimSpace(cs)
 	if jtacBareNumberRe.MatchString(cs) {
 		return ""
@@ -402,23 +461,30 @@ func tankerCallsign(text string) string {
 	return joinCallsignDigits(strings.TrimSpace(cs[:cut]))
 }
 
-// startTanker runs the tanker net beside Command. store may be nil (no
+// startTankers runs every configured tanker net.
+func startTankers(ctx context.Context, apiKey string, store *tacviewPositions) {
+	for _, cfg := range tankerConfigs() {
+		startTanker(ctx, apiKey, store, cfg)
+	}
+}
+
+// startTanker runs one tanker net beside Command. store may be nil (no
 // Tacview): the tanker then gives its briefed angels and speed.
-func startTanker(ctx context.Context, apiKey string, store *tacviewPositions) {
+func startTanker(ctx context.Context, apiKey string, store *tacviewPositions, cfg tankerConfig) {
 	angels := func() int {
 		if store != nil {
-			if info := store.Info(flagTankerTacview); info.AltFt > 1000 && time.Since(info.UpdatedAt) < 2*time.Minute {
+			if info := store.Info(cfg.Tacview); info.AltFt > 1000 && time.Since(info.UpdatedAt) < 2*time.Minute {
 				return int(info.AltFt/1000 + 0.5)
 			}
 		}
-		return flagTankerAngels
+		return cfg.Angels
 	}
 	var speed tankerSpeed
 	kias := func() int {
 		if v, ok := speed.KIAS(); ok {
 			return v
 		}
-		return flagTankerKIAS
+		return cfg.KIAS
 	}
 	if store != nil {
 		go func() {
@@ -430,23 +496,22 @@ func startTanker(ctx context.Context, apiKey string, store *tacviewPositions) {
 					return
 				case <-tick.C:
 				}
-				info := store.Info(flagTankerTacview)
-				if pos, ok := store.Get(flagTankerTacview); ok && time.Since(info.UpdatedAt) < 30*time.Second {
+				info := store.Info(cfg.Tacview)
+				if pos, ok := store.Get(cfg.Tacview); ok && time.Since(info.UpdatedAt) < 30*time.Second {
 					speed.Add(info.UpdatedAt, pos, info.AltFt)
 				}
 			}
 		}()
 	}
-	tn := newTankerNet(flagTankerSpoken, angels, kias)
-	vp := tankerVoice()
-	prompt := strings.Replace(flagTankerName, "-", " ", 1) + ", Knight, Raider, flight of two, 15 mile initial for port observation, " +
+	tn := newTankerNet(cfg.Spoken, angels, kias)
+	prompt := strings.Replace(cfg.Name, "-", " ", 1) + ", Knight, Raider, flight of two, 15 mile initial for port observation, " +
 		"intent to refuel, request, thousand pounds, 1 mile trail, established port observation, moving to starboard basket, " +
 		"ready pre-contact, satisfied, moving to starboard reform, checking out, resuming navigation, pushing 282"
-	go voiceNetLoop(ctx, flagSRSAddr, flagTankerFreq, flagTankerName, apiKey, flagEAMPassword, vp, flagExternalAudio,
+	go voiceNetLoop(ctx, flagSRSAddr, cfg.FreqMHz, cfg.Name, apiKey, flagEAMPassword, cfg.Voice, flagExternalAudio,
 		prompt, nil, func(text string) (string, string) {
 			cs := tankerCallsign(text)
 			return cs, tn.Response(text, cs)
 		})
-	log.Info().Float64("freq", flagTankerFreq).Str("name", flagTankerName).Str("tacview", flagTankerTacview).
+	log.Info().Float64("freq", cfg.FreqMHz).Str("name", cfg.Name).Str("tacview", cfg.Tacview).
 		Bool("store", store != nil).Msg("Tanker net starting")
 }

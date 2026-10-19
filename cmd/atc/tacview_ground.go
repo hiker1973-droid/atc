@@ -115,6 +115,23 @@ func (t *tacviewPositions) Impacts(since time.Time) []tacviewImpact {
 	return out
 }
 
+// CallsignByNumber is the one contact whose callsign ends in the flight number
+// a pilot gave alone ("302" -> "Raider 302"); "" when none or more than one.
+func (t *tacviewPositions) CallsignByNumber(num string) string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	found := ""
+	for k := range t.pos {
+		if strings.HasSuffix(k, " "+num) {
+			if found != "" && found != k {
+				return ""
+			}
+			found = k
+		}
+	}
+	return found
+}
+
 // NearestPilot is the store key of the contact nearest pos within radiusNm,
 // "" if none. It names the jet a weapon came off when Tacview gives no Parent.
 func (t *tacviewPositions) NearestPilot(pos orb.Point, radiusNm float64) string {

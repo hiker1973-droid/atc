@@ -24,6 +24,9 @@ func TestTankerCallsign(t *testing.T) {
 		"Knight 1-3, moving to starboard basket":                                                        "Knight 13",
 		"Knight 1-3 satisfied, moving to starboard reform":                                              "Knight 13",
 		"Texaco 1, Knight 1-1, checking out, resuming navigation, pushing 282":                          "Knight 11",
+		"Texaco 3-1, Raider 302, 15 mile initial, intent to refuel.":                                    "Raider 302",
+		"Texaco three one, Raider 3-0-2, comm check.":                                                   "Raider 302",
+		"Texaco 31 Raider 302 request 5.0":                                                              "Raider 302",
 	} {
 		if got := tankerCallsign(in); got != want {
 			t.Errorf("%q: callsign %q, want %q", in, got, want)
@@ -134,4 +137,18 @@ func TestTankerShortcuts(t *testing.T) {
 	if got := tn.Response("Texaco 1-1, say again", ""); !strings.Contains(got, "say again your callsign") {
 		t.Errorf("no callsign: %q", got)
 	}
+}
+
+// Day 2026-10-19: a ramp comm check got "cleared port observation", and two
+// mid-flow comm checks got nothing.
+func TestTankerRadioCheck(t *testing.T) {
+	tn := testTanker()
+	runTanker(t, tn, []struct{ call, want string }{
+		{"Texaco 1-1, Raider 3-0-2, com check.", "Raider 302, Texaco one one, loud and clear."},
+		{"Texaco 1-1, Raider 302, 15 mile initial, intent to refuel",
+			"Raider 302, Texaco one one, cleared port observation, one three thousand, velocity three three six. How much do you request?"},
+		{"Texaco 1-1, Raider 302, request 5,000 pounds.", "Raider 302, Texaco copies five thousand pounds."},
+		{"Texaco 11, Raider 302, comm check.", "Raider 302, Texaco one one, loud and clear."},
+		{"Raider 302, 1 mile trail for port observation", "Raider 302, Texaco, continue port observation."},
+	})
 }

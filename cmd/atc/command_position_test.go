@@ -154,4 +154,11 @@ func TestCommandTankerHandoff(t *testing.T) {
 	if got := commandPositionResponse("Command, Raider 11, request tanker", "Raider 11", "Command", store, noVar); strings.Contains(got, "Contact") {
 		t.Errorf("another tanker: got %q", got)
 	}
+	// Texaco 3-1, the second net (--tanker2-freq).
+	oldF2, oldT2, oldS2 := flagTanker2Freq, flagTanker2Tacview, flagTanker2Spoken
+	defer func() { flagTanker2Freq, flagTanker2Tacview, flagTanker2Spoken = oldF2, oldT2, oldS2 }()
+	flagTanker2Freq, flagTanker2Tacview, flagTanker2Spoken = 252.3, "Texaco11", "Texaco three one"
+	if got := commandPositionResponse("Command, Raider 11, request tanker", "Raider 11", "Command", store, noVar); !strings.HasSuffix(got, "Contact Texaco three one on two five two point three.") {
+		t.Errorf("second tanker: got %q", got)
+	}
 }
