@@ -45,6 +45,12 @@ wave-off, bolter - from pkg/lso/lso.go and cmd/atc/lso.go. Same day Paddles was 
 (Foothold, start_lso_syria.bat), same 128.300. Every "no SkyEye LSO" line is gone
 (cards 1, 2, 4, 5, the sortie and No answer?). Cards 10 - 23 of v1.25 are now 11 - 24.
 
+v1.28 (user asked 2026-10-19 for an AAR card) follows origin/main 27454b6: new card 17
+TEXACO, the SkyEye tanker net (Texaco 1-1, 252.100 AM, Black Sea Day / Night) - the vSFG-7
+AAQ Aerial Refueling Procedure calls and Texaco's replies, from cmd/atc/tanker.go,
+tanker_speed.go and command_position.go (the full sheet is docs/tanker-flow). Cards 17 - 24
+of v1.27 are now 18 - 25.
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -85,8 +91,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.27"
-DATE = "18 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.28"
+DATE = "19 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -107,12 +113,15 @@ JTAC2_F = "62.000"
 # Paddles, the LSO (cmd/atc/lso.go, start_lso_caucasus.bat, 2026-10-17): Caucasus Day / Night
 # only; no kneeboard preset yet - dial it.
 PADDLES_F = "128.300"
+# Texaco 1-1, the tanker net (cmd/atc/tanker.go, --tanker-freq in start_command_caucasus.bat,
+# 2026-10-19): Black Sea Day / Night; Hornet COMM 2 CH 8 on the Caucasus Training cards.
+TANKER_F, H_TANKER = "252.100", "COMM 2 CH 8"
 
-TOTAL = 24
+TOTAL = 25
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
 FACTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                                     "phraseology", "facts.json"), encoding="utf-8"))
-TOWER_CARDS = "cards 18 - 23"
+TOWER_CARDS = "cards 19 - 24"
 
 
 def card(title_plain, title_gold, sublines, n, eyebrow=EYE_ALL):
@@ -147,6 +156,7 @@ def c01_how():
           ("PADDLES  -  LSO, Black Sea + Syria", "%s AM  ·  card 10" % PADDLES_F),
           ("HITMAN 1-1 / 2-1  -  JTAC, Black Sea", "%s / %s FM  ·  cards 13 - 14" % (JTAC_F[:4], JTAC2_F[:4])),
           ("RANGE AREAS + OVERLORD  -  on Command", "cards 15 - 16"),
+          ("TEXACO 1-1  -  tanker, Black Sea", "%s AM  ·  card 17" % TANKER_F),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
     NK.band(c, "HOW TO BE HEARD", "every call")
     c.bullets([
@@ -538,7 +548,7 @@ def c11_command():
         ("RTB  /  request recovery  /  bingo home plate", "expect handoff at 30 nm"),
         ("state 5.2", "copy state"),
         ("say bullseye  /  request bullseye", "bullseye NNN for NN"),
-        ("request tanker  /  say texaco", "bearing, range, angels"),
+        ("request tanker  /  say texaco", "bearing, range, angels  ·  Black Sea: card 17"),
         ("request tasking  (Black Sea training)", "contact Hitman 1-1 or 2-1  -  card 13"),
         ("proceeding to / request Alpha  (Black Sea)", "range areas  -  cards 15 - 16"),
     ])
@@ -693,9 +703,43 @@ def c15_overlord():
     return save(c, "15_overlord.jpg")
 
 
+# ---------------------------------------------------------- Texaco (cmd/atc/tanker.go)
+def c16_texaco():
+    c = card("TEXA", "CO", ["Texaco 1-1  ·  %s AM  ·  Hornet %s  ·  Black Sea" % (TANKER_F, H_TANKER),
+                            "KC-130, two baskets  ·  TACAN 51Y  ·  angels 13, about 260 KIAS"],
+             17, "vSFG-7  ·  SKYEYE ATC  ·  HORNET  ·  TANKER")
+    NK.band(c, "THE FLOW", "start each call \"Texaco 1, Raider 1-1\"")
+    NK.steps(c, [
+        ("COMMAND", "request tanker  ->  bearing, range, contact Texaco one one"),
+        ("INITIAL", "15 mile initial for port observation, intent to refuel"),
+        ("", "->  cleared port observation ... How much do you request?"),
+        ("GIVE", "request 5.0  (or full)  ->  copies five thousand pounds"),
+        ("TRAIL", "1 mile trail for port observation  ->  continue"),
+        ("OBSERVATION", "established port observation  ->  baskets open"),
+        ("BASKET", "moving to starboard basket  ->  cleared starboard basket"),
+        ("", "established starboard basket  ->  call ready pre-contact"),
+        ("DCS MENU", "Ready pre-contact  ->  cleared contact, plug, take fuel"),
+        ("REFORM", "satisfied, moving to starboard reform  ->  cleared"),
+        ("CHECK OUT", "checking out, pushing 282  ->  cleared to depart"),
+    ], split=170)
+    NK.band(c, "RULES")
+    c.bullets([
+        [("Observation is always port, reform always starboard.", True),
+         ("Lead makes the initial, trail, observation and check-out calls; each jet its own "
+          "basket and reform calls.", False)],
+        [("One jet per basket.", True),
+         ("A held basket gets \"standby, basket occupied\" - it frees when that jet calls reform, "
+          "or after 10 minutes.", False)],
+        [("Fuel won't flow?", True),
+         ("SkyEye is radio only - DCS still needs the AI menu Ready pre-contact.", False)],
+    ])
+    NK.subtle(c, "Give your amount in the initial and Texaco won't ask.  Velocity is read live off Tacview.")
+    return save(c, "16_texaco.jpg")
+
+
 def c12_sortie():
     c = card("A FULL ", "SORTIE", ["Off the boat and back  ·  every SkyEye call, in order",
-                                  "Hornet, Case I, Persian Gulf frequencies."], 17, EYE_CVN)
+                                  "Hornet, Case I, Persian Gulf frequencies."], 18, EYE_CVN)
     NK.band(c, "OUTBOUND")
     NK.steps(c, [
         ("DECKBOSS 128.6", "request taxi  ·  ready cat N  ·  airborne"),
@@ -728,7 +772,7 @@ def c12_sortie():
 def c13_towers():
     c = card("AIRFIELD ", "ATC", ["One AI tower per field  ·  UHF AM  ·  Gulf, Black Sea, Syria",
                                   "Same calls at every field; only name and frequency change."],
-             18, EYE_TWR)
+             19, EYE_TWR)
     NK.band(c, "HOW TO BE HEARD", "every tower call")
     c.bullets([
         [("Open with the field name, then your callsign.", True),
@@ -765,7 +809,7 @@ def c13_towers():
 def c14_tower_radios():
     c = card("TOWER ", "RADIOS", ["Gulf and Black Sea  ·  tower, ATIS, COMM 1 preset",
                                   "Presets read off the squadron Hornet and Viper cards."],
-             19, EYE_TWR)
+             20, EYE_TWR)
     NK.band(c, "PERSIAN GULF", "Hornet  /  Viper")
     c.kv([
         ("AL DHAFRA TOWER  251.100  ·  ATIS 248.200", "CH 8  /  CH 12"),
@@ -802,7 +846,7 @@ def c15_syria_towers():
     atis = {a["icao"]: a["freq"] for a in th["atis"]}
     c = card("SYRIA ", "TOWERS", ["Eastern Med  ·  Foothold  ·  %d fields  ·  tower and ATIS" % len(th["towers"]),
                                   "Read from the start scripts - dial the frequency."],
-             20, EYE_TWR)
+             21, EYE_TWR)
     NK.band(c, "THE TOWERS", "tower  ·  ATIS")
     c.kv([(t["name"].upper(), "%.3f   ATIS %.3f" % (t["freq"], atis[t["icao"]]) if t["icao"] in atis
            else "%.3f" % t["freq"]) for t in th["towers"]])
@@ -821,7 +865,7 @@ def c15_syria_towers():
 
 def c16_tower_departure():
     c = card("DEPART", "URE", ["Parking to Command  ·  every SkyEye field",
-                               "Wait for each reply before the next call."], 21, EYE_TWR)
+                               "Wait for each reply before the next call."], 22, EYE_TWR)
     NK.band(c, "THE DEPARTURE", "in order")
     NK.steps(c, [
         ("REQUEST TAXI", "Minhad Tower, Raider 1, request taxi."),
@@ -862,7 +906,7 @@ def c16_tower_departure():
 
 def c17_tower_arrival():
     c = card("ARRI", "VAL", ["Overhead or straight in  ·  one call per leg",
-                             "Give your distance with inbound, initial or final."], 22, EYE_TWR)
+                             "Give your distance with inbound, initial or final."], 23, EYE_TWR)
     NK.band(c, "THE OVERHEAD", "VMC")
     NK.steps(c, [
         ("INBOUND", "Minhad Tower, Raider 1, 10 mile initial."),
@@ -910,7 +954,7 @@ def c17_tower_arrival():
 
 def c18_tower_calls():
     c = card("TOWER ", "CALLS", ["Every call a tower answers  ·  lead with the field name",
-                                 "Silent calls are heard but get no reply."], 23, EYE_TWR)
+                                 "Silent calls are heard but get no reply."], 24, EYE_TWR)
     NK.band(c, "GROUND AND DEPARTURE", "tower replies")
     c.kv([
         ("request taxi  /  ready to taxi", "taxi, hold short"),
@@ -948,7 +992,7 @@ def c18_tower_calls():
 
 def c19_trouble():
     c = card("NO ", "ANSWER?", ["Work down the list  ·  most misses are the first three",
-                                "Tell the operator what you said, word for word."], 24)
+                                "Tell the operator what you said, word for word."], 25)
     NK.band(c, "CHECK", "in order")
     NK.steps(c, [
         ("1", "Waited 2 - 3 seconds?"),
@@ -956,7 +1000,7 @@ def c19_trouble():
         ("3", "Said your full callsign?"),
         ("4", "Used a trigger word from the calls cards?"),
         ("5", "Half-second pause after keying - call not clipped?"),
-        ("6", "Right frequency? Marshal 306.3; Paddles 128.3; Hitman 61.0 FM."),
+        ("6", "Frequency? Marshal 306.3, Paddles 128.3, Texaco 252.1, Hitman 61 FM."),
         ("7", "SRS shows your TX light? Radio AM (Hitman FM), encryption off?"),
     ], split=120)
     NK.band(c, "KNOWN QUIRKS")
@@ -973,14 +1017,14 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 6208ef8, 18 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 27454b6, 19 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
 CARD_FUNCS = [c01_how, c02_freqs, c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1,
               c06_marshal_case3, c07_marshal_calls_inbound, c08_marshal_calls_stack,
               c09_marshal_calls_case3, c10_paddles, c10_departure, c11_command, c12_jtac_flow,
-              c13_jtac_checks, c14_range_areas, c15_overlord, c12_sortie, c13_towers,
+              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c12_sortie, c13_towers,
               c14_tower_radios, c15_syria_towers, c16_tower_departure, c17_tower_arrival,
               c18_tower_calls, c19_trouble]
 
@@ -997,7 +1041,7 @@ def main():
                 fn != os.path.basename(out):
             os.remove(os.path.join(PACKET, fn))
     n = NS.build_pdf([("SKYEYE ATC", pages)], out, "SKYEYE ATC",
-                     "Command  ·  Deckboss  ·  Marshal  ·  Paddles  ·  JTAC  ·  Towers\nPersian Gulf  ·  Syria  ·  Black Sea",
+                     "Command  ·  Deckboss  ·  Marshal  ·  Paddles  ·  JTAC  ·  Texaco  ·  Towers\nPersian Gulf  ·  Syria  ·  Black Sea",
                      airframe="HORNET  ·  VIPER", squadron="vSFG-7  ·  AI ATC ON SRS",
                      version=VER, date=DATE, cover_logo=LOGO, cover_logo_mode="circle",
                      page_logo=LOGO, page_logo_mode="circle", cache=CACHE, balance=True,

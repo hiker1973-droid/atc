@@ -1,11 +1,23 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 18 OCT 2026.  v1.27.  Product = one full-screen 16:9 PDF, 25 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.27.pdf` — cover + 24 cards: How it works · Frequencies ·
+**Built 19 OCT 2026.  v1.28.  Product = one full-screen 16:9 PDF, 26 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.28.pdf` — cover + 25 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
-**Paddles** · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
-Overlord Actual · A full sortie · Airfield ATC · Tower radios · Syria towers · Departure ·
-Arrival · Tower calls · No answer?
+Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
+Overlord Actual · **Texaco** · A full sortie · Airfield ATC · Tower radios · Syria towers ·
+Departure · Arrival · Tower calls · No answer?
+
+## v1.28 (19 OCT 2026) — Texaco, the SkyEye tanker net, from origin/main `27454b6`
+
+User asked 2026-10-19 for an AAR card.
+- **New card 17 TEXACO:** Texaco 1-1, 252.100 AM (Hornet COMM 2 CH 8), Black Sea Day / Night,
+  KC-130 TACAN 51Y, 13,000 ft about 260 KIAS. The vSFG-7 AAQ Aerial Refueling Procedure flow
+  (initial -> how much -> trail -> port observation -> basket -> DCS Ready pre-contact ->
+  starboard reform -> checking out), one jet per basket, from `cmd/atc/tanker.go`,
+  `tanker_speed.go` and `command_position.go`. Full sheet: `docs/tanker-flow`.
+- Card 1 roles, card 12 Command ("request tanker" -> card 17), No answer? (Texaco 252.1).
+- Cards 17 - 24 of v1.27 are now 18 - 25 (`TOWER_CARDS` = cards 19 - 24). Build stamp 27454b6.
+- Not done: Phraseology Reference (no Texaco section).
 
 ## v1.27 (18 OCT 2026) — red deck / green deck
 
