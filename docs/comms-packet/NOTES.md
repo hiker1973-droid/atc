@@ -1,11 +1,21 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 19 OCT 2026.  v1.28.  Product = one full-screen 16:9 PDF, 26 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.28.pdf` — cover + 25 cards: How it works · Frequencies ·
+**Built 19 OCT 2026.  v1.29.  Product = one full-screen 16:9 PDF, 26 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.29.pdf` — cover + 25 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · **Texaco** · A full sortie · Airfield ATC · Tower radios · Syria towers ·
 Departure · Arrival · Tower calls · No answer?
+
+## v1.29 (19 OCT 2026) — Texaco 3-1, from origin/main `1c8d29d`
+
+User asked 2026-10-19 "add Texaco 3-1 to the comms packet".
+- **Card 17 TEXACO** now covers both SkyEye tankers: new "THE TANKERS" table - Texaco 1-1
+  KC-130 TACAN 51Y, 252.100 AM COMM 2 CH 8, angels 13 ~260 KIAS; Texaco 3-1 KC-135 MPRS
+  TACAN 53Y, 252.300 AM COMM 2 CH 10, angels 24 ~265 KIAS (`--tanker2-freq`, `cmd/atc/tanker.go`).
+  Same flow on both; Command step "contact the nearest Texaco"; note: radio check any time.
+- Card 1 roles row "TEXACO 1-1 / 3-1 252.1 / 252.3 AM"; No answer? step 6 "Texaco 252.1/3".
+- Build stamp 1c8d29d. Not done: docs/tanker-flow sheet still Texaco 1-1 only; Phraseology Reference.
 
 ## v1.28 (19 OCT 2026) — Texaco, the SkyEye tanker net, from origin/main `27454b6`
 

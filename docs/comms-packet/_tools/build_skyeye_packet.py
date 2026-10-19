@@ -51,6 +51,10 @@ AAQ Aerial Refueling Procedure calls and Texaco's replies, from cmd/atc/tanker.g
 tanker_speed.go and command_position.go (the full sheet is docs/tanker-flow). Cards 17 - 24
 of v1.27 are now 18 - 25.
 
+v1.29 (user asked 2026-10-19 "add Texaco 3-1 to the comms packet") follows origin/main 1c8d29d:
+card 17 now has both SkyEye tankers - Texaco 1-1 (KC-130, 252.100) and Texaco 3-1 (KC-135
+MPRS, 252.300, --tanker2-freq) - with the same flow, plus the radio check Texaco now answers.
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -91,7 +95,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.28"
+VER = "v1.29"
 DATE = "19 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -116,6 +120,8 @@ PADDLES_F = "128.300"
 # Texaco 1-1, the tanker net (cmd/atc/tanker.go, --tanker-freq in start_command_caucasus.bat,
 # 2026-10-19): Black Sea Day / Night; Hornet COMM 2 CH 8 on the Caucasus Training cards.
 TANKER_F, H_TANKER = "252.100", "COMM 2 CH 8"
+# Texaco 3-1, the second tanker net (--tanker2-freq, 2026-10-19): KC-135 MPRS, COMM 2 CH 10.
+TANKER2_F, H_TANKER2 = "252.300", "COMM 2 CH 10"
 
 TOTAL = 25
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
@@ -156,7 +162,7 @@ def c01_how():
           ("PADDLES  -  LSO, Black Sea + Syria", "%s AM  ·  card 10" % PADDLES_F),
           ("HITMAN 1-1 / 2-1  -  JTAC, Black Sea", "%s / %s FM  ·  cards 13 - 14" % (JTAC_F[:4], JTAC2_F[:4])),
           ("RANGE AREAS + OVERLORD  -  on Command", "cards 15 - 16"),
-          ("TEXACO 1-1  -  tanker, Black Sea", "%s AM  ·  card 17" % TANKER_F),
+          ("TEXACO 1-1 / 3-1  -  tankers, Black Sea", "%s / %s AM  ·  card 17" % (TANKER_F[:5], TANKER2_F[:5])),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
     NK.band(c, "HOW TO BE HEARD", "every call")
     c.bullets([
@@ -705,12 +711,12 @@ def c15_overlord():
 
 # ---------------------------------------------------------- Texaco (cmd/atc/tanker.go)
 def c16_texaco():
-    c = card("TEXA", "CO", ["Texaco 1-1  ·  %s AM  ·  Hornet %s  ·  Black Sea" % (TANKER_F, H_TANKER),
-                            "KC-130, two baskets  ·  TACAN 51Y  ·  angels 13, about 260 KIAS"],
+    c = card("TEXA", "CO", ["Texaco 1-1 and Texaco 3-1  ·  Black Sea Day / Night",
+                            "the same calls on both  ·  pick the nearer one"],
              17, "vSFG-7  ·  SKYEYE ATC  ·  HORNET  ·  TANKER")
-    NK.band(c, "THE FLOW", "start each call \"Texaco 1, Raider 1-1\"")
+    NK.band(c, "THE FLOW", "both tankers, two baskets each  ·  \"Texaco 1 (or 3), Raider 1-1\"")
     NK.steps(c, [
-        ("COMMAND", "request tanker  ->  bearing, range, contact Texaco one one"),
+        ("COMMAND", "request tanker  ->  bearing, range, contact the nearest Texaco"),
         ("INITIAL", "15 mile initial for port observation, intent to refuel"),
         ("", "->  cleared port observation ... How much do you request?"),
         ("GIVE", "request 5.0  (or full)  ->  copies five thousand pounds"),
@@ -733,7 +739,12 @@ def c16_texaco():
         [("Fuel won't flow?", True),
          ("SkyEye is radio only - DCS still needs the AI menu Ready pre-contact.", False)],
     ])
-    NK.subtle(c, "Give your amount in the initial and Texaco won't ask.  Velocity is read live off Tacview.")
+    NK.band(c, "THE TANKERS", "Hornet presets")
+    c.kv([("TEXACO 1-1  -  KC-130  ·  TACAN 51Y", "%s AM  ·  %s" % (TANKER_F, H_TANKER)),
+          ("     angels 13, about 260 KIAS", ""),
+          ("TEXACO 3-1  -  KC-135 MPRS  ·  TACAN 53Y", "%s AM  ·  %s" % (TANKER2_F, H_TANKER2)),
+          ("     angels 24, about 265 KIAS", "")])
+    NK.subtle(c, "Radio check any time - loud and clear.  Angels and velocity come live off Tacview.")
     return save(c, "16_texaco.jpg")
 
 
@@ -1000,7 +1011,7 @@ def c19_trouble():
         ("3", "Said your full callsign?"),
         ("4", "Used a trigger word from the calls cards?"),
         ("5", "Half-second pause after keying - call not clipped?"),
-        ("6", "Frequency? Marshal 306.3, Paddles 128.3, Texaco 252.1, Hitman 61 FM."),
+        ("6", "Frequency? Marshal 306.3, Paddles 128.3, Texaco 252.1/3, Hitman 61FM."),
         ("7", "SRS shows your TX light? Radio AM (Hitman FM), encryption off?"),
     ], split=120)
     NK.band(c, "KNOWN QUIRKS")
@@ -1017,7 +1028,7 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 27454b6, 19 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 1c8d29d, 19 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
