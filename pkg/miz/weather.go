@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Weather is the subset of .miz weather relevant to ATC: surface wind, QNH,
@@ -20,7 +21,8 @@ import (
 type Weather struct {
 	WindDirTrue float64 // wind FROM, degrees true
 	WindKts     float64
-	CeilFt      float64 // 25000 sentinel when density==0 (no significant cloud)
+	CeilFt      float64 // 25000 sentinel when there is no broken or overcast layer
+	Clouds      string  // the cloud preset's name when the mission uses one, e.g. "Scattered Showers 3"
 	VisNm       float64
 	AltInHg     float64
 	TempC       float64
@@ -43,6 +45,7 @@ var (
 	visRE        = regexp.MustCompile(`(?s)` + key("visibility") + `\{[^{}]*?` + key("distance") + `(\d+)`)
 	cloudsBaseRE = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("base") + `(\d+)`)
 	cloudsDenRE  = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("density") + `(\d+)`)
+	cloudsPreRE  = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("preset") + `"([^"]+)"`)
 	tempRE       = regexp.MustCompile(`(?s)` + key("season") + `\{[^{}]*?` + key("temperature") + `([-\d.]+)`)
 )
 
@@ -130,10 +133,24 @@ func ReadMizWeather(mizPath string) (Weather, error) {
 			w.VisNm = 50
 		}
 	}
-	// Cloud base is only a meaningful ceiling when density > 0. With
-	// density=0 the layer is "preset only" — treat as no significant cloud
-	// and leave the sentinel 25000ft.
-	if m := cloudsDenRE.FindStringSubmatch(s); len(m) == 2 {
+	// A cloud preset (density 0 plus a preset name) keeps its layers in DCS's
+	// clouds.lua, not the .miz: the ceiling is the lowest broken or overcast
+	// layer, moved by the mission's base. Every Training and Foothold mission
+	// uses one, and until 2026-10-19 they all read as "no ceiling", the IFR
+	// squall line at 800 ft included. Old-style clouds: the base is a ceiling
+	// when density > 0.
+	if m := cloudsPreRE.FindStringSubmatch(s); len(m) == 2 {
+		if p, ok := cloudPresets[m[1]]; ok {
+			w.Clouds = strings.TrimSpace(strings.Split(p.Name, " [")[0])
+			base := float64(p.First)
+			if mb := cloudsBaseRE.FindStringSubmatch(s); len(mb) == 2 {
+				base, _ = strconv.ParseFloat(mb[1], 64)
+			}
+			if ceil, ok := p.ceilingM(base); ok {
+				w.CeilFt = ceil * 3.28084
+			}
+		}
+	} else if m := cloudsDenRE.FindStringSubmatch(s); len(m) == 2 {
 		den, _ := strconv.Atoi(m[1])
 		if den > 0 {
 			if mb := cloudsBaseRE.FindStringSubmatch(s); len(mb) == 2 {

@@ -549,14 +549,21 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Info().Msg("traffic alerts enabled - tower warns aircraft converging near the field")
 	}
 	atcCtrl.SetReportFn(func(ev controller.CommsEvent) { recordCommsEvent(callsign, ev) })
-	// Seed weather. Priority: explicit --miz-path > newest .miz in --miz-dir >
-	// --static-* flags. .miz wind is true degrees (controller applies MagVar
+	// Seed weather. Priority: the mission the DCS server has loaded (the hook's
+	// --miz-watch-file) > explicit --miz-path > newest .miz in --miz-dir >
+	// --static-* flags. The loaded mission comes first because SKYEYE_MIZ and
+	// "newest" both go stale on a rotation: on 2026-10-19 every role on all
+	// three rigs booted on another mission's weather (Day "VFR 7 Isolated
+	// Thunderstorms" for VFR 6, Night V1.30, Foothold 15 for 11) until mizwatch
+	// caught up. .miz wind is true degrees (controller applies MagVar
 	// internally). IsNight always comes from --static-night until Tacview's
 	// mission time overrides it on the dashboard side.
 	bootMiz := "" // the .miz the boot weather came from, for the live-weather watcher
 	seedFromMiz := func() bool {
 		var mizPath string
 		switch {
+		case readMissionPointer(flagMizWatchFile) != "":
+			mizPath = readMissionPointer(flagMizWatchFile)
 		case flagMizPath != "":
 			mizPath = flagMizPath
 		case flagMizDir != "":

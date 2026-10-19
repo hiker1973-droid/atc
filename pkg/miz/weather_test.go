@@ -109,3 +109,43 @@ func TestReadMizWeatherBothKeyStyles(t *testing.T) {
 		})
 	}
 }
+
+// Cloud presets (density 0 + a preset name): the ceiling is the lowest broken
+// or overcast layer, moved by the mission's base. Shapes from the Foothold v1.12
+// and Training V1.31 weather sets, which all read "no ceiling" before 2026-10-19.
+func TestReadMizWeatherCloudPresets(t *testing.T) {
+	for _, tc := range []struct {
+		preset, base string
+		ceilFt       float64
+		clouds       string
+	}{
+		{"Preset83", "1981", 1981 * 3.28084, "Scattered Showers 7"},               // BKN at the base: 14 Congestus
+		{"Preset37", "914", (5620 - 2520 + 914) * 3.28084, "Scattered Showers 3"}, // SCT low, BKN 3100 m above
+		{"Preset44", "1524", 25000, "Scattered Cumulus 1"},                        // scattered only: no ceiling
+		{"Preset90", "243", 25000, "VFR Thunderstorms 2"},                         // scattered at 800 ft
+		{"NoSuchPreset", "500", 25000, ""},
+	} {
+		mission := `mission = {
+	weather = {
+		qnh = 760,
+		clouds = {
+			thickness = 200,
+			density = 0,
+			preset = "` + tc.preset + `",
+			base = ` + tc.base + `,
+			iprecptns = 0,
+		},
+	},
+}`
+		w, err := ReadMizWeather(writeMiz(t, mission))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if math.Abs(w.CeilFt-tc.ceilFt) > 1 || w.Clouds != tc.clouds {
+			t.Errorf("%s base %s: ceiling %.0f %q, want %.0f %q", tc.preset, tc.base, w.CeilFt, w.Clouds, tc.ceilFt, tc.clouds)
+		}
+		if math.Abs(w.AltInHg-760*0.0393701) > 0.01 {
+			t.Errorf("%s: QNH lost (%v)", tc.preset, w.AltInHg)
+		}
+	}
+}
