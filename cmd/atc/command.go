@@ -112,8 +112,10 @@ func commandResponse(text, callsign, channelName string) string {
 
 	// Fence in / fence check — entering combat/training area, systems hot
 	// "fencing in" flown on DCS3 2026-10-15 14:18:55 and missed (pending since
-	// 2026-07-02).
-	if containsAny(lower, "fence in", "fence-in", "fencein", "fence check", "fence-check", "fencing in") {
+	// 2026-07-02). Whisper hears "fence in" as "fence again" (Foothold
+	// 2026-10-18 11:36:40 "Raider 303, fence again, air to ground", missed twice).
+	if containsAny(lower, "fence in", "fence-in", "fencein", "fence check", "fence-check", "fencing in",
+		"fence again", "fenced in") {
 		if fuel := extractFuelStateMarshal(lower); fuel > 0 {
 			return composer.NewATCComposer(channelName).CommandFenceIn(callsign, fuel)
 		}
@@ -158,7 +160,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 		}
 	}
 	voiceNetLoop(ctx, srsAddr, freqMHz, channelName, apiKey, eamPassword, commandVoice(voice), externalAudioPath,
-		"Command, Raider, Venom, Viper, request tasking, copy, IP Falcon, Granite, Hammer, Indigo, Javelin, "+rangeAreaWhisperWords,
+		"Command, Raider, Venom, Viper, request tasking, fence in, fence out, air to ground, copy, IP Falcon, Granite, Hammer, Indigo, Javelin, "+rangeAreaWhisperWords,
 		inFlight,
 		func(text string) (string, string) {
 			// Another role's address is skipped too: on 2026-10-15 a pilot on the

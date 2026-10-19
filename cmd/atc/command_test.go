@@ -42,6 +42,7 @@ func TestCommandResponseFuelState(t *testing.T) {
 		{"fence out no state unchanged", "Command, Raider 11, fence out", []string{channel, "fence out"}, nil},
 		{"fence in with state", "Command, Raider 11, fence in, state 7.5", []string{channel, "state 7.5", "fence in"}, nil},
 		{"fence in no state unchanged", "Command, Raider 11, fence in", []string{channel}, []string{"fence in", "fence check"}},
+		{"fence again is fence in", "Command, Raider 303, Fence again, air to ground.", []string{channel}, []string{"fence in", "fence check"}},
 		{"state report", "Command, Raider 11, state 5.2", []string{channel, "state 5.2"}, nil},
 		{"low state report", "Command, Raider 11, state 1.5", []string{"state 1.5"}, []string{"bingo", "low state"}},
 		{"on station keeps its reply", "Command, Raider 11, on station, state 8.0", []string{channel, "good hunting"}, nil},

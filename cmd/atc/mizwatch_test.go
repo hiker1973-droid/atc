@@ -96,3 +96,21 @@ func TestMizWatcherStep(t *testing.T) {
 		t.Fatalf("back to A: applied %v, want [2 1]", applied)
 	}
 }
+
+func TestFieldCeilFt(t *testing.T) {
+	for _, tc := range []struct {
+		msl  float64
+		elev int
+		want float64
+	}{
+		{2900, 1624, 1276}, // Tbilisi: a VFR-looking base is a low ceiling
+		{797, 0, 797},      // carrier / Command: unchanged
+		{25000, 1624, 25000},
+		{1500, 1624, 100}, // cloud on the field
+		{18438, 59, 18379},
+	} {
+		if got := fieldCeilFt(tc.msl, tc.elev); got != tc.want {
+			t.Errorf("fieldCeilFt(%v, %d) = %v, want %v", tc.msl, tc.elev, got, tc.want)
+		}
+	}
+}

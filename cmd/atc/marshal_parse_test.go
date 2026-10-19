@@ -251,6 +251,8 @@ func TestMarshalCallsFlown20261017(t *testing.T) {
 		{"Union Marshal, Raider 312 is 221 for 59, Angels 28, state 6.4.", marshalMarkingMom},
 		// Readbacks answered "BRC 096" again.
 		{"Union Marshal, Raider 312, understands BRC 096, altimeter 3000, Marshal, angels 2, I'll call you at 10.", marshalReadback},
+		// Day 2026-10-18 10:09:23, an intent miss on the build before e759967.
+		{"Marshal, Raider 312 understands. Altimeter 2984, Marshal at angels 2. I'll call you at 10.", marshalReadback},
 		{"Union Marshal Raider 302 BRC 096 marshalling at angels 3, will report CU at 10.", marshalReadback},
 		// Answered "state, copy": never holding, so no Charlie.
 		{"Union Marshal Raider 302 entering stack position 3, fuel state 4.9.", marshalEstablished},

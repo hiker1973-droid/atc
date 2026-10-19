@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func resetOwnTX() {
 	ownTXMu.Lock()
@@ -49,6 +52,24 @@ func TestOwnEchoCatchesTheBrief(t *testing.T) {
 	noteOwnTX(61, "Raider 302, Hitman one one, target 3, Fuel Depot, IP Cobra. Cobra bears two-niner-four for 26. Read back.")
 	if !isOwnEcho(61, "Rider 302, Hitman 1-1, Target 3, Fuel Depot, IP Cobra. Cobra bears 294 for 26. Read back.") {
 		t.Error("the 14:15:22 brief echo was not caught")
+	}
+}
+
+// Foothold 2026-10-18 11:47 and 12:50: Command's spoken frequency is eight
+// words, Whisper's "360.100" two, so the echo only just passed the length test.
+func TestOwnEchoSpokenFrequency(t *testing.T) {
+	resetOwnTX()
+	noteOwnTX(282, "Raider 303, vSFG-7-Command, contact Incirlik tower on three six zero point one zero zero, switching now approved, good landing.")
+	for _, heard := range []string{
+		"Raider 303, VSFG-7 Command, contact Intelic Tower on 360.100. Switching now approved. Good landing.",
+		"Raider 303, BSFG7 command, contact Intelic Tower on 360.100, switching now approved. Good landing.",
+	} {
+		if !isOwnEcho(282, heard) {
+			t.Errorf("handoff echo not caught: %q", heard)
+		}
+	}
+	if got := strings.Join(echoWords("two-niner-four for 26, 360.100, point five, vSFG-7-Command, Hitman one one"), " "); got != "294 for 26 360100 point 5 vsfg 7 command hitman 11" {
+		t.Errorf("echoWords = %q", got)
 	}
 }
 

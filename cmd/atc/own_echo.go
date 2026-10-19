@@ -42,10 +42,64 @@ var (
 	ownTXLog []ownTX
 )
 
+// echoDigits are the spoken digits our TTS lines use.
+var echoDigits = map[string]string{
+	"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+	"five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "niner": "9",
+}
+
+// echoWords splits a line into lowercased words, with every number written as
+// one word however it was said: we speak "three six zero point one zero zero"
+// and Whisper writes "360.100". Without this a long frequency counted eight
+// words in our line and two in the echo (Foothold 2026-10-18 11:47 and 12:50,
+// Command's "contact Incirlik Tower on 360.100" handoff logged as a pilot's
+// intent miss).
 func echoWords(s string) []string {
-	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
+	type tok struct {
+		w       string
+		sep     string // the characters between this word and the last
+		spelled bool
+	}
+	var toks []tok
+	sep, cur := "", ""
+	flush := func() {
+		if cur != "" {
+			toks = append(toks, tok{w: cur, sep: sep})
+			sep, cur = "", ""
+		}
+	}
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			cur += string(r)
+			continue
+		}
+		flush()
+		sep += string(r)
+	}
+	flush()
+	out := make([]string, 0, len(toks))
+	num, spelled := false, false // the last word in out is a number; it was spoken
+	for i, t := range toks {
+		w := t.w
+		if d, ok := echoDigits[w]; ok {
+			w, t.spelled = d, true
+		}
+		joins := strings.TrimSpace(t.sep) == "-" || strings.TrimSpace(t.sep) == "." || (spelled && t.spelled)
+		switch {
+		case isAllDigits(w) && num && joins:
+			out[len(out)-1] += w
+			spelled = t.spelled
+		case isAllDigits(w):
+			out = append(out, w)
+			num, spelled = true, t.spelled
+		case w == "point" && num && spelled && i+1 < len(toks) && echoDigits[toks[i+1].w] != "":
+			// "point" inside a spoken number: dropped, as Whisper's "." is.
+		default:
+			out = append(out, w)
+			num, spelled = false, false
+		}
+	}
+	return out
 }
 
 // noteOwnTX records a line about to be transmitted on freq.

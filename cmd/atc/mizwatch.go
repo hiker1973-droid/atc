@@ -80,6 +80,20 @@ func (w *mizWatcher) step() bool {
 	return true
 }
 
+// fieldCeilFt turns a .miz ceiling (feet MSL, as DCS stores the cloud base)
+// into the ceiling a tower reports: feet above its field. Tbilisi is about
+// 1,600 ft up, so a 2,900 ft MSL base is a 1,300 ft ceiling there. The
+// 25000 "no ceiling" sentinel stays as it is; cloud on the field reads 100 ft.
+func fieldCeilFt(ceilMSL float64, elevFt int) float64 {
+	if elevFt <= 0 || ceilMSL >= 25000 {
+		return ceilMSL
+	}
+	if agl := ceilMSL - float64(elevFt); agl > 100 {
+		return agl
+	}
+	return 100
+}
+
 // runMizWatch polls until ctx ends. bootMiz is the mission the boot weather came
 // from, so a pointer that already names it does not trigger a redundant reload.
 func runMizWatch(ctx context.Context, w *mizWatcher, bootMiz string) {

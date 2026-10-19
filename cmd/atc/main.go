@@ -559,6 +559,13 @@ func run(cmd *cobra.Command, args []string) error {
 	// internally). IsNight always comes from --static-night until Tacview's
 	// mission time overrides it on the dashboard side.
 	bootMiz := "" // the .miz the boot weather came from, for the live-weather watcher
+	// A tower reports its ceiling above the field; the .miz gives it above sea
+	// level. ATIS reads each tower's ceiling, so it follows. Carrier, Command
+	// and ATIS-only roles keep MSL (the carrier is at sea level).
+	ceilElevFt := 0
+	if mode == "tower" {
+		ceilElevFt = af.ElevationFt
+	}
 	seedFromMiz := func() bool {
 		var mizPath string
 		switch {
@@ -581,12 +588,13 @@ func run(cmd *cobra.Command, args []string) error {
 			log.Warn().Err(err).Str("miz", mizPath).Msg(".miz weather read failed — using --static-* flags")
 			return false
 		}
-		atcCtrl.SetFullWeather(w.WindDirTrue, w.WindKts, w.CeilFt, w.VisNm, w.AltInHg, flagStaticNight)
+		atcCtrl.SetFullWeather(w.WindDirTrue, w.WindKts, fieldCeilFt(w.CeilFt, ceilElevFt), w.VisNm, w.AltInHg, flagStaticNight)
 		log.Info().
 			Str("miz", filepath.Base(mizPath)).
 			Float64("windDirTrue", w.WindDirTrue).
 			Float64("windKts", w.WindKts).
 			Float64("ceilFt", w.CeilFt).
+			Float64("fieldCeilFt", fieldCeilFt(w.CeilFt, ceilElevFt)).
 			Float64("visNm", w.VisNm).
 			Float64("altInHg", w.AltInHg).
 			Float64("tempC", w.TempC).
@@ -602,7 +610,7 @@ func run(cmd *cobra.Command, args []string) error {
 		pointerFile: flagMizWatchFile,
 		read:        miz.ReadMizWeather,
 		apply: func(w miz.Weather) {
-			atcCtrl.SetFullWeather(w.WindDirTrue, w.WindKts, w.CeilFt, w.VisNm, w.AltInHg, flagStaticNight)
+			atcCtrl.SetFullWeather(w.WindDirTrue, w.WindKts, fieldCeilFt(w.CeilFt, ceilElevFt), w.VisNm, w.AltInHg, flagStaticNight)
 		},
 	}, bootMiz)
 	marshStack := state.NewMarshalStack()
