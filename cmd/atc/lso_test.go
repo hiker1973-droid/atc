@@ -23,6 +23,9 @@ func TestLSOBallCalls(t *testing.T) {
 		"V0-2 Hornetball 6.2.":   lso.CallRogerBall,
 		"312, Hornet bolt, 4.4.": lso.CallRogerBall, // Whisper's "bolt"
 		"302, Clara, 5.0.":       lso.CallClara,
+		// No "ball" (Day 2026-10-18): three-quarter mile and a state.
+		"Raider 312, three-quarter mile, 5.4.": lso.CallRogerBall,
+		"312, 3/4 mile, full, state 5.1.":      lso.CallRogerBall,
 	} {
 		said = nil
 		_, resp := f.heard(in)
@@ -30,8 +33,21 @@ func TestLSOBallCalls(t *testing.T) {
 			t.Errorf("heard(%q) = %q, said %v; want %q", in, resp, said, want)
 		}
 	}
-	if _, resp := f.heard("Paddles, Raider 302, radio check."); resp != "Raider 302, Paddles, loud and clear." {
-		t.Errorf("radio check reply = %q", resp)
+	for _, in := range []string{"Paddles, Raider 302, radio check.", "Paddles, Raider 302 comp check."} {
+		if _, resp := f.heard(in); resp != "Raider 302, Paddles, loud and clear." {
+			t.Errorf("heard(%q) = %q", in, resp)
+		}
+	}
+	// "302 in the break" (Day 2026-10-18): copy, call abeam.
+	for in, want := range map[string]string{
+		"302 in the break.":                  "302, Paddles, roger, call abeam.",
+		"3-0-2 in the break.":                "302, Paddles, roger, call abeam.",
+		"Paddles, Raider 302, in the break.": "Raider 302, Paddles, roger, call abeam.",
+	} {
+		said = nil
+		if _, resp := f.heard(in); resp != want || len(said) != 0 {
+			t.Errorf("heard(%q) = %q (said %v), want %q", in, resp, said, want)
+		}
 	}
 	// "302 abeam" (operator 2026-10-18): Paddles contact, set up the ball call.
 	for in, want := range map[string]string{
@@ -45,7 +61,8 @@ func TestLSOBallCalls(t *testing.T) {
 			t.Errorf("heard(%q) = %q (said %v), want %q", in, resp, said, want)
 		}
 	}
-	for _, in := range []string{"Abeam."} {
+	// No modex: chatter, not a call to answer.
+	for _, in := range []string{"Abeam.", "In the break.", "Three-quarter mile, 5.4."} {
 		said = nil
 		if _, resp := f.heard(in); resp != "" || len(said) != 0 {
 			t.Errorf("heard(%q) answered %q / %v", in, resp, said)

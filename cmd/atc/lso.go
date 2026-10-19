@@ -181,7 +181,7 @@ func runLSO(ctx context.Context, apiKey string) {
 	<-ctx.Done()
 }
 
-const lsoWhisperPrompt = "Paddles, Raider, Venom, abeam, Hornet ball, Tomcat ball, Clara, ball, red deck, green deck, radio check, state"
+const lsoWhisperPrompt = "Paddles, Raider, Venom, in the break, abeam, three-quarter mile, Hornet ball, Tomcat ball, Clara, ball, red deck, green deck, radio check, state"
 
 // lsoBallRe: "302, Hornet ball, 5.5" (Whisper also writes "Hornetball" and,
 // on 306.3 on 2026-10-16/17, "bolt" for "ball").
@@ -189,9 +189,16 @@ var (
 	lsoBallRe   = regexp.MustCompile(`(?i)\b(?:hornet|tomcat|viper|rhino|super hornet|goshawk)\s*(?:ball|bolt|bowl)\b|\bball\b`)
 	lsoClaraRe  = regexp.MustCompile(`(?i)\bclara\b|\bclarence\b`)
 	lsoModexRe  = regexp.MustCompile(`\b(\d)[\s-]?(\d)[\s-]?(\d)\b`)
-	lsoRadioChk = regexp.MustCompile(`(?i)radio check|comm check|com check|comms check|how copy`)
+	lsoRadioChk = regexp.MustCompile(`(?i)radio check|comm check|com check|comms check|comp check|comcheck|how copy`)
 	// lsoAbeamRe: "302 abeam" (Whisper: "a beam", or just "beam").
 	lsoAbeamRe = regexp.MustCompile(`(?i)\ba[\s-]?beam\b|\bbeam\b`)
+	// lsoBreakRe: "302 in the break" (Day 2026-10-18, three times, unanswered).
+	lsoBreakRe = regexp.MustCompile(`(?i)\b(?:in the|at the|on the|in) break\b|\bbreaking\b`)
+	// lsoThreeQuarterRe + lsoStateRe: a ball call without "ball" - "Raider
+	// 312, three-quarter mile, 5.4" and "312, 3/4 mile, full, state 5.1" (Day
+	// 2026-10-18, both unanswered): the three-quarter mile point and a state.
+	lsoThreeQuarterRe = regexp.MustCompile(`(?i)\b(?:three[\s-]?quarters?|3/4|3 quarters?)[\s-]?(?:of a )?miles?\b`)
+	lsoStateRe        = regexp.MustCompile(`(?i)\b\d{1,2}\.\d\b|\bstate\b`)
 	// lsoCallsignRe is a full callsign ("Raider 302"), not a fragment of the call.
 	lsoCallsignRe = regexp.MustCompile(`^[A-Za-z]+ \d{1,3}$`)
 	// lsoRedDeckRe / lsoGreenDeckRe: the jet that just landed calls "red deck",
@@ -250,7 +257,8 @@ func (f *lsoFeed) heard(text string) (string, string) {
 			cs = last
 		}
 		return cs, composer.PaddlesGreenDeck(cs, flagLSODeckbossFreq)
-	case lsoClaraRe.MatchString(text) || lsoBallRe.MatchString(text):
+	case lsoClaraRe.MatchString(text) || lsoBallRe.MatchString(text) ||
+		lsoThreeQuarterRe.MatchString(text) && lsoStateRe.MatchString(text) && modex != "":
 		clara := lsoClaraRe.MatchString(text)
 		f.lock()
 		c := f.tr.BallCall(modex, clara, time.Now())
@@ -270,6 +278,17 @@ func (f *lsoFeed) heard(text string) (string, string) {
 			return "", ""
 		}
 		return cs, "Paddles contact, " + cs + ". In the groove at three-quarter mile, call the ball."
+	case lsoBreakRe.MatchString(text):
+		// "302 in the break": Paddles copies and asks for the abeam call,
+		// which sets up the ball call.
+		cs := extractCallsignSkippingAddress(text, "paddles", "patels", "paddle")
+		if !lsoCallsignRe.MatchString(cs) {
+			cs = modex
+		}
+		if cs == "" {
+			return "", ""
+		}
+		return cs, cs + ", Paddles, roger, call abeam."
 	case lsoRadioChk.MatchString(text):
 		cs := extractCallsignSkippingAddress(text, "paddles", "patels", "paddle")
 		if cs == "" {
