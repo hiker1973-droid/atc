@@ -274,6 +274,7 @@ type Pass struct {
 	// ramp (metres, - = low); hasRamp once it has.
 	rampLow float64
 	hasRamp bool
+	rampAt  time.Time
 }
 
 type passSample struct {
@@ -304,6 +305,9 @@ type Tracker struct {
 	lastTrapAt time.Time
 	// Done receives each finished pass's summary line.
 	Done func(summary string)
+	// hist is every jet's last few minutes relative to the ship, for the
+	// Case I pattern (pattern.go).
+	hist map[string][]patSample
 }
 
 // NewTracker returns a Tracker with p.
@@ -393,6 +397,8 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 		}
 	}
 
+	t.record(callsign, s, smp, trackDeg, haveTrack)
+
 	pass := t.passes[callsign]
 	if pass == nil {
 		axis := math.Mod(s.HeadingDeg+t.P.AngledDeckDeg+360, 360)
@@ -424,6 +430,11 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 // Expire ends passes that stopped getting samples (jet left Tacview, crashed,
 // or the feed dropped).
 func (t *Tracker) Expire(now time.Time) {
+	for cs, h := range t.hist {
+		if len(h) == 0 || now.Sub(h[len(h)-1].at) > patternKeep {
+			delete(t.hist, cs) // gone without a pass
+		}
+	}
 	for _, p := range t.passes {
 		if len(p.samples) > 0 && now.Sub(p.samples[len(p.samples)-1].at) > lostAfter {
 			if p.outcome == "" {
@@ -509,6 +520,7 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		if pr.astern > stern && g.astern <= stern {
 			h := pr.height + (g.height-pr.height)*(pr.astern-stern)/(pr.astern-g.astern)
 			p.rampLow, p.hasRamp = h-math.Tan(t.P.GlideslopeDeg*math.Pi/180)*stern, true
+			p.rampAt = s.at
 		}
 	}
 	if p.touchdown == nil && g.height < deckLevelM+0.3 && g.astern < 60 {
@@ -839,6 +851,17 @@ func (t *Tracker) finish(p *Pass) {
 			}
 		}
 	}
+	end := p.rampAt
+	if end.IsZero() && n > 0 {
+		end = p.samples[n-1].at
+	}
+	if pt := t.pattern(p.Callsign, end); pt.String() != "" {
+		fmt.Fprintf(&b, "; pattern: %s", pt)
+		if f := pt.Faults(); len(f) > 0 {
+			fmt.Fprintf(&b, " [%s]", strings.Join(f, "; "))
+		}
+	}
+	delete(t.hist, p.Callsign)
 	if len(p.calls) > 0 {
 		fmt.Fprintf(&b, "; said: %s", strings.Join(p.calls, ", "))
 	}

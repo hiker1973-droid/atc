@@ -450,8 +450,9 @@ func (t *lsoTacview) handleLine(line string) {
 	if !ok {
 		return
 	}
-	// Only bother inside ~3 nm of the boat.
-	if math.Abs(lat-s.Lat) > 0.06 || math.Abs(lon-s.Lon) > 0.08 {
+	// Only bother inside ~5 nm of the boat: the Case I pattern's initial is 3
+	// nm astern of it (pkg/lso pattern.go).
+	if math.Abs(lat-s.Lat) > 0.09 || math.Abs(lon-s.Lon) > 0.12 {
 		return
 	}
 	smp := lso.Sample{At: now, Lat: lat, Lon: lon, AltM: o.altM, PitchDeg: o.pitch, HasPitch: o.hasPitch}

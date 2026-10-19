@@ -6,6 +6,8 @@ skipped) from one or more rigs and builds a PDF for a day: every pass with Paddl
 grade and wire, DCS's own grade beside it, the groove (glideslope and lineup at
 X / IM / IC / AR) as a small plot, a pilot table, what Paddles heard and said, and
 the month's greenie board (every pass so far this month, from --board-dir).
+Each pass's Case I pattern (pkg/lso pattern.go: initial, break, abeam, the
+90, the 45, groove time) gets its own table against the kneeboard numbers.
 With --field-log, the Senaki tower's field landings too (pkg/fieldgrade,
 "Approach graded"): same notation, graded on the kneeboard's numbers.
 
@@ -107,12 +109,28 @@ PASS_RE = re.compile(r"^(?P<cs>.+?) \((?P<model>[^)]*)\): (?P<outcome>[a-z ]+?)(
 SEG_RE = re.compile(r"\b(X|IM|IC|AR) GS ([+-]?\d+\.\d)° LU ([+-]?\d+\.\d)°(?: AoA (\d+\.\d))?")
 
 
+PAT_RE = {
+    "initial": r"initial (\d+) ft", "break": r"break (\d+) ft", "abeam": r"abeam (\d+\.\d) nm (\d+) ft",
+    "90": r"\b90 (\d+) ft", "45": r"\b45 (\d+) ft", "groove": r"groove (\d+\.\d) s",
+}
+
+
+def parse_pattern(s):
+    out = {}
+    for k, rx in PAT_RE.items():
+        m = re.search(rx, s)
+        if m:
+            out[k] = tuple(float(x) for x in m.groups())
+    return out
+
+
 def parse_pass(s):
     m = PASS_RE.match(s)
     if not m:
         return None
     p = {"callsign": m["cs"], "model": m["model"], "outcome": m["outcome"].strip(), "grade": "",
-         "comments": "", "wire": None, "touch": None, "segs": {}, "said": []}
+         "comments": "", "wire": None, "touch": None, "segs": {}, "said": [], "pattern": {},
+         "pattern_faults": []}
     g = re.search(r", grade (.+?)(?:, hook touched|, ramp |; \d+ samples|$)", s)
     if g:
         gr = g.group(1)
@@ -133,6 +151,10 @@ def parse_pass(s):
         p["touch"] = (int(t.group(1)), int(t.group(2)))
     for seg, gs, lu, aoa in SEG_RE.findall(s):
         p["segs"][seg] = (float(gs), float(lu), float(aoa) if aoa else None)
+    pt = re.search(r"; pattern: ([^;\[]*)(?:\[([^\]]*)\])?", s)
+    if pt:
+        p["pattern"] = parse_pattern(pt.group(1))
+        p["pattern_faults"] = [f.strip() for f in (pt.group(2) or "").split(";") if f.strip()]
     said = s.split("; said: ", 1)
     if len(said) == 2:
         p["said"] = [c.strip() for c in said[1].split(", ") if c.strip()]
@@ -382,6 +404,52 @@ def mins(sec):
     return "%.1f h" % (sec / 3600)
 
 
+# Case I kneeboard numbers (p24): (low, high) and the slack before it is red,
+# matching pkg/lso pattern.go.
+PAT_LIMITS = {"initial": (800, 800, 100), "break": (800, 800, 100), "abeam_ft": (600, 600, 100),
+              "abeam_nm": (1.0, 1.5, 0), "90": (450, 500, 50), "45": (370, 400, 50), "groove": (15, 18, 0)}
+
+
+def pat_cell(v, key, fmt):
+    lo, hi, slack = PAT_LIMITS[key]
+    txt = fmt % v
+    if v < lo - slack or v > hi + slack:
+        return "<font color='#b3261e'><b>%s</b></font>" % txt
+    return txt
+
+
+def pattern_section(passes):
+    """The Case I pattern of every pass that flew one."""
+    rows = []
+    for p in passes:
+        pt = p.get("pattern") or {}
+        if "abeam" not in pt and "groove" not in pt:
+            continue
+
+        def get(k, key=None, fmt="%d", i=0):
+            return pat_cell(pt[k][i], key or k, fmt) if k in pt else "-"
+        rows.append(["%s<br/><font size=6.4 color='#555555'>%s</font>" % (p["t"].strftime("%H:%M"), p["rig"]),
+                     "<b>%s</b>" % p["callsign"], get("initial"), get("break"),
+                     "%s / %s" % (get("abeam", "abeam_nm", "%.1f nm"), get("abeam", "abeam_ft", "%d ft", 1))
+                     if "abeam" in pt else "-",
+                     get("90"), get("45"),
+                     # No downwind (straight-in): the groove is not a Case I one.
+                     get("groove", fmt="%.1f s") if "abeam" in pt else "%.1f s" % pt["groove"][0],
+                     "<font size=6.4>%s</font>" % ("; ".join(p.get("pattern_faults") or []) or "-")])
+    if not rows:
+        return []
+    return [KeepTogether([Paragraph("Case I pattern", h), table(
+        ["Time", "Pilot", "Initial<br/>800 ft", "Break<br/>800 ft", "Abeam<br/>1-1.5 nm / 600 ft",
+         "The 90<br/>450-500", "The 45<br/>370-400", "Groove<br/>15-18 s", "Off the kneeboard"],
+        rows, [0.5, 0.85, 0.55, 0.55, 1.15, 0.6, 0.6, 0.6, 2.1])]),
+        Paragraph("From the vSFG-7 Case I Recovery kneeboard: initial 3 nm astern at 800 ft, a level break, "
+                  "downwind 1-1.5 nm abeam at 600 ft, the 90 at 450-500 ft, the 45 at 370-400 ft, 15-18 s in "
+                  "the groove. Heights are above the water; red is off by more than 100 ft (initial, break, "
+                  "abeam) or 50 ft (the 90 and 45). The 90 and 45 are turn still to go to the landing (angled "
+                  "deck) heading. The groove runs from wings level within 10&deg; of it to the ramp. No break "
+                  "is shown after a bolter or wave-off (no initial).", note)]
+
+
 def field_section(fields):
     """Senaki field landings (pkg/fieldgrade): report only, being tried out."""
     out = [Paragraph("Field landings - Senaki (test)", h)]
@@ -472,6 +540,8 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None)
     else:
         S.append(Paragraph("Passes", h))
         S.append(Paragraph("No passes flown.", note))
+
+    S += pattern_section(passes)
 
     # Pilots
     by = defaultdict(list)
