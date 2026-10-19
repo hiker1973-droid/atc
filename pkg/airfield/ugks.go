@@ -44,8 +44,13 @@ var UGKS = &Airfield{
 	},
 	RunwayPairs: []RunwayPair{
 		{
-			Primary:    Runway{Designator: "09", MagneticHeading: 88.0, ThresholdLatLon: orb.Point{42.0342, 42.2419}},
-			Reciprocal: Runway{Designator: "27", MagneticHeading: 268.0, ThresholdLatLon: orb.Point{42.0610, 42.2403}},
+			// Thresholds on the centreline measured from 1648 Tacview ground-roll
+			// fixes (2026-10-16/18 recordings; median 2.4 m off the line): it
+			// runs 100.7 true in lat/lon. The old points were laid off the
+			// 095 DCS yaw - DCS's map grid is ~6 deg off true north here - and
+			// sat 60-80 m south of the runway at the far end.
+			Primary:    Runway{Designator: "09", MagneticHeading: 88.0, ThresholdLatLon: orb.Point{42.0342, 42.24277}},
+			Reciprocal: Runway{Designator: "27", MagneticHeading: 268.0, ThresholdLatLon: orb.Point{42.0610, 42.23901}},
 		},
 	},
 }

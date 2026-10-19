@@ -38,7 +38,7 @@ start "Kobuleti Tower" cmd /c "%~dp0atc.exe --airfield UG5X --srs-addr %SRS% --e
 :: Senaki Tower — UGKS, 261.0, dashboard 6013
 :: Lisa and OP6zHc4gr2eULw36mXX5 (round 13 senaki_5) on 2-hour shifts; Ground
 :: and Traffic follow the shift (operator 2026-10-16). Was X1Wt (senaki_6) alone.
-start "Senaki Tower" cmd /c "%~dp0atc.exe --airfield UGKS --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --elevenlabs-tower-alt-voice OP6zHc4gr2eULw36mXX5 --dashboard-port 6013 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+start "Senaki Tower" cmd /c "%~dp0atc.exe --airfield UGKS --approach-grade --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice alloy --elevenlabs-tower-alt-voice OP6zHc4gr2eULw36mXX5 --dashboard-port 6013 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
 :: Kutaisi Tower — UGKO, 263.0, dashboard 6014

@@ -6,6 +6,8 @@ skipped) from one or more rigs and builds a PDF for a day: every pass with Paddl
 grade and wire, DCS's own grade beside it, the groove (glideslope and lineup at
 X / IM / IC / AR) as a small plot, a pilot table, what Paddles heard and said, and
 the month's greenie board (every pass so far this month, from --board-dir).
+With --field-log, the Senaki tower's field landings too (pkg/fieldgrade,
+"Approach graded"): same notation, graded on the kneeboard's numbers.
 
 The pass line is pkg/lso Tracker.finish(); the rest are the Msg()s in
 cmd/atc/lso.go and cmd/atc/lso_grpc.go.
@@ -137,6 +139,30 @@ def parse_pass(s):
     return p
 
 
+FIELD_RE = re.compile(r"^(?P<cs>.+?) \((?P<model>[^)]*)\): rwy (?P<rwy>\S+) (?P<outcome>[a-z -]+?), grade (?P<grade>.+?)"
+                      r"(?:, touched|, rolled out|, final turn|, lowest|; \d+ samples)")
+FSEG_RE = re.compile(r"\b(X|IM|IC|AR) GP ([+-]?\d+\.\d)°(?: LU ([+-]?\d+\.\d)°)? sink (-?\d+)(?: AoA (\d+\.\d))?")
+
+
+def parse_field(s):
+    """One "Approach graded" summary (pkg/fieldgrade Result.Summary)."""
+    m = FIELD_RE.match(s)
+    if not m:
+        return None
+    g, _, com = m["grade"].partition(": ")
+    f = {"callsign": m["cs"], "model": m["model"], "runway": m["rwy"], "outcome": m["outcome"],
+         "grade": g, "comments": com, "td": None, "rollout": None, "segs": {}}
+    t = re.search(r"touched (-?\d+) m past the threshold, ([+-]\d+) m right, (-?\d+) fpm", s)
+    if t:
+        f["td"] = (int(t.group(1)), int(t.group(2)), int(t.group(3)))
+    ro = re.search(r"rolled out (\d+\.\d) nm (-?\d+) ft", s)
+    if ro:
+        f["rollout"] = (float(ro.group(1)), int(ro.group(2)))
+    for seg, gp, lu, sink, aoa in FSEG_RE.findall(s):
+        f["segs"][seg] = (float(gp), float(lu) if lu else None, float(aoa) if aoa else None, int(sink))
+    return f
+
+
 def collect(logs, start, end):
     """logs: [(rig, path)]. Returns the day's events, de-duplicated."""
     seen = set()
@@ -175,13 +201,18 @@ def collect(logs, start, end):
                 ev["abeam"].append(o)
             elif msg == "Command intent miss" and o.get("channel") == "Paddles":
                 ev["miss"].append(o)
+            elif msg == "Approach graded":
+                f = parse_field(o.get("summary", ""))
+                if f:
+                    f.update(rig=rig, t=t)
+                    ev["field"].append(f)
             elif msg.startswith("Paddles: DCS-gRPC events"):
                 ev["grpc"].append(o)
             elif msg in ("Paddles: Tacview disconnected, reconnecting in 5s",
                          "Paddles: call dropped, too late", "Paddles: TTS failed", "Paddles: TX queue full"):
                 ev["health"].append(o)
     for k in ev:
-        ev[k].sort(key=lambda o: o["t"] if k == "pass" else o["_t"])
+        ev[k].sort(key=lambda o: o["t"] if k in ("pass", "field") else o["_t"])
     return ev
 
 
@@ -208,7 +239,7 @@ def groove_plot(segs, w=1.55 * inch, hgt=0.52 * inch, lim=3.0):
     for idx, color in ((0, NAVY), (1, ORANGE)):
         pts = []
         for i, s in enumerate(SEGMENTS):
-            if s in segs:
+            if s in segs and segs[s][idx] is not None:
                 pts += [xs[i], y(segs[s][idx])]
         if len(pts) >= 4:
             d.add(PolyLine(pts, strokeColor=color, strokeWidth=1.1))
@@ -351,6 +382,37 @@ def mins(sec):
     return "%.1f h" % (sec / 3600)
 
 
+def field_section(fields):
+    """Senaki field landings (pkg/fieldgrade): report only, being tried out."""
+    out = [Paragraph("Field landings - Senaki (test)", h)]
+    if not fields:
+        return out + [Paragraph("No graded landings at Senaki.", note)]
+    rows = []
+    for f in fields:
+        g = f["grade"]
+        if f["comments"]:
+            g += "<br/><font size=6.4 color='#555555'>%s</font>" % f["comments"]
+        td = "%d m, %+d m R<br/>%d fpm" % f["td"] if f["td"] else "-"
+        ro = "%.1f nm / %d ft" % f["rollout"] if f["rollout"] else "-"
+        sink = ", ".join("%s %d" % (k, f["segs"][k][3]) for k in ("IC", "AR") if k in f["segs"]) or "-"
+        rows.append(["%s<br/><font size=6.4 color='#555555'>%s</font>" % (f["t"].strftime("%H:%M"), f["rig"]),
+                     "<b>%s</b><br/><font size=6.4 color='#555555'>%s</font>" % (f["callsign"], f["model"]),
+                     "%s %s" % (f["runway"], f["outcome"]), g, ro, td, sink, groove_plot(f["segs"])])
+    out.append(table(["Time", "Pilot", "Rwy / result", "Grade", "Rolled out", "Touchdown", "Sink fpm",
+                      "Final: path / lineup"],
+                     rows, [0.5, 0.95, 0.75, 1.55, 0.75, 0.8, 0.6, 1.65]))
+    out.append(Paragraph(
+        "Graded on the vSFG-7 Airfield Arrivals kneeboard: rolled out 1-1.5 nm at ~350 ft, a 3&deg; path to a "
+        "point 300 m down the runway, 500-700 fpm on short final (never over 1000), on-speed AoA (Hornet, "
+        "estimated from pitch). X / IM / IC / AR here are 1.5-1, 1-&frac12;, &frac12;-&frac14; and the last "
+        "&frac14; nm to the threshold. Field codes: <b>LRO</b> late rollout (inside 0.9 nm; inside &frac12; nm "
+        "is a big one), <b>SINK</b> over 850 / 1000 fpm in close, <b>SHT</b> / <b>LNG</b> touchdown inside "
+        "100 m / past 600 m (past 900 m big; before the threshold is a C), <b>LUL</b>/<b>LUR TD</b> off the "
+        "centreline at touchdown, <b>HARD</b> over 900 fpm. _OK_ = no errors and down 150-450 m past the "
+        "threshold. DCS grades no field landings, so these are our numbers, not DCS's.", note))
+    return [KeepTogether(out[:2])] + out[2:]
+
+
 def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None):
     passes = ev["pass"]
     real = [p for p in passes if p["outcome"] in ("trap", "bolter", "wave off")]
@@ -433,6 +495,8 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None)
     if board is not None:
         S += greenie_board(board, end.replace(day=1), end)
 
+    S += field_section(ev["field"])
+
     # DCS's own grades (AI included) and the comparison
     if ev["dcs"]:
         drow = [[d["_t"].strftime("%H:%M"), d["_rig"], d.get("callsign", ""), d.get("type", ""), d.get("grade", ""),
@@ -504,6 +568,7 @@ def main():
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sample", action="store_true")
     ap.add_argument("--board-dir", help='folder of "YYYY-MM-DD Rig.log" day logs for the greenie board')
+    ap.add_argument("--field-log", action="append", default=[], help="RIG=path of a field tower's log (Senaki)")
     ap.add_argument("--problem", action="append", default=[], help="a rig that could not be read (noted)")
     ap.add_argument("--no-copy", action="store_true", help="don't copy to the Desktop Documentation folder")
     a = ap.parse_args()
@@ -514,6 +579,8 @@ def main():
     logs = [tuple(x.split("=", 1)) for x in a.log]
     rigs = list(OrderedDict.fromkeys(r for r, _ in logs))
     ev = collect(logs, start, end)
+    if a.field_log:
+        ev["field"] = collect([tuple(x.split("=", 1)) for x in a.field_log], start, end)["field"]
     name = "Paddles Report %s%s.pdf" % (end.isoformat(), " SAMPLE" if a.sample else "")
     out = os.path.join(a.out, name)
     board = None

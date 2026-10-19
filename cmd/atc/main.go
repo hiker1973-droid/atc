@@ -343,6 +343,7 @@ func main() {
 	f.StringVar(&flagScudwatchBullseye, "scudwatch-bullseye", "",
 		"Bullseye reference for Scudwatch announcements as 'lat,lon' (default: airfield center)")
 	registerLSOFlags(f)
+	registerApproachGradeFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
 	f.BoolVar(&flagMarshalTestTx, "marshal-test-tx", false,
@@ -922,6 +923,9 @@ func run(cmd *cobra.Command, args []string) error {
 		defer wg.Done()
 		tacviewLoop(ctx, flagTacviewAddr, atcCtrl, &tacviewConnected, &tacviewLastData)
 	}()
+	if flagApproachGrade {
+		go runFieldGrade(ctx, flagTacviewAddr, af)
+	}
 
 	log.Info().
 		Str("callsign", callsign).
