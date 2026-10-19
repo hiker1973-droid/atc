@@ -9,6 +9,7 @@ import (
 	"github.com/paulmach/orb"
 
 	"github.com/vsfg7/atc/pkg/airfield"
+	"github.com/vsfg7/atc/pkg/composer"
 )
 
 // Command replies that need the Tacview picture: the pilot's bullseye and the
@@ -182,9 +183,14 @@ func commandPositionResponse(text, callsign, channelName string, store *tacviewP
 			return fmt.Sprintf("%s, %s, negative tanker on scope.", callsign, channelName)
 		}
 		brg, nm := bearingRangeFromRef(pos, tk.pos[0], tk.pos[1])
-		return fmt.Sprintf("%s, %s, %s bears %s for %d, angels %d.",
+		reply := fmt.Sprintf("%s, %s, %s bears %s for %d, angels %d.",
 			callsign, channelName, tk.callsign,
 			spokenBearing(toMagnetic(brg, magVar(pos))), int(nm+0.5), int(tk.info.AltFt/1000+0.5))
+		// The tanker with a SkyEye net (tanker.go) takes his check-in.
+		if flagTankerFreq > 0 && strings.EqualFold(tk.callsign, flagTankerTacview) {
+			reply += fmt.Sprintf(" Contact %s on %s.", flagTankerSpoken, composer.SpellFrequency(flagTankerFreq))
+		}
+		return reply
 	}
 
 	bull, ok := store.Bullseye(coalition)

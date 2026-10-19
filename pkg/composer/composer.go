@@ -1748,6 +1748,10 @@ var digitWords = map[rune]string{
 	'8': "eight", '9': "niner",
 }
 
+// SpellFrequency is a frequency as the controllers say it, for nets outside
+// the composer (the tanker hand-off from Command).
+func SpellFrequency(mhz float64) string { return spellFrequency(mhz) }
+
 func spellFrequency(mhz float64) string {
 	whole := int(mhz)
 	frac := int(math.Round((mhz - float64(whole)) * 1000))

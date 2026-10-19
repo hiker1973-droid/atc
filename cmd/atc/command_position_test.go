@@ -138,3 +138,20 @@ func TestCommandRadarCheck(t *testing.T) {
 		t.Errorf("unknown caller = %q", got)
 	}
 }
+
+// With the tanker net on (tanker.go), Command sends the pilot to it.
+func TestCommandTankerHandoff(t *testing.T) {
+	store := positionTestStore()
+	noVar := func(orb.Point) float64 { return 0 }
+	oldF, oldT, oldS := flagTankerFreq, flagTankerTacview, flagTankerSpoken
+	defer func() { flagTankerFreq, flagTankerTacview, flagTankerSpoken = oldF, oldT, oldS }()
+	flagTankerFreq, flagTankerTacview, flagTankerSpoken = 252.1, "Texaco11", "Texaco one one"
+	got := commandPositionResponse("Command, Raider 11, request tanker", "Raider 11", "Command", store, noVar)
+	if !strings.HasSuffix(got, "Contact Texaco one one on two five two point one.") {
+		t.Errorf("got %q", got)
+	}
+	flagTankerTacview = "Shell 1-1"
+	if got := commandPositionResponse("Command, Raider 11, request tanker", "Raider 11", "Command", store, noVar); strings.Contains(got, "Contact") {
+		t.Errorf("another tanker: got %q", got)
+	}
+}
