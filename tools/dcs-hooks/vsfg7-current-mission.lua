@@ -16,8 +16,32 @@
 -- Check it works: after a mission loads, C:\SkyeyeATC\current_mission.txt holds the
 -- .miz path, dcs.log has a "VSFG7-MIZ current mission:" line, and each SkyEye role
 -- logs "Weather reloaded — DCS server loaded a different mission".
+--
+-- It also re-pins SKYEYE_MIZ (user and machine) to the loaded mission, so a role
+-- started after a rotation boots on the right weather instead of a .miz the
+-- rotation has moved past or the Missions folder no longer has (2026-10-18:
+-- scheduler shuffles 7 missions, the pin went stale every load). Only on a
+-- change, since setx flashes a console and stalls the hook ~100 ms. The machine
+-- write needs an elevated DCS; if it fails the user value still wins.
 
 local OUT = [[C:\SkyeyeATC\current_mission.txt]]
+
+local lastPinned = nil
+
+local function pinSkyeyeMiz(path)
+    if path == lastPinned then
+        return
+    end
+    -- cmd would expand %VAR% and a quote would end the argument; Windows paths
+    -- can't hold a quote, so this only guards a '%' in a mission name.
+    if path:find('[%%"]') then
+        log.write("VSFG7-MIZ", log.WARNING, "SKYEYE_MIZ not updated, path has % or \": " .. path)
+        return
+    end
+    os.execute('setx SKYEYE_MIZ "' .. path .. '" >nul 2>&1 & setx SKYEYE_MIZ "' .. path .. '" /M >nul 2>&1')
+    lastPinned = path
+    log.write("VSFG7-MIZ", log.INFO, "SKYEYE_MIZ set to " .. path)
+end
 
 local cb = {}
 
@@ -39,6 +63,7 @@ local function writeCurrentMission()
         os.remove(OUT)
         os.rename(tmp, OUT)
         log.write("VSFG7-MIZ", log.INFO, "current mission: " .. path)
+        pinSkyeyeMiz(path)
     end)
     if not ok then
         log.write("VSFG7-MIZ", log.ERROR, tostring(err))
