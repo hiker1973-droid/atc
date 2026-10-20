@@ -1,11 +1,22 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 19 OCT 2026.  v1.29.  Product = one full-screen 16:9 PDF, 26 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.29.pdf` — cover + 25 cards: How it works · Frequencies ·
+**Built 20 OCT 2026.  v1.30.  Product = one full-screen 16:9 PDF, 26 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.30.pdf` — cover + 25 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · **Texaco** · A full sortie · Airfield ATC · Tower radios · Syria towers ·
 Departure · Arrival · Tower calls · No answer?
+
+## v1.30 (20 OCT 2026) — Day 2026-10-19 log fixes, from origin/main `823cf86`
+
+User asked 2026-10-20 "push and update documentation".
+- **Card 12 Command:** new row "in hot / pickle / Fox 3 / splash -> cleared hot · copy" (`a5264fb`).
+- **Card 17 Texaco:** check-out "checking out / moving on to mission -> cleared to depart" (`a5264fb`).
+- **Card 24 Tower calls:** "holding" alone = holding short; "request handoff" -> contact Command
+  (`bfe1f15`); "green jet" -> loud and clear; mayday "(+ runway NN)" -> the runway you name;
+  new row "N souls on board, fuel state -> crash crew standing by" (`823cf86`).
+- Build stamp 823cf86. `docs/tanker-flow` sheet now covers Texaco 1-1 + 3-1, the three
+  send-offs, radio check and the new words. Not done: Phraseology Reference (no Texaco section).
 
 ## v1.29 (19 OCT 2026) — Texaco 3-1, from origin/main `1c8d29d`
 

@@ -55,6 +55,11 @@ v1.29 (user asked 2026-10-19 "add Texaco 3-1 to the comms packet") follows origi
 card 17 now has both SkyEye tankers - Texaco 1-1 (KC-130, 252.100) and Texaco 3-1 (KC-135
 MPRS, 252.300, --tanker2-freq) - with the same flow, plus the radio check Texaco now answers.
 
+v1.30 (user asked 2026-10-20 "update documentation") follows origin/main 823cf86, the Day
+2026-10-19 log fixes: Texaco check-out "moving on to mission" (card 17); Command in hot /
+pickle / Fox / splash (card 12); tower "holding", "request handoff", "green jet", and an
+emergency gets the runway it names plus souls / fuel copied (card 24).
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -95,8 +100,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.29"
-DATE = "19 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.30"
+DATE = "20 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -548,6 +553,7 @@ def c11_command():
         ("radio check  /  comm check  /  how copy", "loud and clear"),
         ("checking in  /  check in", "proceed mission"),
         ("fence in  /  fence check", "cleared hot"),
+        ("in hot  /  pickle  /  Fox 3  /  splash", "cleared hot  ·  copy"),
         ("on station", "good hunting"),
         ("off station  /  departing station", "proceed to assigned pattern"),
         ("fence out", "safe passage"),
@@ -726,7 +732,7 @@ def c16_texaco():
         ("", "established starboard basket  ->  call ready pre-contact"),
         ("DCS MENU", "Ready pre-contact  ->  cleared contact, plug, take fuel"),
         ("REFORM", "satisfied, moving to starboard reform  ->  cleared"),
-        ("CHECK OUT", "checking out, pushing 282  ->  cleared to depart"),
+        ("CHECK OUT", "checking out  /  moving on to mission  ->  cleared to depart"),
     ], split=170)
     NK.band(c, "RULES")
     c.bullets([
@@ -969,11 +975,11 @@ def c18_tower_calls():
     NK.band(c, "GROUND AND DEPARTURE", "tower replies")
     c.kv([
         ("request taxi  /  ready to taxi", "taxi, hold short"),
-        ("holding short  /  at the hold", "line up and wait"),
+        ("holding short  /  at the hold  /  holding", "line up and wait"),
         ("ready for takeoff  /  request takeoff", "cleared for takeoff"),
         ("airborne  /  departing  /  rolling", "angels, expect handoff"),
         ("(at 7 miles the tower calls you)", "contact Command"),
-        ("seven DME  /  seven miles", "copy (optional)"),
+        ("seven DME  /  seven miles  /  request handoff", "copy, or contact Command"),
         ("pushing command", "good day"),
     ])
     NK.band(c, "ARRIVAL AND LANDING")
@@ -992,9 +998,10 @@ def c18_tower_calls():
         ("say again", "your last call, 2 min"),
         ("wind check  /  say altimeter", "wind and altimeter"),
         ("radar check", "angels, range, bearing"),
-        ("radio check  /  checking in", "loud and clear"),
+        ("radio check  /  checking in  /  green jet", "loud and clear"),
         ("hung ordnance", "straight in, dearm"),
-        ("mayday  /  pan pan  /  emergency", "runway is yours"),
+        ("mayday  /  pan pan  /  emergency  (+ runway NN)", "runway is yours - the one you name"),
+        ("N souls on board, fuel state", "crash crew standing by"),
         ("tally  /  no joy  /  altitude check  /  roger", "silent"),
     ])
     NK.subtle(c, "Anything else gets \"say again your request\".")
@@ -1028,7 +1035,7 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 1c8d29d, 19 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 823cf86, 20 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
