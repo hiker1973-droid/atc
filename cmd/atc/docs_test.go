@@ -14,6 +14,7 @@ import (
 
 	"github.com/vsfg7/atc/pkg/airfield"
 	"github.com/vsfg7/atc/pkg/controller"
+	"github.com/vsfg7/atc/pkg/lso"
 )
 
 // The pilot documentation (docs/phraseology, the ATC Phraseology Reference)
@@ -44,6 +45,9 @@ type docTheatre struct {
 	JTAC2    float64      `json:"jtac2,omitempty"`
 	Deckboss float64      `json:"deckboss,omitempty"`
 	Marshal  float64      `json:"marshal,omitempty"`
+	LSO      float64      `json:"lso,omitempty"`
+	Tanker   float64      `json:"tanker,omitempty"`
+	Tanker2  float64      `json:"tanker2,omitempty"`
 	Towers   []docStation `json:"towers"`
 	ATIS     []docStation `json:"atis"`
 }
@@ -119,6 +123,9 @@ func currentDocFacts(t *testing.T) []docTheatre {
 			JTAC2:    batFreq(t, "start_command"+th.suffix+".bat", "jtac2-freq"),
 			Deckboss: batFreq(t, "start_deckboss"+th.suffix+".bat", "deckboss-freq"),
 			Marshal:  batFreq(t, "start_marshal"+th.suffix+".bat", "marshal-freq"),
+			LSO:      batFreq(t, "start_lso"+th.suffix+".bat", "lso-freq"),
+			Tanker:   batFreq(t, "start_command"+th.suffix+".bat", "tanker-freq"),
+			Tanker2:  batFreq(t, "start_command"+th.suffix+".bat", "tanker2-freq"),
 		}
 		lines, titles := batLaunches(t, "start_towers"+th.suffix+".bat")
 		for i, l := range lines {
@@ -184,7 +191,7 @@ func TestDocFacts(t *testing.T) {
 
 // docPhrase is one printed pilot call and what the document says it does.
 type docPhrase struct {
-	Role  string `json:"role"`  // tower | command | jtac | marshal | deckboss
+	Role  string `json:"role"`  // tower | command | jtac | marshal | deckboss | tanker | lso
 	Say   string `json:"say"`   // as printed, with the address
 	Tower string `json:"tower"` // tower calls: the tower addressed
 	Want  string `json:"want"`  // the intent the document promises
@@ -202,6 +209,40 @@ var towerIntents = map[string]controller.RequestType{
 	"say_again": controller.RequestSayAgain, "wind_check": controller.RequestWindCheck,
 	"radar_check": controller.RequestRadarCheck, "radio_check": controller.RequestRadioCheck,
 	"hung": controller.RequestHungOrdnance, "emergency": controller.RequestEmergency,
+	"souls_fuel": controller.RequestSoulsFuel,
+}
+
+// commandAttackReplies: the attack calls Command copies when nothing else
+// answered (commandShotResponse), and a word each reply must carry.
+var commandAttackReplies = map[string]*regexp.Regexp{
+	"in_hot":      regexp.MustCompile(`cleared hot`),
+	"release":     regexp.MustCompile(`(?i)pickle|rifle`),
+	"shot":        regexp.MustCompile(`(?i)fox|splash`),
+	"attack_move": regexp.MustCompile(`(?i)copy|roger`),
+}
+
+// lsoDocKind is what Paddles did with a printed call: the ball call and red
+// deck are handled with no text reply (the ball call goes to the TX queue).
+func lsoDocKind(f *lsoFeed, said *[]lso.Call, say string) string {
+	*said = nil
+	_, resp := f.heard(say)
+	switch {
+	case resp == netHandled && len(*said) == 1 && (*said)[0] == lso.CallRogerBall:
+		return "ball"
+	case resp == netHandled && len(*said) == 1 && (*said)[0] == lso.CallClara:
+		return "clara"
+	case resp == netHandled && len(*said) == 0:
+		return "red_deck"
+	case strings.Contains(resp, "roger green deck"):
+		return "green_deck"
+	case strings.Contains(resp, "call the ball"):
+		return "abeam"
+	case strings.Contains(resp, "call abeam"):
+		return "break"
+	case strings.Contains(resp, "loud and clear"):
+		return "radio_check"
+	}
+	return resp
 }
 
 var marshalIntents = map[string]marshalIntent{
@@ -250,6 +291,12 @@ func TestDocPhrases(t *testing.T) {
 	if len(phrases) < 40 {
 		t.Fatalf("only %d phrases - the builder wrote a short list", len(phrases))
 	}
+	// Texaco: the printed flow runs in order through one tanker net, and each
+	// reply must carry the words the document gives (Want).
+	tanker := newTankerNet("Texaco one one", func() int { return 13 }, func() int { return 260 })
+	tanker.pick = func(o [3]string) string { return o[0] }
+	var lsoSaid []lso.Call
+	paddles := newLSOFeed(lso.NimitzParams(), func(c lso.Call) { lsoSaid = append(lsoSaid, c) })
 	for _, p := range phrases {
 		lower := strings.ToLower(p.Say)
 		fail := func(got interface{}) { t.Errorf("%s %q: got %v, the document says %s", p.Role, p.Say, got, p.Want) }
@@ -311,6 +358,12 @@ func TestDocPhrases(t *testing.T) {
 				if rangeAreaOffRe.MatchString(lower) || rangeAreaOffAnyRe.MatchString(lower) {
 					got = "off_target"
 				}
+			case "in_hot", "release", "shot", "attack_move":
+				if r := commandReply(p.Say, cs, "Command", newTacviewPositions()); commandAttackReplies[p.Want].MatchString(r) {
+					got = p.Want
+				} else {
+					got = r
+				}
 			case "winchester", "bingo", "joker":
 				switch {
 				case winchesterRe.MatchString(lower):
@@ -327,6 +380,14 @@ func TestDocPhrases(t *testing.T) {
 			}
 			if got != p.Want {
 				fail(got)
+			}
+		case "tanker":
+			if r := tanker.Response(p.Say, tankerCallsign(p.Say)); !strings.Contains(r, p.Want) {
+				fail(fmt.Sprintf("%q", r))
+			}
+		case "lso":
+			if got := lsoDocKind(paddles, &lsoSaid, p.Say); got != p.Want {
+				fail(fmt.Sprintf("%q", got))
 			}
 		case "deckboss":
 			// Deckboss parses inline in deckboss.go; its phrases are checked by

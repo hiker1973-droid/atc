@@ -19,6 +19,12 @@
  },
  {
   "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, green jet.",
+  "tower": "Batumi Tower",
+  "want": "radio_check"
+ },
+ {
+  "role": "tower",
   "say": "Batumi Tower, Raider 1-1, request startup.",
   "tower": "Batumi Tower",
   "want": "startup"
@@ -44,6 +50,12 @@
  {
   "role": "tower",
   "say": "Batumi Tower, Raider 1-1, at the hold.",
+  "tower": "Batumi Tower",
+  "want": "holding_short"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, holding.",
   "tower": "Batumi Tower",
   "want": "holding_short"
  },
@@ -86,6 +98,12 @@
  {
   "role": "tower",
   "say": "Batumi Tower, Raider 1-1, seven miles.",
+  "tower": "Batumi Tower",
+  "want": "dme"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, request handoff.",
   "tower": "Batumi Tower",
   "want": "dme"
  },
@@ -228,6 +246,18 @@
   "want": "emergency"
  },
  {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, declaring emergency, request runway 13.",
+  "tower": "Batumi Tower",
+  "want": "emergency"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, one soul on board, fuel state 1.5.",
+  "tower": "Batumi Tower",
+  "want": "souls_fuel"
+ },
+ {
   "role": "command",
   "say": "Command, Raider 1-1, radio check.",
   "tower": "",
@@ -304,6 +334,48 @@
   "say": "Command, Raider 1-1, request tasking.",
   "tower": "",
   "want": "tasking"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, in hot.",
+  "tower": "",
+  "want": "in_hot"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, pickle.",
+  "tower": "",
+  "want": "release"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, rifle.",
+  "tower": "",
+  "want": "release"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, Fox 3.",
+  "tower": "",
+  "want": "shot"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, splash one MiG-29.",
+  "tower": "",
+  "want": "shot"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, inbound artillery battery.",
+  "tower": "",
+  "want": "attack_move"
+ },
+ {
+  "role": "command",
+  "say": "Command, Raider 1-1, proceeding to IP Granite.",
+  "tower": "",
+  "want": "attack_move"
  },
  {
   "role": "command",
@@ -574,5 +646,149 @@
   "say": "Marshal, Raider 1-1, radio check.",
   "tower": "",
   "want": "radio_check"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, radio check.",
+  "tower": "",
+  "want": "radio_check"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, in the break.",
+  "tower": "",
+  "want": "break"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, abeam.",
+  "tower": "",
+  "want": "abeam"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, Hornet ball, 5.5.",
+  "tower": "",
+  "want": "ball"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, three-quarter mile, 5.4.",
+  "tower": "",
+  "want": "ball"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, Clara, 5.0.",
+  "tower": "",
+  "want": "clara"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, red deck.",
+  "tower": "",
+  "want": "red_deck"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, green deck.",
+  "tower": "",
+  "want": "green_deck"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, comm check.",
+  "tower": "",
+  "want": "loud and clear"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, radio check.",
+  "tower": "",
+  "want": "loud and clear"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, 15 mile initial for port observation, intent to refuel.",
+  "tower": "",
+  "want": "cleared port observation"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, request 5.0.",
+  "tower": "",
+  "want": "copies"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, request full.",
+  "tower": "",
+  "want": "copies"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, 1 mile trail for port observation.",
+  "tower": "",
+  "want": "continue port observation"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, established port observation.",
+  "tower": "",
+  "want": "baskets open"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, establish portside.",
+  "tower": "",
+  "want": "baskets open"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, moving to port basket.",
+  "tower": "",
+  "want": "cleared port basket"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, established port basket.",
+  "tower": "",
+  "want": "call ready pre-contact"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, ready pre-contact.",
+  "tower": "",
+  "want": "call ready pre-contact"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, satisfied, moving to starboard reform.",
+  "tower": "",
+  "want": "cleared starboard reform"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, established starboard reform.",
+  "tower": "",
+  "want": "copy"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, establish starboard side.",
+  "tower": "",
+  "want": "copy"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, checking out, pushing 282.",
+  "tower": "",
+  "want": "cleared to depart"
+ },
+ {
+  "role": "tanker",
+  "say": "Texaco 1-1, Raider 1-1, moving on to mission.",
+  "tower": "",
+  "want": "cleared to depart"
  }
 ]

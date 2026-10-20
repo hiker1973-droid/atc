@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.3"
-DATE = "16 OCT 2026"          # change together with VER
+VER = "v2.4"
+DATE = "20 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 LOGO = r"C:\Users\afhin\Saved Games\DCS\Missions\New Pilot packs\VMFA225_patch.png"
@@ -61,14 +61,15 @@ def f3(x):
 # Table rows: (intent, what the pilot says - alternatives split by "  /  ", the response,
 # the intent the test checks). Each alternative is said as "<address>, Raider 1-1, <alt>."
 TOWER_GROUND = [
-    ("Comm / Radio check", "radio check  /  comm check  /  how copy", "Loud and clear", "radio_check"),
+    ("Comm / Radio check", "radio check  /  comm check  /  how copy  /  green jet", "Loud and clear", "radio_check"),
     ("Request startup", "request startup", "Startup approved", "startup"),
     ("Request taxi", "request taxi  /  ready to taxi", "Taxi to RWY XX, hold short", "taxi"),
-    ("Holding short", "holding short  /  at the hold", "Line up and wait, then cleared for takeoff", "holding_short"),
+    ("Holding short", "holding short  /  at the hold  /  holding", "Line up and wait, then cleared for takeoff", "holding_short"),
     ("Takeoff", "ready for takeoff  /  request takeoff", "Cleared for takeoff", "takeoff"),
     ("Airborne", "airborne  /  departing", "Climb angels N, expect handoff at 7 DME", "airborne"),
     ("Rolling (CTAF)", "rolling runway NN", "Same as airborne", "rolling"),
-    ("7 DME (optional)", "seven DME  /  seven miles", "Copy - the tower already handed you off", "dme"),
+    ("7 DME / handoff (optional)", "seven DME  /  seven miles  /  request handoff",
+     "Copy if already handed off, else contact Command", "dme"),
     ("Pushing Command", "pushing command", "Good day", "pushing_command"),
 ]
 TOWER_ARRIVAL = [
@@ -88,7 +89,10 @@ TOWER_ANYTIME = [
     ("Wind / altimeter", "wind check  /  say altimeter", "Wind and altimeter", "wind_check"),
     ("Radar check", "radar check", "Angels, range, bearing", "radar_check"),
     ("Hung ordnance", "hung ordnance", "Straight in, dearm at the end", "hung"),
-    ("Emergency", "mayday mayday mayday  /  pan pan", "The runway is yours", "emergency"),
+    ("Emergency", "mayday mayday mayday  /  pan pan  /  declaring emergency, request runway NN",
+     "The runway is yours - the one you name, if you name one", "emergency"),
+    ("Souls and fuel (after an emergency)", "one soul on board, fuel state 1.5",
+     "Copy, crash crew standing by, cleared to land", "souls_fuel"),
 ]
 COMMAND = [
     ("Radio check", "radio check  /  how copy", "Loud and clear", "radio_check"),
@@ -100,8 +104,12 @@ COMMAND = [
     ("RTB", "RTB  /  request recovery", "Expect handoff at 30 nm", "rtb"),
     ("State", "state 5.2", "Copy state; under 2.0 bingo", "state"),
     ("Bullseye", "say bullseye", "Bullseye NNN for NN", "bullseye"),
-    ("Tanker", "request tanker", "Bearing, range, angels", "tanker"),
+    ("Tanker", "request tanker", "Nearest tanker: bearing, range, angels; a Texaco adds contact on its frequency", "tanker"),
     ("Tasking", "request tasking", "Black Sea: contact Hitman 1-1 (61.0) or 2-1 (62.0)", "tasking"),
+    ("In hot (no JTAC)", "in hot", "Cleared hot", "in_hot"),
+    ("Release", "pickle  /  rifle", "Copy pickle / copy rifle", "release"),
+    ("Shot / kill", "Fox 3  /  splash one MiG-29", "Copy Fox three / copy splash, good kill", "shot"),
+    ("Moving", "inbound artillery battery  /  proceeding to IP Granite", "Copy", "attack_move"),
 ]
 # Black Sea training range areas A-O (command_areas.go), and closing out a run
 # (commandBrevityResponse). Section 5.
@@ -149,7 +157,35 @@ MARSHAL = [
 ]
 
 
-def table_rows(role, rows, address, tower=""):
+# Paddles (cmd/atc/lso.go heard, pkg/lso): test kinds in docs_test.go lsoDocKind.
+PADDLES = [
+    ("Radio check", "radio check", "Loud and clear", "radio_check"),
+    ("In the break", "in the break", "Roger, call abeam", "break"),
+    ("Abeam (the 180)", "abeam", "Paddles contact, in the groove at three-quarter mile, call the ball", "abeam"),
+    ("Ball call", "Hornet ball, 5.5  /  three-quarter mile, 5.4", "Roger ball", "ball"),
+    ("No ball in sight", "Clara, 5.0", "Paddles contact, keep it coming", "clara"),
+    ("After the trap", "red deck", "No reply - the deck is foul, the next jet is waved off at 1/4 nm", "red_deck"),
+    ("Clear of the landing area", "green deck", "Roger green deck, contact Deckboss 128.6", "green_deck"),
+]
+# Texaco (cmd/atc/tanker.go Response). The test runs these in order through one
+# tanker net; the last field is words the reply must carry.
+TEXACO = [
+    ("Radio check", "comm check  /  radio check", "Loud and clear", "loud and clear"),
+    ("Initial", "15 mile initial for port observation, intent to refuel",
+     "Cleared port observation, angels, velocity. How much do you request?", "cleared port observation"),
+    ("Give", "request 5.0  /  request full", "Copies five thousand pounds / full give", "copies"),
+    ("1 mile trail", "1 mile trail for port observation", "Continue port observation", "continue port observation"),
+    ("Observation", "established port observation  /  establish portside", "Copy. Port and starboard baskets open", "baskets open"),
+    ("Basket", "moving to port basket", "Cleared port basket (or standby, basket occupied)", "cleared port basket"),
+    ("At the basket", "established port basket  /  ready pre-contact", "Copy, call ready pre-contact", "call ready pre-contact"),
+    ("Reform", "satisfied, moving to starboard reform", "Cleared starboard reform", "cleared starboard reform"),
+    ("In reform", "established starboard reform  /  establish starboard side", "Copy", "copy"),
+    ("Check out", "checking out, pushing 282  /  moving on to mission",
+     "Cleared to depart - Fortuna super te, Viking / Stay classy, Raider / Fara í víking", "cleared to depart"),
+]
+
+
+def table_rows(role, rows, address, tower="", cs=CS):
     """Records every alternative for the test; returns printable rows."""
     out = []
     for intent, say, reply, want in rows:
@@ -158,7 +194,7 @@ def table_rows(role, rows, address, tower=""):
             # Hitman readback: a real card target (command_tasking.go target 4, IP Indigo;
             # training V1.25 north range - docs_test.go docReadbackTarget).
             spoken = spoken.replace("target N", "target 4").replace("<IP>", "Indigo")
-            PHRASES.append({"role": role, "say": "%s, %s, %s." % (address, CS, spoken),
+            PHRASES.append({"role": role, "say": "%s, %s, %s." % (address, cs, spoken),
                             "tower": tower, "want": want})
         quoted = " ".join('"...%s"' % a for a in say.split("  /  "))
         out.append((intent, quoted, reply))
@@ -389,6 +425,12 @@ def build():
             rows.append(("Deckboss  -  Carrier", f3(t["deckboss"]), "Two-way", "CVN-72 launch ops"))
         if t.get("marshal"):
             rows.append(("Marshal  -  Carrier", f3(t["marshal"]), "Two-way", "Recovery stack"))
+        if t.get("lso"):
+            rows.append(("Paddles  -  LSO", f3(t["lso"]), "Two-way", "Groove calls, ball call, deck calls"))
+        if t.get("tanker"):
+            rows.append(("Texaco 1-1  -  Tanker", f3(t["tanker"]), "Two-way", "KC-130, TACAN 51Y, angels 13"))
+        if t.get("tanker2"):
+            rows.append(("Texaco 3-1  -  Tanker", f3(t["tanker2"]), "Two-way", "KC-135 MPRS, TACAN 53Y, angels 24"))
         for a in t["atis"]:
             rows.append(("ATIS  -  " + a["name"].replace(" ATIS", ""), f3(a["freq"]), "Listen only", "Updates with the weather"))
         d.table(("Channel", "Freq (MHz)", "Type", "Notes"), rows, (0.34, 0.17, 0.15, 0.34))
@@ -452,6 +494,11 @@ def build():
     d.h2("3.3 Any Time")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("tower", TOWER_ANYTIME, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))
+    d.callout("Emergencies", [
+        "\"Declaring emergency, request runway 09\": you get the runway you name, even against the active, for the "
+        "rest of your approach. No runway named: the active.",
+        "The tower asks for souls on board and fuel state. Answer \"one soul on board, fuel state 1.5\" (or "
+        "\"fuel state zero\"): the tower copies it, crash crew standing by, cleared to land."])
     d.table(("The tower calls you when", "Call"), [
         ("Over 350 kt inside 10 nm", "Speed check"),
         ("Inside 5 nm while a jet is rolling", "Go around"),
@@ -470,7 +517,10 @@ def build():
     d.callout("The automatic handoff", [
         "Once you have talked to Command it watches you on Tacview. Inside 30 nm of your recovery - a field, or the "
         "carrier if you launched from it - it calls you once with the tower or Marshal frequency.",
-        "Bullseye and tanker need the radar picture; without it you hear \"unable\". Tasking is Black Sea training only."])
+        "Bullseye and tanker need the radar picture; without it you hear \"unable\". Tasking is Black Sea training only.",
+        "No JTAC up? After fence in, Command copies your attack calls: \"in hot\" gets cleared hot, \"pickle\" / "
+        "\"rifle\" / \"Fox 3\" / \"splash\" get a copy. Pilots often use the flight number alone (\"302, Fox 3\") - "
+        "Command finds the full callsign on Tacview."])
 
     # 5. Range areas (command_areas.go)
     d.h1("5. Range Areas and Overlord Actual - Command")
@@ -553,20 +603,72 @@ def build():
         "Commencing: descend to platform 5,000, final bearing NNN. Call \"platform\" passing 5,000 ft - your last call.",
         "Radial = BRC + 180. Final bearing = BRC - 9. All magnetic."])
 
-    # 8. Tips
-    d.h1("9. General Tips")
+    # 9. Paddles
+    cau = TH["caucasus"]
+    d.h1("9. Paddles - %s MHz (LSO)" % f3(cau["lso"]))
+    d.para("SkyEye's LSO on CVN-72 Abe (Black Sea Day / Night and Foothold Syria). Hornet COMM 2 CH 4. Marshal sends "
+           "you here at the initial (\"contact paddles\"). Paddles talks you down the glideslope from Tacview: you fly, "
+           "he calls. Give your modex or full callsign; the examples use Raider 302.")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("lso", PADDLES, "Paddles", cs="Raider 302"), (0.22, 0.38, 0.40))
+    d.dialogue([("Pilot", "Paddles, Raider 302, abeam."),
+                ("Paddles", "Paddles contact, Raider 302. In the groove at three-quarter mile, call the ball."),
+                ("Pilot", "302, Hornet ball, 5.5."),
+                ("Paddles", "Roger ball."),
+                ("Paddles", "You're high, bring it down."),
+                ("Pilot", "302, red deck."),
+                ("Pilot", "302, green deck."),
+                ("Paddles", "302, Paddles, roger green deck, contact Deckboss, one two eight point six.")])
+    d.callout("In the groove (no readback)", [
+        "Calls start about 0.8 nm (1.3 nm after your ball call): a little high, you're high, you're low - power, "
+        "POWER, right for lineup, come left, you're fast / slow (Hornet AoA). After your ball call, a call every second "
+        "while you are off.",
+        "No ball call by about 0.6 nm: \"call the ball\". Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
+        "Foul deck at 1/4 nm (no green deck from the jet ahead, or Tacview shows the landing area foul): "
+        "\"302, foul deck, wave off, wave off, proceed to bolter pattern\". A red deck lapses after 3 minutes."])
+
+    # 10. Texaco
+    d.h1("10. Texaco - %s / %s MHz (Tankers)" % (f3(cau["tanker"]), f3(cau["tanker2"])))
+    d.para("Black Sea Day / Night. Texaco 1-1: KC-130, %s AM (Hornet COMM 2 CH 8), TACAN 51Y, angels 13, about "
+           "260 KIAS. Texaco 3-1: KC-135 MPRS, %s AM (COMM 2 CH 10), TACAN 53Y, angels 24, about 265 KIAS. "
+           "Two baskets each; the same calls work on both (\"Texaco 1\" or \"Texaco 3\"). The calls follow the "
+           "vSFG-7 AAQ Aerial Refueling Procedure: observation is always port, reform always starboard."
+           % (f3(cau["tanker"]), f3(cau["tanker2"])))
+    d.table(("Step", "Say something like", "Texaco"),
+            table_rows("tanker", TEXACO, "Texaco 1-1"), (0.18, 0.44, 0.38))
+    d.dialogue([("Pilot", "Command, Raider 1-1, request tanker."),
+                ("Cmd", "Raider 1-1, Command, Texaco 1-1 bears zero four five for 32, angels 13. Contact Texaco one one "
+                        "on two five two point one."),
+                ("Pilot", "Texaco 1-1, Raider 1-1, 15 mile initial for port observation, intent to refuel."),
+                ("Texaco", "Raider 11, Texaco one one, cleared port observation, one three thousand, velocity two six "
+                           "zero. How much do you request?"),
+                ("Pilot", "Texaco 1-1, Raider 1-1, request 5.0."),
+                ("Texaco", "Raider 11, Texaco copies five thousand pounds."),
+                ("Pilot", "Texaco 1-1, Raider 1-1, moving on to mission."),
+                ("Texaco", "Raider 11, Texaco, cleared to depart. Stay classy, Raider.")])
+    d.callout("Tanker rules", [
+        "Lead makes the initial, trail, observation and check-out calls; each jet its own basket and reform calls. "
+        "Give your amount in the initial (\"... intent to refuel, request 6.0\") and Texaco copies it instead of asking.",
+        "One jet per basket: a held basket gets \"standby, basket occupied\" - it frees when that jet calls reform, "
+        "or after 10 minutes. A bare \"ready pre-contact\" counts when you are the only jet on the tanker.",
+        "Altitude and velocity come live from Tacview. SkyEye is radio only: DCS still needs the AI comms menu "
+        "Ready pre-contact before fuel flows."])
+
+    # 11. Tips
+    d.h1("11. General Tips")
     d.tips([
         ("Always say your callsign.", "Address first, then your full callsign with its number. Raider and Venom are "
          "auto-corrected from common mishearings."),
         ("Keep transmissions under 20 seconds.", "Long calls are cut off. Two short calls beat one long one."),
         ("Pause half a second after keying,", "then speak; wait 2 - 3 seconds for the answer and do not re-key over it."),
         ("CTAF style works.", "\"[Field] traffic, [callsign], [intent]\" is recognised like a direct tower call."),
-        ("Emergencies bypass sequencing.", "\"mayday\", \"pan pan\" or \"declaring emergency\" puts you at the top of the queue."),
+        ("Emergencies bypass sequencing.", "\"mayday\", \"pan pan\" or \"declaring emergency\" puts you at the top "
+         "of the queue; name a runway and it is yours."),
         ("ATIS letters only advance on a weather change.", "Information Alpha three broadcasts running is expected."),
         ("Position calls need Tacview.", "Radar check, bullseye, Hitman's checks and the 30 nm handoff need the rig's Tacview feed."),
     ])
     d.callout("If the ATC doesn't respond", [
-        "1.  Addressed the right controller - field name, Command, Hitman, Deckboss or Marshal?",
+        "1.  Addressed the right controller - field name, Command, Hitman, Deckboss, Marshal, Paddles or Texaco?",
         "2.  Included your full callsign with its number?",
         "3.  Used a call from the tables in this reference?",
         "4.  Right frequency (section 1), AM - or FM for Hitman? Encryption off?",

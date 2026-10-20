@@ -58,6 +58,9 @@
   "jtac2": 62,
   "deckboss": 128.6,
   "marshal": 306.3,
+  "lso": 128.3,
+  "tanker": 252.1,
+  "tanker2": 252.3,
   "towers": [
    {
     "name": "Batumi Tower",
@@ -119,6 +122,7 @@
   "command": 282,
   "deckboss": 128.6,
   "marshal": 306.3,
+  "lso": 128.3,
   "towers": [
    {
     "name": "Akrotiri Tower",
