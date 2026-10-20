@@ -108,6 +108,15 @@ func TestParseIntentClassification(t *testing.T) {
 		{"bare inbound", "Senaki Tower, Raider 11, inbound", RequestDistanceInitial},
 		{"request taxi", "Senaki Tower, Raider 11, request taxi", RequestTaxiClear},
 		{"holding short", "Senaki Tower, Raider 11, holding short runway 09", RequestHoldingShort},
+
+		// Day 2026-10-19, Raider 033 at Senaki.
+		{"holding at nine is holding short", "Tower, Raider 033, holding at nine.", RequestHoldingShort},
+		{"bare holding is holding short", "Senaki Tower, Raider 033, holding.", RequestHoldingShort},
+		{"holding angels is not the hold short", "Senaki Tower, Raider 11, holding angels 5 overhead", RequestOverhead},
+		{"holding at parking is still taxi", "Senaki Ground, Raider 11, holding at parking, request taxi", RequestTaxiClear},
+		{"handoff after takeoff", "Tower, Raider 033, handoff.", RequestDistanceCheck},
+		{"request handoff", "Senaki Tower, Raider 11, request handoff to Command", RequestDistanceCheck},
+		{"frequency change", "Senaki Tower, Raider 11, request frequency change", RequestDistanceCheck},
 		{"request takeoff", "Senaki Tower, Raider 11, request takeoff", RequestTakeoffClear},
 		{"runway vacated", "Senaki Tower, Raider 11, runway vacated", RequestRunwayVacated},
 		{"wheels down is touchdown", "Senaki Tower, Raider 303, wheels down", RequestTouchdown},

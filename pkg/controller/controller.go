@@ -1424,6 +1424,13 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// with arrival words: as substrings "15 miles inbound" / "17 miles"
 		// matched "5 miles" / "7 miles" and handed arrivals to Command.
 		req.Type = RequestDistanceCheck
+	case !containsAny(lower, "initial", "inbound", "final", "overhead", "straight", "rtb", "return") &&
+		(containsWord(lower, "handoff", "hand off", "handover", "hand over") ||
+			containsAny(lower, "frequency change", "freq change", "request switch", "request frequency")):
+		// A departure asking for the handoff before 7 DME (Day 2026-10-19
+		// 18:32 "Tower, Raider 033, handoff." got "you were broken"): the same
+		// answer as the 7 DME call - over to Command.
+		req.Type = RequestDistanceCheck
 	case containsDistanceMiles(lower) && containsAny(lower, "initial", "mile", "inbound") &&
 		!containsWord(lower, "final"):
 		// "10 mile final" is a landing call, not an inbound report — it falls
@@ -1492,7 +1499,13 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// at unknown distance. "Raider 312 is 020 for 38, intent to land" went
 		// unanswered twice at Senaki (Day 2026-10-16 19:32).
 		req.Type = RequestDistanceInitial
-	case containsAny(lower, "holding short", "hold short", "short of runway", "at the hold"):
+	case containsAny(lower, "holding short", "hold short", "short of runway", "at the hold", "holding point", "holding position") ||
+		containsWord(lower, "holding") && !containsAny(lower, "angels", "altitude", "feet", "pattern", "mile", "fuel", "state", "stack", "orbit",
+			"taxi", "parking", "ramp", "start", "spot"):
+		// "holding" without "short" (Day 2026-10-19 18:28 "Tower, Raider 033,
+		// holding at nine." got "unable to copy") - on a tower frequency a
+		// held jet is at the hold short. Not "holding angels 5" / "holding
+		// over the field, 5 miles": those are airborne.
 		req.Type = RequestHoldingShort
 	case containsAny(lower, "request takeoff", "request departure", "ready for departure", "ready for takeoff",
 		"requesting takeoff", "requesting departure",
