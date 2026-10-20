@@ -10,7 +10,25 @@ func testTanker() *tankerNet {
 	tn := newTankerNet("Texaco one one", func() int { return 13 }, func() int { return 336 })
 	at := time.Date(2026, 10, 18, 20, 0, 0, 0, time.UTC)
 	tn.now = func() time.Time { return at }
+	tn.pick = func(o [3]string) string { return o[0] }
 	return tn
+}
+
+// The three check-out send-offs (operator 2026-10-19, one "stay classy Raider").
+func TestTankerCheckOutVariations(t *testing.T) {
+	want := []string{
+		"Raider 302, Texaco, copy, cleared to depart. Good hunting.",
+		"Raider 302, Texaco, cleared to depart. Stay classy, Raider.",
+		"Raider 302, Texaco, copy, cleared to depart. Go get 'em.",
+	}
+	for i, w := range want {
+		tn := testTanker()
+		tn.pick = func(o [3]string) string { return o[i] }
+		call := "Texaco 3-1, Raider 302, checking out, pushing 282."
+		if got := tn.Response(call, tankerCallsign(call)); got != w {
+			t.Errorf("version %d: got %q, want %q", i, got, w)
+		}
+	}
 }
 
 func TestTankerCallsign(t *testing.T) {

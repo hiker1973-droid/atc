@@ -146,6 +146,7 @@ type tankerNet struct {
 	mu      sync.Mutex
 	flights map[string]*tankerFlight
 	now     func() time.Time
+	pick    func([3]string) string // which of a reply's versions; tests pin the first
 }
 
 // tankerFlightAge: a flight not heard from in this long starts again.
@@ -161,7 +162,7 @@ func newTankerNet(spoken string, angels, kias func() int) *tankerNet {
 		short = spoken[:i]
 	}
 	return &tankerNet{Spoken: spoken, Short: short, angels: angels, kias: kias,
-		flights: make(map[string]*tankerFlight), now: time.Now}
+		flights: make(map[string]*tankerFlight), now: time.Now, pick: commandPick}
 }
 
 var (
@@ -354,7 +355,17 @@ func (n *tankerNet) Response(text, cs string) string {
 	// "checking out, resuming navigation, pushing 282"
 	case tankerCheckOutRe.MatchString(lower) && !checkIn:
 		f.stage, f.basket = 0, ""
-		return fmt.Sprintf("%s, %s, copy, cleared to depart. Good hunting.", cs, n.Short)
+		// Three send-offs (operator 2026-10-19: one of them "stay classy
+		// Raider" - the callsign's name, so Venom hears "stay classy, Venom").
+		name := cs
+		if i := strings.IndexByte(cs, ' '); i > 0 {
+			name = cs[:i]
+		}
+		return n.pick([3]string{
+			fmt.Sprintf("%s, %s, copy, cleared to depart. Good hunting.", cs, n.Short),
+			fmt.Sprintf("%s, %s, cleared to depart. Stay classy, %s.", cs, n.Short, name),
+			fmt.Sprintf("%s, %s, copy, cleared to depart. Go get 'em.", cs, n.Short),
+		})
 
 	// "satisfied, moving to starboard reform" / "established starboard reform"
 	case reform || tankerReformRe.MatchString(lower) && f.stage > 0:
