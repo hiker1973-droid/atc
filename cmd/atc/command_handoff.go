@@ -22,7 +22,19 @@ const (
 	handoffThresholdNm   = 30.0
 	handoffCheckInterval = 30 * time.Second
 	pilotIdleTimeout     = 60 * time.Minute
+	// handoffMaxCloseNm: more than this closer in one check is not a jet
+	// flying in, it is a respawn on a parking spot (Day 2026-10-19 17:21
+	// Raider 302 "contact Senaki tower" at 0.28 nm; Foothold Raider 303 at
+	// 0.32 nm from Incirlik four times, 18-19 Oct).
+	handoffMaxCloseNm = 25.0
 )
+
+// positionJumped: the pilot went from lastDistNm to nowNm in one check faster
+// than any jet flies. An infinite lastDistNm is the tasked pilot's RTB call,
+// which hands off from wherever he is, so it never counts as a jump.
+func positionJumped(lastDistNm, nowNm float64) bool {
+	return !math.IsInf(lastDistNm, 1) && lastDistNm-nowNm > handoffMaxCloseNm
+}
 
 // carrierLaunchRadiusNm: a pilot Command first sees this close to the boat
 // launched from it (they check in with Command right after Marshal releases
@@ -626,6 +638,13 @@ func runCommandHandoffWatch(
 			// Trigger only when closing through the threshold — prevents
 			// firing when pilot starts a sortie already within range, and
 			// prevents repeat fires when they orbit at the edge.
+			if recoveryName != "" && pilot.lastDistNm > handoffThresholdNm && nearestDist <= handoffThresholdNm &&
+				positionJumped(pilot.lastDistNm, nearestDist) {
+				log.Info().Str("callsign", cs).Float64("dist", nearestDist).Float64("was", pilot.lastDistNm).
+					Msg("Command: recovery handoff skipped - position jumped (respawn), not a jet flying in")
+				pilot.lastDistNm = nearestDist
+				continue
+			}
 			if recoveryName != "" && pilot.lastDistNm > handoffThresholdNm && nearestDist <= handoffThresholdNm {
 				switch gateHandoff(pilot, tracker.inFlight.Load() > 0) {
 				case handoffDefer:

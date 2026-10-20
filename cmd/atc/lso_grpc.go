@@ -147,6 +147,16 @@ func streamLSOGrades(ctx context.Context, addr string, truth *lsoTruth, connecte
 		if err != nil {
 			return err
 		}
+		// A player's own landing, logged so a player trap shows whether DCS
+		// sends players anything at all: AI traps get a grade, no player trap
+		// on Day 16-20 Oct did (the grade is likely worked out on the
+		// player's PC in multiplayer and never reaches the server's events).
+		if land := ev.GetLand(); land != nil {
+			if p := land.GetInitiator().GetUnit().GetPlayerName(); p != "" {
+				log.Info().Str("player", p).Str("type", land.GetInitiator().GetUnit().GetType()).
+					Str("place", land.GetPlace().GetName()).Msg("Paddles: DCS player landing event")
+			}
+		}
 		lqm := ev.GetLandingQualityMark()
 		if lqm == nil {
 			continue

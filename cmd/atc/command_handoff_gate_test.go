@@ -72,3 +72,22 @@ func TestCommandEchoesDoNotChangeTasked(t *testing.T) {
 		t.Error("a check-in marked the pilot tasked")
 	}
 }
+
+// A respawn on a parking spot is not a crossing (Day 2026-10-19 17:21 Raider
+// 302 at 0.28 nm; Foothold Raider 303 at 0.32 nm from Incirlik).
+func TestHandoffIgnoresPositionJump(t *testing.T) {
+	for _, c := range []struct {
+		last, now float64
+		jumped    bool
+	}{
+		{48, 0.28, true},          // last seen far out, respawned at the field
+		{31.5, 27.4, false},       // flying in at ~500 kt
+		{36, 29, false},           // fast, still real
+		{math.Inf(1), 0.3, false}, // tasked pilot called RTB: hand off from anywhere
+		{-1, 0.3, false},          // first sighting
+	} {
+		if got := positionJumped(c.last, c.now); got != c.jumped {
+			t.Errorf("positionJumped(%v, %v) = %v, want %v", c.last, c.now, got, c.jumped)
+		}
+	}
+}
