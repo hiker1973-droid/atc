@@ -101,6 +101,7 @@ const (
 	RequestWindCheck                // "wind check" / "say altimeter" — current wind and altimeter
 	RequestHungOrdnance             // "hung ordnance" / "hung store" — straight in, dearm after landing
 	RequestTouchdown                // "wheels down" / "touchdown" / "landed" — on the runway, not yet clear of it
+	RequestSoulsFuel                // "one soul on board, fuel state zero" — the answer to the emergency ack (emergency.go)
 )
 
 // ATCRequest is a parsed pilot transmission.
@@ -654,10 +655,19 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 	case RequestEmergency:
 		// Emergency — clear the pattern, priority landing clearance.
 		// Remove all other aircraft from cleared-to-land state; they hold.
+		// The pilot's runway, if he names one: in an emergency he picks it
+		// (emergency.go).
 		ac.Phase = state.PhaseInbound
+		ac.Emergency = true
+		if rwy := requestedRunway(s.Airfield, strings.ToLower(req.Raw)); rwy != "" {
+			ac.EmergencyRunway = rwy
+		}
 		response = c.composer.EmergencyAck(
-			req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, s.AltimeterInHg,
+			req.Callsign, c.runwayFor(ac), s.WindFromMag, s.WindKts, s.AltimeterInHg,
 		)
+
+	case RequestSoulsFuel:
+		response = c.emergencyDetails(req, ac)
 
 	case RequestNegativeContact:
 		return // basic mode — not active
@@ -806,11 +816,17 @@ func (c *ATCController) landingClearance(req *ATCRequest, ac *state.AircraftStat
 		ac.GroundSlowSince = time.Time{}
 		ac.RunwayChased = false
 	}
+	if ac != nil && ac.Emergency { // "on final runway 09" from an emergency jet
+		if rwy := requestedRunway(s.Airfield, strings.ToLower(req.Raw)); rwy != "" {
+			ac.EmergencyRunway = rwy
+		}
+	}
+	rwy := c.runwayFor(ac)
 	wheels := c.oweWheelsCheck(ac, req.Raw)
 	if req.Option != composer.OptionNone {
-		return c.composer.OptionClearance(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, req.Option, wheels)
+		return c.composer.OptionClearance(req.Callsign, rwy, s.WindFromMag, s.WindKts, req.Option, wheels)
 	}
-	return c.composer.ClearedToLand(req.Callsign, s.ActiveRunway, s.WindFromMag, s.WindKts, wheels)
+	return c.composer.ClearedToLand(req.Callsign, rwy, s.WindFromMag, s.WindKts, wheels)
 }
 
 // handleTakeoffRequest applies conflict detection before issuing a takeoff clearance.
@@ -1398,6 +1414,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// south", "turning base", "just airborne"), and any later case would
 		// otherwise answer it as a routine pattern call.
 		req.Type = RequestEmergency
+	case containsAny(lower, "soul on board", "souls on board", "soul onboard", "souls onboard",
+		"souls aboard", "persons on board", "people on board"):
+		req.Type = RequestSoulsFuel
 	case containsAny(lower, "hung ordnance", "hung ordinance", "hung store", "hung bomb", "hung weapon", "hung munition", "hung missile"):
 		// Ahead of the position cases for the same reason as emergency.
 		// "ordinance" is how Whisper usually spells it.

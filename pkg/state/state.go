@@ -103,6 +103,10 @@ type AircraftState struct {
 	LastContact time.Time
 	// Runway is the assigned runway designator (e.g. "27")
 	Runway string
+	// Emergency is set once the aircraft declared an emergency; EmergencyRunway
+	// is the runway end it asked for then ("09"), "" for the active.
+	Emergency       bool
+	EmergencyRunway string
 	// FuelState is the pilot's stated fuel in decimal (e.g. 5.2 = 5200 lbs)
 	FuelState float64
 	// GoAroundWarned tracks whether a proactive go-around has been issued
