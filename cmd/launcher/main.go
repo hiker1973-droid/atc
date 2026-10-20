@@ -783,6 +783,8 @@ type RigStatus struct {
 	RolesTotal int          `json:"rolesTotal"`
 	Running    []Role       `json:"running,omitempty"`
 	Alerts     []Alert      `json:"alerts,omitempty"`
+	Mission    *RigMission  `json:"mission,omitempty"`
+	Air        *RigAir      `json:"air,omitempty"`
 	Err        string       `json:"err,omitempty"`
 	At         time.Time    `json:"at"`
 }
@@ -837,7 +839,9 @@ func pollRig(rig Rig) RigStatus {
 		if err := fleetGetJSON(base+"/api/alerts", &alerts); err == nil {
 			rs.Alerts = alerts
 		}
+		rs.Mission = pollRigMission(base, rs.Running)
 	}
+	rs.Air = rigAir(rig)
 	return rs
 }
 
@@ -1362,6 +1366,7 @@ func writeMizWeather(w http.ResponseWriter, path string, wx miz.Weather) {
 		"visNm":   wx.VisNm,
 		"altInHg": wx.AltInHg,
 		"tempC":   wx.TempC,
+		"theatre": wx.Theatre,
 	})
 }
 

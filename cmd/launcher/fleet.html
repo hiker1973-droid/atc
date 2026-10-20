@@ -70,6 +70,18 @@
   .upd { margin-top: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.78rem; border: 1px solid var(--border); }
   .upd.run { border-color: #9e6a0399; color: var(--amber); }
   .upd.ok { border-color: #2386364d; color: var(--green); }
+  /* Mission + DCS link + traffic */
+  .mission { margin-bottom: 0.7rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; background: #ffffff05; }
+  .mission.bad { border-color: #da363399; background: #6e111122; }
+  .mission-name { font-size: 0.86rem; font-weight: 600; color: var(--text); word-break: break-word; }
+  .mission-sub { font-size: 0.76rem; color: var(--muted); margin-top: 0.2rem; display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+  .mismatch { color: var(--red); font-size: 0.78rem; font-weight: 600; margin-top: 0.3rem; }
+  .traffic summary { cursor: pointer; font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; }
+  .traffic table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.3rem; }
+  .traffic td { padding: 0.1rem 0.3rem 0.1rem 0; white-space: nowrap; }
+  .traffic td.alt { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .traffic td.ac { color: var(--muted); }
+  .c-blue { color: var(--blue); } .c-red { color: var(--red); }
   .upd.fail { border-color: #da363366; color: var(--red); white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
@@ -106,6 +118,55 @@ function gciDot(h) {
   return dot('GCI', null, 'unknown — launcher predates the GCI probe, needs redeploy');
 }
 
+// What the rig's DCS server is flying: mission file, DCS link (this launcher's
+// Tacview feed for the rig), traffic, and a red flag when the running roles are
+// for another theatre.
+function missionBlock(r) {
+  const m = r.mission, a = r.air;
+  if (!m && !a) return '';
+  // A dead link only matters when ATC roles are up and talking to nobody.
+  const live = (r.running || []).length > 0;
+  const bad = !!(m && m.mismatch && m.mismatch.length) || !!(a && !a.connected && live);
+  let h = `<div class="mission${bad ? ' bad' : ''}">`;
+  if (m && m.name) {
+    h += `<div class="mission-name" title="${esc(m.name)}: the mission the DCS server reports loaded">${esc(m.name.replace(/\.miz$/i, ''))}</div>`;
+  } else if (m && m.err) {
+    h += `<div class="empty" title="${esc(m.err)}">no mission reported</div>`;
+  } else {
+    h += `<div class="empty">mission unknown</div>`;
+  }
+  const sub = [];
+  if (m && m.region) {
+    const lbl = REGION_LABEL[m.region] || m.region;
+    sub.push(m.regionGuessed ? `<span title="guessed from the file name: this rig's launcher does not report the theatre yet">${esc(lbl)}?</span>` : esc(lbl));
+  }
+  if (a) {
+    const stale = a.connected && a.ageSec > 30;
+    const title = a.connected ? (stale ? `no telemetry for ${Math.round(a.ageSec)} s: mission paused or ended?` : 'Tacview feed live') : (a.err || 'not connected');
+    sub.push(dot('DCS', a.connected && !stale, title));
+    if (a.connected) sub.push(`<span><b>${a.airborne}</b> airborne · ${a.onGround} on ground</span>`);
+  }
+  if (sub.length) h += `<div class="mission-sub">${sub.join('')}</div>`;
+  if (a && !a.connected && a.err && live) h += `<div class="err" title="${esc(a.err)}">${esc(linkErr(a.err))}</div>`;
+  if (m && m.mismatch && m.mismatch.length) {
+    const roles = m.mismatch.map(x => REGION_LABEL[x] || x).join(', ');
+    h += `<div class="mismatch">⚠ roles running for ${esc(roles)}, mission is ${esc(REGION_LABEL[m.region] || m.region)}</div>`;
+  }
+  if (a && a.contacts && a.contacts.length) {
+    const rows = a.contacts.map(c => `<tr><td class="${c.color === 'Blue' ? 'c-blue' : c.color === 'Red' ? 'c-red' : ''}">${esc(c.callsign)}</td><td class="ac">${esc(c.aircraft)}</td><td class="alt">${c.altFt.toLocaleString()} ft</td></tr>`).join('');
+    const key = 'traffic:' + r.name;
+    h += `<details class="traffic" data-key="${esc(key)}"${OPEN[key] ? ' open' : ''} ontoggle="OPEN[this.dataset.key]=this.open"><summary>${a.blue} blue · ${a.red} red airborne</summary><table>${rows}</table></details>`;
+  }
+  return h + '</div>';
+}
+// Tacview's socket errors are long Windows strings; say what they mean.
+function linkErr(e) {
+  if (/actively refused/i.test(e)) return 'DCS not running or no mission loaded (Tacview port closed)';
+  if (/timed? ?out|did not properly respond/i.test(e)) return 'no answer from the rig (Tacview timed out)';
+  return e;
+}
+const OPEN = {}; // traffic lists the operator opened survive the 5 s refresh
+
 function rigCard(r) {
   let badge, cls;
   if (r.launcherUp) { badge = 'Online'; cls = 'online'; }
@@ -123,6 +184,7 @@ function rigCard(r) {
       ${gciDot(h)}
     </div>`;
   }
+  body += missionBlock(r);
 
   if (r.launcherUp) {
     const running = r.running || [];
@@ -190,10 +252,16 @@ async function refresh() {
     document.getElementById('grid').innerHTML = rigs.map(rigCard).join('');
     // global alert banner
     let total = 0, offline = 0;
-    rigs.forEach(r => { total += (r.alerts || []).length; if (!r.launcherUp && !r.hostUp) offline++; });
+    let wrongMap = 0;
+    rigs.forEach(r => {
+      total += (r.alerts || []).length;
+      if (!r.launcherUp && !r.hostUp) offline++;
+      if (r.mission && r.mission.mismatch && r.mission.mismatch.length) wrongMap++;
+    });
     const banner = document.getElementById('banner');
     const parts = [];
     if (total) parts.push(`${total} active fault${total === 1 ? '' : 's'} across the fleet`);
+    if (wrongMap) parts.push(`${wrongMap} rig${wrongMap === 1 ? '' : 's'} running roles for the wrong theatre`);
     if (offline) parts.push(`${offline} rig${offline === 1 ? '' : 's'} offline`);
     if (parts.length) { banner.textContent = '⚠ ' + parts.join(' · '); banner.classList.add('show'); }
     else { banner.classList.remove('show'); }

@@ -149,3 +149,18 @@ func TestReadMizWeatherCloudPresets(t *testing.T) {
 		}
 	}
 }
+
+func TestReadMizWeatherTheatre(t *testing.T) {
+	for _, mission := range []string{
+		"mission = {\n[\"theatre\"] = \"Caucasus\",\n[\"weather\"] = {\n[\"qnh\"] = 760,\n},\n}\n",
+		"mission = {\ntheatre = \"Caucasus\",\nweather = {\nqnh = 760,\n},\n}\n",
+	} {
+		w, err := ReadMizWeather(writeMiz(t, mission))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w.Theatre != "Caucasus" {
+			t.Fatalf("theatre = %q, want Caucasus", w.Theatre)
+		}
+	}
+}

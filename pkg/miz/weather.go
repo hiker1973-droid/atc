@@ -26,6 +26,7 @@ type Weather struct {
 	VisNm       float64
 	AltInHg     float64
 	TempC       float64
+	Theatre     string // the mission's map as DCS names it, e.g. "Caucasus", "PersianGulf"
 	SourcePath  string
 }
 
@@ -46,6 +47,7 @@ var (
 	cloudsBaseRE = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("base") + `(\d+)`)
 	cloudsDenRE  = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("density") + `(\d+)`)
 	cloudsPreRE  = regexp.MustCompile(`(?s)` + key("clouds") + `\{[^{}]*?` + key("preset") + `"([^"]+)"`)
+	theatreRE    = regexp.MustCompile(key("theatre") + `"([^"]+)"`)
 	tempRE       = regexp.MustCompile(`(?s)` + key("season") + `\{[^{}]*?` + key("temperature") + `([-\d.]+)`)
 )
 
@@ -109,6 +111,10 @@ func ReadMizWeather(mizPath string) (Weather, error) {
 		return w, err
 	}
 	s := string(data)
+	// theatre is a top-level key, outside the weather block.
+	if m := theatreRE.FindStringSubmatch(s); len(m) == 2 {
+		w.Theatre = m[1]
+	}
 	// Bare keys are common words, so start at the weather block rather than
 	// risk a `qnh =` or `visibility =` from a trigger script earlier in the file.
 	if loc := weatherRE.FindStringIndex(s); loc != nil {
