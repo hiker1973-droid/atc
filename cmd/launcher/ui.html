@@ -35,7 +35,7 @@
   /* One row that wraps instead of squashing. The header carries a lot now —
      brand, rig picker, five theatre buttons, region controls, nav, clock — and
      on a narrow window flex was shrinking the wordmark into odd sizes. */
-  header { padding: 0.8rem 1.2rem; background: var(--panel); border-bottom: 2px solid var(--orange);
+  header { padding: 1.35rem 1.2rem 0.8rem; position: relative; background: var(--panel); border-bottom: 2px solid var(--orange);
            display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; row-gap: 0.6rem; }
   .brand { display: flex; align-items: center; gap: 0.7rem; flex: none; }
   .patch { width: 38px; height: 38px; border-radius: 50%; flex: none;
@@ -165,9 +165,17 @@
   .el-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.72rem; color: var(--label); }
   .el-chip b { color: var(--text); font-weight: 600; }
   .el-chip.bad { border-color: var(--red); color: var(--red); }
-  .build-badge { position: fixed; right: 0.6rem; bottom: 0.5rem; z-index: 50; font: 0.7rem/1.4 ui-monospace, Consolas, monospace;
-                 color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
-                 padding: 0.15rem 0.45rem; opacity: 0.85; pointer-events: auto; }
+  /* Build badge: pinned to the header's upper right corner, in the strip the
+     header's top padding leaves free, so it never sits on the header's rows. */
+  .build-badge { position: absolute; top: 0.2rem; right: 1.2rem; font: 0.66rem/1.35 ui-monospace, Consolas, monospace;
+                 color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px;
+                 padding: 0.05rem 0.45rem; }
+  /* Tacview telemetry chip: live / connected but no data (paused) / offline. */
+  .tv-chip { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); padding: 0.15rem 0.5rem;
+             border-radius: 3px; font-size: 0.7rem; letter-spacing: 0.05em; margin-left: 0.6rem; vertical-align: middle; color: var(--muted); }
+  .tv-chip.live { color: var(--green); border-color: var(--green-dim); }
+  .tv-chip.stale { color: var(--amber, #d9a400); border-color: var(--amber, #d9a400); }
+  .tv-chip.off { color: var(--red); border-color: var(--red); }
   .build-badge.warn { color: var(--amber, #d9a400); border-color: var(--amber, #d9a400); }
   .cr-list { max-height: 18rem; overflow-y: auto; margin-top: 0.5rem; border-top: 1px solid var(--border); }
   .cr-row { display: grid; grid-template-columns: 4.2rem 9.5rem 1fr; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--label); }
@@ -302,7 +310,6 @@
 </style>
 </head>
 <body>
-<div class="build-badge" id="buildBadge" title="Build this rig is running">build …</div>
 <header>
   <div class="brand">
     <img class="patch" src="/logo.png" alt="vSFG-7 squadron patch">
@@ -334,8 +341,9 @@
     <a href="/fleet" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Fleet</a>
     <a href="/logs" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Logs</a>
   </div>
+  <div class="build-badge" id="buildBadge" title="Build this rig is running">build …</div>
   <div class="server">
-    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="gci-chip" id="gciChip"></span><span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
+    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv-chip" id="tvChip" title="Tacview real-time telemetry">TACVIEW …</span><span class="gci-chip" id="gciChip"></span><span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
     <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
   </div>
 </header>
@@ -853,6 +861,32 @@ function renderCards() {
 // Air picture — everyone airborne on the selected rig, ranged and bearinged off
 // the blue bullseye. Bearings are true, not magnetic: the Tacview feed carries
 // no declination, so calling them magnetic would be a quiet lie.
+// Tacview chip in the header, from the same feed as the air picture: LIVE while
+// data flows, NO DATA when connected but silent for 30 s (a paused mission),
+// OFFLINE when the telemetry port does not answer.
+function setTvChip(p) {
+  const chip = $('tvChip');
+  if (!p) {
+    chip.className = 'tv-chip';
+    chip.textContent = 'TACVIEW ?';
+    chip.title = 'Tacview status unavailable';
+  } else if (!p.connected) {
+    chip.className = 'tv-chip off';
+    chip.textContent = 'TACVIEW OFFLINE';
+    chip.title = 'Tacview real-time telemetry not reachable' + (p.err ? ' — ' + p.err : '') +
+      '. Mission paused or stopped, or telemetry off in DCS (Options > Special > Tacview).';
+  } else if ((p.ageSec || 0) > 30) {
+    chip.className = 'tv-chip stale';
+    chip.textContent = 'TACVIEW NO DATA';
+    chip.title = `Connected, but no data for ${Math.round(p.ageSec)} s — mission paused?`;
+  } else {
+    const n = (p.contacts || []).length;
+    chip.className = 'tv-chip live';
+    chip.textContent = 'TACVIEW LIVE';
+    chip.title = `Tacview telemetry flowing · ${n} airborne · data ${Math.round(p.ageSec || 0)} s ago`;
+  }
+}
+
 async function refreshAirborne() {
   const sub = $('airborneSub');
   const tbl = $('airborneTbl');
@@ -865,6 +899,7 @@ async function refreshAirborne() {
     if (r.status === 404) {
       sub.textContent = '';
       tbl.innerHTML = '<div class="empty">No Tacview feed configured for this rig.</div>';
+      setTvChip(null);
       return;
     }
     if (!r.ok) throw new Error(r.status);
@@ -872,8 +907,10 @@ async function refreshAirborne() {
   } catch (e) {
     sub.textContent = '';
     tbl.innerHTML = '<div class="empty">Air picture unavailable.</div>';
+    setTvChip(null);
     return;
   }
+  setTvChip(p);
 
   if (!p.connected) {
     sub.textContent = '';

@@ -53,6 +53,9 @@ type AirPicture struct {
 	Bullseye  *LatLon   `json:"bullseye,omitempty"`
 	Contacts  []Contact `json:"contacts"`
 	OnGround  int       `json:"onGround"`
+	// AgeSec is how old At is when served: the feed only republishes while
+	// data flows, so a connected feed going stale means a paused mission.
+	AgeSec float64 `json:"ageSec"`
 }
 
 type LatLon struct {
@@ -136,7 +139,11 @@ func handleAirborne(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no air picture configured for that rig", http.StatusNotFound)
 		return
 	}
-	writeJSON(w, s.get())
+	p := s.get()
+	if !p.At.IsZero() {
+		p.AgeSec = time.Since(p.At).Seconds()
+	}
+	writeJSON(w, p)
 }
 
 // tvObject is the accumulated state of one object in the stream. Updates are
