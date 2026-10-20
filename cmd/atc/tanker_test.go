@@ -19,7 +19,7 @@ func TestTankerCheckOutVariations(t *testing.T) {
 	want := []string{
 		"Raider 302, Texaco, copy, cleared to depart. Good hunting.",
 		"Raider 302, Texaco, cleared to depart. Stay classy, Raider.",
-		"Raider 302, Texaco, copy, cleared to depart. Go get 'em.",
+		"Raider 302, Texaco, copy, cleared to depart. Fara í víking.",
 	}
 	for i, w := range want {
 		tn := testTanker()
