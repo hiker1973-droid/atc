@@ -101,6 +101,8 @@ func TestParseIntentClassification(t *testing.T) {
 		{"ils", "Senaki Tower, Raider 11, request ILS runway 09", RequestStraightIn},
 		{"straight in", "Senaki Tower, Raider 11, request straight in", RequestStraightIn},
 		{"airborne", "Senaki Tower, Raider 11, airborne", RequestClearTraffic},
+		{"wheels up", "Senaki Tower, Raiders 306, wheels up.", RequestClearTraffic},
+		{"wheels down is not airborne", "Senaki Tower, Raider 11, wheels down", RequestTouchdown},
 		{"departing", "Senaki traffic, Raider 11, departing runway 09", RequestClearTraffic},
 		{"7 dme", "Senaki Tower, Raider 11, 7 dme", RequestDistanceCheck},
 		{"10 mile initial", "Senaki Tower, Raider 11, 10 mile initial", RequestDistanceInitial},

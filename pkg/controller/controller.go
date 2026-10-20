@@ -1427,8 +1427,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		req.Type = RequestSayAgain
 	case containsAny(lower, "wind check", "winds check", "say wind", "request wind", "say altimeter", "altimeter check", "request altimeter"):
 		req.Type = RequestWindCheck
-	case containsAny(lower, "clear traffic", "clear of traffic", "airborne", "departing"):
-		// Departure release — pilot is clear of the pattern (works on tower or CTAF)
+	case containsAny(lower, "clear traffic", "clear of traffic", "airborne", "departing", "wheels up", "wheels-up"):
+		// Departure release — pilot is clear of the pattern (works on tower or CTAF).
+		// "Senaki Tower, Raiders 306, wheels up" was asked to say again on DCS3 2026-10-20.
 		req.Type = RequestClearTraffic
 	case containsWord(lower, "rolling", "on the roll"):
 		// CTAF self-announced takeoff roll: "Senaki traffic, Raider 302, rolling

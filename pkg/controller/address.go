@@ -13,9 +13,10 @@ import "strings"
 //   - Tbilisi (UGTB): Whisper wrote "Double-Ace" and "To Velocity" on DCS3
 //     2026-10-14 and the calls were dropped; DCS names the field Lochini.
 //   - Senaki (UGKS): "Snarky Tower" (twice) and "Select Ski traffic" were
-//     dropped on DCS3 2026-10-17.
+//     dropped on DCS3 2026-10-17; "The Naki Raider 306, holding short" on
+//     2026-10-20 (Whisper split off the "Se").
 var fieldSpokenAliases = map[string][]string{
-	"senaki tower":          {"snarky", "select ski", "senacky", "senaky"},
+	"senaki tower":          {"snarky", "select ski", "senacky", "senaky", "the naki", "naki"},
 	"tbilisi tower":         {"tbilissi", "tiblisi", "tibilisi", "t bilisi", "lochini", "double ace", "double-ace", "to velocity"},
 	"mafraq tower":          {"king hussein", "hussein"},
 	"h4 tower":              {"h 4", "h-4", "h four"},
