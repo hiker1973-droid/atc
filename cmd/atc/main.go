@@ -1522,6 +1522,7 @@ func srsLoop(ctx context.Context, addr string, freqMHz float64, callsign, apiKey
 				if err != nil {
 					return
 				}
+				srsNames.note(line) // SRS client names: srs_names.go
 				// Respond to pings
 				var msg map[string]interface{}
 				if json.Unmarshal(line, &msg) == nil {
@@ -1825,6 +1826,7 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 		}
 		return
 	}
+	text = srsCorrect(text, origin)
 	log.Info().Str("text", text).Msg("recognized")
 	req := controller.ParseIntent(text, callsign)
 	if req == nil {

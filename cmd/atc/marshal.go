@@ -540,6 +540,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 				if err != nil {
 					return
 				}
+				srsNames.note(line) // SRS client names: srs_names.go
 				var msg map[string]interface{}
 				if json.Unmarshal(line, &msg) == nil {
 					if msgType, ok := msg["MsgType"].(float64); ok && int(msgType) == 1 {
@@ -591,6 +592,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 								log.Info().Str("text", text).Msg("Marshal: hallucination filtered")
 								return
 							}
+							text = srsCorrect(text, origin)
 							log.Info().Str("text", text).Msg("Marshal heard")
 							cs := undoubleCallsign(marshalCallsignFromText(text), func(c string) bool {
 								return atcCtrl.HasRecentContact(c, time.Minute)

@@ -312,6 +312,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 				if err != nil {
 					return
 				}
+				srsNames.note(line) // SRS client names: srs_names.go
 				var msg map[string]interface{}
 				if json.Unmarshal(line, &msg) == nil {
 					if msgType, ok := msg["MsgType"].(float64); ok && int(msgType) == 1 {
@@ -371,6 +372,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 								log.Info().Str("text", text).Str("channel", channelName).Msg("Command: own transmission heard back - dropped")
 								return
 							}
+							text = srsCorrect(text, origin)
 							log.Info().Str("text", text).Str("channel", channelName).Msg("Command heard")
 							pilots.add(origin)
 							cs, resp := handle(text)

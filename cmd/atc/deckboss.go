@@ -503,6 +503,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				if err != nil {
 					return
 				}
+				srsNames.note(line) // SRS client names: srs_names.go
 				var msg map[string]interface{}
 				if json.Unmarshal(line, &msg) == nil {
 					if msgType, ok := msg["MsgType"].(float64); ok && int(msgType) == 1 {
@@ -546,6 +547,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 							if isWhisperHallucination(text) {
 								return
 							}
+							text = srsCorrect(text, origin)
 							log.Info().Str("text", text).Msg("Deckboss heard")
 							cs := extractCallsignSkippingAddress(text, deckbossAddrPrefixes...)
 							handleDeckbossCall(text, cs)
