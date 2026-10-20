@@ -33,7 +33,7 @@ import (
 //	"Knight 1-3, satisfied, moving to starboard reform" -> "Knight 13, Texaco, cleared starboard reform."
 //	"Knight 1-3, established starboard reform"      -> "Knight 13, Texaco, copy."
 //	"Texaco 1, Knight 1-1, checking out, resuming navigation, pushing 282"
-//	   -> "Knight 11, Texaco, copy, cleared to depart. Good hunting."
+//	   -> "Knight 11, Texaco, copy, cleared to depart. Fortuna super te, Viking."
 //
 // Texaco 1-1 in V1.31 Training (Day): KC-130, 252.100 AM (Hornet COMM2 CH8),
 // TACAN 51Y TX1, angels 13, two wing drogues. Its altitude and speed come
@@ -357,13 +357,14 @@ func (n *tankerNet) Response(text, cs string) string {
 		f.stage, f.basket = 0, ""
 		// Three send-offs (operator 2026-10-19: one of them "stay classy
 		// Raider" - the callsign's name, so Venom hears "stay classy, Venom" -
-		// and one "fara í víking", Old Norse for "go a-viking").
+		// one "fara í víking", Old Norse for "go a-viking", and #1 "Fortuna super
+		// te, Viking", Latin "fortune be upon you", in place of "Good hunting").
 		name := cs
 		if i := strings.IndexByte(cs, ' '); i > 0 {
 			name = cs[:i]
 		}
 		return n.pick([3]string{
-			fmt.Sprintf("%s, %s, copy, cleared to depart. Good hunting.", cs, n.Short),
+			fmt.Sprintf("%s, %s, copy, cleared to depart. Fortuna super te, Viking.", cs, n.Short),
 			fmt.Sprintf("%s, %s, cleared to depart. Stay classy, %s.", cs, n.Short, name),
 			fmt.Sprintf("%s, %s, copy, cleared to depart. Fara í víking.", cs, n.Short),
 		})

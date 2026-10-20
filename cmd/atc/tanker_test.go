@@ -17,7 +17,7 @@ func testTanker() *tankerNet {
 // The three check-out send-offs (operator 2026-10-19, one "stay classy Raider").
 func TestTankerCheckOutVariations(t *testing.T) {
 	want := []string{
-		"Raider 302, Texaco, copy, cleared to depart. Good hunting.",
+		"Raider 302, Texaco, copy, cleared to depart. Fortuna super te, Viking.",
 		"Raider 302, Texaco, cleared to depart. Stay classy, Raider.",
 		"Raider 302, Texaco, copy, cleared to depart. Fara í víking.",
 	}
@@ -99,7 +99,7 @@ func TestTankerProcedureFlow(t *testing.T) {
 		{"Knight 1-1, satisfied, moving to starboard reform", "Knight 11, Texaco, cleared starboard reform."},
 		{"Knight 1-1, established starboard reform", "Knight 11, Texaco, copy."},
 		{"Texaco 1, Knight 1-1, checking out, resuming navigation, pushing 282",
-			"Knight 11, Texaco, copy, cleared to depart. Good hunting."},
+			"Knight 11, Texaco, copy, cleared to depart. Fortuna super te, Viking."},
 	})
 	if f := tn.flights["Knight 11"]; f != nil {
 		t.Errorf("lead still on the tanker after checking out: %+v", f)
@@ -117,7 +117,7 @@ func TestTankerOperatorFlow(t *testing.T) {
 		{"Raider 302, established.", "Raider 302, Texaco, copy. Port and starboard baskets open."},
 		{"Raider 302, ready pre-contact.", "Raider 302, Texaco, copy, call ready pre-contact."},
 		{"Texaco, Raider 302, refuel complete.", "Raider 302, Texaco, cleared starboard reform."},
-		{"Texaco, Raider 302, departing.", "Raider 302, Texaco, copy, cleared to depart. Good hunting."},
+		{"Texaco, Raider 302, departing.", "Raider 302, Texaco, copy, cleared to depart. Fortuna super te, Viking."},
 	})
 }
 
