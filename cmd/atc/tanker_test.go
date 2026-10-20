@@ -170,3 +170,36 @@ func TestTankerRadioCheck(t *testing.T) {
 		{"Raider 302, 1 mile trail for port observation", "Raider 302, Texaco, continue port observation."},
 	})
 }
+
+// Day 2026-10-19 19:35-19:41, Raider 302 on Texaco 3-1: "one flight of F-18"
+// was taken as the callsign, "establish portside", the bare "Ready
+// pre-contact.", "establish starboard side" and "moving on (to) mission"
+// were misses.
+func TestTankerDay1019Flow(t *testing.T) {
+	tn := testTanker()
+	tn.Spoken, tn.Short = "Texaco three one", "Texaco"
+	runTanker(t, tn, []struct{ call, want string }{
+		{"Texaco 3-1, one flight of F-18, Raider 302, 15-mile trail, intent to refuel.",
+			"Raider 302, Texaco three one, cleared port observation, one three thousand, velocity three three six. How much do you request?"},
+		{"Texaco 31, Raider 302, request 3,000 pounds.", "Raider 302, Texaco copies three thousand pounds."},
+		{"Texaco 31, Raider 302, one-mile trail for portside observation.", "Raider 302, Texaco, continue port observation."},
+		{"Texaco 31, Raider 302, establish portside.", "Raider 302, Texaco, copy. Port and starboard baskets open."},
+		{"Texaco 3-1, Raider 302 passing behind for portside basket.", "Raider 302, Texaco, cleared port basket."},
+		{"Ready pre-contact.", "Raider 302, Texaco, copy, call ready pre-contact."},
+		{"Texaco 31, Raider 302 satisfied, moving to starboard side reform.", "Raider 302, Texaco, cleared starboard reform."},
+		{"Texaco 3-1, Raider 302, establish starboard side.", "Raider 302, Texaco, copy."},
+		{"Texaco 3-1, Raider 302 moving on mission.", "Raider 302, Texaco, copy, cleared to depart. Fortuna super te, Viking."},
+	})
+	// Nobody on the tanker now: a bare call with no callsign is not answered.
+	if got := tn.Response("Ready pre-contact.", tankerCallsign("Ready pre-contact.")); got != "" {
+		t.Errorf("no jet on the tanker: %q", got)
+	}
+	call := "Texaco 3-1, Raider 3-0-2, moving on to mission."
+	if got := tankerCallsign(call); got != "Raider 302" {
+		t.Errorf("callsign %q", got)
+	}
+	tn.Response("Texaco 3-1, Raider 302, intent to refuel", "Raider 302")
+	if got := tn.Response(call, "Raider 302"); !strings.Contains(got, "cleared to depart") {
+		t.Errorf("moving on to mission: %q", got)
+	}
+}

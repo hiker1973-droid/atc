@@ -31,3 +31,25 @@ func TestCommandShotResponse(t *testing.T) {
 		t.Errorf("two jets end in 302, got %q", got)
 	}
 }
+
+// Day 2026-10-19 19:28-19:45: Raider 302's attack calls to Command were misses.
+func TestCommandAttackCalls(t *testing.T) {
+	store := newTacviewPositions()
+	store.Set("Raider 302", orb.Point{41.6, 42.0})
+	for in, want := range map[string]string{
+		"Command, Raider 302 proceeding to IP Granite.":  "Raider 302, vSFG-7-Command, ",
+		"Command, Raider 302 inbound artillery battery.": "Raider 302, vSFG-7-Command, ",
+		"Command, Raider 302 in hot.":                    "cleared hot",
+		"Command, Raider 302, pickle times two.":         "pickle",
+		"Command, Raider 302, rifle.":                    "rifle",
+	} {
+		cs := joinCallsignDigits(extractCallsignSkippingAddress(in, commandAddresses...))
+		got := commandReply(in, cs, "vSFG-7-Command", store)
+		if !strings.Contains(got, want) || !strings.HasPrefix(got, "Raider 302, ") {
+			t.Errorf("%q (callsign %q): %q, want it to contain %q", in, cs, got, want)
+		}
+	}
+	if got := commandReply("Command, M203 copies.", "M203", "vSFG-7-Command", store); got != "" {
+		t.Errorf("acknowledgement answered: %q", got)
+	}
+}

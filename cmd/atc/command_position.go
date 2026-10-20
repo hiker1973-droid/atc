@@ -90,6 +90,12 @@ var (
 	foxRe     = regexp.MustCompile(`\bfox[\s-]*(1|2|3|one|two|three)\b`)
 	splashRe  = regexp.MustCompile(`\bsplash(ed)?\b`)
 	bareNumRe = regexp.MustCompile(`^(\d{2,3})\b`)
+	// The attack calls a pilot makes to Command when no JTAC is up (Day
+	// 2026-10-19 19:44-19:45: "inbound artillery battery", "in hot", "pickle
+	// times two" were misses; "proceeding to IP Granite" at 19:28).
+	inHotRe      = regexp.MustCompile(`\b(in hot|rolling in|in from the \w+)\b`)
+	releaseRe    = regexp.MustCompile(`\b(pickle|rifle|bombs away)\b`)
+	attackMoveRe = regexp.MustCompile(`\b(inbound|proceeding|en ?route)\b`)
 )
 
 var foxSpoken = map[string]string{"1": "one", "2": "two", "3": "three", "one": "one", "two": "two", "three": "three"}
@@ -97,12 +103,16 @@ var foxSpoken = map[string]string{"1": "one", "2": "two", "3": "three", "one": "
 // commandShotResponse copies a shot or a kill (Day 2026-10-19 16:59-17:00:
 // "302 Fox 3, 26 for 73", "302, splash MiG-29" were intent misses). Only
 // reached when nothing else answered. Pilots call these with the flight
-// number alone, so "302" becomes the Tacview callsign that ends in it.
+// number alone, so "302" becomes the Tacview callsign that ends in it. Also
+// the attack calls: in hot, pickle/rifle, inbound/proceeding.
 func commandShotResponse(text, callsign, channelName string, store *tacviewPositions) string {
 	lower := strings.ToLower(text)
 	splash := splashRe.MatchString(lower)
 	fox := foxRe.FindStringSubmatch(lower)
-	if !splash && fox == nil {
+	release := releaseRe.FindStringSubmatch(lower)
+	inHot := inHotRe.MatchString(lower)
+	move := attackMoveRe.MatchString(lower)
+	if !splash && fox == nil && release == nil && !inHot && !move {
 		return ""
 	}
 	// "302 Fox 3, 26 for 73" extracts as "302 Fox 3".
@@ -116,6 +126,30 @@ func commandShotResponse(text, callsign, channelName string, store *tacviewPosit
 	}
 	if callsign == "" {
 		return ""
+	}
+	switch {
+	case release != nil:
+		word := release[1]
+		if word == "bombs away" {
+			word = "pickle"
+		}
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, copy %s.", callsign, channelName, word),
+			fmt.Sprintf("%s, %s, copy %s, call off safe.", callsign, channelName, word),
+			fmt.Sprintf("%s, %s, roger %s.", callsign, channelName, word),
+		})
+	case inHot:
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, cleared hot.", callsign, channelName),
+			fmt.Sprintf("%s, %s, copy in hot, cleared hot.", callsign, channelName),
+			fmt.Sprintf("%s, %s, roger, cleared hot.", callsign, channelName),
+		})
+	case !splash && fox == nil: // inbound / proceeding
+		return commandPick([3]string{
+			fmt.Sprintf("%s, %s, copy.", callsign, channelName),
+			fmt.Sprintf("%s, %s, roger.", callsign, channelName),
+			fmt.Sprintf("%s, %s, copy, continue.", callsign, channelName),
+		})
 	}
 	if splash {
 		return commandPick([3]string{

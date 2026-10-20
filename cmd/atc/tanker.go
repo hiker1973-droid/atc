@@ -168,12 +168,12 @@ func newTankerNet(spoken string, angels, kias func() int) *tankerNet {
 var (
 	tankerCheckInRe     = regexp.MustCompile(`\b(initial|intent(ion)? to (refuel|tank|get gas)|request(ing)? (fuel|gas|tanking|to refuel|refuel|rejoin)|for (fuel|gas)|need (fuel|gas)|checking in|check in|inbound)\b`)
 	tankerTrailRe       = regexp.MustCompile(`\b(mile trail|in trail|trail|one mile|1 mile|astern)\b`)
-	tankerEstablishedRe = regexp.MustCompile(`\b(established|in position|stabilized|in place)\b`)
+	tankerEstablishedRe = regexp.MustCompile(`\b(established|establish(ing)?|in position|stabilized|in place)\b`)
 	tankerObservationRe = regexp.MustCompile(`\bobservation\b`)
 	tankerBasketRe      = regexp.MustCompile(`\b(?:(port|starboard|left|right)\s+)?(basket|drogue|hose)\b`)
 	tankerPreContactRe  = regexp.MustCompile(`\bpre-?\s?contact\b`)
 	tankerReformRe      = regexp.MustCompile(`\b(reform|satisfied|complete|completed|disconnect(ed|ing)?|done)\b`)
-	tankerCheckOutRe    = regexp.MustCompile(`\b(checking out|check out|resuming (navigation|mission|nav)|pushing|departing|leaving|clear(ing)? (of|the) tanker)\b`)
+	tankerCheckOutRe    = regexp.MustCompile(`\b(checking out|check out|resuming (navigation|mission|nav)|pushing|departing|leaving|clear(ing)? (of|the) tanker|moving on|on (to )?(the )?mission|proceeding (to )?(the )?mission|back to (the )?mission)\b`)
 	tankerFullRe        = regexp.MustCompile(`\b(full|top(ped)? off|fill (it|her|us) up|max)\b`)
 	tankerRadioCheckRe  = regexp.MustCompile(`\b((radio|comms?|com|comp)[\s-]?check|comcheck|how (do you )?copy|five by( five)?)\b`)
 	// "request 5.0", "five point oh", "5000 pounds", "5 thousand".
@@ -308,20 +308,40 @@ func basketSide(word string) string {
 	return ""
 }
 
+// onlyFlight is the one flight working the tanker, "" for none or several.
+func (n *tankerNet) onlyFlight(now time.Time) string {
+	only := ""
+	for cs, f := range n.flights {
+		if now.Sub(f.at) > tankerFlightAge {
+			continue
+		}
+		if only != "" {
+			return ""
+		}
+		only = cs
+	}
+	return only
+}
+
 var otherBasket = map[string]string{"port": "starboard", "starboard": "port"}
 
 // Response is the tanker's reply to one call ("" = nothing to say).
 func (n *tankerNet) Response(text, cs string) string {
 	lower := strings.ToLower(text)
-	if cs == "" {
-		if strings.Contains(lower, "texaco") || strings.Contains(lower, "tanker") {
-			return fmt.Sprintf("Station calling %s, say again your callsign.", n.Spoken)
-		}
-		return ""
-	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	now := n.now()
+	if cs == "" {
+		// "Ready pre-contact." with no callsign (Day 2026-10-19 19:38): the
+		// one jet on the tanker said it. A call that names the tanker and no
+		// callsign still gets "say again your callsign".
+		if strings.Contains(lower, "texaco") || strings.Contains(lower, "tanker") {
+			return fmt.Sprintf("Station calling %s, say again your callsign.", n.Spoken)
+		}
+		if cs = n.onlyFlight(now); cs == "" {
+			return ""
+		}
+	}
 	f := n.flights[cs]
 	if f != nil && now.Sub(f.at) > tankerFlightAge {
 		f = nil
@@ -370,7 +390,10 @@ func (n *tankerNet) Response(text, cs string) string {
 		})
 
 	// "satisfied, moving to starboard reform" / "established starboard reform"
-	case reform || tankerReformRe.MatchString(lower) && f.stage > 0:
+	// "establish starboard side" after the reform clearance is the reform
+	// established (Day 2026-10-19 19:40 was a miss).
+	case reform || tankerReformRe.MatchString(lower) && f.stage > 0 ||
+		established && strings.Contains(lower, "starboard") && f.stage >= tankerBasket && basket == nil:
 		f.basket = ""
 		if established {
 			f.stage = tankerReform
@@ -455,6 +478,9 @@ func (n *tankerNet) Response(text, cs string) string {
 // tankerCallsign is the pilot's callsign in a call to the tanker, without
 // the address: "Texaco 1-1, Raider 302, one Hornet, 15 miles" -> "Raider 302".
 func tankerCallsign(text string) string {
+	// "Texaco 3-1, one flight of F-18, Raider 302, ..." took "one" as the
+	// callsign (Day 2026-10-19 19:35): drop the flight description first.
+	text = tankerFlightDescRe.ReplaceAllString(text, "$1")
 	cs := extractCallsignSkippingAddress(text, "texaco one-one", "texaco one one", "texaco 1-1", "texaco 1 1", "texaco 11",
 		"texaco three-one", "texaco three one", "texaco 3-1", "texaco 3 1", "texaco 31",
 		"texaco one", "texaco 1", "texaco three", "texaco 3", "texaco", "tanker")
@@ -471,8 +497,16 @@ func tankerCallsign(text string) string {
 			cut = i
 		}
 	}
-	return joinCallsignDigits(strings.TrimSpace(cs[:cut]))
+	cs = joinCallsignDigits(strings.TrimSpace(cs[:cut]))
+	if !strings.ContainsAny(cs, "0123456789") {
+		return "" // "Ready pre-contact." is not a callsign
+	}
+	return cs
 }
+
+// tankerFlightDescRe: ", one flight of F-18," / ", flight of 2," / ", two Hornets,"
+// ahead of the callsign.
+var tankerFlightDescRe = regexp.MustCompile(`(?i)(,\s*)(?:(?:one|two|three|four|a|\d)\s+(?:flights?\s+of|ships?\s+of|hornets?\b|f-?1[68]s?\b|vipers?\b|jets?\b)|flights?\s+of)[^,]*,\s*`)
 
 // startTankers runs every configured tanker net.
 func startTankers(ctx context.Context, apiKey string, store *tacviewPositions) {

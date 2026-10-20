@@ -1556,11 +1556,13 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 
 
 	case containsAny(lower, "radio check", "comm check", "comms check", "com check", "comcheck", "comp check", "how copy",
-		"checking in", "check in"):
+		"checking in", "check in", "green jet", "engines running", "engines online"):
 		// A bare "checking in" is a first call with no request yet — answer it
 		// like a radio check ("loud and clear, go ahead") rather than "say
 		// again". Late in the switch, so a check-in carrying a position or
 		// request still gets that handling. Live miss, Akrotiri 2026-09-13.
+		// "Green jet" after startup is the same first call (Day 2026-10-19
+		// 19:18 "Senaki traffic, Raider 302, green jet." got "say again").
 		req.Type = RequestRadioCheck
 	case containsAny(lower, "wilco", "roger", "copy", "affirm", "negative",
 		"taxiing", "taxying"):
