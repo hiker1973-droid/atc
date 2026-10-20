@@ -25,7 +25,7 @@ from reportlab.platypus import (KeepTogether, PageBreak, Paragraph, SimpleDocTem
                                 TableStyle)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = "SkyEye 7047a8a, 20 Oct 2026"
+BUILD = "SkyEye 75405a7, 20 Oct 2026"
 OUT_NAME = "SkyEye Network Architecture.pdf"
 DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"]
 
@@ -314,7 +314,8 @@ VERIFY = [
 FAULTS = [
     ["TACVIEW OFFLINE on every role", "Real-time telemetry off in DCS, or the mission is paused (Foothold with no players - normal)."],
     ["SRS TCP failed for ~1 min, then fine", "Mission rotation restarting DCS/SRS. Roles re-register on their own."],
-    ["Dashboard :7000 dead, ATC still talking", "launcher.exe died; start_launcher.bat (roles keep running)."],
+    ["Dashboard :7000 dead, ATC still talking", "launcher.exe died; start_launcher.bat (roles keep running). "
+              "install_launcher_watchdog.bat (once per rig) restarts it automatically within ~60 s."],
     ["Radio effect missing (clean audio)", "ffmpeg path wrong - pass --ffmpeg."],
     ["Voices switched to OpenAI", "ElevenLabs credit cap (127,000) reached; resets on the 14th, 16:31Z."],
     ["Roles on the wrong weather", "Hook not installed / current_mission.txt stale; check /api/miz-weather."],
