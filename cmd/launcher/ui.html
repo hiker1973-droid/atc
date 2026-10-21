@@ -632,6 +632,9 @@ const THEATRES = {
       { id: 'marshal',  label: 'Marshal',  freq: '306.200', extras: 'CVN-72 · Black Sea',       roles: ['Marshal (Caucasus)'],        stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Caucasus)', roles: ['vSFG-7 Command (Caucasus)'], stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Black Sea carrier UHF',    roles: ['Deckboss (Caucasus)'],       stopLabel: 'Stop Deckboss' },
+      // GCI (cmd/atc/gci.go, 2026-10-21): not in the region bat while skyeye.exe may
+      // still be on 264, so it is started here by hand.
+      { id: 'gci',      label: 'GCI Darkstar', freq: '264.000', extras: 'AWACS 264.000 · stop skyeye.exe first', roles: ['vSFG-7 GCI Darkstar (Caucasus)'], stopLabel: 'Stop GCI' },
     ],
   },
   germany: {
@@ -697,6 +700,7 @@ const THEATRES = {
       { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 ABE · TACAN 72X',   roles: ['Marshal (Syria)'],          stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Syria)',   roles: ['vSFG-7 Command (Syria)'],   stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Eastern Med carrier UHF',  roles: ['Deckboss (Syria)'],         stopLabel: 'Stop Deckboss' },
+      { id: 'gci',      label: 'GCI Overlord', freq: '266.000', extras: 'AWACS 266.000 · stop skyeye.exe first', roles: ['vSFG-7 GCI Overlord (Syria)'], stopLabel: 'Stop GCI' },
     ],
   },
   kola: {
