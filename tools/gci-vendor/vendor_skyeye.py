@@ -52,7 +52,66 @@ PATCHES = [
     ("controller/controller.go", "srsClient *simpleradio.Client,", "srsClient srsinfo.Client,"),
     ("radar/radar.go", "srsClient *simpleradio.Client", "srsClient srsinfo.Client"),
     ("radar/radar.go", "srsClient *simpleradio.Client) *Radar", "srsClient srsinfo.Client) *Radar"),
+    # A paused DCS server (Foothold waits for a player) refuses Tacview, and
+    # SkyEye logged an ERROR every 10 s - a red alert on the dashboard all day
+    # (operator 2026-10-21: "make the GCI quieter about telemetry when
+    # paused"). One info line per outage, the retries at debug; a session
+    # that lasted 30 s or more counts as connected and re-arms the line.
+    ("telemetry/telemetry.go",
+     """func (c *RealTimeClient) Run(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			nextAttempt := time.Now().Add(10 * time.Second)
+			if err := c.read(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				log.Error().Err(err).Msg("error reading telemetry, retrying")
+				time.Sleep(time.Until(nextAttempt))
+			}
+		}
+	}
+}""",
+     """func (c *RealTimeClient) Run(ctx context.Context) error {
+	quiet := false // vsfg7: one line per outage (tools/gci-vendor/vendor_skyeye.py)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			start := time.Now()
+			nextAttempt := start.Add(10 * time.Second)
+			if err := c.read(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				if time.Since(start) >= 30*time.Second {
+					quiet = false // it was connected: say so when it drops
+				}
+				if !quiet {
+					log.Info().Err(err).Msg("telemetry unavailable (DCS paused or restarting?) - retrying every 10 s quietly")
+					quiet = true
+				} else {
+					log.Debug().Err(err).Msg("error reading telemetry, retrying")
+				}
+				time.Sleep(time.Until(nextAttempt))
+			}
+		}
+	}
+}"""),
 ]
+
+
+def _writable_retry(func, path, _exc):
+    """rmtree helper: the collections copy came from the read-only module cache."""
+    os.chmod(path, 0o777)
+    parent = os.path.dirname(path)
+    if parent:
+        os.chmod(parent, 0o777)
+    func(path)
 
 
 def main():
@@ -61,7 +120,7 @@ def main():
     for name in os.listdir(DST) if os.path.isdir(DST) else []:
         if name not in OURS:
             p = os.path.join(DST, name)
-            shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+            shutil.rmtree(p, onexc=_writable_retry) if os.path.isdir(p) else os.remove(p)
     os.makedirs(DST, exist_ok=True)
     for p in PKGS:
         shutil.copytree(os.path.join(SRC, "pkg", p), os.path.join(DST, p))
@@ -80,9 +139,12 @@ def main():
     for sub in subs:
         d = os.path.join(DST, "internal", "collections", sub)
         shutil.copytree(os.path.join(csrc, sub), d)
-        for base, _, files in os.walk(d):  # the module cache is read-only
+        for base, dirs, files in os.walk(d):  # the module cache is read-only
+            for x in dirs:
+                os.chmod(os.path.join(base, x), 0o755)
             for f in files:
                 os.chmod(os.path.join(base, f), 0o644)
+        os.chmod(d, 0o755)
     shutil.copy(os.path.join(csrc, "LICENSE.md"), os.path.join(DST, "internal", "collections", "LICENSE.md"))
 
     n = 0

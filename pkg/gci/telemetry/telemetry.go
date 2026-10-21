@@ -50,17 +50,27 @@ func NewRealTimeClient(
 // reconnecting if the connection is lost, a read timeout occurs, or an EOF is
 // received.
 func (c *RealTimeClient) Run(ctx context.Context) error {
+	quiet := false // vsfg7: one line per outage (tools/gci-vendor/vendor_skyeye.py)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			nextAttempt := time.Now().Add(10 * time.Second)
+			start := time.Now()
+			nextAttempt := start.Add(10 * time.Second)
 			if err := c.read(ctx); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil
 				}
-				log.Error().Err(err).Msg("error reading telemetry, retrying")
+				if time.Since(start) >= 30*time.Second {
+					quiet = false // it was connected: say so when it drops
+				}
+				if !quiet {
+					log.Info().Err(err).Msg("telemetry unavailable (DCS paused or restarting?) - retrying every 10 s quietly")
+					quiet = true
+				} else {
+					log.Debug().Err(err).Msg("error reading telemetry, retrying")
+				}
 				time.Sleep(time.Until(nextAttempt))
 			}
 		}
