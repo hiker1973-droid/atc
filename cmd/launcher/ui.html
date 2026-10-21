@@ -130,6 +130,7 @@
   .gci-chip { display: none; background: var(--panel-2); border: 1px solid var(--border); padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.7rem; letter-spacing: 0.05em; margin-left: 0.6rem; vertical-align: middle; }
   .gci-chip.online { display: inline-block; color: var(--green); border-color: var(--green-dim); }
   .gci-chip.offline { display: inline-block; color: var(--red); border-color: var(--red); }
+  .gci-chip.stby { display: inline-block; color: var(--amber, #d29922); border-color: var(--amber, #d29922); }
 
   /* Tables (stack, pattern, freqs, cats) */
   table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
@@ -1418,8 +1419,12 @@ async function refreshHealth() {
     const chip = $('gciChip');
     // Both our GCI role and skyeye.exe up = two controllers on one frequency.
     const both = gci === 'online' && h.gciBoth;
-    chip.className = 'gci-chip' + (both ? ' offline' : (gci === 'online' || gci === 'offline' ? ' ' + gci : ''));
-    chip.textContent = both ? 'GCI ×2' : (gci === 'online' ? 'GCI ONLINE' : 'GCI OFFLINE');
+    // Our GCI up but no AWACS airborne: amber OFF STATION. Otherwise the AWACS
+    // feeding its fused picture ("E-3 Darkstar 1-1 + E-2 Wizard 1-1").
+    const offStn = gci === 'online' && !both && h.gciOffStation;
+    chip.className = 'gci-chip' + (both ? ' offline' : offStn ? ' stby' : (gci === 'online' || gci === 'offline' ? ' ' + gci : ''));
+    chip.textContent = both ? 'GCI ×2' : offStn ? 'GCI · OFF STATION'
+      : (gci === 'online' ? 'GCI ONLINE' + (h.gciRadars ? ' · ' + h.gciRadars : '') : 'GCI OFFLINE');
     chip.title = both ? `${h.gciName} both running - stop skyeye.exe, they talk over each other`
       : gci === 'online' ? `GCI running: ${h.gciName || 'SkyEye'} (PID ${h.gciPid})`
       : 'GCI not running - start the GCI role (Darkstar / Overlord)';

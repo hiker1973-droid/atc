@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -65,20 +68,27 @@ type gciRadar struct {
 	RangeNm float64
 }
 
+// Short is the radar as the dashboard shows it: "E-3 Darkstar 1-1".
+func (r gciRadar) Short() string {
+	t := strings.TrimSuffix(strings.TrimSuffix(r.Type, "A"), "C")
+	return t + " " + r.Key
+}
+
 type gciCoverage struct {
 	store     *tacviewPositions
-	gci       string               // our callsign, matched in the AWACS unit name
+	gci       string               // our callsign (logging only since the picture is fused)
 	coalition coalitions.Coalition // our side
 	fades     chan<- sim.Faded     // SkyEye's fade input
 	now       func() time.Time
 
-	mu     sync.Mutex
-	seen   map[uint64]bool // hostiles on our scope
-	radar  *gciRadar       // last platform found, for logging changes
-	onStn  bool            // announced state
-	since  time.Time       // when the current raw state began
-	rawOn  bool
-	booted bool
+	mu      sync.Mutex
+	seen    map[uint64]bool // hostiles on our scope
+	setSig  string          // the radars last logged, to log changes once
+	onStn   bool            // announced state
+	since   time.Time       // when the current raw state began
+	rawOn   bool
+	booted  bool
+	current []gciRadar // radars at the last onStation check (dashboard)
 }
 
 func newGCICoverage(store *tacviewPositions, gci string, side coalitions.Coalition, fades chan<- sim.Faded) *gciCoverage {
@@ -93,12 +103,15 @@ func tacviewSide(c coalitions.Coalition) string {
 	return "allies"
 }
 
-// platform finds the GCI's AWACS: airborne, recently updated, our side.
-func (c *gciCoverage) platform() (gciRadar, bool) {
+// platforms is every AWACS of our side that is airborne and recently
+// updated. The picture is FUSED over all of them (operator 2026-10-21:
+// "combine all the AWACS"), as real AWACS share one picture over datalink:
+// an E-3 and two E-2s in the Caucasus missions all feed Darkstar.
+func (c *gciCoverage) platforms() []gciRadar {
 	c.store.mu.RLock()
 	defer c.store.mu.RUnlock()
 	side := tacviewSide(c.coalition)
-	var named, any []gciRadar
+	var out []gciRadar
 	for key, info := range c.store.info {
 		rng, ok := gciRadarRangeNm[info.Name]
 		if !ok || !strings.EqualFold(info.Coalition, side) {
@@ -107,20 +120,10 @@ func (c *gciCoverage) platform() (gciRadar, bool) {
 		if c.now().Sub(info.UpdatedAt) > gciAWACSStale || info.AltFt < gciAWACSMinAltFt {
 			continue
 		}
-		r := gciRadar{Key: key, Type: info.Name, Pos: c.store.pos[key], AltFt: info.AltFt, RangeNm: rng}
-		if strings.Contains(strings.ToLower(key), strings.ToLower(c.gci)) {
-			named = append(named, r)
-		} else {
-			any = append(any, r)
-		}
+		out = append(out, gciRadar{Key: key, Type: info.Name, Pos: c.store.pos[key], AltFt: info.AltFt, RangeNm: rng})
 	}
-	for _, list := range [][]gciRadar{named, any} {
-		if len(list) > 0 {
-			sort.Slice(list, func(i, j int) bool { return list[i].Key < list[j].Key })
-			return list[0], true
-		}
-	}
-	return gciRadar{}, false
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
 }
 
 // sees: inside the radar horizon and the type's range.
@@ -129,13 +132,19 @@ func (r gciRadar) sees(p orb.Point, altFt float64) bool {
 	return d <= r.RangeNm && d <= radarHorizonNm(r.AltFt, altFt)
 }
 
-// filter is the radar.CoverageFilter hook.
+// filter is the radar.CoverageFilter hook: seen by any of our AWACS.
 func (c *gciCoverage) filter(u sim.Updated) bool {
 	if u.Labels.Coalition == c.coalition {
 		return true // friendlies: IFF / datalink
 	}
-	r, on := c.platform()
-	visible := on && r.sees(u.Frame.Point, u.Frame.Altitude.Feet())
+	radars := c.platforms()
+	visible := false
+	for _, r := range radars {
+		if r.sees(u.Frame.Point, u.Frame.Altitude.Feet()) {
+			visible = true
+			break
+		}
+	}
 	id := u.Labels.ID
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -145,9 +154,9 @@ func (c *gciCoverage) filter(u sim.Updated) bool {
 	}
 	if c.seen[id] {
 		delete(c.seen, id)
-		// Out of coverage while the AWACS is up: fade it, as a real scope would.
-		// Off station: dropped quietly (no FADED call per contact).
-		if on && c.fades != nil {
+		// Out of every AWACS' coverage while one is up: fade it, as a real
+		// scope would. Off station: dropped quietly (no FADED call per contact).
+		if len(radars) > 0 && c.fades != nil {
 			go func() {
 				select {
 				case c.fades <- sim.Faded{ID: id}:
@@ -159,23 +168,35 @@ func (c *gciCoverage) filter(u sim.Updated) bool {
 	return false
 }
 
-// onStation reports whether the GCI has an AWACS up. changed is true once
+// gciRadarsText: "E-3 Darkstar 1-1 + E-2 Wizard 1-1".
+func gciRadarsText(radars []gciRadar) string {
+	parts := make([]string, len(radars))
+	for i, r := range radars {
+		parts[i] = r.Short()
+	}
+	return strings.Join(parts, " + ")
+}
+
+// onStation reports whether any AWACS of ours is up. changed is true once
 // when a state has held gciStationDebounce (the first state after start is
-// taken silently).
-func (c *gciCoverage) onStation() (on, changed bool, r gciRadar) {
-	r, raw := c.platform()
+// taken silently). radars are the ones feeding the picture now.
+func (c *gciCoverage) onStation() (on, changed bool, radars []gciRadar) {
+	radars = c.platforms()
+	raw := len(radars) > 0
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := c.now()
-	if raw && (c.radar == nil || c.radar.Key != r.Key) {
-		log.Info().Str("awacs", r.Key).Str("type", r.Type).Float64("rangeNm", r.RangeNm).Msg("GCI radar platform")
-		rr := r
-		c.radar = &rr
+	c.current = radars
+	if sig := gciRadarsText(radars); sig != c.setSig {
+		c.setSig = sig
+		if raw {
+			log.Info().Str("radars", sig).Int("count", len(radars)).Msg("GCI radar picture fed by")
+		}
 	}
 	if !c.booted {
 		c.booted, c.onStn, c.rawOn, c.since = true, raw, raw, now
 		log.Info().Bool("onStation", raw).Msg("GCI coverage: initial state")
-		return raw, false, r
+		return raw, false, radars
 	}
 	if raw != c.rawOn {
 		c.rawOn, c.since = raw, now
@@ -183,12 +204,33 @@ func (c *gciCoverage) onStation() (on, changed bool, r gciRadar) {
 	if c.rawOn != c.onStn && now.Sub(c.since) >= gciStationDebounce {
 		c.onStn = c.rawOn
 		if !c.onStn {
-			c.radar = nil
 			c.seen = map[uint64]bool{}
 		}
-		return c.onStn, true, r
+		return c.onStn, true, radars
 	}
-	return c.onStn, false, r
+	return c.onStn, false, radars
+}
+
+// gciStatus is what the GCI tells the launcher's dashboard chip
+// (logs\gci-status-<callsign>.json, read by launcher gciProbe).
+type gciStatus struct {
+	Callsign  string    `json:"callsign"`
+	Coverage  bool      `json:"coverage"`  // line of sight on (--gci-awacs-coverage)
+	OnStation bool      `json:"onStation"` // an AWACS is up (always true with coverage off)
+	Radars    string    `json:"radars"`    // "E-3 Darkstar 1-1 + E-2 Wizard 1-1"
+	At        time.Time `json:"at"`
+}
+
+func writeGCIStatus(st gciStatus) {
+	data, err := json.Marshal(st)
+	if err != nil {
+		return
+	}
+	path := filepath.Join(`C:\SkyeyeATC\logs`, "gci-status-"+strings.ToLower(st.Callsign)+".json")
+	tmp := path + ".tmp"
+	if os.WriteFile(tmp, data, 0o644) == nil {
+		_ = os.Rename(tmp, path)
+	}
 }
 
 // gciNeedsPicture: a request that needs the radar picture. With no AWACS up

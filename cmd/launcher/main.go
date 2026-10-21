@@ -80,6 +80,10 @@ type Health struct {
 	// or "skyeye.exe". GCIBoth: both at once - they talk over each other.
 	GCIName string `json:"gciName,omitempty"`
 	GCIBoth bool   `json:"gciBoth,omitempty"`
+	// From our GCI's status file (cmd/atc/gci_coverage.go): no AWACS airborne,
+	// and the AWACS feeding its picture ("E-3 Darkstar 1-1 + E-2 Wizard 1-1").
+	GCIOffStation bool   `json:"gciOffStation,omitempty"`
+	GCIRadars     string `json:"gciRadars,omitempty"`
 	At        time.Time `json:"at"`
 }
 
@@ -345,6 +349,9 @@ func updateHealth() {
 		OpenAI:    openaiProbe(3 * time.Second),
 	}
 	h.GCI, h.GCIPID, h.GCIName, h.GCIBoth = gciProbe()
+	if h.GCI == "online" && h.GCIName != "skyeye.exe" {
+		h.GCIOffStation, h.GCIRadars = gciStationStatus()
+	}
 	healthMu.Lock()
 	cachedHealth = h
 	healthMu.Unlock()
@@ -387,6 +394,32 @@ func gciProbe() (status string, pid int, name string, both bool) {
 		}
 	}
 	return sStatus, 0, "", false
+}
+
+// gciStationStatus reads the newest logs\gci-status-*.json our GCI writes
+// every 10 s (cmd/atc/gci_coverage.go writeGCIStatus). A file older than a
+// minute (GCI stopped) is ignored.
+func gciStationStatus() (offStation bool, radars string) {
+	files, _ := filepath.Glob(filepath.Join(rootDir, "logs", "gci-status-*.json"))
+	var newest time.Time
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var st struct {
+			Coverage  bool      `json:"coverage"`
+			OnStation bool      `json:"onStation"`
+			Radars    string    `json:"radars"`
+			At        time.Time `json:"at"`
+		}
+		if json.Unmarshal(data, &st) != nil || time.Since(st.At) > time.Minute || !st.At.After(newest) {
+			continue
+		}
+		newest = st.At
+		offStation, radars = st.Coverage && !st.OnStation, st.Radars
+	}
+	return offStation, radars
 }
 
 // skyeyeProbe reports whether the SkyEye GCI server is running on this rig:

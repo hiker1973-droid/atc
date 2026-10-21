@@ -327,23 +327,21 @@ func runGCI(ctx context.Context, apiKey string) {
 	calls := make(chan controller.Call)
 	wg.Go(func() { ctrl.Run(ctx, calls) })
 	wg.Go(func() { gciSpeak(ctx, apiKey, comp, calls, say) })
-	if cov != nil {
-		wg.Go(func() {
-			tk := time.NewTicker(10 * time.Second)
-			defer tk.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-tk.C:
-					on, changed, r := cov.onStation()
-					if !changed {
-						continue
-					}
+	// Station watch + the dashboard chip's status file (gci_coverage.go).
+	wg.Go(func() {
+		tk := time.NewTicker(10 * time.Second)
+		defer tk.Stop()
+		for {
+			if cov == nil {
+				writeGCIStatus(gciStatus{Callsign: cs, OnStation: true, At: time.Now()})
+			} else {
+				on, changed, radars := cov.onStation()
+				writeGCIStatus(gciStatus{Callsign: cs, Coverage: true, OnStation: on, Radars: gciRadarsText(radars), At: time.Now()})
+				if changed {
 					msg := fmt.Sprintf("All players, %s, off station.", cs)
 					if on {
 						msg = fmt.Sprintf("All players, %s, on station.", cs)
-						log.Info().Str("awacs", r.Key).Str("type", r.Type).Msg("GCI on station")
+						log.Info().Str("radars", gciRadarsText(radars)).Msg("GCI on station")
 					} else {
 						log.Info().Msg("GCI off station - no AWACS airborne")
 					}
@@ -353,8 +351,13 @@ func runGCI(ctx context.Context, apiKey string) {
 					}
 				}
 			}
-		})
-	}
+			select {
+			case <-ctx.Done():
+				return
+			case <-tk.C:
+			}
+		}
+	})
 
 	requests := make(chan any, 8)
 	wg.Go(func() {

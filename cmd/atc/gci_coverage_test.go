@@ -41,28 +41,30 @@ func hostile(id uint64, lat, altFt float64) sim.Updated {
 	}
 }
 
-// Operator 2026-10-21: the picture is what the mission's AWACS can see.
+// Operator 2026-10-21: the picture is what the mission's AWACS can see -
+// fused over every AWACS of ours that is up ("combine all the AWACS").
 func TestGCICoverage(t *testing.T) {
 	c, store, fades, now := covFixture(t)
-	// AWACS at 43N; 1 degree of latitude = 60 nm.
-	putAC(store, "Overlord 1-1", "E-2C", "Allies", 43.0, 25000, now) // another AWACS
-	putAC(store, "Darkstar 1-1", "E-3A", "Allies", 43.0, 10000, now) // ours, low orbit
+	// 1 degree of latitude = 60 nm. An E-3 low at 43N, an E-2 high at 41N.
+	putAC(store, "Darkstar 1-1", "E-3A", "Allies", 43.0, 10000, now)
+	putAC(store, "Wizard 1-1", "E-2C", "Allies", 41.0, 25000, now)
 	putAC(store, "Raider 302", "FA-18C_hornet", "Allies", 43.0, 20000, now)
-	r, ok := c.platform()
-	if !ok || r.Key != "Darkstar 1-1" || r.RangeNm != 217 {
-		t.Fatalf("platform %+v %v - want the E-3 named for the GCI", r, ok)
+	radars := c.platforms()
+	if len(radars) != 2 || gciRadarsText(radars) != "E-3 Darkstar 1-1 + E-2 Wizard 1-1" {
+		t.Fatalf("platforms %q", gciRadarsText(radars))
 	}
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		name    string
 		lat, ft float64
 		want    bool
 	}{
-		{"high, 150 nm", 45.5, 30000, true},
-		{"high, 240 nm - beyond the E-3's 217", 47.0, 30000, false},
-		{"low, 150 nm - below a 10,000 ft AWACS' horizon (~135 nm)", 45.5, 100, false},
-		{"low, 100 nm - inside it", 44.666, 100, true},
+		{"high, 150 nm north of the E-3", 45.5, 30000, true},
+		{"high, 240 nm north - beyond the E-3's 217, 360 from the E-2", 47.0, 30000, false},
+		{"low, 150 nm north of the E-3 - below its 10,000 ft horizon, 270 from the E-2", 45.5, 100, false},
+		{"low, 100 nm north of the E-3 - inside its horizon", 44.666, 100, true},
+		{"low, 150 nm south of the E-2 - only the E-2 at 25,000 ft sees it", 38.5, 100, true},
 	} {
-		if got := c.filter(hostile(uint64(100+len(tc.name)), tc.lat, tc.ft)); got != tc.want {
+		if got := c.filter(hostile(uint64(100+i), tc.lat, tc.ft)); got != tc.want {
 			t.Errorf("%s: visible %v, want %v", tc.name, got, tc.want)
 		}
 	}
@@ -72,7 +74,7 @@ func TestGCICoverage(t *testing.T) {
 	if !c.filter(f) {
 		t.Error("friendly hidden")
 	}
-	// A seen contact that drops out of coverage is faded once.
+	// A seen contact that drops out of every AWACS' coverage is faded once.
 	c.filter(hostile(2, 45.0, 30000))
 	if c.filter(hostile(2, 47.5, 30000)) {
 		t.Fatal("should be out of range")
@@ -93,20 +95,20 @@ func TestGCICoverage(t *testing.T) {
 	}
 }
 
-func TestGCIPlatformAnyAWACS(t *testing.T) {
+func TestGCIPlatforms(t *testing.T) {
 	c, store, _, now := covFixture(t)
 	putAC(store, "AWACS_BLUE-1", "E-3A", "Allies", 43.0, 30000, now) // Foothold's naming
 	putAC(store, "AWACS_RED-1", "E-3A", "Enemies", 43.0, 30000, now) // theirs
-	if r, ok := c.platform(); !ok || r.Key != "AWACS_BLUE-1" {
-		t.Errorf("platform %+v %v", r, ok)
+	if got := gciRadarsText(c.platforms()); got != "E-3 AWACS_BLUE-1" {
+		t.Errorf("platforms %q", got)
 	}
-	// On the deck, or stale, is not on station.
+	// On the deck, or stale, is not up.
 	putAC(store, "AWACS_BLUE-1", "E-3A", "Allies", 43.0, 200, now)
-	if _, ok := c.platform(); ok {
+	if len(c.platforms()) != 0 {
 		t.Error("an AWACS on the ground counted")
 	}
 	putAC(store, "AWACS_BLUE-1", "E-3A", "Allies", 43.0, 30000, now.Add(-2*time.Minute))
-	if _, ok := c.platform(); ok {
+	if len(c.platforms()) != 0 {
 		t.Error("a stale AWACS counted")
 	}
 }
@@ -132,8 +134,8 @@ func TestGCIOnStation(t *testing.T) {
 	later := now.Add(gciStationDebounce + time.Second)
 	c.now = func() time.Time { return later }
 	store.SetInfo("Darkstar 1-1", tacviewContactInfo{Name: "E-3A", Coalition: "Allies", AltFt: 30000, UpdatedAt: later})
-	if on, changed, r := c.onStation(); !on || !changed || r.Key != "Darkstar 1-1" {
-		t.Errorf("after debounce: on %v changed %v %+v", on, changed, r)
+	if on, changed, r := c.onStation(); !on || !changed || gciRadarsText(r) != "E-3 Darkstar 1-1" {
+		t.Errorf("after debounce: on %v changed %v %q", on, changed, gciRadarsText(r))
 	}
 	if on, changed, _ := c.onStation(); !on || changed {
 		t.Errorf("announced twice: on %v changed %v", on, changed)
