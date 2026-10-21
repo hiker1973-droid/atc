@@ -580,7 +580,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 						frames := tx.opusFrames
 						delete(transmissions, origin)
 						go func(f [][]byte) {
-							text, err := transcribeFrames(ctx, apiKey, f)
+							text, err := transcribeFramesRetry(ctx, apiKey, f, carrierWhisperPrompt, "Marshal", isWhisperHallucination)
 							if err != nil {
 								// Was a silent return: a failing Whisper call
 								// looked exactly like nobody transmitting.

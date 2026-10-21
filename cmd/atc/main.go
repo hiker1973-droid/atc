@@ -1809,7 +1809,9 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 	// ends in "Tower"; appending another "Tower" duplicates it in-prompt and
 	// nudges Whisper toward prompt-regurgitation hallucinations.
 	prompt := fmt.Sprintf("%s, Raider, Venom, radio check, request taxi, holding short, runway, cleared for takeoff, airborne, seven DME, cleared airspace, inbound, overhead, downwind, base, short final, clear active, runway vacated, going around, mayday", callsign)
-	text, err := whisperTranscribeWithPrompt(ctx, apiKey, wav, "audio.wav", prompt)
+	text, err := transcribeWAVRetry(ctx, apiKey, wav, len(frames), prompt, callsign, func(t string) bool {
+		return isWhisperHallucination(t) || isPromptEcho(t, prompt)
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Whisper transcription error")
 		return
@@ -1827,7 +1829,8 @@ func transcribeAndHandle(ctx context.Context, apiKey, ffmpegPath string, frames 
 		return
 	}
 	text = srsCorrect(text, origin)
-	log.Info().Str("text", text).Msg("recognized")
+	lv := measureWAV(wav)
+	log.Info().Str("text", text).Float64("rmsDb", lv.rmsDB).Msg("recognized")
 	req := controller.ParseIntent(text, callsign)
 	if req == nil {
 		// Logged so a call to another field on this frequency, or a field name
@@ -2391,7 +2394,9 @@ func whisperTranscribeWithPrompt(ctx context.Context, apiKey string, audio []byt
 	}
 	w.WriteField("model", "gpt-4o-mini-transcribe")
 	w.WriteField("language", "en")
-	w.WriteField("prompt", prompt)
+	if prompt != "" { // "" = the no-prompt retry in whisper_retry.go
+		w.WriteField("prompt", prompt)
+	}
 	w.Close()
 	req, err := http.NewRequestWithContext(ctx, "POST",
 		"https://api.openai.com/v1/audio/transcriptions", &buf)

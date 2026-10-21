@@ -394,7 +394,9 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							if inFlight != nil {
 								defer inFlight.Add(-1)
 							}
-							text, err := transcribeFramesWithPrompt(ctx, apiKey, f, prompt)
+							text, err := transcribeFramesRetry(ctx, apiKey, f, prompt, "Command "+channelName, func(t string) bool {
+								return isWhisperHallucination(t) || isPromptEcho(t, prompt)
+							})
 							if err != nil || text == "" {
 								log.Info().Err(err).Str("channel", channelName).Msg("Command: empty/error transcription")
 								return

@@ -565,7 +565,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 						frames := tx.opusFrames
 						delete(transmissions, origin)
 						go func(f [][]byte) {
-							text, err := transcribeFrames(ctx, apiKey, f)
+							text, err := transcribeFramesRetry(ctx, apiKey, f, carrierWhisperPrompt, "Deckboss", isWhisperHallucination)
 							if err != nil || text == "" {
 								return
 							}
