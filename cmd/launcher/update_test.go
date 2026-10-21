@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -31,6 +32,41 @@ func TestSwapExeKeepsRollback(t *testing.T) {
 	}
 	if read("atc.exe") != "v3" || read("atc.prev.exe") != "v2" {
 		t.Errorf("second swap: atc=%q prev=%q", read("atc.exe"), read("atc.prev.exe"))
+	}
+}
+
+// A locked atc.exe (Night 2026-10-21: "being used by another process") is
+// retried, not given up on at once.
+func TestSwapExeWaitsOutALock(t *testing.T) {
+	defer func(r string) { rootDir = r }(rootDir)
+	defer func(n int, w time.Duration) { swapRetries, swapRetryWait = n, w }(swapRetries, swapRetryWait)
+	rootDir = t.TempDir()
+	swapRetries, swapRetryWait = 20, 50*time.Millisecond
+	cur := filepath.Join(rootDir, "atc.exe")
+	os.WriteFile(cur, []byte("v1"), 0o644)
+	os.WriteFile(filepath.Join(rootDir, "atc.new.exe"), []byte("v2"), 0o644)
+	f, err := os.Open(cur) // Go opens without FILE_SHARE_DELETE: a rename fails while it is open
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { time.Sleep(300 * time.Millisecond); f.Close() }()
+	if err := swapExe("atc.exe", "atc.new.exe", "atc.prev.exe"); err != nil {
+		t.Fatalf("swap gave up: %v", err)
+	}
+	if b, _ := os.ReadFile(cur); string(b) != "v2" {
+		t.Errorf("atc.exe = %q after the lock cleared", b)
+	}
+
+	// A lock that never clears still fails, and atc.exe stays the old build.
+	swapRetries = 3
+	os.WriteFile(filepath.Join(rootDir, "atc.new.exe"), []byte("v3"), 0o644)
+	g, _ := os.Open(cur)
+	defer g.Close()
+	if err := swapExe("atc.exe", "atc.new.exe", "atc.prev.exe"); err == nil {
+		t.Fatal("a permanent lock was reported as swapped")
+	}
+	if b, _ := os.ReadFile(cur); string(b) != "v2" {
+		t.Errorf("atc.exe = %q after a failed swap, want the old build", b)
 	}
 }
 

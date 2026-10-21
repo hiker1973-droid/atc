@@ -298,6 +298,16 @@ func runningRegions() []string {
 	return out
 }
 
+// swapRetries x swapRetryWait is how long swapExe keeps trying to move a
+// locked cur aside: Night's Update on 2026-10-21 08:32 failed "being used by
+// another process" 3 s after its roles were stopped (most likely the
+// antivirus scanning atc.exe as the roles let go, or a role slow to exit) and
+// put the theatre back on the old build. A second press would have worked.
+var (
+	swapRetries   = 14
+	swapRetryWait = 1500 * time.Millisecond
+)
+
 // swapExe moves cur to prev (a running image can be renamed on Windows) and
 // next to cur. On failure cur is put back.
 func swapExe(cur, next, prev string) error {
@@ -307,8 +317,22 @@ func swapExe(cur, next, prev string) error {
 		// dated name for this one.
 		p = filepath.Join(rootDir, strings.TrimSuffix(prev, ".exe")+time.Now().Format("-20060102-150405")+".exe")
 	}
-	if err := os.Rename(c, p); err != nil && !os.IsNotExist(err) {
-		return err
+	for try := 1; ; try++ {
+		err := os.Rename(c, p)
+		if err == nil || os.IsNotExist(err) {
+			if try > 1 {
+				updLog("%s was locked - moved aside on try %d", cur, try)
+			}
+			break
+		}
+		if try >= swapRetries {
+			return fmt.Errorf("%v (still locked after %d tries over %s)", err,
+				try, time.Duration(try-1)*swapRetryWait)
+		}
+		if try == 1 {
+			updLog("%s is locked (%v) - retrying for up to %s", cur, err, time.Duration(swapRetries-1)*swapRetryWait)
+		}
+		time.Sleep(swapRetryWait)
 	}
 	if err := os.Rename(n, c); err != nil {
 		_ = os.Rename(p, c)
