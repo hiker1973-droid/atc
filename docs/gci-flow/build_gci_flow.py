@@ -140,6 +140,12 @@ S.append(section("3. Rules and tips",
         ["<b>Quiet in recoveries</b>", "No threat calls to you, and the automatic picture waits, while you are within "
                                        "12 nm of the carrier below 10,000 ft or within 10 nm of a field below 4,000 ft. "
                                        "Anything you ask is still answered."],
+        ["<b>What Darkstar sees</b>", "Only what the mission's AWACS could see: the E-3 out to about 217 nm, the E-2 about "
+                                      "200 nm, and not below its radar horizon - a jet on the deck far out is invisible until it "
+                                      "climbs or closes. A bandit that drops out of coverage is called <b>faded</b>."],
+        ["<b>Off station</b>", "No AWACS airborne (not up yet, or shot down): \"All players, Darkstar, off station.\" "
+                               "Picture, bogey dope and declare get \"off station, no picture\"; radio check, fence and "
+                               "check in / out still work. \"On station\" when it is back up."],
         ["<b>On the ramp</b>", "You may not be on scope until airborne - a radio check says so."],
         ["<b>Speak</b>", "Think, then key: steady pace, slight pause between numbers. Misspoke? Release and start again."],
         ["<b>No answer?</b>", "Wait 3-4 s, repeat once. Check 264.000 / 266.000 <b>AM</b> and that you opened with "
