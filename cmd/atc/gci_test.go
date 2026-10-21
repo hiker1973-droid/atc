@@ -192,3 +192,22 @@ func TestGCIRecovery(t *testing.T) {
 		t.Error("stale track still recovering")
 	}
 }
+
+// Operator 2026-10-21: fence checks and splash calls with the GCI.
+func TestGCIAck(t *testing.T) {
+	for text, want := range map[string][2]string{
+		"Darkstar, Raider 302, fence in.":        {"fence_in", "RAIDER 3 0 2, DARKSTAR, copy fence in, picture follows."},
+		"Darkstar, Raider 302, fence again.":     {"fence_in", "RAIDER 3 0 2, DARKSTAR, copy fence in, picture follows."},
+		"Darkstar, Venom 212, fencing out, RTB.": {"fence_out", "VENOM 2 1 2, DARKSTAR, copy fence out."},
+		"Darkstar, Raider 302, splash one.":      {"splash", "RAIDER 3 0 2, DARKSTAR, copy splash one."},
+		"Darkstar, Raider 302, splash 2.":        {"splash", "RAIDER 3 0 2, DARKSTAR, copy splash two."},
+		"Anyface, Venom 212, splash.":            {"splash", "VENOM 2 1 2, DARKSTAR, copy splash."},
+		"Command, Raider 302, fence in.":         {"", ""}, // Command's, not the GCI's
+		"Darkstar, Raider 302, picture.":         {"", ""},
+	} {
+		kind, reply := gciAck(text, "Darkstar")
+		if kind != want[0] || reply != want[1] {
+			t.Errorf("%q -> %q %q, want %q %q", text, kind, reply, want[0], want[1])
+		}
+	}
+}

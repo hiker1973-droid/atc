@@ -124,6 +124,9 @@ func gciWhisperPrompt(callsign string) string {
 		"fast movers, slow movers, ARGUMENTS such as BULLSEYE, BRAA, numbers or digits."
 }
 
+// gciFencePictureDelay: after "copy fence in, picture follows" is spoken.
+const gciFencePictureDelay = 5 * time.Second
+
 // gciMoverRe: "fast movers" asks for bogey dope on jets, "slow movers" on
 // helicopters (operator 2026-10-21: "in addition to saying bogey you can say
 // 'fast movers', for helicopter ... 'slow mover'"). Rewritten into SkyEye's
@@ -137,6 +140,71 @@ var (
 func gciAliases(text string) string {
 	text = gciFastMoverRe.ReplaceAllString(text, "bogey dope airplane")
 	return gciSlowMoverRe.ReplaceAllString(text, "bogey dope helicopter")
+}
+
+// Fence checks and splash calls with the GCI (operator 2026-10-21: "we
+// should do fence checks with the GCI", "splash calls"). SkyEye has neither
+// and said "say again". Fence in is answered and the picture follows; fence
+// out and splash are acknowledged. Whisper writes "fence in" as "fence again"
+// (as on Command's net).
+var (
+	gciFenceInRe  = regexp.MustCompile(`(?i)\bfenc(?:e|ed|ing)[\s-]*(?:in|again|check)\b`)
+	gciFenceOutRe = regexp.MustCompile(`(?i)\bfenc(?:e|ed|ing)[\s-]*out\b`)
+	gciSplashRe   = regexp.MustCompile(`(?i)\bsplash(?:ed)?\b(?:[\s,]+(one|two|three|four|five|six|[1-6])\b)?`)
+)
+
+var gciNumberWords = map[string]string{"1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six"}
+
+// gciAddressed: the call opens with (or names) this GCI or "Anyface".
+func gciAddressed(lower, gci string) bool {
+	return strings.Contains(lower, strings.ToLower(gci)) || strings.Contains(lower, "anyface") || strings.Contains(lower, "any face")
+}
+
+// gciCallerCallsign is the pilot's callsign in a call to the GCI, with the
+// GCI's name and the given phrase taken out first.
+func gciCallerCallsign(lower, gci string, phrase *regexp.Regexp) (string, bool) {
+	rest := strings.NewReplacer(strings.ToLower(gci), " ", "anyface", " ", "any face", " ").Replace(lower)
+	rest = phrase.ReplaceAllString(rest, " ")
+	return callsigns.ParsePilotCallsign(rest)
+}
+
+// gciAck answers fence in / fence out / splash. kind is "fence_in",
+// "fence_out", "splash", or "" when the call is none of these addressed to gci.
+func gciAck(text, gci string) (kind, reply string) {
+	lower := strings.ToLower(text)
+	if !gciAddressed(lower, gci) {
+		return "", ""
+	}
+	var re *regexp.Regexp
+	switch {
+	case gciFenceOutRe.MatchString(lower):
+		kind, re = "fence_out", gciFenceOutRe
+	case gciFenceInRe.MatchString(lower):
+		kind, re = "fence_in", gciFenceInRe
+	case gciSplashRe.MatchString(lower):
+		kind, re = "splash", gciSplashRe
+	default:
+		return "", ""
+	}
+	cs, ok := gciCallerCallsign(lower, gci, re)
+	if !ok {
+		return "", ""
+	}
+	head := fmt.Sprintf("%s, %s, ", strings.ToUpper(cs), strings.ToUpper(gci))
+	switch kind {
+	case "fence_in":
+		return kind, head + "copy fence in, picture follows."
+	case "fence_out":
+		return kind, head + "copy fence out."
+	}
+	if m := gciSplashRe.FindStringSubmatch(lower); m != nil && m[1] != "" {
+		n := m[1]
+		if w, ok := gciNumberWords[n]; ok {
+			n = w
+		}
+		return kind, head + "copy splash " + n + "."
+	}
+	return kind, head + "copy splash."
 }
 
 // gciCheckOut answers "Darkstar, Raider 302, checking out" - SkyEye has no
@@ -257,6 +325,20 @@ func runGCI(ctx context.Context, apiKey string) {
 			if reply := gciCheckOut(text, cs); reply != "" {
 				log.Info().Str("text", text).Msg("GCI: checking out")
 				return "", reply // voiceNetLoop speaks it
+			}
+			if kind, reply := gciAck(text, cs); kind != "" {
+				log.Info().Str("text", text).Str("kind", kind).Msg("GCI: " + strings.ReplaceAll(kind, "_", " "))
+				if kind == "fence_in" {
+					// The picture follows the acknowledgement, not on top of it.
+					pcs, _ := gciCallerCallsign(strings.ToLower(text), cs, gciFenceInRe)
+					time.AfterFunc(gciFencePictureDelay, func() {
+						select {
+						case requests <- &brevity.PictureRequest{Callsign: pcs}:
+						default:
+						}
+					})
+				}
+				return "", reply
 			}
 			if t := gciAliases(text); t != text {
 				log.Info().Str("text", text).Str("as", t).Msg("GCI: fast / slow movers -> bogey dope")
