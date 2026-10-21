@@ -23,7 +23,16 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
-OUT = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation\Health Reports"
+# One Reports folder (operator 2026-10-21): Reports\YYYY-MM\YYYY-MM-DD <Kind>.pdf,
+# raw data under Reports\_data\<kind>.
+REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
+
+
+def report_pdf(root, date, kind):
+    """Reports\2026-10\2026-10-20 Health.pdf - every night's reports side by side, a folder a month."""
+    d = os.path.join(root, date[:7])
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, "%s %s.pdf" % (date, kind))
 
 
 def get(url, timeout=60):
@@ -45,9 +54,9 @@ def kind(log_file):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=(dt.date.today() - dt.timedelta(days=1)).isoformat())
-    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--out", default=REPORTS)
     a = ap.parse_args()
-    data = os.path.join(a.out, "data", a.date)
+    data = os.path.join(a.out, "_data", "health", a.date)
     os.makedirs(data, exist_ok=True)
 
     man = {"date": a.date, "rigs": [], "problems": []}
@@ -107,8 +116,12 @@ def main():
     if not man["rigs"]:
         print("no rig answered:", "; ".join(man["problems"]), file=sys.stderr)
         return 1
-    return subprocess.call([sys.executable, "-I", os.path.join(HERE, "build_health_report.py"),
-                            "--manifest", mpath, "--out", a.out])
+    rc = subprocess.call([sys.executable, "-I", os.path.join(HERE, "build_health_report.py"),
+                          "--manifest", mpath, "--out", data])
+    built = os.path.join(data, "SkyEye Health Report %s.pdf" % a.date)
+    if rc == 0 and os.path.exists(built):
+        os.replace(built, report_pdf(a.out, a.date, "Health"))
+    return rc
 
 
 if __name__ == "__main__":

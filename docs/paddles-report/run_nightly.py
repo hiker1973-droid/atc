@@ -23,15 +23,24 @@ RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.
 # Field landings are graded by these towers (start_towers_caucasus.bat
 # --approach-grade); Foothold is Syria, no Senaki.
 FIELD_ROLES = [("Day", "Senaki Tower"), ("Night", "Senaki Tower")]
-OUT = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation\Paddles Reports"
+# One Reports folder (operator 2026-10-21): Reports\YYYY-MM\YYYY-MM-DD <Kind>.pdf,
+# raw data under Reports\_data\<kind>.
+REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
+
+
+def report_pdf(root, date, kind):
+    """Reports\2026-10\2026-10-20 Health.pdf - every night's reports side by side, a folder a month."""
+    d = os.path.join(root, date[:7])
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, "%s %s.pdf" % (date, kind))
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=(dt.date.today() - dt.timedelta(days=1)).isoformat())
-    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--out", default=REPORTS)
     a = ap.parse_args()
-    data = os.path.join(a.out, "data")
+    data = os.path.join(a.out, "_data", "paddles")
     os.makedirs(data, exist_ok=True)
 
     logs, problems = [], []
@@ -72,10 +81,14 @@ def main():
             f.write(body)
         logs += ["--field-log", "%s=%s" % (rig, path)]
     cmd = [sys.executable, "-I", os.path.join(HERE, "build_paddles_report.py"), "--date", a.date,
-           "--out", a.out, "--no-copy", "--board-dir", data] + logs
+           "--out", data, "--no-copy", "--board-dir", data] + logs
     for p in problems:
         cmd += ["--problem", p]
-    return subprocess.call(cmd)
+    rc = subprocess.call(cmd)
+    built = os.path.join(data, "Paddles Report %s.pdf" % a.date)
+    if rc == 0 and os.path.exists(built):
+        os.replace(built, report_pdf(a.out, a.date, "Paddles"))
+    return rc
 
 
 if __name__ == "__main__":

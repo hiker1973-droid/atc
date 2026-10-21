@@ -22,7 +22,16 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-OUT = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation\Pilot Reports"
+# One Reports folder (operator 2026-10-21): Reports\YYYY-MM\YYYY-MM-DD <Kind>.pdf,
+# raw data under Reports\_data\<kind>.
+REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
+
+
+def report_pdf(root, date, kind):
+    """Reports\2026-10\2026-10-20 Health.pdf - every night's reports side by side, a folder a month."""
+    d = os.path.join(root, date[:7])
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, "%s %s.pdf" % (date, kind))
 LAUNCHER = "http://127.0.0.1:7000"
 
 ss = getSampleStyleSheet()
@@ -161,16 +170,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="day to report (default yesterday)")
     ap.add_argument("--launcher", default=LAUNCHER)
-    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--out", default=REPORTS)
     a = ap.parse_args()
     day = dt.date.fromisoformat(a.date) if a.date else dt.date.today() - dt.timedelta(days=1)
     rep = fetch(a.launcher, "date=" + day.isoformat())
     week = fetch(a.launcher, "days=7")
-    data = os.path.join(a.out, "data")
+    data = os.path.join(a.out, "_data", "pilots")
     os.makedirs(data, exist_ok=True)
     with open(os.path.join(data, "%s.json" % day), "w", encoding="utf-8") as f:
         json.dump({"day": rep, "week": week}, f)
-    out_pdf = os.path.join(a.out, "Pilot Report %s.pdf" % day)
+    out_pdf = report_pdf(a.out, day.isoformat(), "Pilots")
     build(day, rep, week, out_pdf)
     print("wrote", out_pdf)
 
