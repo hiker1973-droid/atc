@@ -95,10 +95,10 @@ func gciVoice() voiceProfile {
 // was ElevenLabs speed gciBaseSpeed. ElevenLabs stops at 1.2 and its speed is
 // not linear (1.05 -> 1.2 plus a 1.14 stretch came out 1.7x faster), so the
 // delivery stays the one heard at gciBaseSpeed and is time-stretched exactly
-// 1.30 (Tempo, pitch kept).
+// gciSpeedUp (Tempo, pitch kept).
 const (
 	gciBaseSpeed = 1.05
-	gciSpeedUp   = 1.30
+	gciSpeedUp   = 1.20 // 1.30, then "back it off 5-10%" (operator 2026-10-21)
 )
 
 // gciSRSBook is the SRS client list the GCI's controller and radar read
