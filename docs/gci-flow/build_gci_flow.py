@@ -4,7 +4,7 @@
 The GCI is SkyEye's brain built into atc.exe with our voice (cmd/atc/gci.go,
 pkg/gci; operator 2026-10-21). Every reply here is read out of the code:
 gci.go (check in, radio check, checking out, fast / slow movers),
-gci_recovery.go (quiet in recoveries), pkg/gci/composer (SkyEye's wording),
+gci_coverage.go (what the GCI sees, off station), pkg/gci/composer (SkyEye's wording),
 command.go (the hint after "fence in"), gciAck (fence in / out, splash). Darkstar 264.000 on Caucasus Day /
 Night (Hornet COMM1 CH5 on the Black Sea card), Overlord 266.000 on Syria.
 
@@ -137,9 +137,6 @@ S.append(section("2. What Darkstar says without being asked (tuned to 264 only)"
 
 S.append(section("3. Rules and tips",
     table(["Item", "Detail"], [
-        ["<b>Quiet in recoveries</b>", "No threat calls to you, and the automatic picture waits, while you are within "
-                                       "12 nm of the carrier below 10,000 ft or within 10 nm of a field below 4,000 ft. "
-                                       "Anything you ask is still answered."],
         ["<b>What Darkstar sees</b>", "Only what the mission's AWACS could see: the E-3 out to about 217 nm, the E-2 about "
                                       "200 nm, and not below its radar horizon - a jet on the deck far out is invisible until it "
                                       "climbs or closes. A bandit that drops out of coverage is called <b>faded</b>."],

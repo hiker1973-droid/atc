@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.6"
+VER = "v2.7"
 DATE = "21 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -719,9 +719,7 @@ def build():
         "of coverage is called faded. Friendlies are always seen.",
         "No AWACS airborne (not up yet, or shot down): off station. Picture, bogey dope and declare get \"off station, "
         "no picture\"; radio check, fence, splash and check in / out still work."])
-    d.callout("Quiet in recoveries", [
-        "Within 12 nm of the carrier below 10,000 ft, or within 10 nm of a field below 4,000 ft AGL: no threat call to "
-        "you, and the automatic picture waits. Your own requests are always answered.",
+    d.callout("The flow", [
         "Flow: Command check-in -> %s check-in, fence in -> fly (picture, bogey dope, declare) -> fence out, checking "
         "out -> Command RTB -> Marshal or tower. Overlord Actual on Command (section 5) is the range officer, not the "
         "GCI." % cau["gci_name"]])

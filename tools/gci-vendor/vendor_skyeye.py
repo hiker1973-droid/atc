@@ -95,32 +95,9 @@ func (r *Radar) handleUpdate(update sim.Updated) {
 		return
 	}
 """),
-    # Quiet during recoveries (operator 2026-10-21): no THREAT call to a jet in
-    # the carrier stack / pattern or a tower's pattern, and the automatic PICTURE
-    # waits while a pilot on frequency is recovering. atc.exe sets the hooks
-    # (cmd/atc/gci_recovery.go) from our own Tacview tracker; nil = SkyEye as is.
-    ("controller/threat.go",
-     r"""func (c *Controller) broadcastThreats(ctx context.Context) {""",
-     r"""// RecoveryQuiet, when set, reports a friendly (by DCS name) recovering to a
-// carrier or field: it gets no THREAT call. vsfg7 (tools/gci-vendor).
-var RecoveryQuiet func(contactName string) bool
-
-func (c *Controller) broadcastThreats(ctx context.Context) {"""),
-    ("controller/threat.go",
-     r"""		friendly := c.scope.FindUnit(friendID)
-		if friendly == nil {
-			continue
-		}
-""",
-     r"""		friendly := c.scope.FindUnit(friendID)
-		if friendly == nil {
-			continue
-		}
-		if RecoveryQuiet != nil && RecoveryQuiet(friendly.Contact.Name) { // vsfg7
-			logger.Debug().Str("friendly", friendly.Contact.Name).Msg("omitting friendly from threat call: recovering")
-			continue
-		}
-"""),
+    # The automatic PICTURE waits while the GCI is off station (no AWACS up;
+    # cmd/atc/gci_coverage.go). "Quiet in recoveries" used this hook and a
+    # threat-call one until the operator dropped it 2026-10-21. nil = SkyEye as is.
     ("controller/picture.go",
      r"""func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logger, forceBroadcast bool) {
 	if !forceBroadcast {
@@ -129,8 +106,8 @@ func (c *Controller) broadcastThreats(ctx context.Context) {"""),
 			return
 		}
 """,
-     r"""// AutoPictureQuiet, when set and true, holds the automatic PICTURE (a pilot
-// on frequency is recovering); it goes out once they are down. vsfg7.
+     r"""// AutoPictureQuiet, when set and true, holds the automatic PICTURE (the GCI
+// is off station - no AWACS up); it goes out once one is. vsfg7.
 var AutoPictureQuiet func() bool
 
 func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logger, forceBroadcast bool) {
@@ -140,7 +117,7 @@ func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logge
 			return
 		}
 		if AutoPictureQuiet != nil && AutoPictureQuiet() { // vsfg7: deadline not reset, so it retries
-			logger.Debug().Msg("holding automatic PICTURE: a pilot on frequency is recovering")
+			logger.Debug().Msg("holding automatic PICTURE: off station")
 			return
 		}
 """),

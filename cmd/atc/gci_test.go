@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/paulmach/orb"
 
 	"github.com/martinlindhe/unit"
 
@@ -157,41 +154,6 @@ func TestCommandGCIHint(t *testing.T) {
 	}
 }
 
-// Quiet during recoveries: near the boat low, in a field's pattern, or not.
-func TestGCIRecovery(t *testing.T) {
-	store := newTacviewPositions()
-	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
-	put := func(key string, lon, lat, alt float64) {
-		store.Set(key, orb.Point{lon, lat})
-		store.SetInfo(key, tacviewContactInfo{AltFt: alt, UpdatedAt: now})
-	}
-	put("CVN_72", 37.5, 42.8, 0)
-	put("Raider 302", 37.55, 42.85, 2500)  // ~3.5 nm from the boat, angels 2.5: in the stack
-	put("Raider 303", 37.55, 42.85, 22000) // same place, angels 22: transiting overhead
-	put("Venom 212", 42.06, 42.25, 1500)   // Senaki pattern
-	put("Venom 201", 42.06, 43.40, 1500)   // 70 nm north of Senaki, low: on the range
-	r := newGCIRecovery(store, gciFields("caucasus"))
-	r.now = func() time.Time { return now }
-	for name, want := range map[string]string{
-		"Raider 302 | Jedi":    "the carrier",
-		"Raider 303 | Thrash":  "",
-		"Venom 212 | Dabs":     "Senaki",
-		"Venom 201 | Screwy":   "",
-		"Unknown 999 | Nobody": "",
-	} {
-		if got := r.where(name); got != want {
-			t.Errorf("%s: recovering at %q, want %q", name, got, want)
-		}
-	}
-	if !r.anyRecovering([]string{"Raider 303 | Thrash", "Venom 212 | Dabs"}) || r.anyRecovering([]string{"Raider 303 | Thrash"}) {
-		t.Error("anyRecovering")
-	}
-	// A track not updated for a minute (slot left, Tacview lost it) is not recovering.
-	r.now = func() time.Time { return now.Add(time.Minute) }
-	if r.where("Raider 302 | Jedi") != "" {
-		t.Error("stale track still recovering")
-	}
-}
 
 // Operator 2026-10-21: fence checks and splash calls with the GCI.
 func TestGCIAck(t *testing.T) {

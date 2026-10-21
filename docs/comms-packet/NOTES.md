@@ -1,11 +1,17 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 21 OCT 2026.  v1.32.  Product = one full-screen 16:9 PDF, 28 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.32.pdf` — cover + 27 cards: How it works · Frequencies ·
+**Built 21 OCT 2026.  v1.33.  Product = one full-screen 16:9 PDF, 28 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.33.pdf` — cover + 27 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · Texaco · **Darkstar** · **GCI calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · No answer?
+
+## v1.33 (21 OCT 2026) — quiet in recoveries removed
+
+Operator: "you can remove Quiet in recoveries this is not needed". The GCI no longer holds
+threat calls or the picture near the boat or a field (cmd/atc/gci_recovery.go deleted); card 19
+loses its bullet, phraseology v2.7 its callout. The picture is fused over every AWACS up.
 
 ## v1.32 (21 OCT 2026) — GCI line of sight
 

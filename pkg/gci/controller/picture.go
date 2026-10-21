@@ -18,8 +18,8 @@ func (c *Controller) HandlePicture(ctx context.Context, request *brevity.Picture
 	c.broadcastPicture(ctx, &logger, true)
 }
 
-// AutoPictureQuiet, when set and true, holds the automatic PICTURE (a pilot
-// on frequency is recovering); it goes out once they are down. vsfg7.
+// AutoPictureQuiet, when set and true, holds the automatic PICTURE (the GCI
+// is off station - no AWACS up); it goes out once one is. vsfg7.
 var AutoPictureQuiet func() bool
 
 func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logger, forceBroadcast bool) {
@@ -29,7 +29,7 @@ func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logge
 			return
 		}
 		if AutoPictureQuiet != nil && AutoPictureQuiet() { // vsfg7: deadline not reset, so it retries
-			logger.Debug().Msg("holding automatic PICTURE: a pilot on frequency is recovering")
+			logger.Debug().Msg("holding automatic PICTURE: off station")
 			return
 		}
 		c.scope.WaitUntilFadesResolve(ctx)

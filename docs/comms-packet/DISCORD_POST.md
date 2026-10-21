@@ -54,8 +54,7 @@ OVERLORD   266.000 AM   SYRIA (FOOTHOLD)        (dial it)
 • *"... fence out"*, then *"... checking out"*: copy, good day. Then call Command for RTB as usual.
 
 **It calls you too:** a picture every 5 minutes, a THREAT when a hostile is inside 25 nm, MERGED inside 3 nm.
-**Quiet in recoveries:** inside 12 nm of the boat below 10,000 ft, or 10 nm of a field below 4,000 ft, there are no threat calls and the picture waits. If you ask for something, you still get an answer.
 
-📄 **SkyEye ATC Comms Packet v1.31** (new cards 18-19) and **ATC Phraseology Reference v2.5** (new section 11)
+📄 **SkyEye ATC Comms Packet v1.33** (cards 18-19) and **ATC Phraseology Reference v2.7** (section 11)
 
 **What Darkstar can see:** only what the mission's AWACS could see - the E-3 out to about 217 nm, the E-2 about 200 nm, and nothing below its radar horizon (a bandit on the deck far out is invisible until it climbs or closes; when one drops out of coverage you hear "faded"). If no AWACS is airborne, Darkstar is **off station**: "All players, Darkstar, off station" - picture and bogey dope get "off station, no picture" until "on station" comes back.

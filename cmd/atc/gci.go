@@ -276,13 +276,10 @@ func runGCI(ctx context.Context, apiKey string) {
 	prs := parser.New(cs, nil, true)
 	comp := composer.Composer{Callsign: cs}
 
-	// Quiet during recoveries (gci_recovery.go): our own Tacview tracker,
-	// the one Command runs, knows where the carrier and the fields are.
+	// Our own Tacview tracker (the one Command runs) finds the mission's AWACS.
+	// "Quiet in recoveries" was removed 2026-10-21 (operator: "not needed").
 	store := newTacviewPositions()
 	go runMiniTacview(ctx, flagTacviewAddr, store)
-	rec := newGCIRecovery(store, gciFields(flagMap))
-	controller.RecoveryQuiet = rec.quiet
-	log.Info().Str("map", flagMap).Int("fields", len(rec.fields)).Msg("GCI: quiet during recoveries armed")
 
 	// AWACS line of sight (gci_coverage.go).
 	var cov *gciCoverage
@@ -293,9 +290,7 @@ func runGCI(ctx context.Context, apiKey string) {
 		onStation = func() bool { on, _, _ := cov.onStation(); return on }
 		log.Info().Msg("GCI: AWACS line of sight armed - the picture is what the mission's AWACS can see")
 	}
-	controller.AutoPictureQuiet = func() bool {
-		return !onStation() || rec.anyRecovering(gciSRSBook.NamesOnFrequency())
-	}
+	controller.AutoPictureQuiet = func() bool { return !onStation() }
 	say := make(chan string, 4) // free text for gciSpeak: on / off station
 
 	var wg sync.WaitGroup
