@@ -36,6 +36,9 @@ var marshalAliases = struct {
 
 var angelsInCallRe = regexp.MustCompile(`\bangels?,?\s+(\d{1,2})\b`)
 
+// bareModexRe is a modex said without the callsign word: "032, established".
+var bareModexRe = regexp.MustCompile(`\b(\d)[\s-]?(\d)[\s-]?(\d)\b`)
+
 // marshalResolvesAlias: the intents a holding jet's flight call can carry.
 func marshalResolvesAlias(in marshalIntent) bool {
 	switch in {
@@ -57,6 +60,14 @@ func resolveStackCallsign(callsign, lower string, stack *state.MarshalStack) str
 		if target != "" {
 			if _, ok := stack.GetAircraft(target); ok {
 				return target
+			}
+		}
+	}
+	if callsign == "" {
+		// "032, established": a wingman (or lead) giving only his modex.
+		if m := bareModexRe.FindStringSubmatch(lower); m != nil {
+			if cs := stackJetByModex(m[1]+m[2]+m[3], stack); cs != "" {
+				return cs
 			}
 		}
 	}
@@ -115,4 +126,20 @@ func splitCallsign(cs string) (word, num string) {
 		return f[0], f[n-1]
 	}
 	return f[0], ""
+}
+
+// stackJetByModex finds the stack entry a bare modex belongs to: a lead, or a
+// section's wingman.
+func stackJetByModex(modex string, stack *state.MarshalStack) string {
+	for _, ac := range stack.GetAll() {
+		if _, n := splitCallsign(ac.Callsign); n == modex {
+			return ac.Callsign
+		}
+		for _, w := range ac.Wingmen {
+			if _, n := splitCallsign(w); n == modex {
+				return ac.Callsign
+			}
+		}
+	}
+	return ""
 }

@@ -646,6 +646,9 @@ type MarshalAircraft struct {
 	// Case 3 holding fields. Zero values when assigned under Case 1/2.
 	AssignedRadial int       // 0-359, holding radial from CV TACAN (reciprocal of BRC)
 	EAT            time.Time // expected approach time — when this aircraft commences
+	// Wingmen are the jets that checked in "holding hands" with this lead:
+	// one stack slot, one Charlie, and the lead speaks for the section.
+	Wingmen []string
 }
 
 // MarshalStack manages the carrier recovery stack.
@@ -775,6 +778,15 @@ func (s *MarshalStack) CollapseStack(minAngels int) []StepDown {
 	return changes
 }
 
+// SetWingmen records the section the lead checked in with.
+func (s *MarshalStack) SetWingmen(callsign string, wingmen []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ac, ok := s.aircraft[callsign]; ok {
+		ac.Wingmen = append([]string(nil), wingmen...)
+	}
+}
+
 // SetAngels updates the assigned angels for an aircraft already in the stack.
 func (s *MarshalStack) SetAngels(callsign string, angels int) {
 	s.mu.Lock()
@@ -811,6 +823,7 @@ func (s *MarshalStack) GetAircraft(callsign string) (*MarshalAircraft, bool) {
 		return nil, false
 	}
 	copy := *ac
+	copy.Wingmen = append([]string(nil), ac.Wingmen...)
 	return &copy, true
 }
 
@@ -1069,6 +1082,7 @@ func (s *MarshalStack) GetAll() []*MarshalAircraft {
 	result := make([]*MarshalAircraft, 0, len(s.aircraft))
 	for _, ac := range s.aircraft {
 		copy := *ac
+		copy.Wingmen = append([]string(nil), ac.Wingmen...)
 		result = append(result, &copy)
 	}
 	return result

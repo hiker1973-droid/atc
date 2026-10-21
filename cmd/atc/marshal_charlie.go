@@ -92,6 +92,6 @@ func watchCharlie(ctx context.Context, stack *state.MarshalStack, comp *composer
 		stack.SetPhase(cs, "charlie")
 		marshalCharlie.given(now)
 		log.Info().Str("callsign", cs).Msg("Marshal: deck clear - signal Charlie")
-		transmit(comp.MarshalSignalCharlie(cs))
+		transmit(comp.MarshalSignalCharlie(stackTXCallsign(stack, cs)))
 	}
 }

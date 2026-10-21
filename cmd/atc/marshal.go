@@ -680,21 +680,23 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("text", text).Msg("Marshal: no callsign in call — ignored")
 		return
 	}
+	// A section leads with "<lead> flight" (marshal_section.go).
+	say := stackTXCallsign(stack, callsign)
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
 	switch intent {
 	case marshalRadioCheck:
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
-		transmit(comp.RadioCheck(callsign))
+		transmit(comp.RadioCheck(say))
 
 	case marshalRadarCheck:
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		rBrg = magneticDeg(atcCtrl, rBrg)
 		log.Info().Str("callsign", callsign).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Msg("Marshal: radar check")
 		if rFound {
-			transmit(comp.MarshalRadarCheck(callsign, rAng, rDist, rBrg))
+			transmit(comp.MarshalRadarCheck(say, rAng, rDist, rBrg))
 		} else {
-			transmit(comp.MarshalRadarCheckNoContact(callsign))
+			transmit(comp.MarshalRadarCheckNoContact(say))
 		}
 
 	case marshalBRCRequest:
@@ -703,10 +705,16 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		// would have been ignored.
 		brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
 		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Msg("Marshal: BRC request")
-		transmit(comp.MarshalSayBRC(callsign, brc))
+		transmit(comp.MarshalSayBRC(say, brc))
 
 	case marshalMarkingMom:
 		pos, _ := stack.Enqueue(callsign, fuelState)
+		// "Raider 302 holding hands with 032, marking mom's ...": one slot for
+		// the section (operator 2026-10-20).
+		if wing := marshalWingmen(text, callsign); len(wing) > 0 {
+			joinSection(stack, callsign, wing)
+			say = stackTXCallsign(stack, callsign)
+		}
 		reserved := stack.ReservedAngels(callsign)
 		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
 		stack.SetAngels(callsign, stackAngels)
@@ -736,10 +744,10 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			stack.SetAssignedRadial(callsign, radial)
 			stack.SetEAT(callsign, eat)
 			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Msg("Marshal: Case 3 aircraft checking in")
-			transmit(comp.MarshalMarkingMomCase3(callsign, stackAngels, radial, eat.Minute(), altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
+			transmit(comp.MarshalMarkingMomCase3(say, stackAngels, radial, eat.Minute(), altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
 		} else {
 			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
-			transmit(comp.MarshalMarkingMom(callsign, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
+			transmit(comp.MarshalMarkingMom(say, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
 		}
 
 	case marshalCheckIn:
@@ -749,15 +757,15 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		rBrg = magneticDeg(atcCtrl, rBrg)
 		log.Info().Str("callsign", callsign).Bool("radarFound", rFound).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Msg("Marshal: check-in without marking mom's")
-		transmit(comp.MarshalCheckIn(callsign, rAng, rDist, rBrg, rFound))
+		transmit(comp.MarshalCheckIn(say, rAng, rDist, rBrg, rFound))
 
 	case marshalSeeYouAtTen:
 		if fuelState > 0 {
 			// "see you at 10, state 6.6": the state is already given, don't ask.
-			transmit(comp.MarshalCopyState(callsign, fuelState))
+			transmit(comp.MarshalCopyState(say, fuelState))
 			break
 		}
-		transmit(comp.MarshalRadarContact(callsign, 10))
+		transmit(comp.MarshalRadarContact(say, 10))
 
 	case marshalDepartureClear:
 		// Departing aircraft, handed over by Deckboss with the airborne ack.
@@ -772,7 +780,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", callsign).Int("distNm", dist).
 			Str("to", flagHandoffCommandName).Float64("freq", flagHandoffCommandFreq).
 			Msg("Marshal: departure clear of zone, pushing to command")
-		transmit(comp.MarshalDepartureClear(callsign, marshalZoneName(),
+		transmit(comp.MarshalDepartureClear(say, marshalZoneName(),
 			flagHandoffCommandName, flagHandoffCommandFreq, flagHandoffCommandPreset))
 
 	case marshalDME:
@@ -783,10 +791,10 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		}
 		_, _, _, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		log.Info().Str("callsign", callsign).Int("distNm", dist).Bool("radarFound", rFound).Msg("Marshal: DME position report")
-		transmit(comp.MarshalAckDME(callsign, dist, rFound, fuelState))
+		transmit(comp.MarshalAckDME(say, dist, rFound, fuelState))
 
 	case marshalState:
-		transmit(comp.MarshalCopyState(callsign, fuelState))
+		transmit(comp.MarshalCopyState(say, fuelState))
 
 	case marshalEstablished:
 		if _, ok := stack.GetAircraft(callsign); !ok {
@@ -825,13 +833,13 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 				stack.SetEAT(callsign, eat)
 			}
 			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Msg("Marshal: Case 3 established in hold")
-			transmit(comp.MarshalEstablishedAckCase3(callsign, angels, radial, eat.Minute()))
+			transmit(comp.MarshalEstablishedAckCase3(say, angels, radial, eat.Minute()))
 		} else if atcCtrl.IsDeckClear() && marshalCharlie.nextCharlie(stack.GetAll(), time.Now()) == callsign {
 			stack.SetPhase(callsign, "charlie")
 			marshalCharlie.given(time.Now())
-			transmit(comp.MarshalSignalCharlie(callsign))
+			transmit(comp.MarshalSignalCharlie(say))
 		} else {
-			transmit(comp.MarshalEstablishedAck(callsign, angels, position))
+			transmit(comp.MarshalEstablishedAck(say, angels, position))
 		}
 
 	case marshalCommencing:
@@ -846,9 +854,9 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 				finalBearing = (brcDeg - marshalFinalBearingOffset + 360) % 360
 			}
 			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
-			transmit(comp.MarshalCopyCommencingCase3(callsign, fuelState, finalBearing, brcDeg))
+			transmit(comp.MarshalCopyCommencingCase3(say, fuelState, finalBearing, brcDeg))
 		} else {
-			transmit(comp.MarshalCopyCommencing(callsign, fuelState))
+			transmit(comp.MarshalCopyCommencing(say, fuelState))
 		}
 		// Internal stack collapse only — pack remaining aircraft down to fill
 		// the vacated slot so the next "marking moms" gets the correct angels.
@@ -871,7 +879,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		}
 		stack.SetPhase(callsign, "platform")
 		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
-		transmit(comp.MarshalAtPlatform(callsign, finalBearing))
+		transmit(comp.MarshalAtPlatform(say, finalBearing))
 
 	case marshalPushCommand:
 		// Pilot's courtesy call on the departure push issued above. Short ack
@@ -880,7 +888,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		// which contains this trigger — the address-led guard at the top of the
 		// handler drops that echo before it reaches here.
 		log.Info().Str("callsign", callsign).Msg("Marshal: pilot-initiated command handoff ack")
-		transmit(comp.HandoffAck(callsign, flagHandoffCommandName))
+		transmit(comp.HandoffAck(say, flagHandoffCommandName))
 
 	case marshalPushPaddles:
 		// Pilot's courtesy call announcing they're leaving Marshal for the
@@ -890,14 +898,14 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		// "Marshal, Raider 39, 7 DME, switching channel 4" still reads as a
 		// DME position report.
 		log.Info().Str("callsign", callsign).Msg("Marshal: pilot-initiated paddles handoff ack")
-		transmit(comp.HandoffAck(callsign, "paddles"))
+		transmit(comp.HandoffAck(say, "paddles"))
 
 	case marshalInitial:
 		// 3nm initial — pilot is rolling on the boat, hand off to LSO/Paddles.
 		// Marshal's last call before pilot pushes to the LSO freq. TACAN
 		// button reference was dropped — pilots know to switch.
 		log.Info().Str("callsign", callsign).Msg("Marshal: 3nm initial, handing off to LSO")
-		transmit(comp.MarshalPushButton(callsign))
+		transmit(comp.MarshalPushButton(say))
 
 	case marshalReadback:
 		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal: readback, no reply")
