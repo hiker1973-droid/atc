@@ -100,11 +100,16 @@ def local(ts):
     return t.astimezone().strftime("%H:%M")
 
 
-def build(day, rep, week, out_pdf):
+NIGHTLY = {"when": None, "main": "Yesterday, by pilot", "none": "Nobody flew.",
+           "second": "Last 7 days", "second_none": "Nobody flew this week.", "flew": "pilots flew"}
+
+
+def build(day, rep, week, out_pdf, lab=None):
+    lab = lab or NIGHTLY
     pilots = rep.get("pilots") or []
     S = [Paragraph("vSFG-7 Pilot Report", title),
          Paragraph("%s &middot; Day / Night / Foothold &middot; DCSServerBot statistics via the SkyEye launcher"
-                   % day.strftime("%a %d %b %Y"), sub)]
+                   % (lab["when"] or day.strftime("%a %d %b %Y")), sub)]
     rigs = rep.get("rigs") or []
     linked = [r for r in rigs if r.get("configured")]
     S.append(Paragraph("Data: " + " &middot; ".join(
@@ -117,11 +122,11 @@ def build(day, rep, week, out_pdf):
 
     tot = lambda k: sum(p.get(k) or 0 for p in pilots)
     S.append(Spacer(1, 4))
-    S.append(tiles([(len(pilots), "pilots flew"), ("%.1f" % tot("hours"), "hours in slot"),
+    S.append(tiles([(len(pilots), lab["flew"]), ("%.1f" % tot("hours"), "hours in slot"),
                     (tot("sorties"), "sorties"), (tot("landings"), "landings"), (tot("traps"), "carrier traps"),
                     (tot("kills"), "kills"), (tot("deaths"), "deaths")]))
 
-    S.append(Paragraph("Yesterday, by pilot", h))
+    S.append(Paragraph(lab["main"], h))
     if pilots:
         rows = [[esc(p["name"]), "%.1f" % p["hours"], zero(p["sorties"]), zero(p["landings"]),
                  zero(p["traps"]) + ((" (%.1f)" % p["trapPoints"]) if p.get("traps") else ""),
@@ -132,7 +137,7 @@ def build(day, rep, week, out_pdf):
                         "Deaths", "Crashes", "Ejects", "Aircraft", "Servers"], rows,
                        [1.9, 0.5, 0.55, 0.6, 0.75, 0.55, 0.6, 0.5, 0.62, 0.5, 1.6, 1.33], left=(0, 10, 11)))
     else:
-        S.append(Paragraph("Nobody flew.", cell))
+        S.append(Paragraph(lab["none"], cell))
 
     traps = sorted((t for p in pilots for t in (p.get("recentTraps") or [])), key=lambda t: t.get("time") or "")
     if traps:
@@ -144,7 +149,7 @@ def build(day, rep, week, out_pdf):
                        [0.6, 2.0, 1.3, 0.7, 0.5, 0.6, 0.8, 1.6], left=(0, 1, 2, 3, 6, 7)))
 
     wp = sorted(week.get("pilots") or [], key=lambda p: -p["hours"])[:25]
-    S.append(Paragraph("Last 7 days - top %d by hours" % len(wp), h))
+    S.append(Paragraph("%s - top %d by hours" % (lab["second"], len(wp)), h))
     if wp:
         S.append(table(["Pilot", "Hours", "Slots", "Sorties", "Landings", "Traps (avg)", "Kills", "Deaths",
                         "Main aircraft", "Last seen"],
@@ -156,7 +161,7 @@ def build(day, rep, week, out_pdf):
                         for p in wp],
                        [2.2, 0.55, 0.5, 0.6, 0.65, 0.8, 0.5, 0.55, 1.6, 0.9], left=(0, 8, 9)))
     else:
-        S.append(Paragraph("Nobody flew this week.", cell))
+        S.append(Paragraph(lab["second_none"], cell))
     S.append(Paragraph("Hours are time in a slot (DCSServerBot hop on to hop off), not airborne time. Traps and "
                        "points are DCSServerBot's greenieboard (DCS's LSO); SkyEye Paddles grades are in the "
                        "Paddles report.", note))
@@ -171,7 +176,11 @@ def main():
     ap.add_argument("--date", help="day to report (default yesterday)")
     ap.add_argument("--launcher", default=LAUNCHER)
     ap.add_argument("--out", default=REPORTS)
+    ap.add_argument("--history", action="store_true",
+                    help="everything DCSServerBot holds (all time + last 30 days), not one day")
     a = ap.parse_args()
+    if a.history:
+        return history(a)
     day = dt.date.fromisoformat(a.date) if a.date else dt.date.today() - dt.timedelta(days=1)
     rep = fetch(a.launcher, "date=" + day.isoformat())
     week = fetch(a.launcher, "days=7")
@@ -182,6 +191,27 @@ def main():
     out_pdf = report_pdf(a.out, day.isoformat(), "Pilots")
     build(day, rep, week, out_pdf)
     print("wrote", out_pdf)
+
+
+def history(a):
+    """One-off report of all DCSServerBot history (operator 2026-10-21: "do a pilot
+    report from past data")."""
+    today = dt.date.today()
+    rep = fetch(a.launcher, "days=0")
+    month = fetch(a.launcher, "days=30")
+    sess = [s for p in rep.get("pilots") or [] for s in (p.get("recent") or [])]
+    first = min((p["firstSeen"] for p in rep.get("pilots") or [] if p.get("firstSeen")), default="")[:10]
+    last = max((p["lastSeen"] for p in rep.get("pilots") or [] if p.get("lastSeen")), default="")[:10]
+    lab = {"when": "All DCSServerBot history %s to %s" % (first or "?", last or "?"),
+           "main": "All time, by pilot", "none": "No slots recorded.", "second": "Last 30 days",
+           "second_none": "Nobody flew in the last 30 days.", "flew": "pilots"}
+    data = os.path.join(a.out, "_data", "pilots")
+    os.makedirs(data, exist_ok=True)
+    with open(os.path.join(data, "%s history.json" % today), "w", encoding="utf-8") as f:
+        json.dump({"all": rep, "month": month}, f)
+    out_pdf = report_pdf(a.out, today.isoformat(), "Pilots history")
+    build(today, rep, month, out_pdf, lab)
+    print("wrote", out_pdf, "-", len(rep.get("pilots") or []), "pilots,", len(sess), "recent slots")
 
 
 if __name__ == "__main__":
