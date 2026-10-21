@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"strings"
 	"sync"
@@ -275,15 +276,18 @@ func gciCompose(comp composer.Composer, call any) (composer.NaturalLanguageRespo
 	return composer.NaturalLanguageResponse{}, false
 }
 
-// gciRadioCheck answers a radio / comm check with "good copy" (operator
-// 2026-10-21: "For Comms check response instead of Lima Charlie say good
-// copy"). SkyEye's own picks at random from "5 by 5", "loud and clear",
-// "Lima Charlie" and the like. Not on scope is still said - it tells the
-// pilot the GCI cannot see them (wrong DCS name, or still on the ramp).
+// gciRadioChecks are the radio / comm check answers, picked at random
+// (operator 2026-10-21: "instead of Lima Charlie say good copy ... or 5X5 you
+// can random"). SkyEye's own also offered "loud and clear" and "Lima Charlie".
+var gciRadioChecks = []string{"good copy", "5 by 5"}
+
+// gciRadioCheck answers a radio / comm check. Not on scope is still said - it
+// tells the pilot the GCI cannot see them (wrong DCS name, or on the ramp).
 func gciRadioCheck(comp composer.Composer, c brevity.RadioCheckResponse) composer.NaturalLanguageResponse {
-	reply := fmt.Sprintf("%s, %s, good copy.", strings.ToUpper(c.Callsign), strings.ToUpper(comp.Callsign))
+	reply := fmt.Sprintf("%s, %s, %s.", strings.ToUpper(c.Callsign), strings.ToUpper(comp.Callsign),
+		gciRadioChecks[rand.IntN(len(gciRadioChecks))])
 	if !c.RadarContact {
-		reply = fmt.Sprintf("%s, %s, good copy, but I don't see you on scope.", strings.ToUpper(c.Callsign), strings.ToUpper(comp.Callsign))
+		reply = strings.TrimSuffix(reply, ".") + ", but I don't see you on scope."
 	}
 	return composer.NaturalLanguageResponse{Subtitle: reply, Speech: reply}
 }

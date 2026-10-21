@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/martinlindhe/unit"
@@ -68,15 +69,19 @@ func TestGCICheckInPlain(t *testing.T) {
 	}
 }
 
-// Operator 2026-10-21: "good copy", not "Lima Charlie".
+// Operator 2026-10-21: "good copy" or "5 by 5" at random, not "Lima Charlie".
 func TestGCIRadioCheckGoodCopy(t *testing.T) {
 	comp := composer.Composer{Callsign: "Darkstar"}
-	r, _ := gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2", RadarContact: true})
-	if r.Speech != "RAIDER 3 0 2, DARKSTAR, good copy." {
-		t.Errorf("radio check: %q", r.Speech)
+	seen := map[string]bool{}
+	for i := 0; i < 200; i++ {
+		r, _ := gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2", RadarContact: true})
+		seen[r.Speech] = true
 	}
-	r, _ = gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2"})
-	if r.Speech != "RAIDER 3 0 2, DARKSTAR, good copy, but I don't see you on scope." {
+	if len(seen) != 2 || !seen["RAIDER 3 0 2, DARKSTAR, good copy."] || !seen["RAIDER 3 0 2, DARKSTAR, 5 by 5."] {
+		t.Errorf("radio check replies: %v", seen)
+	}
+	r, _ := gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2"})
+	if !strings.HasSuffix(r.Speech, ", but I don't see you on scope.") || strings.Contains(r.Speech, "Lima") {
 		t.Errorf("radio check off scope: %q", r.Speech)
 	}
 }
