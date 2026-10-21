@@ -58,6 +58,10 @@ func (t *cooldownTracker) remove(id uint64) {
 	delete(t.cooldowns, id)
 }
 
+// RecoveryQuiet, when set, reports a friendly (by DCS name) recovering to a
+// carrier or field: it gets no THREAT call. vsfg7 (tools/gci-vendor).
+var RecoveryQuiet func(contactName string) bool
+
 func (c *Controller) broadcastThreats(ctx context.Context) {
 	if !c.enableThreatMonitoring {
 		return
@@ -99,6 +103,10 @@ func (c *Controller) broadcastThreat(ctx context.Context, hostileGroup brevity.G
 		}
 		friendly := c.scope.FindUnit(friendID)
 		if friendly == nil {
+			continue
+		}
+		if RecoveryQuiet != nil && RecoveryQuiet(friendly.Contact.Name) { // vsfg7
+			logger.Debug().Str("friendly", friendly.Contact.Name).Msg("omitting friendly from threat call: recovering")
 			continue
 		}
 		callsign, ok := callsigns.ParsePilotCallsign(friendly.Contact.Name)

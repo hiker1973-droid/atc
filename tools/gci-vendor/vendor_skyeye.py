@@ -77,6 +77,55 @@ PATCHES = [
 // squadronCallsignRe finds a vSFG-7 squadron callsign anywhere in a name or call.
 var squadronCallsignRe = regexp.MustCompile(`(?i)\b(raider|venom)s?\b[\s\-|,]*((?:\d[\s\-]*){1,3})`)
 """),
+    # Quiet during recoveries (operator 2026-10-21): no THREAT call to a jet in
+    # the carrier stack / pattern or a tower's pattern, and the automatic PICTURE
+    # waits while a pilot on frequency is recovering. atc.exe sets the hooks
+    # (cmd/atc/gci_recovery.go) from our own Tacview tracker; nil = SkyEye as is.
+    ("controller/threat.go",
+     r"""func (c *Controller) broadcastThreats(ctx context.Context) {""",
+     r"""// RecoveryQuiet, when set, reports a friendly (by DCS name) recovering to a
+// carrier or field: it gets no THREAT call. vsfg7 (tools/gci-vendor).
+var RecoveryQuiet func(contactName string) bool
+
+func (c *Controller) broadcastThreats(ctx context.Context) {"""),
+    ("controller/threat.go",
+     r"""		friendly := c.scope.FindUnit(friendID)
+		if friendly == nil {
+			continue
+		}
+""",
+     r"""		friendly := c.scope.FindUnit(friendID)
+		if friendly == nil {
+			continue
+		}
+		if RecoveryQuiet != nil && RecoveryQuiet(friendly.Contact.Name) { // vsfg7
+			logger.Debug().Str("friendly", friendly.Contact.Name).Msg("omitting friendly from threat call: recovering")
+			continue
+		}
+"""),
+    ("controller/picture.go",
+     r"""func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logger, forceBroadcast bool) {
+	if !forceBroadcast {
+		if c.srsClient.ClientsOnFrequency() == 0 {
+			logger.Debug().Msg("skipping PICTURE broadcast because no clients are on frequency")
+			return
+		}
+""",
+     r"""// AutoPictureQuiet, when set and true, holds the automatic PICTURE (a pilot
+// on frequency is recovering); it goes out once they are down. vsfg7.
+var AutoPictureQuiet func() bool
+
+func (c *Controller) broadcastPicture(ctx context.Context, logger *zerolog.Logger, forceBroadcast bool) {
+	if !forceBroadcast {
+		if c.srsClient.ClientsOnFrequency() == 0 {
+			logger.Debug().Msg("skipping PICTURE broadcast because no clients are on frequency")
+			return
+		}
+		if AutoPictureQuiet != nil && AutoPictureQuiet() { // vsfg7: deadline not reset, so it retries
+			logger.Debug().Msg("holding automatic PICTURE: a pilot on frequency is recovering")
+			return
+		}
+"""),
     # A paused DCS server (Foothold waits for a player) refuses Tacview, and
     # SkyEye logged an ERROR every 10 s - a red alert on the dashboard all day
     # (operator 2026-10-21: "make the GCI quieter about telemetry when

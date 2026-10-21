@@ -149,6 +149,19 @@ func (b *Book) count(humansOnly bool) int {
 	return n
 }
 
+// NamesOnFrequency is the SRS name of every human on the GCI frequency.
+func (b *Book) NamesOnFrequency() []string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	var out []string
+	for _, c := range b.clients {
+		if b.onFrequency(c) && !isBot(c) {
+			out = append(out, c.Name)
+		}
+	}
+	return out
+}
+
 // HumansOnFrequency counts clients on the GCI frequency whose name does not end "[BOT]".
 func (b *Book) HumansOnFrequency() int { return b.count(true) }
 

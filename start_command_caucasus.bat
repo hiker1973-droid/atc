@@ -37,4 +37,4 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: Command sends each flight to the one with a free target.
 :: --tanker-freq 252.1: Texaco 1-1 KC-130 (Hornet COMM2 CH8, Eric). --tanker2-freq
 :: 252.3: Texaco 3-1 KC-135 MPRS, angels 24 (COMM2 CH10, Brian; operator 2026-10-19).
-start "vSFG-7 Command (Caucasus)" cmd /c "%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --jtac-freq 61.0 --jtac-voice ash --jtac2-freq 62.0 --tanker-freq 252.1 --tanker2-freq 252.3 --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
+start "vSFG-7 Command (Caucasus)" cmd /c "%~dp0atc.exe --command-only --map caucasus --command-gci-name Darkstar --command-gci-freq 264.0 --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --jtac-freq 61.0 --jtac-voice ash --jtac2-freq 62.0 --tanker-freq 252.1 --tanker2-freq 252.3 --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"

@@ -21,5 +21,7 @@ call "%~dp0start_marshal_kola.bat"
 
 echo [vSFG-7] Launching Deckboss (128.600)...
 call "%~dp0start_deckboss_kola.bat"
+echo [vSFG-7] Launching GCI Darkstar (264.000)...
+call "%~dp0start_gci_kola.bat"
 
 echo [vSFG-7] Kola region launched.

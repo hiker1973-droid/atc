@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/paulmach/orb"
 
 	"github.com/martinlindhe/unit"
 
@@ -107,5 +110,85 @@ func TestGCISquadronCallsigns(t *testing.T) {
 	p := parser.New("Darkstar", nil, false)
 	if req, ok := p.Parse("Darkstar, Raiders 306, radio check.").(*brevity.RadioCheckRequest); !ok || req.Callsign != "raider 3 0 6" {
 		t.Errorf("spoken call parsed as %#v", p.Parse("Darkstar, Raiders 306, radio check."))
+	}
+}
+
+// Operator 2026-10-21: "fast movers" = bogey dope on jets, "slow movers" on helicopters.
+func TestGCIMovers(t *testing.T) {
+	p := parser.New("Darkstar", nil, false)
+	for text, want := range map[string]brevity.ContactCategory{
+		"Darkstar, Raider 302, any fast movers?":  brevity.FixedWing,
+		"Darkstar, Venom 212, slow movers.":       brevity.RotaryWing,
+		"Darkstar, Raider 302, fast-mover check.": brevity.FixedWing,
+		"Darkstar, Raider 302, bogey dope":        brevity.Aircraft,
+	} {
+		req, ok := p.Parse(gciAliases(text)).(*brevity.BogeyDopeRequest)
+		if !ok || req.Filter != want {
+			t.Errorf("%q -> %#v, want bogey dope filter %v", text, p.Parse(gciAliases(text)), want)
+		}
+	}
+}
+
+// Operator 2026-10-21: "checking out" gets a reply, not "say again".
+func TestGCICheckOut(t *testing.T) {
+	for text, want := range map[string]string{
+		"Darkstar, Raider 302, checking out.": "RAIDER 3 0 2, DARKSTAR, copy, good day.",
+		"Anyface, Venom 212, check out, RTB.": "VENOM 2 1 2, DARKSTAR, copy, good day.",
+		"Darkstar, Raider 302, picture.":      "",
+		"Command, Raider 302, checking out.":  "", // not addressed to the GCI
+	} {
+		if got := gciCheckOut(text, "Darkstar"); got != want {
+			t.Errorf("%q -> %q, want %q", text, got, want)
+		}
+	}
+}
+
+// Command points a fenced-in flight at the GCI.
+func TestCommandGCIHint(t *testing.T) {
+	defer func(n string, f float64) { flagCommandGCIName, flagCommandGCIFreq = n, f }(flagCommandGCIName, flagCommandGCIFreq)
+	flagCommandGCIName, flagCommandGCIFreq = "", 0
+	if r := commandResponse("Command, Raider 302, fence in.", "Raider 302", "vSFG-7-Command"); strings.Contains(r, "picture") {
+		t.Errorf("hint without the flag: %q", r)
+	}
+	flagCommandGCIName, flagCommandGCIFreq = "Darkstar", 264.0
+	r := commandResponse("Command, Raider 302, fence in.", "Raider 302", "vSFG-7-Command")
+	if !strings.HasSuffix(r, " Darkstar is up on two six four point zero for picture.") {
+		t.Errorf("fence in reply %q", r)
+	}
+}
+
+// Quiet during recoveries: near the boat low, in a field's pattern, or not.
+func TestGCIRecovery(t *testing.T) {
+	store := newTacviewPositions()
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	put := func(key string, lon, lat, alt float64) {
+		store.Set(key, orb.Point{lon, lat})
+		store.SetInfo(key, tacviewContactInfo{AltFt: alt, UpdatedAt: now})
+	}
+	put("CVN_72", 37.5, 42.8, 0)
+	put("Raider 302", 37.55, 42.85, 2500)  // ~3.5 nm from the boat, angels 2.5: in the stack
+	put("Raider 303", 37.55, 42.85, 22000) // same place, angels 22: transiting overhead
+	put("Venom 212", 42.06, 42.25, 1500)   // Senaki pattern
+	put("Venom 201", 42.06, 43.40, 1500)   // 70 nm north of Senaki, low: on the range
+	r := newGCIRecovery(store, gciFields("caucasus"))
+	r.now = func() time.Time { return now }
+	for name, want := range map[string]string{
+		"Raider 302 | Jedi":    "the carrier",
+		"Raider 303 | Thrash":  "",
+		"Venom 212 | Dabs":     "Senaki",
+		"Venom 201 | Screwy":   "",
+		"Unknown 999 | Nobody": "",
+	} {
+		if got := r.where(name); got != want {
+			t.Errorf("%s: recovering at %q, want %q", name, got, want)
+		}
+	}
+	if !r.anyRecovering([]string{"Raider 303 | Thrash", "Venom 212 | Dabs"}) || r.anyRecovering([]string{"Raider 303 | Thrash"}) {
+		t.Error("anyRecovering")
+	}
+	// A track not updated for a minute (slot left, Tacview lost it) is not recovering.
+	r.now = func() time.Time { return now.Add(time.Minute) }
+	if r.where("Raider 302 | Jedi") != "" {
+		t.Error("stale track still recovering")
 	}
 }

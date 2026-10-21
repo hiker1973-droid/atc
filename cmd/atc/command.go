@@ -150,14 +150,16 @@ func commandResponse(text, callsign, channelName string) string {
 	// 2026-10-18 11:36:40 "Raider 303, fence again, air to ground", missed twice).
 	if containsAny(lower, "fence in", "fence-in", "fencein", "fence check", "fence-check", "fencing in",
 		"fence again", "fenced in") {
+		// commandGCIHint: "Darkstar is up on two six four point zero for
+		// picture" (gci.go; operator 2026-10-21), when --command-gci-name is set.
 		if fuel := extractFuelStateMarshal(lower); fuel > 0 {
-			return composer.NewATCComposer(channelName).CommandFenceIn(callsign, fuel)
+			return composer.NewATCComposer(channelName).CommandFenceIn(callsign, fuel) + commandGCIHint()
 		}
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, copy fence in, you are cleared hot.", callsign, channelName),
 			fmt.Sprintf("%s, %s, roger fence in, master arm on, cleared hot, good hunting.", callsign, channelName),
 			fmt.Sprintf("%s, %s, copy fence check, systems hot, you are cleared into the area.", callsign, channelName),
-		})
+		}) + commandGCIHint()
 	}
 
 	// Bare fuel state report ("Command, Raider 11, state 1.8"). Last so a state

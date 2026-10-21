@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/vsfg7/atc/pkg/gci/callsigns"
 	"github.com/vsfg7/atc/pkg/gci/coalitions"
 	"github.com/vsfg7/atc/pkg/gci/composer"
 	"github.com/vsfg7/atc/pkg/gci/controller"
@@ -56,6 +58,9 @@ var (
 	flagGCITacviewPassword string
 	flagGCISampleDir       string
 	flagGCISampleOnly      string
+	// Command's pointer to the GCI after "fence in" (operator 2026-10-21).
+	flagCommandGCIName string
+	flagCommandGCIFreq float64
 )
 
 // registerGCIFlags is called from the flag block in main.go.
@@ -77,6 +82,9 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.StringVar(&flagGCITacviewPassword, "gci-tacview-password", "", "Tacview real-time telemetry password, if the server sets one")
 	f.StringVar(&flagGCISampleDir, "gci-sample", "", "Render sample GCI calls in the GCI voice to this folder and exit (gci_sample.go)")
 	f.StringVar(&flagGCISampleOnly, "gci-sample-only", "", `With --gci-sample: render just this call ("picture", "threat", ...)`)
+	f.StringVar(&flagCommandGCIName, "command-gci-name", "",
+		`With --command-only: after "fence in", Command adds "<name> is up on <freq> for picture" ("" = off)`)
+	f.Float64Var(&flagCommandGCIFreq, "command-gci-freq", 0, "With --command-gci-name: the GCI frequency in MHz")
 }
 
 // styleGCI is the OpenAI fallback's delivery brief.
@@ -106,10 +114,67 @@ const (
 // (who is on frequency). voiceNetLoop feeds it from its SRS connection.
 var gciSRSBook *srsinfo.Book
 
-// gciWhisperPrompt is SkyEye's own transcription prompt (pkg/recognizer).
+// gciWhisperPrompt is SkyEye's own transcription prompt (pkg/recognizer),
+// primed with our squadron words (operator 2026-10-21): the Raider and Venom
+// callsigns, the extra calls the GCI takes (checking in / out, fast and slow
+// movers) and the word Whisper otherwise drops, "Darkstar".
 func gciWhisperPrompt(callsign string) string {
-	return "Either ANYFACE or " + callsign + ", PILOT CALLSIGN, DIGITS, one of 'RADIO' 'ALPHA' 'BOGEY' " +
-		"'PICTURE' 'DECLARE' 'SNAPLOCK' 'SPIKED', ARGUMENTS such as BULLSEYE, BRAA, numbers or digits."
+	return "Either ANYFACE or " + callsign + ", PILOT CALLSIGN such as Raider 302 or Venom 212, DIGITS, one of " +
+		"'RADIO' 'ALPHA' 'BOGEY' 'PICTURE' 'DECLARE' 'SNAPLOCK' 'SPIKED', or checking in, checking out, " +
+		"fast movers, slow movers, ARGUMENTS such as BULLSEYE, BRAA, numbers or digits."
+}
+
+// gciMoverRe: "fast movers" asks for bogey dope on jets, "slow movers" on
+// helicopters (operator 2026-10-21: "in addition to saying bogey you can say
+// 'fast movers', for helicopter ... 'slow mover'"). Rewritten into SkyEye's
+// own words before its parser sees the call.
+var (
+	gciFastMoverRe = regexp.MustCompile(`(?i)\bfast[\s-]*movers?\b`)
+	gciSlowMoverRe = regexp.MustCompile(`(?i)\bslow[\s-]*movers?\b`)
+	gciCheckOutRe  = regexp.MustCompile(`(?i)\bcheck(?:ing|s)?[\s-]*out\b`)
+)
+
+func gciAliases(text string) string {
+	text = gciFastMoverRe.ReplaceAllString(text, "bogey dope airplane")
+	return gciSlowMoverRe.ReplaceAllString(text, "bogey dope helicopter")
+}
+
+// gciCheckOut answers "Darkstar, Raider 302, checking out" - SkyEye has no
+// such call and said "say again" (operator 2026-10-21). "" = not a check-out
+// addressed to this GCI.
+func gciCheckOut(text, gci string) string {
+	lower := strings.ToLower(text)
+	if !gciCheckOutRe.MatchString(lower) ||
+		!(strings.Contains(lower, strings.ToLower(gci)) || strings.Contains(lower, "anyface") || strings.Contains(lower, "any face")) {
+		return ""
+	}
+	rest := strings.NewReplacer(strings.ToLower(gci), " ", "anyface", " ", "any face", " ").Replace(lower)
+	rest = gciCheckOutRe.ReplaceAllString(rest, " ")
+	cs, ok := callsigns.ParsePilotCallsign(rest)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s, %s, copy, good day.", strings.ToUpper(cs), strings.ToUpper(gci))
+}
+
+// commandGCIHint is what Command adds after "fence in": where the picture is.
+func commandGCIHint() string {
+	if flagCommandGCIName == "" || flagCommandGCIFreq <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" %s is up on %s for picture.", flagCommandGCIName, spokenFreq1(flagCommandGCIFreq))
+}
+
+// spokenFreq1 reads a frequency to one decimal, digit by digit: 264.0 ->
+// "two six four point zero".
+func spokenFreq1(mhz float64) string {
+	words := map[rune]string{'0': "zero", '1': "one", '2': "two", '3': "three", '4': "four",
+		'5': "five", '6': "six", '7': "seven", '8': "eight", '9': "nine", '.': "point"}
+	var out []string
+	for _, ch := range fmt.Sprintf("%.1f", mhz) {
+		out = append(out, words[ch])
+	}
+	return strings.Join(out, " ")
 }
 
 func runGCI(ctx context.Context, apiKey string) {
@@ -134,6 +199,15 @@ func runGCI(ctx context.Context, apiKey string) {
 		flagGCIThreats, flagGCIThreatInterval, true, nil)
 	prs := parser.New(cs, nil, true)
 	comp := composer.Composer{Callsign: cs}
+
+	// Quiet during recoveries (gci_recovery.go): our own Tacview tracker,
+	// the one Command runs, knows where the carrier and the fields are.
+	store := newTacviewPositions()
+	go runMiniTacview(ctx, flagTacviewAddr, store)
+	rec := newGCIRecovery(store, gciFields(flagMap))
+	controller.RecoveryQuiet = rec.quiet
+	controller.AutoPictureQuiet = func() bool { return rec.anyRecovering(gciSRSBook.NamesOnFrequency()) }
+	log.Info().Str("map", flagMap).Int("fields", len(rec.fields)).Msg("GCI: quiet during recoveries armed")
 
 	var wg sync.WaitGroup
 	wg.Go(func() {
@@ -180,6 +254,14 @@ func runGCI(ctx context.Context, apiKey string) {
 	voiceNetLoop(ctx, flagSRSAddr, flagGCIFreq, cs, apiKey, flagEAMPassword, gciVoice(), flagExternalAudio,
 		gciWhisperPrompt(cs), nil,
 		func(text string) (string, string) {
+			if reply := gciCheckOut(text, cs); reply != "" {
+				log.Info().Str("text", text).Msg("GCI: checking out")
+				return "", reply // voiceNetLoop speaks it
+			}
+			if t := gciAliases(text); t != text {
+				log.Info().Str("text", text).Str("as", t).Msg("GCI: fast / slow movers -> bogey dope")
+				text = t
+			}
 			req := prs.Parse(text)
 			if req == nil {
 				log.Info().Str("text", text).Msg("GCI: not addressed to us or not understood - silent")

@@ -34,4 +34,4 @@ set GOMEMLIMIT=256MiB
 :: --gci-picture-interval 5m: SkyEye's own default is 2m; every PICTURE is
 :: spoken through ElevenLabs. --airfield only tells this atc.exe apart in the
 :: launcher's process match.
-start "vSFG-7 GCI Darkstar (Caucasus)" cmd /c "%~dp0atc.exe --gci-only --airfield UGSB --gci-callsign Darkstar --gci-freq 264.0 --gci-picture-interval 5m --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"
+start "vSFG-7 GCI Darkstar (Caucasus)" cmd /c "%~dp0atc.exe --gci-only --map caucasus --airfield UGSB --gci-callsign Darkstar --gci-freq 264.0 --gci-picture-interval 5m --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"
