@@ -60,6 +60,13 @@ v1.30 (user asked 2026-10-20 "update documentation") follows origin/main 823cf86
 pickle / Fox / splash (card 12); tower "holding", "request handoff", "green jet", and an
 emergency gets the runway it names plus souls / fuel copied (card 24).
 
+v1.31 (user asked 2026-10-21 to add the new GCI) follows origin/main 16957f2 (GCI
+fence checks and splash, gciAck): new cards 18 - 19 DARKSTAR and GCI CALLS - SkyEye's
+GCI brain inside atc.exe (cmd/atc/gci.go, gci_recovery.go, pkg/gci), Darkstar 264.000 on
+Black Sea Day / Night (Hornet COMM 1 CH 5, the Caucasus Training / Hornet New Pilot Pack
+cards), Overlord 266.000 on Foothold (dial it). Every printed GCI call is in the Phraseology
+Reference v2.5 and parsed by TestDocPhrases. Cards 18 - 25 of v1.30 are now 20 - 27.
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -78,6 +85,8 @@ FREQUENCIES — "what SkyEye uses", per theatre:
            306.300  Syria             (start_marshal_syria.bat)
            306.300  Black Sea         (start_marshal_caucasus.bat, operator ruling 2026-09-20)
   Hitman   61.000 FM  Black Sea      (start_command_caucasus.bat --jtac-freq)
+  GCI      264.000    Black Sea       Darkstar (start_gci_caucasus.bat; Kola too, unconfirmed)
+           266.000    Syria           Overlord (start_gci_syria.bat)
   Towers and ATIS: docs/phraseology/facts.json (cmd/atc/docs_test.go reads the bats)
 
 Run:  python "_tools\\build_skyeye_packet.py"   (from the packet folder)
@@ -101,8 +110,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.30"
-DATE = "20 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.31"
+DATE = "21 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -129,11 +138,19 @@ TANKER_F, H_TANKER = "252.100", "COMM 2 CH 8"
 # Texaco 3-1, the second tanker net (--tanker2-freq, 2026-10-19): KC-135 MPRS, COMM 2 CH 10.
 TANKER2_F, H_TANKER2 = "252.300", "COMM 2 CH 10"
 
-TOTAL = 25
+# GCI (cmd/atc/gci.go, start_gci_{caucasus,syria}.bat, 2026-10-21). Black Sea: Hornet COMM 1
+# CH 5 "DARKSTAR 1" on the Caucasus Training and Hornet New Pilot Pack cards. Foothold: dial it.
+H_GCI = "COMM 1 CH 5"
+
+TOTAL = 27
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
 FACTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                                     "phraseology", "facts.json"), encoding="utf-8"))
-TOWER_CARDS = "cards 19 - 24"
+TOWER_CARDS = "cards 21 - 26"
+_CAU = next(t for t in FACTS if t["key"] == "caucasus")
+_SYR = next(t for t in FACTS if t["key"] == "syria")
+GCI_BS = (_CAU["gci_name"], "%.3f" % _CAU["gci"])     # Darkstar 264.000
+GCI_SY = (_SYR["gci_name"], "%.3f" % _SYR["gci"])     # Overlord 266.000
 
 
 def card(title_plain, title_gold, sublines, n, eyebrow=EYE_ALL):
@@ -169,6 +186,7 @@ def c01_how():
           ("HITMAN 1-1 / 2-1  -  JTAC, Black Sea", "%s / %s FM  ·  cards 13 - 14" % (JTAC_F[:4], JTAC2_F[:4])),
           ("RANGE AREAS + OVERLORD  -  on Command", "cards 15 - 16"),
           ("TEXACO 1-1 / 3-1  -  tankers, Black Sea", "%s / %s AM  ·  card 17" % (TANKER_F[:5], TANKER2_F[:5])),
+          ("DARKSTAR / OVERLORD  -  GCI", "%s / %s AM  ·  cards 18 - 19" % (GCI_BS[1][:5], GCI_SY[1][:5])),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
     NK.band(c, "HOW TO BE HEARD", "every call")
     c.bullets([
@@ -192,9 +210,14 @@ def c02_freqs():
                                  "Hornet preset shown for each; Vipers use Command only."], 2)
     for th in ("PERSIAN GULF", "SYRIA", "BLACK SEA"):
         NK.band(c, th, "Hornet preset")
-        c.kv([("COMMAND  %s" % COMMAND_F, "%s  ·  Viper %s" % (H_CMD, V_CMD)),
-              ("DECKBOSS  %s" % DECKBOSS_F, H_DKB),
-              ("MARSHAL  %s" % MARSHAL_F[th], H_MSH[th])])
+        rows = [("COMMAND  %s" % COMMAND_F, "%s  ·  Viper %s" % (H_CMD, V_CMD)),
+                ("DECKBOSS  %s" % DECKBOSS_F, H_DKB),
+                ("MARSHAL  %s" % MARSHAL_F[th], H_MSH[th])]
+        if th == "BLACK SEA":
+            rows.append(("%s  %s  -  GCI" % (GCI_BS[0].upper(), GCI_BS[1]), H_GCI))
+        if th == "SYRIA":
+            rows.append(("%s  %s  -  GCI" % (GCI_SY[0].upper(), GCI_SY[1]), "dial it"))
+        c.kv(rows)
     NK.band(c, "READING THE PRESET CARDS", "read this")
     c.bullets([
         [("\"AI\" on a carrier preset means SkyEye.", True),
@@ -529,6 +552,7 @@ def c10_departure():
         ("", "push vSFG-7-Command,"),
         ("", "two eight two point zero, channel four, for tasking."),
         ("3  COMMAND", "Command, Raider 1, checking in."),
+        ("4  %s" % GCI_BS[0].upper(), "Black Sea: %s %s for picture - card 18." % (GCI_BS[0], GCI_BS[1][:5])),
     ], split=250)
     NK.band(c, "GET THE CLEAR CALL RIGHT")
     c.bullets([
@@ -553,7 +577,7 @@ def c11_command():
     c.kv([
         ("radio check  /  comm check  /  how copy", "loud and clear"),
         ("checking in  /  check in", "proceed mission"),
-        ("fence in  /  fence check", "cleared hot"),
+        ("fence in  /  fence check", "cleared hot  ·  where the GCI is"),
         ("in hot  /  pickle  /  Fox 3  /  splash", "cleared hot  ·  copy"),
         ("on station", "good hunting"),
         ("off station  /  departing station", "proceed to assigned pattern"),
@@ -755,14 +779,84 @@ def c16_texaco():
     return save(c, "16_texaco.jpg")
 
 
+# ------------------------------------------------- GCI (cmd/atc/gci.go, gci_recovery.go)
+EYE_GCI = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER  ·  GCI"
+
+
+def c17_gci():
+    c = card("DARK", "STAR", ["GCI  ·  %s %s AM Black Sea  ·  %s %s AM Syria" % (GCI_BS + GCI_SY),
+                              "SkyEye's AWACS controller, our voice. Picture, threats, bogey dope."],
+             18, EYE_GCI)
+    NK.band(c, "THE FREQUENCIES", "Hornet preset")
+    c.kv([("%s  -  Black Sea Day / Night" % GCI_BS[0].upper(), "%s AM  ·  %s" % (GCI_BS[1], H_GCI)),
+          ("%s  -  Syria (Foothold)" % GCI_SY[0].upper(), "%s AM  ·  dial it" % GCI_SY[1])])
+    NK.band(c, "THE FLOW", "\"%s, Raider 302, ...\"" % GCI_BS[0])
+    NK.steps(c, [
+        ("COMMAND", "checking in on 282  ·  Command still runs your recovery"),
+        ("CHECK IN", "checking in  ->  radar contact"),
+        ("FENCE IN", "fence in  ->  copy fence in, picture follows"),
+        ("FLY", "picture  ·  bogey dope  ·  declare  ·  splash  -  card 19"),
+        ("FENCE OUT", "fence out  ->  copy fence out"),
+        ("CHECK OUT", "checking out  ->  copy, good day.  Then Command: RTB"),
+    ], split=170)
+    NK.band(c, "TO BE HEARD", "and to get threat calls")
+    c.bullets([
+        [("Your name must carry your callsign.", True),
+         ("DCS name \"Raider 302 | Name\" or \"Venom 212 | Name\" - the GCI finds Raider / Venom and the "
+          "number anywhere in it. SRS name the same as DCS, or threat and merged calls never reach you.", False)],
+        [("Lead with \"%s\", \"%s\" or \"Anyface\", then your callsign." % (GCI_BS[0], GCI_SY[0]), True),
+         ("Bearings as three digits (\"zero six five\"), ranges and altitudes as numbers. No \"niner\".", False)],
+        [("Command still copies fence in", True),
+         ("and adds \"%s is up on two six four point zero for picture\" - the fence check goes to the GCI, "
+          "the picture follows." % GCI_BS[0], False)],
+    ])
+    NK.subtle(c, "Overlord Actual on Command (cards 15 - 16) is the range officer, not the GCI.")
+    return save(c, "17_gci.jpg")
+
+
+def c17_gci_calls():
+    c = card("GCI ", "CALLS", ["Every call the GCI answers  ·  as Raider 302 hears them",
+                              "Bullseye and BRAA numbers are examples."], 19, EYE_GCI)
+    NK.band(c, "YOU SAY", "%s replies" % GCI_BS[0])
+    c.kv([
+        ("radio check  /  comm check", "good copy  ·  5 by 5"),
+        ("checking in", "radar contact"),
+        ("fence in  /  fence out", "copy  ·  picture follows fence in"),
+        ("alpha check", "contact, alpha check bullseye 010/48"),
+        ("picture", "up to 3 groups, from bullseye"),
+        ("bogey dope", "group BRAA 045/32, 25000, hot, hostile"),
+        ("any fast movers  /  any slow movers", "bogey dope: jets  /  helicopters"),
+        ("declare bullseye 010 for 48 at 25000", "hostile, friendly, furball, clean"),
+        ("snaplock 125 for 10 at 8000", "threat BRAA 125/10, 8000, hot"),
+        ("spiked 080  /  strobe 080", "spike range 35 ...  ·  clean 080"),
+        ("vector to tanker", "bearing and range"),
+        ("splash one  /  splash", "copy splash one"),
+        ("checking out", "copy, good day"),
+    ], size=14, rh=27)
+    NK.band(c, "UNASKED", "only if you are on the GCI frequency")
+    c.kv([
+        ("every 5 minutes", "PICTURE"),
+        ("a hostile inside 25 nm  ·  repeats every 3 min", "THREAT"),
+        ("inside 3 nm of a hostile (fixed wing)", "MERGED"),
+        ("a hostile off scope 30 s  /  the GCI comes up", "FADED  /  SUNRISE"),
+    ], size=14, rh=27)
+    c.bullets([
+        [("Quiet in recoveries:", True),
+         ("within 12 nm of the carrier below 10,000 ft, or 10 nm of a field below 4,000 ft AGL - no threat "
+          "call, and the picture waits. Your own requests are always answered.", False)],
+    ])
+    return save(c, "17_gci_calls.jpg")
+
+
 def c12_sortie():
     c = card("A FULL ", "SORTIE", ["Off the boat and back  ·  every SkyEye call, in order",
-                                  "Hornet, Case I, Persian Gulf frequencies."], 18, EYE_CVN)
+                                  "Hornet, Case I, Persian Gulf frequencies."], 20, EYE_CVN)
     NK.band(c, "OUTBOUND")
     NK.steps(c, [
         ("DECKBOSS 128.6", "request taxi  ·  ready cat N  ·  airborne"),
         ("MARSHAL 306.3", "clear seven miles"),
         ("COMMAND 282.0", "checking in  ·  fence in  ·  on station"),
+        ("GCI 264 / 266", "Black Sea / Syria: check in  ·  fence in  ·  picture"),
     ], split=280)
     NK.band(c, "ON THE JOB")
     NK.steps(c, [
@@ -790,7 +884,7 @@ def c12_sortie():
 def c13_towers():
     c = card("AIRFIELD ", "ATC", ["One AI tower per field  ·  UHF AM  ·  Gulf, Black Sea, Syria",
                                   "Same calls at every field; only name and frequency change."],
-             19, EYE_TWR)
+             21, EYE_TWR)
     NK.band(c, "HOW TO BE HEARD", "every tower call")
     c.bullets([
         [("Open with the field name, then your callsign.", True),
@@ -827,7 +921,7 @@ def c13_towers():
 def c14_tower_radios():
     c = card("TOWER ", "RADIOS", ["Gulf and Black Sea  ·  tower, ATIS, COMM 1 preset",
                                   "Presets read off the squadron Hornet and Viper cards."],
-             20, EYE_TWR)
+             22, EYE_TWR)
     NK.band(c, "PERSIAN GULF", "Hornet  /  Viper")
     c.kv([
         ("AL DHAFRA TOWER  251.100  ·  ATIS 248.200", "CH 8  /  CH 12"),
@@ -864,7 +958,7 @@ def c15_syria_towers():
     atis = {a["icao"]: a["freq"] for a in th["atis"]}
     c = card("SYRIA ", "TOWERS", ["Eastern Med  ·  Foothold  ·  %d fields  ·  tower and ATIS" % len(th["towers"]),
                                   "Read from the start scripts - dial the frequency."],
-             21, EYE_TWR)
+             23, EYE_TWR)
     NK.band(c, "THE TOWERS", "tower  ·  ATIS")
     c.kv([(t["name"].upper(), "%.3f   ATIS %.3f" % (t["freq"], atis[t["icao"]]) if t["icao"] in atis
            else "%.3f" % t["freq"]) for t in th["towers"]])
@@ -883,7 +977,7 @@ def c15_syria_towers():
 
 def c16_tower_departure():
     c = card("DEPART", "URE", ["Parking to Command  ·  every SkyEye field",
-                               "Wait for each reply before the next call."], 22, EYE_TWR)
+                               "Wait for each reply before the next call."], 24, EYE_TWR)
     NK.band(c, "THE DEPARTURE", "in order")
     NK.steps(c, [
         ("REQUEST TAXI", "Minhad Tower, Raider 1, request taxi."),
@@ -924,7 +1018,7 @@ def c16_tower_departure():
 
 def c17_tower_arrival():
     c = card("ARRI", "VAL", ["Overhead or straight in  ·  one call per leg",
-                             "Give your distance with inbound, initial or final."], 23, EYE_TWR)
+                             "Give your distance with inbound, initial or final."], 25, EYE_TWR)
     NK.band(c, "THE OVERHEAD", "VMC")
     NK.steps(c, [
         ("INBOUND", "Minhad Tower, Raider 1, 10 mile initial."),
@@ -972,7 +1066,7 @@ def c17_tower_arrival():
 
 def c18_tower_calls():
     c = card("TOWER ", "CALLS", ["Every call a tower answers  ·  lead with the field name",
-                                 "Silent calls are heard but get no reply."], 24, EYE_TWR)
+                                 "Silent calls are heard but get no reply."], 26, EYE_TWR)
     NK.band(c, "GROUND AND DEPARTURE", "tower replies")
     c.kv([
         ("request taxi  /  ready to taxi", "taxi, hold short"),
@@ -1011,7 +1105,7 @@ def c18_tower_calls():
 
 def c19_trouble():
     c = card("NO ", "ANSWER?", ["Work down the list  ·  most misses are the first three",
-                                "Tell the operator what you said, word for word."], 25)
+                                "Tell the operator what you said, word for word."], 27)
     NK.band(c, "CHECK", "in order")
     NK.steps(c, [
         ("1", "Waited 2 - 3 seconds?"),
@@ -1020,6 +1114,7 @@ def c19_trouble():
         ("4", "Used a trigger word from the calls cards?"),
         ("5", "Half-second pause after keying - call not clipped?"),
         ("6", "Frequency? Marshal 306.3, Paddles 128.3, Texaco 252.1/3, Hitman 61FM."),
+        ("", "GCI: Darkstar 264.0, Overlord 266.0."),
         ("7", "SRS shows your TX light? Radio AM (Hitman FM), encryption off?"),
     ], split=120)
     NK.band(c, "KNOWN QUIRKS")
@@ -1033,17 +1128,19 @@ def c19_trouble():
          ("\"Marshal, Raider 1, ...\" - a call with no number gets no answer.", False)],
         [("Paddles answers only the ball call and a radio check.", True),
          ("Everything else he says is his own call on your pass - no readback.", False)],
+        [("The GCI needs your callsign in your name.", True),
+         ("DCS and SRS name \"Raider 302 | Name\" - no Raider / Venom number, no threat calls.", False)],
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 823cf86, 20 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 16957f2, 21 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
 CARD_FUNCS = [c01_how, c02_freqs, c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1,
               c06_marshal_case3, c07_marshal_calls_inbound, c08_marshal_calls_stack,
               c09_marshal_calls_case3, c10_paddles, c10_departure, c11_command, c12_jtac_flow,
-              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c12_sortie, c13_towers,
+              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c17_gci, c17_gci_calls, c12_sortie, c13_towers,
               c14_tower_radios, c15_syria_towers, c16_tower_departure, c17_tower_arrival,
               c18_tower_calls, c19_trouble]
 
@@ -1060,7 +1157,7 @@ def main():
                 fn != os.path.basename(out):
             os.remove(os.path.join(PACKET, fn))
     n = NS.build_pdf([("SKYEYE ATC", pages)], out, "SKYEYE ATC",
-                     "Command  ·  Deckboss  ·  Marshal  ·  Paddles  ·  JTAC  ·  Texaco  ·  Towers\nPersian Gulf  ·  Syria  ·  Black Sea",
+                     "Command  ·  Deckboss  ·  Marshal  ·  Paddles  ·  JTAC  ·  Texaco  ·  GCI  ·  Towers\nPersian Gulf  ·  Syria  ·  Black Sea",
                      airframe="HORNET  ·  VIPER", squadron="vSFG-7  ·  AI ATC ON SRS",
                      version=VER, date=DATE, cover_logo=LOGO, cover_logo_mode="circle",
                      page_logo=LOGO, page_logo_mode="circle", cache=CACHE, balance=True,

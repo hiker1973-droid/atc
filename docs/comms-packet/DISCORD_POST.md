@@ -36,3 +36,24 @@ Ask instead (*"permission to proceed to Alpha"*, *"request Alpha"*, *"request to
 **Updated docs** 📄
 • **SkyEye ATC Comms Packet v1.25**: Hitman 1-1 / 2-1, Cleared Hot? (BDA), new Range Areas and Overlord Actual cards
 • **ATC Phraseology Reference v2.3**: new section 5 (range areas + Overlord), Hitman section updated
+
+---
+**New: Darkstar / Overlord GCI** 📡
+Our own AWACS controller is on the air, a British voice, giving you the air picture.
+```
+DARKSTAR   264.000 AM   BLACK SEA DAY / NIGHT   (Hornet COMM1 CH5)
+OVERLORD   266.000 AM   SYRIA (FOOTHOLD)        (dial it)
+```
+**Your name matters.** Your DCS name has to carry your callsign, like *"Raider 302 | Name"* or *"Venom 212 | Name"*, and your SRS name has to be the same. If it isn't, you won't get threat or merged calls.
+
+**How to call:** start with "Darkstar" (or "Overlord", or "Anyface"), then your callsign, then what you want. Say bearings as three digits (*"zero six five"*).
+• *"Darkstar, Raider 302, checking in"*: radar contact
+• *"... fence in"*: copy fence in, and the picture comes a few seconds later. Command on 282 still copies your fence in and tells you where Darkstar is.
+• *"... picture"*, *"... bogey dope"*, *"... declare bullseye 010 for 48 at 25000"*, *"... alpha check"*, *"... splash one"*
+• *"... any fast movers"* gets jets only and *"... any slow movers"* gets helicopters only
+• *"... fence out"*, then *"... checking out"*: copy, good day. Then call Command for RTB as usual.
+
+**It calls you too:** a picture every 5 minutes, a THREAT when a hostile is inside 25 nm, MERGED inside 3 nm.
+**Quiet in recoveries:** inside 12 nm of the boat below 10,000 ft, or 10 nm of a field below 4,000 ft, there are no threat calls and the picture waits. If you ask for something, you still get an answer.
+
+📄 **SkyEye ATC Comms Packet v1.31** (new cards 18-19) and **ATC Phraseology Reference v2.5** (new section 11)

@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.4"
-DATE = "20 OCT 2026"          # change together with VER
+VER = "v2.5"
+DATE = "21 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 LOGO = r"C:\Users\afhin\Saved Games\DCS\Missions\New Pilot packs\VMFA225_patch.png"
@@ -97,7 +97,7 @@ TOWER_ANYTIME = [
 COMMAND = [
     ("Radio check", "radio check  /  how copy", "Loud and clear", "radio_check"),
     ("Check in", "checking in", "Loud and clear, proceed mission", "check_in"),
-    ("Fence in", "fence in, state 6.2", "Copy fence in, cleared hot", "fence_in"),
+    ("Fence in", "fence in, state 6.2", "Copy fence in, cleared hot; Black Sea and Syria add where the GCI is", "fence_in"),
     ("On station", "on station", "Copy on station, good hunting", "on_station"),
     ("Off station", "off station", "Proceed to assigned pattern", "off_station"),
     ("Fence out", "fence out", "Copy fence out, safe passage", "fence_out"),
@@ -182,6 +182,26 @@ TEXACO = [
     ("In reform", "established starboard reform  /  establish starboard side", "Copy", "copy"),
     ("Check out", "checking out, pushing 282  /  moving on to mission",
      "Cleared to depart - Fortuna super te, Viking / Stay classy, Raider / Fara í víking", "cleared to depart"),
+]
+# GCI, Darkstar / Overlord (cmd/atc/gci.go: gciCheckOut, gciAck, gciAliases, then SkyEye's
+# own parser, pkg/gci/parser). Test kinds in docs_test.go gciDocKind. Replies from
+# pkg/gci/composer and gci.go; the bullseye / BRAA numbers are examples.
+GCI = [
+    ("Radio check", "radio check  /  comm check", "Good copy  /  5 by 5 - off scope adds \"but I don't see you on scope\"", "radio_check"),
+    ("Check in", "checking in", "Radar contact", "check_in"),
+    ("Fence in", "fence in", "Copy fence in, picture follows - the picture a few seconds later", "fence_in"),
+    ("Alpha check", "alpha check", "Contact, alpha check bullseye 010/48", "alpha"),
+    ("Picture", "picture  /  request picture", "Up to 3 groups: bullseye, altitude, track, ID, contacts, type", "picture"),
+    ("Bogey dope (nearest)", "bogey dope", "Group BRAA 045/32, 25000, hot, hostile, Flanker", "bogey"),
+    ("Jets only", "any fast movers  /  bogey dope airplanes", "Nearest fixed-wing group, as bogey dope", "bogey_fast"),
+    ("Helicopters only", "any slow movers  /  bogey dope helicopters", "Nearest helicopter group, as bogey dope", "bogey_slow"),
+    ("Declare (bullseye)", "declare bullseye 010 for 48 at 25000", "Hostile, friendly, furball or clean", "declare"),
+    ("Snaplock (BRAA)", "snaplock 125 for 10 at 8000", "Threat BRAA 125/10, 8000, hot, hostile, Flanker", "snaplock"),
+    ("Spiked / strobe", "spiked 080  /  strobe 080", "Spike range 35, 16000, flank northeast, hostile - or clean 080", "spiked"),
+    ("Vector", "vector to tanker", "Bearing and range to the nearest tanker", "vector"),
+    ("Splash", "splash one  /  splash", "Copy splash one  /  copy splash", "splash"),
+    ("Fence out", "fence out", "Copy fence out", "fence_out"),
+    ("Check out", "checking out", "Copy, good day", "check_out"),
 ]
 
 
@@ -431,6 +451,11 @@ def build():
             rows.append(("Texaco 1-1  -  Tanker", f3(t["tanker"]), "Two-way", "KC-130, TACAN 51Y, angels 13"))
         if t.get("tanker2"):
             rows.append(("Texaco 3-1  -  Tanker", f3(t["tanker2"]), "Two-way", "KC-135 MPRS, TACAN 53Y, angels 24"))
+        if t.get("gci"):
+            note = "Picture, threats, bogey dope"
+            if t["key"] == "kola":
+                note = "Confirm on the Kola card"
+            rows.append(("%s  -  GCI" % t["gci_name"], f3(t["gci"]), "Two-way", note))
         for a in t["atis"]:
             rows.append(("ATIS  -  " + a["name"].replace(" ATIS", ""), f3(a["freq"]), "Listen only", "Updates with the weather"))
         d.table(("Channel", "Freq (MHz)", "Type", "Notes"), rows, (0.34, 0.17, 0.15, 0.34))
@@ -654,8 +679,47 @@ def build():
         "Altitude and velocity come live from Tacview. SkyEye is radio only: DCS still needs the AI comms menu "
         "Ready pre-contact before fuel flows."])
 
-    # 11. Tips
-    d.h1("11. General Tips")
+    # 11. GCI
+    syr = TH["syria"]
+    d.h1("11. GCI - %s %s / %s %s MHz" % (cau["gci_name"], f3(cau["gci"]), syr["gci_name"], f3(syr["gci"])))
+    d.para("SkyEye's GCI (AWACS) controller in our voice, a British woman. Blue coalition. Black Sea Day / Night: "
+           "%s on %s AM (Hornet COMM 1 CH 5). Syria (Foothold): %s on %s AM - dial it, the Foothold cards number "
+           "channels per airframe. Lead with \"%s\" (or \"%s\", or \"Anyface\"), then your callsign, then the "
+           "request. Your fence check goes here and the picture follows. Command still copies fence in and adds "
+           "\"%s is up on two six four point zero for picture\" (Syria: %s, two six six)."
+           % (cau["gci_name"], f3(cau["gci"]), syr["gci_name"], f3(syr["gci"]), cau["gci_name"], syr["gci_name"],
+              cau["gci_name"], syr["gci_name"]))
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("gci", GCI, cau["gci_name"], cau["gci_name"], cs="Raider 302"), (0.2, 0.4, 0.4))
+    d.dialogue([("Pilot", "Darkstar, Raider 302, checking in."),
+                ("GCI", "Raider 3 0 2, Darkstar, radar contact."),
+                ("Pilot", "Darkstar, Raider 302, fence in."),
+                ("GCI", "Raider 3 0 2, Darkstar, copy fence in, picture follows."),
+                ("GCI", "Darkstar, 2 groups. Group bullseye zero one zero, 48, 25000, track southwest, hostile, "
+                        "2 contacts, Flanker. ..."),
+                ("Pilot", "Darkstar, Raider 302, bogey dope."),
+                ("GCI", "Raider 3 0 2, group BRAA zero four five, 32, 25000, hot, hostile, Flanker."),
+                ("Pilot", "Darkstar, Raider 302, checking out."),
+                ("GCI", "Raider 3 0 2, Darkstar, copy, good day.")])
+    d.callout("Your name must carry your callsign", [
+        "DCS name \"Raider 302 | Name\" or \"Venom 212 | Name\" - the GCI finds Raider / Venom and the number "
+        "anywhere in it. Your SRS name must be the same as your DCS name, or threat and merged calls never reach you.",
+        "Bearings: say the three digits (\"zero six five\"); ranges and altitudes as normal numbers. No \"niner\" / \"tree\"."])
+    d.table(("The GCI calls you, unasked (only if you are on its frequency)", "Call"), [
+        ("Every 5 minutes", "Picture"),
+        ("A hostile inside 25 nm (repeats every 3 min)", "Threat"),
+        ("Inside 3 nm of a hostile (fixed wing)", "Merged"),
+        ("A hostile off scope for 30 s", "Faded"),
+        ("The GCI comes online (mid-mission = it restarted)", "Sunrise")], (0.7, 0.3))
+    d.callout("Quiet in recoveries", [
+        "Within 12 nm of the carrier below 10,000 ft, or within 10 nm of a field below 4,000 ft AGL: no threat call to "
+        "you, and the automatic picture waits. Your own requests are always answered.",
+        "Flow: Command check-in -> %s check-in, fence in -> fly (picture, bogey dope, declare) -> fence out, checking "
+        "out -> Command RTB -> Marshal or tower. Overlord Actual on Command (section 5) is the range officer, not the "
+        "GCI." % cau["gci_name"]])
+
+    # 12. Tips
+    d.h1("12. General Tips")
     d.tips([
         ("Always say your callsign.", "Address first, then your full callsign with its number. Raider and Venom are "
          "auto-corrected from common mishearings."),
@@ -668,7 +732,7 @@ def build():
         ("Position calls need Tacview.", "Radar check, bullseye, Hitman's checks and the 30 nm handoff need the rig's Tacview feed."),
     ])
     d.callout("If the ATC doesn't respond", [
-        "1.  Addressed the right controller - field name, Command, Hitman, Deckboss, Marshal, Paddles or Texaco?",
+        "1.  Addressed the right controller - field name, Command, Hitman, Deckboss, Marshal, Paddles, Texaco or Darkstar?",
         "2.  Included your full callsign with its number?",
         "3.  Used a call from the tables in this reference?",
         "4.  Right frequency (section 1), AM - or FM for Hitman? Encryption off?",

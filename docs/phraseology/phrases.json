@@ -790,5 +790,131 @@
   "say": "Texaco 1-1, Raider 1-1, moving on to mission.",
   "tower": "",
   "want": "cleared to depart"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, radio check.",
+  "tower": "Darkstar",
+  "want": "radio_check"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, comm check.",
+  "tower": "Darkstar",
+  "want": "radio_check"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, checking in.",
+  "tower": "Darkstar",
+  "want": "check_in"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, fence in.",
+  "tower": "Darkstar",
+  "want": "fence_in"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, alpha check.",
+  "tower": "Darkstar",
+  "want": "alpha"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, picture.",
+  "tower": "Darkstar",
+  "want": "picture"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, request picture.",
+  "tower": "Darkstar",
+  "want": "picture"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, bogey dope.",
+  "tower": "Darkstar",
+  "want": "bogey"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, any fast movers.",
+  "tower": "Darkstar",
+  "want": "bogey_fast"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, bogey dope airplanes.",
+  "tower": "Darkstar",
+  "want": "bogey_fast"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, any slow movers.",
+  "tower": "Darkstar",
+  "want": "bogey_slow"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, bogey dope helicopters.",
+  "tower": "Darkstar",
+  "want": "bogey_slow"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, declare bullseye 010 for 48 at 25000.",
+  "tower": "Darkstar",
+  "want": "declare"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, snaplock 125 for 10 at 8000.",
+  "tower": "Darkstar",
+  "want": "snaplock"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, spiked 080.",
+  "tower": "Darkstar",
+  "want": "spiked"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, strobe 080.",
+  "tower": "Darkstar",
+  "want": "spiked"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, vector to tanker.",
+  "tower": "Darkstar",
+  "want": "vector"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, splash one.",
+  "tower": "Darkstar",
+  "want": "splash"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, splash.",
+  "tower": "Darkstar",
+  "want": "splash"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, fence out.",
+  "tower": "Darkstar",
+  "want": "fence_out"
+ },
+ {
+  "role": "gci",
+  "say": "Darkstar, Raider 302, checking out.",
+  "tower": "Darkstar",
+  "want": "check_out"
  }
 ]

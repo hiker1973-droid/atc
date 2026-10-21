@@ -61,6 +61,8 @@
   "lso": 128.3,
   "tanker": 252.1,
   "tanker2": 252.3,
+  "gci": 264,
+  "gci_name": "Darkstar",
   "towers": [
    {
     "name": "Batumi Tower",
@@ -123,6 +125,8 @@
   "deckboss": 128.6,
   "marshal": 306.3,
   "lso": 128.3,
+  "gci": 266,
+  "gci_name": "Overlord",
   "towers": [
    {
     "name": "Akrotiri Tower",
@@ -322,6 +326,8 @@
   "command": 282,
   "deckboss": 128.6,
   "marshal": 306.3,
+  "gci": 264,
+  "gci_name": "Darkstar",
   "towers": [
    {
     "name": "Bodo Tower",

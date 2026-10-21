@@ -14,6 +14,8 @@ import (
 
 	"github.com/vsfg7/atc/pkg/airfield"
 	"github.com/vsfg7/atc/pkg/controller"
+	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/vsfg7/atc/pkg/gci/parser"
 	"github.com/vsfg7/atc/pkg/lso"
 )
 
@@ -48,6 +50,8 @@ type docTheatre struct {
 	LSO      float64      `json:"lso,omitempty"`
 	Tanker   float64      `json:"tanker,omitempty"`
 	Tanker2  float64      `json:"tanker2,omitempty"`
+	GCI      float64      `json:"gci,omitempty"`
+	GCIName  string       `json:"gci_name,omitempty"`
 	Towers   []docStation `json:"towers"`
 	ATIS     []docStation `json:"atis"`
 }
@@ -126,6 +130,15 @@ func currentDocFacts(t *testing.T) []docTheatre {
 			LSO:      batFreq(t, "start_lso"+th.suffix+".bat", "lso-freq"),
 			Tanker:   batFreq(t, "start_command"+th.suffix+".bat", "tanker-freq"),
 			Tanker2:  batFreq(t, "start_command"+th.suffix+".bat", "tanker2-freq"),
+			GCI:      batFreq(t, "start_gci"+th.suffix+".bat", "gci-freq"),
+		}
+		if d.GCI > 0 {
+			lines, _ := batLaunches(t, "start_gci"+th.suffix+".bat")
+			for _, l := range lines {
+				if v := batFlag(l, "gci-callsign"); v != "" {
+					d.GCIName = v
+				}
+			}
 		}
 		lines, titles := batLaunches(t, "start_towers"+th.suffix+".bat")
 		for i, l := range lines {
@@ -191,9 +204,9 @@ func TestDocFacts(t *testing.T) {
 
 // docPhrase is one printed pilot call and what the document says it does.
 type docPhrase struct {
-	Role  string `json:"role"`  // tower | command | jtac | marshal | deckboss | tanker | lso
+	Role  string `json:"role"`  // tower | command | jtac | marshal | deckboss | tanker | lso | gci
 	Say   string `json:"say"`   // as printed, with the address
-	Tower string `json:"tower"` // tower calls: the tower addressed
+	Tower string `json:"tower"` // tower calls: the tower addressed; gci: the GCI callsign
 	Want  string `json:"want"`  // the intent the document promises
 }
 
@@ -273,6 +286,49 @@ func jtacKind(lower string) string {
 		return "copy"
 	}
 	return ""
+}
+
+// gciDocKind is what the GCI (gci.go runGCI) does with a printed call:
+// checking out, fence in / out and splash are ours (gciCheckOut, gciAck);
+// everything else goes through SkyEye's parser after the fast / slow movers
+// rewrite (gciAliases).
+func gciDocKind(say, gci string) string {
+	if gciCheckOut(say, gci) != "" {
+		return "check_out"
+	}
+	if kind, _ := gciAck(say, gci); kind != "" {
+		return kind
+	}
+	switch req := parser.New(gci, nil, false).Parse(gciAliases(say)).(type) {
+	case *brevity.RadioCheckRequest:
+		return "radio_check"
+	case *brevity.CheckInRequest:
+		return "check_in"
+	case *brevity.AlphaCheckRequest:
+		return "alpha"
+	case *brevity.PictureRequest:
+		return "picture"
+	case *brevity.BogeyDopeRequest:
+		switch req.Filter {
+		case brevity.FixedWing:
+			return "bogey_fast"
+		case brevity.RotaryWing:
+			return "bogey_slow"
+		}
+		return "bogey"
+	case *brevity.DeclareRequest:
+		return "declare"
+	case *brevity.SnaplockRequest:
+		return "snaplock"
+	case *brevity.SpikedRequest, *brevity.StrobeRequest:
+		return "spiked" // printed on one row: same answer
+	case *brevity.VectorRequest:
+		return "vector"
+	case nil:
+		return "not understood"
+	default:
+		return fmt.Sprintf("%T", req)
+	}
 }
 
 // docReadbackTarget is the card target the Phraseology Reference's Hitman
@@ -388,6 +444,14 @@ func TestDocPhrases(t *testing.T) {
 		case "lso":
 			if got := lsoDocKind(paddles, &lsoSaid, p.Say); got != p.Want {
 				fail(fmt.Sprintf("%q", got))
+			}
+		case "gci":
+			gci := p.Tower
+			if gci == "" {
+				gci = "Darkstar"
+			}
+			if got := gciDocKind(p.Say, gci); got != p.Want {
+				fail(got)
 			}
 		case "deckboss":
 			// Deckboss parses inline in deckboss.go; its phrases are checked by

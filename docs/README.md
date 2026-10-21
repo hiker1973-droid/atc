@@ -35,7 +35,8 @@ Older versions are in git history, not in `Old\` folders.
        python -I docs/hitman-flow/build_hitman_flow.py
 
 4. `go test ./cmd/atc -run TestDocPhrases` runs every pilot call the Phraseology
-   Reference prints through SkyEye's real parsers (tower, Command, Hitman, Marshal).
+   Reference prints through SkyEye's real parsers (tower, Command, Hitman, Marshal,
+   Paddles, Texaco, GCI).
    Deckboss parses inline in `deckboss.go`, so its calls are checked by hand.
 5. Bump `VER` / `DATE` in the builder when the content changes, commit the PDF with the
    code, and update `comms-packet/NOTES.md` and `DISCORD_POST.md` for a packet release.

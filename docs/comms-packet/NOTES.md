@@ -1,11 +1,35 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 20 OCT 2026.  v1.30.  Product = one full-screen 16:9 PDF, 26 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.30.pdf` — cover + 25 cards: How it works · Frequencies ·
+**Built 21 OCT 2026.  v1.31.  Product = one full-screen 16:9 PDF, 28 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.31.pdf` — cover + 27 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
-Overlord Actual · **Texaco** · A full sortie · Airfield ATC · Tower radios · Syria towers ·
-Departure · Arrival · Tower calls · No answer?
+Overlord Actual · Texaco · **Darkstar** · **GCI calls** · A full sortie · Airfield ATC ·
+Tower radios · Syria towers · Departure · Arrival · Tower calls · No answer?
+
+## v1.31 (21 OCT 2026) — the GCI, Darkstar / Overlord, from origin/main `16957f2`
+
+User asked 2026-10-21 to add the new GCI controller to the pilot documentation.
+- **New card 18 DARKSTAR:** SkyEye's GCI brain in atc.exe, our voice (Lily, British).
+  Darkstar 264.000 AM Black Sea Day / Night (Hornet COMM 1 CH 5, as on the Caucasus Training
+  `fleet.py` and the Hornet New Pilot Pack card); Overlord 266.000 AM Syria / Foothold (dial
+  it - channels differ per Foothold card). The flow Command check-in -> GCI check-in -> fence in
+  (picture follows) -> fly -> fence out -> checking out -> Command RTB; the naming rule (DCS and
+  SRS name "Raider 302 | Name"); Command's "Darkstar is up on two six four point zero for picture".
+- **New card 19 GCI CALLS:** radio check, checking in, fence in / out, alpha check, picture,
+  bogey dope, fast / slow movers, declare, snaplock, spiked / strobe, vector to tanker, splash,
+  checking out; unasked PICTURE (5 min), THREAT (25 nm, 3 min), MERGED (3 nm), FADED, SUNRISE;
+  quiet in recoveries (12 nm / 10,000 ft carrier, 10 nm / 4,000 ft AGL field).
+  From `cmd/atc/gci.go` (gciCheckOut, gciAck, gciAliases), `gci_recovery.go`, `pkg/gci`.
+- Card 1 roles row, card 2 Black Sea / Syria GCI rows, card 11 Off the boat step 4,
+  card 12 Command fence in, card 20 sortie, card 27 No answer? (step 6, naming quirk).
+- Cards 18 - 25 of v1.30 are now 20 - 27 (`TOWER_CARDS` = cards 21 - 26). Build stamp 16957f2.
+- GCI frequencies come from `facts.json` (`gci`, `gci_name`, read from `start_gci_*.bat` by
+  TestDocFacts). Phraseology Reference v2.5 section 11 prints the same calls; TestDocPhrases
+  runs each through gciCheckOut / gciAck / SkyEye's parser.
+- Not done: Kola (Darkstar 264.000 assumed, not confirmed on the Kola card) is not printed.
+  "vector to bullseye" is not printed - the GCI's parser has no bullseye location and would
+  not answer it.
 
 ## v1.30 (20 OCT 2026) — Day 2026-10-19 log fixes, from origin/main `823cf86`
 
