@@ -23,7 +23,7 @@ func TestChooseRecoveryCarrierBasedPilotGoesToMarshal(t *testing.T) {
 	pilot := offsetNm(airfield.LCRA.Center, 29, 0)
 	boat := offsetNm(pilot, 0, 52)
 
-	rec := chooseRecovery(pilot, fields, boat, true, true)
+	rec := chooseRecovery(pilot, fields, nil, boat, true, true)
 	if rec.kind != "marshal" {
 		t.Fatalf("carrier-based pilot sent to %q (%s), want marshal", rec.name, rec.kind)
 	}
@@ -31,12 +31,12 @@ func TestChooseRecoveryCarrierBasedPilotGoesToMarshal(t *testing.T) {
 		t.Errorf("distance = %.1f, want ~52 (to the boat, which the threshold is tested against)", rec.distNm)
 	}
 
-	rec = chooseRecovery(pilot, fields, boat, true, false)
+	rec = chooseRecovery(pilot, fields, nil, boat, true, false)
 	if rec.kind != "tower" || rec.name != airfield.LCRA.Name+" tower" {
 		t.Errorf("land-based pilot sent to %q (%s), want %s tower", rec.name, rec.kind, airfield.LCRA.Name)
 	}
 
-	rec = chooseRecovery(pilot, fields, boat, false, true)
+	rec = chooseRecovery(pilot, fields, nil, boat, false, true)
 	if rec.kind != "tower" {
 		t.Errorf("with the Marshal handoff unavailable, sent to %q (%s), want the tower", rec.name, rec.kind)
 	}
@@ -48,7 +48,7 @@ func TestChooseRecoveryNearerBoatWins(t *testing.T) {
 	fields := []*airfield.Airfield{airfield.LCRA}
 	pilot := offsetNm(airfield.LCRA.Center, 40, 0)
 	boat := offsetNm(pilot, 0, 10)
-	if rec := chooseRecovery(pilot, fields, boat, true, false); rec.kind != "marshal" {
+	if rec := chooseRecovery(pilot, fields, nil, boat, true, false); rec.kind != "marshal" {
 		t.Errorf("sent to %q (%s), want marshal (boat 10 nm, field 40 nm)", rec.name, rec.kind)
 	}
 }

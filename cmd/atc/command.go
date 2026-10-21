@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -37,6 +38,31 @@ var commandAddresses = []string{"vsfg-7-command", "vsfg 7 command", "command",
 	"deck boss", "deckboss", "hitman 1-1", "hitman one one", "hitman",
 	"overlord actual", "overlord"}
 
+// flightOfRe: a lead checking in more than one jet, "flight of three".
+var flightOfRe = regexp.MustCompile(`\bflight of (?:two|three|four|five|six|[2-6])\b`)
+
+// fillerCallsignWords are words Whisper leaves where the callsign word was
+// lost: "Command and 203 checking in" (Day 2026-10-20 18:47, Venom 203) was
+// answered "and 203, vSFG-7-Command".
+var fillerCallsignWords = map[string]bool{"and": true, "the": true, "uh": true, "um": true,
+	"this": true, "is": true, "with": true, "a": true, "an": true, "of": true, "on": true,
+	"to": true, "at": true, "in": true, "er": true, "ah": true, "it": true, "its": true}
+
+// commandCallsign repairs a callsign whose word is a filler: the one Tacview
+// contact with that number, else the number alone.
+func commandCallsign(cs string, store *tacviewPositions) string {
+	word, num := splitCallsign(cs)
+	if num == "" || !fillerCallsignWords[strings.ToLower(word)] {
+		return cs
+	}
+	if store != nil {
+		if full := store.CallsignByNumber(num); full != "" {
+			return full
+		}
+	}
+	return num
+}
+
 // commandResponse generates an ATC response for a command channel intent.
 func commandResponse(text, callsign, channelName string) string {
 	lower := strings.ToLower(text)
@@ -53,8 +79,16 @@ func commandResponse(text, callsign, channelName string) string {
 	// Check-in. A departure handed over by the tower often says "entering
 	// airspace" or "airborne" instead; Venom 021's three such calls went
 	// unanswered on Day 2026-10-16 21:55 until he said "checking in".
-	if containsAny(lower, "check in", "checking in", "check-in", "entering airspace", "entering the airspace",
-		"entering your airspace", "airborne", "with you") {
+	// "check it in" and "on channel" were missed on Day 2026-10-20 18:38
+	// ("Command, Venom 201, flight of three F-16s, check it in.", "Command,
+	// Venom 020 on channel."); a lead checking in his flight is answered as
+	// the flight.
+	if containsAny(lower, "check in", "checking in", "check-in", "check it in", "checks in", "checked in",
+		"entering airspace", "entering the airspace", "entering your airspace", "airborne", "with you",
+		"on channel", "on frequency", "on freq", "up freq", "up this freq") {
+		if flightOfRe.MatchString(lower) && !strings.HasSuffix(callsign, " flight") {
+			callsign += " flight"
+		}
 		return commandPick([3]string{
 			fmt.Sprintf("%s, %s, read you loud and clear, proceed mission.", callsign, channelName),
 			fmt.Sprintf("%s, %s, loud and clear, you are cleared to proceed, good hunting.", callsign, channelName),
@@ -170,6 +204,7 @@ func commandLoop(ctx context.Context, srsAddr string, freqMHz float64, channelNa
 			if store != nil {
 				cs = undoubleCallsign(cs, func(c string) bool { _, ok := store.Get(c); return ok })
 			}
+			cs = commandCallsign(cs, store)
 			if tracker != nil {
 				tracker.Note(cs, text)
 			}

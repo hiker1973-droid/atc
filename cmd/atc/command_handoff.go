@@ -41,6 +41,14 @@ func positionJumped(lastDistNm, nowNm float64) bool {
 // them at ~7 DME), so their recovery is Marshal however near a field is.
 const carrierLaunchRadiusNm = 20.0
 
+// homeFieldRadiusNm: a land-based pilot Command first sees this close to a
+// field took off from it (towers hand departures to Command at ~7 DME), and
+// that field is his recovery. On Day 2026-10-20 Venom 201 and 020, out of
+// Senaki, were sent to Kutaisi tower at 18:49, 14 minutes after takeoff,
+// because their route to work passed inside 30 nm of Kutaisi; Venom 200 got
+// the same at 19:31, mid-sortie. All of them landed back at Senaki.
+const homeFieldRadiusNm = 20.0
+
 type trackedPilot struct {
 	callsign   string
 	lastSeen   time.Time
@@ -50,6 +58,11 @@ type trackedPilot struct {
 	// and a carrier on scope.
 	carrierBased   bool
 	carrierChecked bool
+	// home is the field a land-based pilot launched from, decided on the
+	// first check with the pilot on scope; nil when he was first seen away
+	// from every field (then the nearest field is his recovery).
+	home        *airfield.Airfield
+	homeChecked bool
 	// tasked: the pilot asked Command for tasking and has not since made a
 	// recovery call (RTB, fence out, off station). A tasked pilot is going
 	// to work, not home, so the proactive recovery handoff stays quiet.
@@ -633,7 +646,13 @@ func runCommandHandoffWatch(
 				pilot.carrierChecked = true
 				pilot.carrierBased = haversineNm(pos, carrierPos) <= carrierLaunchRadiusNm
 			}
-			rec := chooseRecovery(pos, fields, carrierPos, haveCarrier && flagHandoffMarshalFreq > 0, pilot.carrierBased)
+			if !pilot.homeChecked {
+				pilot.homeChecked = true
+				if !pilot.carrierBased {
+					pilot.home = homeField(pos, fields)
+				}
+			}
+			rec := chooseRecovery(pos, fields, pilot.home, carrierPos, haveCarrier && flagHandoffMarshalFreq > 0, pilot.carrierBased)
 			recoveryName, recoveryFreq, recoveryKind, nearestDist := rec.name, rec.freqMHz, rec.kind, rec.distNm
 			// Trigger only when closing through the threshold — prevents
 			// firing when pilot starts a sortie already within range, and
@@ -691,14 +710,32 @@ type recoveryPoint struct {
 	distNm  float64
 }
 
-// chooseRecovery picks the facility for the recovery handoff: the nearest
-// field's tower, or Marshal when the boat is nearer. A carrier-based pilot goes
+// homeField is the field within homeFieldRadiusNm of pos, the nearest one if
+// several; nil if none.
+func homeField(pos orb.Point, fields []*airfield.Airfield) *airfield.Airfield {
+	var home *airfield.Airfield
+	best := homeFieldRadiusNm
+	for _, fld := range fields {
+		if d := haversineNm(pos, fld.Center); d <= best {
+			home, best = fld, d
+		}
+	}
+	return home
+}
+
+// chooseRecovery picks the facility for the recovery handoff: the home field's
+// tower when the pilot launched from a field, else the nearest field's tower,
+// or Marshal when the boat is nearer. A carrier-based pilot goes
 // to Marshal regardless — on 2026-09-14 Raider 331, off CVN-72, was sent to
 // Akrotiri tower because the field was 29 nm away and the boat 52.
 // marshalAvailable is false when no carrier is on scope or the Marshal handoff
 // is disabled. The returned distance is to the chosen facility, which is what
 // the handoff threshold is tested against.
-func chooseRecovery(pos orb.Point, fields []*airfield.Airfield, carrierPos orb.Point, marshalAvailable, carrierBased bool) recoveryPoint {
+func chooseRecovery(pos orb.Point, fields []*airfield.Airfield, home *airfield.Airfield, carrierPos orb.Point, marshalAvailable, carrierBased bool) recoveryPoint {
+	if home != nil && !carrierBased {
+		return recoveryPoint{name: home.Name + " tower", freqMHz: home.TowerFreqMHz, kind: "tower",
+			distNm: haversineNm(pos, home.Center)}
+	}
 	rp := recoveryPoint{kind: "tower", distNm: 9999}
 	for _, fld := range fields {
 		if d := haversineNm(pos, fld.Center); d < rp.distNm {
