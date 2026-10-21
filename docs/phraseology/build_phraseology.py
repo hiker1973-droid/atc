@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.5"
+VER = "v2.6"
 DATE = "21 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -710,7 +710,15 @@ def build():
         ("A hostile inside 25 nm (repeats every 3 min)", "Threat"),
         ("Inside 3 nm of a hostile (fixed wing)", "Merged"),
         ("A hostile off scope for 30 s", "Faded"),
-        ("The GCI comes online (mid-mission = it restarted)", "Sunrise")], (0.7, 0.3))
+        ("The GCI comes online (mid-mission = it restarted)", "Sunrise"),
+        ("No AWACS airborne / back up (\"All players, %s, off station / on station\")" % cau["gci_name"],
+         "Off / on station")], (0.7, 0.3))
+    d.callout("What the GCI can see", [
+        "Only what the mission's own AWACS could: the E-3 out to about 217 nm, the E-2 about 200 nm, and nothing below "
+        "its radar horizon - a bandit on the deck far out is invisible until it climbs or closes, and one that drops out "
+        "of coverage is called faded. Friendlies are always seen.",
+        "No AWACS airborne (not up yet, or shot down): off station. Picture, bogey dope and declare get \"off station, "
+        "no picture\"; radio check, fence, splash and check in / out still work."])
     d.callout("Quiet in recoveries", [
         "Within 12 nm of the carrier below 10,000 ft, or within 10 nm of a field below 4,000 ft AGL: no threat call to "
         "you, and the automatic picture waits. Your own requests are always answered.",

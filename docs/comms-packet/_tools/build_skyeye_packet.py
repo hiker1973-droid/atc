@@ -110,7 +110,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.31"
+VER = "v1.32"
 DATE = "21 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -839,11 +839,15 @@ def c17_gci_calls():
         ("a hostile inside 25 nm  ·  repeats every 3 min", "THREAT"),
         ("inside 3 nm of a hostile (fixed wing)", "MERGED"),
         ("a hostile off scope 30 s  /  the GCI comes up", "FADED  /  SUNRISE"),
+        ("no AWACS airborne  /  back up", "OFF / ON STATION"),
     ], size=14, rh=27)
     c.bullets([
+        [("It sees what the mission's AWACS sees:", True),
+         ("E-3 about 217 nm, E-2 about 200 nm, nothing below its radar horizon. Off station: picture and "
+          "bogey dope get \"off station, no picture\".", False)],
         [("Quiet in recoveries:", True),
-         ("within 12 nm of the carrier below 10,000 ft, or 10 nm of a field below 4,000 ft AGL - no threat "
-          "call, and the picture waits. Your own requests are always answered.", False)],
+         ("12 nm of the carrier below 10,000 ft, or 10 nm of a field below 4,000 ft AGL - no threat call, "
+          "and the picture waits.", False)],
     ])
     return save(c, "17_gci_calls.jpg")
 

@@ -1,11 +1,17 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 21 OCT 2026.  v1.31.  Product = one full-screen 16:9 PDF, 28 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.31.pdf` — cover + 27 cards: How it works · Frequencies ·
+**Built 21 OCT 2026.  v1.32.  Product = one full-screen 16:9 PDF, 28 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.32.pdf` — cover + 27 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · Texaco · **Darkstar** · **GCI calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · No answer?
+
+## v1.32 (21 OCT 2026) — GCI line of sight
+
+Card 19 GCI CALLS: unasked OFF / ON STATION row and "It sees what the mission's AWACS sees"
+(E-3 ~217 nm, E-2 ~200 nm, radar horizon; off station = "off station, no picture"), from
+`cmd/atc/gci_coverage.go` (f0df333). Phraseology v2.6 section 11 the same.
 
 ## v1.31 (21 OCT 2026) — the GCI, Darkstar / Overlord, from origin/main `16957f2`
 
