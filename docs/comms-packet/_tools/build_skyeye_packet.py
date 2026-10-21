@@ -67,6 +67,13 @@ Black Sea Day / Night (Hornet COMM 1 CH 5, the Caucasus Training / Hornet New Pi
 cards), Overlord 266.000 on Foothold (dial it). Every printed GCI call is in the Phraseology
 Reference v2.5 and parsed by TestDocPhrases. Cards 18 - 25 of v1.30 are now 20 - 27.
 
+v1.34 (user asked 2026-10-21 "update documentation") follows origin/main 0aab154: new card
+27 MULTI-SHIP - one takeoff and one landing clearance for a flight ("flight of two", wingmen
+named after the lead, "<lead> flight" replies, +20 s spacing per jet, a parking spot each;
+pkg/controller/flight.go). Card 18: Viper COMM 1 CH 4 on the Black Sea; Foothold Overlord is
+Hornet CH 7 / Viper CH 5 (CH 5 / CH 4 = 264 there reach the DCS AI E-3, not ours). Card 19:
+terrain hides low bandits (pkg/terrain). Card 27 of v1.33 is now 28.
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -110,7 +117,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.33"
+VER = "v1.34"
 DATE = "21 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -139,14 +146,16 @@ TANKER_F, H_TANKER = "252.100", "COMM 2 CH 8"
 TANKER2_F, H_TANKER2 = "252.300", "COMM 2 CH 10"
 
 # GCI (cmd/atc/gci.go, start_gci_{caucasus,syria}.bat, 2026-10-21). Black Sea: Hornet COMM 1
-# CH 5 "DARKSTAR 1" on the Caucasus Training and Hornet New Pilot Pack cards. Foothold: dial it.
-H_GCI = "COMM 1 CH 5"
+# CH 5 "DARKSTAR 1" on the Caucasus Training and Hornet New Pilot Pack cards; Viper COMM 1 CH 4.
+# Foothold (DTC_SY_1.0 carts, checked 2026-10-21): Overlord 266 = Hornet CH 7, Viper CH 5.
+H_GCI, V_GCI = "COMM 1 CH 5", "COMM 1 CH 4"
+H_GCI_SY, V_GCI_SY = "CH 7", "CH 5"
 
-TOTAL = 27
+TOTAL = 28
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
 FACTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                                     "phraseology", "facts.json"), encoding="utf-8"))
-TOWER_CARDS = "cards 21 - 26"
+TOWER_CARDS = "cards 21 - 27"
 _CAU = next(t for t in FACTS if t["key"] == "caucasus")
 _SYR = next(t for t in FACTS if t["key"] == "syria")
 GCI_BS = (_CAU["gci_name"], "%.3f" % _CAU["gci"])     # Darkstar 264.000
@@ -787,9 +796,11 @@ def c17_gci():
     c = card("DARK", "STAR", ["GCI  ·  %s %s AM Black Sea  ·  %s %s AM Syria" % (GCI_BS + GCI_SY),
                               "SkyEye's AWACS controller, our voice. Picture, threats, bogey dope."],
              18, EYE_GCI)
-    NK.band(c, "THE FREQUENCIES", "Hornet preset")
-    c.kv([("%s  -  Black Sea Day / Night" % GCI_BS[0].upper(), "%s AM  ·  %s" % (GCI_BS[1], H_GCI)),
-          ("%s  -  Syria (Foothold)" % GCI_SY[0].upper(), "%s AM  ·  dial it" % GCI_SY[1])])
+    NK.band(c, "THE FREQUENCIES", "Hornet  ·  Viper preset")
+    c.kv([("%s  -  Black Sea Day / Night, Kola" % GCI_BS[0].upper(),
+           "%s AM  ·  %s  ·  %s" % (GCI_BS[1], H_GCI.replace("COMM 1 ", ""), V_GCI.replace("COMM 1 ", ""))),
+          ("%s  -  Syria (Foothold)" % GCI_SY[0].upper(), "%s AM  ·  %s  ·  %s" % (GCI_SY[1], H_GCI_SY, V_GCI_SY))])
+    NK.subtle(c, "Foothold: CH 5 Hornet / CH 4 Viper is 264, the DCS AI E-3 - not SkyEye.")
     NK.band(c, "THE FLOW", "\"%s, Raider 302, ...\"" % GCI_BS[0])
     NK.steps(c, [
         ("COMMAND", "checking in on 282  ·  Command still runs your recovery"),
@@ -843,8 +854,9 @@ def c17_gci_calls():
     ], size=14, rh=27)
     c.bullets([
         [("It sees what the mission's AWACS sees:", True),
-         ("E-3 about 217 nm, E-2 about 200 nm, nothing below its radar horizon. Off station: picture and "
-          "bogey dope get \"off station, no picture\".", False)],
+         ("E-3 about 217 nm, E-2 about 200 nm, nothing below its radar horizon or behind a ridge - "
+          "low in a valley you are hidden. Off station: picture and bogey dope get \"off station, "
+          "no picture\".", False)],
     ])
     return save(c, "17_gci_calls.jpg")
 
@@ -1104,9 +1116,48 @@ def c18_tower_calls():
     return save(c, "18_tower_calls.jpg")
 
 
+def c18_multiship():
+    # pkg/controller/flight.go (origin/main 0aab154, 2026-10-21): one takeoff and one landing
+    # clearance cover the flight (operator ruling).
+    c = card("MULTI-", "SHIP", ["Flights of 2 - 6  ·  one clearance for the whole flight",
+                                "The lead talks. Name the wingmen on the first call."], 27, EYE_TWR)
+    NK.band(c, "DEPARTURE", "the lead calls")
+    NK.steps(c, [
+        ("HOLDING SHORT", "Senaki Tower, Raider 301, flight of three,"),
+        ("", "302 and 303, holding short."),
+        ("", "Reply: Raider 301 flight, flight of three, line up, wait."),
+        ("TAKEOFF", "Raider 301 flight, cleared for takeoff - all three jets."),
+        ("AIRBORNE", "Senaki Tower, Raider 301 flight, airborne."),
+        ("7 MILES", "Departure calls the flight once."),
+    ], split=270)
+    NK.band(c, "ARRIVAL")
+    NK.steps(c, [
+        ("INBOUND", "Senaki Tower, Raider 301, flight of two, 302,"),
+        ("", "10 miles east, inbound full stop."),
+        ("", "Reply: Raider 301 flight, flight of two, report initial."),
+        ("BASE / FINAL", "Raider 301 flight, cleared to land - both jets."),
+        ("VACATED", "Senaki Tower, Raider 301 flight, clear of the active."),
+        ("", "Ground: Raider 301 spot 12, Raider 302 spot 13."),
+    ], split=270)
+    NK.band(c, "GOOD TO KNOW")
+    c.bullets([
+        [("Say the size:", True),
+         ("\"flight of two\", \"two-ship\" or \"three FA-18s\". Wingmen right after the lead: "
+          "\"302 and 303\", \"Raider 302, Raider 303\" or \"1-2 and 1-3\".", False)],
+        [("A wingman may call too:", True),
+         ("named, or flying within 2 nm of the lead, he is answered as the flight.", False)],
+        [("\"Raider 301, flight of two, full stop\"", True),
+         ("on its own is the landing call: cleared to land for both.", False)],
+        [("Spacing and parking:", True),
+         ("the next departure waits 60 s plus 20 s per extra jet. Every jet gets a spot; "
+          "unnamed wingmen get \"spots 12, 13 and 14\".", False)],
+    ])
+    return save(c, "18_multiship.jpg")
+
+
 def c19_trouble():
     c = card("NO ", "ANSWER?", ["Work down the list  ·  most misses are the first three",
-                                "Tell the operator what you said, word for word."], 27)
+                                "Tell the operator what you said, word for word."], 28)
     NK.band(c, "CHECK", "in order")
     NK.steps(c, [
         ("1", "Waited 2 - 3 seconds?"),
@@ -1134,7 +1185,7 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 16957f2, 21 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 0aab154, 21 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
@@ -1143,7 +1194,7 @@ CARD_FUNCS = [c01_how, c02_freqs, c03_deckboss_flow, c04_deckboss_calls, c05_mar
               c09_marshal_calls_case3, c10_paddles, c10_departure, c11_command, c12_jtac_flow,
               c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c17_gci, c17_gci_calls, c12_sortie, c13_towers,
               c14_tower_radios, c15_syria_towers, c16_tower_departure, c17_tower_arrival,
-              c18_tower_calls, c19_trouble]
+              c18_tower_calls, c18_multiship, c19_trouble]
 
 
 def main():

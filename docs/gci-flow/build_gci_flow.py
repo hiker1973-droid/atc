@@ -60,7 +60,8 @@ def section(heading, tbl, *notes):
 S = [
     Paragraph("Darkstar / Overlord GCI Comms Flow", title),
     Paragraph("vSFG7 SkyEye &middot; AI AWACS on SRS &middot; Black Sea Day / Night: <b>Darkstar 264.000 AM</b> "
-              "(Hornet COMM 1 CH 5) &middot; Syria / Foothold: <b>Overlord 266.000 AM</b> &middot; %s" % BUILD, sub),
+              "(Hornet COMM 1 CH 5, Viper COMM 1 CH 4; Kola too) &middot; Syria / Foothold: <b>Overlord 266.000 AM</b> "
+              "(Hornet CH 7, Viper CH 5 - CH 5 / CH 4 there is the DCS AI E-3) &middot; %s" % BUILD, sub),
     table(["Before you call", "Detail"], [
         ["<b>Your DCS name</b>", "Put the squadron callsign in it: <b>Raider 302 | Jedi</b>, <b>Venom 212 | Dabs</b> "
                                  "(it may sit anywhere, e.g. \"vSFG-7 | Raider 302 | Jedi\"). Without Raider / Venom NNN "
@@ -139,7 +140,8 @@ S.append(section("3. Rules and tips",
     table(["Item", "Detail"], [
         ["<b>What Darkstar sees</b>", "Only what the mission's AWACS could see: the E-3 out to about 217 nm, the E-2 about "
                                       "200 nm, and not below its radar horizon - a jet on the deck far out is invisible until it "
-                                      "climbs or closes. A bandit that drops out of coverage is called <b>faded</b>."],
+                                      "climbs or closes. Terrain hides too: low in a valley behind a ridge from every AWACS, "
+                                      "a jet drops off the picture. A bandit that drops out of coverage is called <b>faded</b>."],
         ["<b>Off station</b>", "No AWACS airborne (not up yet, or shot down): \"All players, Darkstar, off station.\" "
                                "Picture, bogey dope and declare get \"off station, no picture\"; radio check, fence and "
                                "check in / out still work. \"On station\" when it is back up."],

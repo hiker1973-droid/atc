@@ -28,7 +28,11 @@ func TestParseFlight(t *testing.T) {
 		{"Test Tower, Raider 301, two-ship, 10 miles east, inbound", "Raider 301", RequestDistanceInitial, 2, nil, 10},
 		{"Test Tower, Venom 201, Venom 202, holding short", "Venom 201", RequestHoldingShort, 2, []string{"Venom 202"}, 0},
 		{"Test Tower, Raider 301, 3-0-2 and 3-0-3, ready for takeoff", "Raider 301", RequestTakeoffClear, 3, []string{"Raider 302", "Raider 303"}, 0},
+		// DCS-style two-digit callsigns, as the Phraseology Reference prints them.
+		{"Test Tower, Raider 1-1, flight of three, Raider 1-2 and 1-3, holding short", "Raider 1-1", RequestHoldingShort, 3, []string{"Raider 1-2", "Raider 1-3"}, 0},
+		{"Test Tower, Raider 1-1, flight of two, 10 miles inbound full stop", "Raider 1-1", RequestDistanceInitial, 2, nil, 10},
 		// Single ships are untouched.
+		{"Test Tower, Raider 1-1, 10 miles, inbound", "Raider 1-1", RequestDistanceInitial, 0, nil, 10},
 		{"Test Tower, Raider 302, holding short runway 27", "Raider 302", RequestHoldingShort, 0, nil, 0},
 		{"Test Tower, Raider 301, 10 miles, inbound", "Raider 301", RequestDistanceInitial, 0, nil, 10},
 		{"Test Tower, Raider 301, 3 mile initial", "Raider 301", RequestOverhead, 0, nil, 3},

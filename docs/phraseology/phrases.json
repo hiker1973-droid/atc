@@ -205,6 +205,54 @@
  },
  {
   "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, flight of two, Raider 1-2, holding short.",
+  "tower": "Batumi Tower",
+  "want": "holding_short"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, flight of three, 1-2 and 1-3, holding short.",
+  "tower": "Batumi Tower",
+  "want": "holding_short"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, flight of two, ready for takeoff.",
+  "tower": "Batumi Tower",
+  "want": "takeoff"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, two-ship, ready for takeoff.",
+  "tower": "Batumi Tower",
+  "want": "takeoff"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, flight of two, 10 miles inbound full stop.",
+  "tower": "Batumi Tower",
+  "want": "inbound"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, two-ship, 10 mile initial.",
+  "tower": "Batumi Tower",
+  "want": "inbound"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, flight of two, full stop.",
+  "tower": "Batumi Tower",
+  "want": "final"
+ },
+ {
+  "role": "tower",
+  "say": "Batumi Tower, Raider 1-1, flight of two, clear of the active.",
+  "tower": "Batumi Tower",
+  "want": "vacated"
+ },
+ {
+  "role": "tower",
   "say": "Batumi Tower, Raider 1-1, say again.",
   "tower": "Batumi Tower",
   "want": "say_again"

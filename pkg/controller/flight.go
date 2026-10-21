@@ -49,8 +49,10 @@ var flightSizeRes = []*regexp.Regexp{
 	regexp.MustCompile(`(?i),?\s*\b(two|three|four|five|six)\s+(?:f/?a?[\s-]?1[68]s|hornets|vipers|jets)\b`),
 }
 
-// flightMemberRe is one callsign in a list: "Raider 302", "302", "3-0-3".
-var flightMemberRe = regexp.MustCompile(`(?i)(?:\b(raider|venom|viper)s?[\s,-]*)?\b(\d(?:[\s-]?\d){2})\b`)
+// flightMemberRe is one callsign in a list: "Raider 302", "302", "3-0-3", and
+// the two-digit DCS form "1-2" (only with its dash or space, so "10 miles"
+// after the lead is not taken for a wingman).
+var flightMemberRe = regexp.MustCompile(`(?i)(?:\b(raider|venom|viper|enfield|springfield|uzi|colt|dodge|ford|chevy|pontiac)s?[\s,-]*)?\b(\d(?:[\s-]?\d){2}|\d[\s-]\d)\b`)
 
 // flightListGapRe is what may sit between two members of a list.
 var flightListGapRe = regexp.MustCompile(`(?i)^[\s,.]*(?:(?:and|&|plus|with)[\s,]*)?$`)
@@ -88,6 +90,9 @@ func parseFlight(lower, lead string) (size int, wingmen []string, cleaned string
 					w := word
 					if n[2] >= 0 {
 						w = strings.ToUpper(cleaned[n[2]:n[2]+1]) + strings.ToLower(cleaned[n[2]+1:n[3]])
+					}
+					if len(num) == 2 {
+						num = num[:1] + "-" + num[1:] // "Raider 1-2"
 					}
 					wingmen = append(wingmen, strings.TrimSpace(w+" "+num))
 				}

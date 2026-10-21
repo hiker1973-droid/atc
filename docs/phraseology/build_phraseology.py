@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.7"
+VER = "v2.8"
 DATE = "21 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -83,6 +83,18 @@ TOWER_ARRIVAL = [
     ("Straight-in", "request straight in  /  ILS approach", "Straight-in approved, report final", "straight_in"),
     ("Going around", "going around", "Climb runway heading, report downwind", "go_around"),
     ("Runway vacated", "runway vacated  /  clear of the active", "Taxi to parking", "vacated"),
+]
+# Multi-ship flights (pkg/controller/flight.go, 2026-10-21): one takeoff and one landing
+# clearance cover the flight. The lead is CS (Raider 1-1); the wingmen follow him.
+TOWER_FLIGHT = [
+    ("Flight holding short", "flight of two, Raider 1-2, holding short  /  flight of three, 1-2 and 1-3, holding short",
+     "Raider 1-1 flight, flight of two, line up and wait", "holding_short"),
+    ("Flight takeoff", "flight of two, ready for takeoff  /  two-ship, ready for takeoff",
+     "One takeoff clearance for the flight", "takeoff"),
+    ("Flight inbound", "flight of two, N miles inbound full stop  /  two-ship, N mile initial",
+     "Raider 1-1 flight, runway, wind, report initial", "inbound"),
+    ("Flight full stop", "flight of two, full stop", "Cleared to land - the whole flight", "final"),
+    ("Flight vacated", "flight of two, clear of the active", "A parking spot for every jet", "vacated"),
 ]
 TOWER_ANYTIME = [
     ("Say again", "say again", "Repeats your last call (2 min)", "say_again"),
@@ -516,7 +528,27 @@ def build():
         "Past 15 nm you hear \"continue inbound, report N miles\".",
         "Say \"gear down\" in your base or final call, or the tower adds \"check wheels down\".",
         "IMC (ceiling under 1,500 ft or visibility under 3 nm): no overhead - straight in only."])
-    d.h2("3.3 Any Time")
+    d.h2("3.3 Multi-Ship Flights")
+    d.para("The lead talks for the flight. Say the size and name the wingmen on the first call; one takeoff "
+           "clearance and one landing clearance cover every jet, and the tower answers \"<lead> flight\".")
+    d.table(("Intent", "Say something like", "Response"),
+            table_rows("tower", TOWER_FLIGHT, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))
+    d.dialogue([("Pilot", "Batumi Tower, Raider 1-1, flight of three, 1-2 and 1-3, holding short."),
+                ("Tower", "Raider 1-1 flight, Batumi Tower, flight of three, runway one three, line up and wait."),
+                ("Tower", "Raider 1-1 flight, Batumi Tower, wind one two zero at eight, runway one three, cleared for takeoff."),
+                ("Pilot", "Batumi Tower, Raider 1-1 flight, airborne."),
+                ("Pilot", "Batumi Tower, Raider 1-1, flight of two, Raider 1-2, 10 miles inbound full stop."),
+                ("Tower", "Raider 1-1 flight, Batumi Tower, flight of two, runway one three, wind one two zero at "
+                          "eight, report initial."),
+                ("Pilot", "Batumi Tower, Raider 1-1 flight, clear of the active."),
+                ("Ground", "Raider 1-1 flight, taxi to parking, Raider 1-1 spot 12, Raider 1-2 spot 13.")])
+    d.callout("Flights", [
+        "Size: \"flight of two\", \"two-ship\" or \"three FA-18s\". Wingmen right after the lead: \"1-2 and 1-3\", "
+        "\"302 and 303\" or \"Raider 302, Raider 303\".",
+        "A wingman may call too: named, or flying within 2 nm of the lead (Tacview), he is answered as the flight.",
+        "The next departure waits the usual 60 s plus 20 s for each extra jet. Every jet gets a parking spot; "
+        "unnamed wingmen get \"spots 12, 13 and 14\"."])
+    d.h2("3.4 Any Time")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("tower", TOWER_ANYTIME, "Batumi Tower", "Batumi Tower"), (0.24, 0.42, 0.34))
     d.callout("Emergencies", [
@@ -717,6 +749,8 @@ def build():
         "Only what the mission's own AWACS could: the E-3 out to about 217 nm, the E-2 about 200 nm, and nothing below "
         "its radar horizon - a bandit on the deck far out is invisible until it climbs or closes, and one that drops out "
         "of coverage is called faded. Friendlies are always seen.",
+        "Terrain hides you too (Black Sea, Syria, Kola): a jet low in a valley behind a ridge from every AWACS drops "
+        "off the picture until it climbs or an AWACS gets an angle on it.",
         "No AWACS airborne (not up yet, or shot down): off station. Picture, bogey dope and declare get \"off station, "
         "no picture\"; radio check, fence, splash and check in / out still work."])
     d.callout("The flow", [

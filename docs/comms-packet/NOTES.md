@@ -1,11 +1,22 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 21 OCT 2026.  v1.33.  Product = one full-screen 16:9 PDF, 28 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.33.pdf` — cover + 27 cards: How it works · Frequencies ·
+**Built 21 OCT 2026.  v1.34.  Product = one full-screen 16:9 PDF, 29 pages.**
+`vSFG-7_SkyEye_ATC_Comms_v1.34.pdf` — cover + 28 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · Texaco · **Darkstar** · **GCI calls** · A full sortie · Airfield ATC ·
-Tower radios · Syria towers · Departure · Arrival · Tower calls · No answer?
+Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
+
+## v1.34 (21 OCT 2026) — multi-ship flights, AWACS presets, terrain
+
+User: "update documentation" after origin/main 0aab154. New card 27 MULTI-SHIP: one takeoff
+and one landing clearance for a flight (pkg/controller/flight.go - "flight of two", wingmen
+named after the lead incl. "1-2 and 1-3", "<lead> flight" replies, +20 s spacing per extra
+jet, a parking spot each, an unnamed wingman within 2 nm of the lead joins). Card 18: Viper
+COMM 1 CH 4 on the Black Sea and Kola; Foothold Overlord = Hornet CH 7 / Viper CH 5 (from the
+DTC_SY_1.0 carts; CH 5 / CH 4 = 264 there is the DCS AI E-3). Card 19: terrain masking
+(pkg/terrain). Phraseology v2.8: new 3.3 Multi-Ship Flights (5 rows in TestDocPhrases),
+terrain in "What the GCI can see". Old card 27 (No answer?) is 28.
 
 ## v1.33 (21 OCT 2026) — quiet in recoveries removed
 
