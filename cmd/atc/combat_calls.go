@@ -72,9 +72,10 @@ func foxNumber(text string) string {
 	return ""
 }
 
-// downReply is the CSAR call, said to everyone on the net.
-func downReply(station, who string) string {
-	return fmt.Sprintf("All players, %s, %s down, launching CSAR.", station, who)
+// downReply is the CSAR call: "Raider 302 down, launching CSAR." and no
+// more (operator 2026-10-21).
+func downReply(who string) string {
+	return who + " down, launching CSAR."
 }
 
 // gciCombatCall answers a Fox, splash or down call on the AWACS net that
@@ -82,7 +83,7 @@ func downReply(station, who string) string {
 // kind is "fox", "splash", "down", or "" when it is none of these.
 func gciCombatCall(text, gci string, byNumber func(string) string) (kind, reply string) {
 	if who, ok := downedCallsign(text, byNumber); ok {
-		return "down", downReply(strings.ToUpper(gci), gciSpoken(who))
+		return "down", downReply(gciSpoken(who))
 	}
 	who, ok := leadCallsign(text, byNumber)
 	if !ok {

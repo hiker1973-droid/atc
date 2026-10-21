@@ -18,10 +18,10 @@ func TestGCICombatCalls(t *testing.T) {
 		{"302 Fox 311 for 56, 21,000.", "fox", "RAIDER 3 0 2, DARKSTAR, copy Fox three."},
 		{"Darkstar, Raider 302, fox two.", "fox", "RAIDER 3 0 2, DARKSTAR, copy Fox two."},
 		{"302 splash.", "splash", "RAIDER 3 0 2, DARKSTAR, copy splash."},
-		{"302 ejecting.", "down", "All players, DARKSTAR, RAIDER 3 0 2 down, launching CSAR."},
-		{"302, eject, eject, eject!", "down", "All players, DARKSTAR, RAIDER 3 0 2 down, launching CSAR."},
-		{"Darkstar, Raider 301, 302 is down.", "down", "All players, DARKSTAR, RAIDER 3 0 2 down, launching CSAR."},
-		{"Venom 212 is down, Venom 212 is down.", "down", "All players, DARKSTAR, VENOM 2 1 2 down, launching CSAR."},
+		{"302 ejecting.", "down", "RAIDER 3 0 2 down, launching CSAR."},
+		{"302, eject, eject, eject!", "down", "RAIDER 3 0 2 down, launching CSAR."},
+		{"Darkstar, Raider 301, 302 is down.", "down", "RAIDER 3 0 2 down, launching CSAR."},
+		{"Venom 212 is down, Venom 212 is down.", "down", "VENOM 2 1 2 down, launching CSAR."},
 		// Not shot or down calls.
 		{"302 defending.", "", ""},
 		{"302 down to angels 5.", "", ""},
@@ -39,8 +39,8 @@ func TestCommandCombatCalls(t *testing.T) {
 	store := newTacviewPositions()
 	store.Set("Raider 302", orb.Point{41.6, 42.0})
 	for in, want := range map[string]string{
-		"302 ejecting.":                     "All players, vSFG-7-Command, Raider 302 down, launching CSAR.",
-		"Command, Raider 301, 302 is down.": "All players, vSFG-7-Command, Raider 302 down, launching CSAR.",
+		"302 ejecting.":                     "Raider 302 down, launching CSAR.",
+		"Command, Raider 301, 302 is down.": "Raider 302 down, launching CSAR.",
 	} {
 		cs := joinCallsignDigits(extractCallsignSkippingAddress(in, commandAddresses...))
 		if got := commandReply(in, cs, "vSFG-7-Command", store); got != want {

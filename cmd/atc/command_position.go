@@ -65,7 +65,7 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 		byNumber = store.CallsignByNumber
 	}
 	if who, ok := downedCallsign(text, byNumber); ok {
-		return downReply(channelName, who)
+		return downReply(who)
 	}
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
