@@ -7,6 +7,7 @@ require (
 	github.com/dharmab/goacmi/v2 v2.0.1
 	github.com/dharmab/numwords v1.0.1
 	github.com/hbollon/go-edlib v1.6.0
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jba/omap v0.1.0
 	github.com/lithammer/shortuuid/v3 v3.0.7
 	github.com/martinlindhe/unit v0.0.0-20230420213220-4adfd7d0a0d6
@@ -23,7 +24,10 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	golang.org/x/crypto v0.46.0 // indirect
 )
 
 require (

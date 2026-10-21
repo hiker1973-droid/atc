@@ -33,7 +33,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html logs.html logo.png
+//go:embed ui.html fleet.html logs.html pilots.html logo.png
 var uiFS embed.FS
 
 var (
@@ -123,6 +123,7 @@ func main() {
 	mux.HandleFunc("/", serveUI)
 	mux.HandleFunc("/fleet", serveFleetUI)
 	mux.HandleFunc("/logs", serveLogsUI)
+	mux.HandleFunc("/pilots", servePilotsUI)
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/api/me", handleMe)
 	mux.HandleFunc("/api/fleet", handleFleet)
@@ -141,6 +142,8 @@ func main() {
 	mux.HandleFunc("/api/comms-fleet", handleCommsFleet)
 	mux.HandleFunc("/api/lso-log", handleLSOLog)
 	mux.HandleFunc("/api/day-log", handleDayLog)
+	mux.HandleFunc("/api/pilots-raw", handlePilotsRaw)
+	mux.HandleFunc("/api/pilots", handlePilots)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(handleStart))
