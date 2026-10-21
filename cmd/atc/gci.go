@@ -409,7 +409,9 @@ func runGCI(ctx context.Context, apiKey string) {
 			req := prs.Parse(text)
 			if req == nil {
 				log.Info().Str("text", text).Msg("GCI: not addressed to us or not understood - silent")
-				return "", ""
+				// netHandled: voiceNetLoop would log "Command intent miss" too,
+				// and the health report counted the call twice.
+				return "", netHandled
 			}
 			log.Info().Str("text", text).Any("request", req).Msg("GCI request")
 			if gciNeedsPicture(req) && !onStation() {
@@ -422,7 +424,10 @@ func runGCI(ctx context.Context, apiKey string) {
 			default:
 				log.Warn().Str("text", text).Msg("GCI: request queue full - dropped")
 			}
-			return "", "" // the controller answers on its own, through gciSpeak
+			// The controller answers on its own, through gciSpeak. netHandled keeps
+			// voiceNetLoop from logging an answered request as "Command intent
+			// miss" (Day 2026-10-21 14:55 "Darkstar, Raider 302, request picture").
+			return "", netHandled
 		})
 	wg.Wait()
 	log.Info().Msg("GCI offline")
