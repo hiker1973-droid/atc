@@ -52,6 +52,31 @@ PATCHES = [
     ("controller/controller.go", "srsClient *simpleradio.Client,", "srsClient srsinfo.Client,"),
     ("radar/radar.go", "srsClient *simpleradio.Client", "srsClient srsinfo.Client"),
     ("radar/radar.go", "srsClient *simpleradio.Client) *Radar", "srsClient srsinfo.Client) *Radar"),
+    # vSFG-7 names put the callsign anywhere: "vSFG-7 | Raider 302 | Jedi",
+    # "[CLAN] Bob | Venom 212". SkyEye kept everything before the first digit,
+    # so "vSFG-7 | ..." became "vsfg 7 ..." and the pilot was never found on
+    # scope (operator 2026-10-21: "just pay attention to the Raider/Venom XXX
+    # part"). When a Raider or Venom callsign is anywhere in the text - a DCS
+    # name or a transcribed call - only it is used; "Raiders 306" (Whisper)
+    # counts as Raider 306. Anything else parses as SkyEye always did.
+    ("callsigns/callsign.go",
+     """func ParsePilotCallsign(tx string) (callsign string, isValid bool) {
+	tx = removeClanTags(tx)
+""",
+     """func ParsePilotCallsign(tx string) (callsign string, isValid bool) {
+	tx = removeClanTags(tx)
+	if m := squadronCallsignRe.FindStringSubmatch(tx); m != nil { // vsfg7 (tools/gci-vendor)
+		tx = strings.ToLower(m[1]) + " " + m[2]
+	}
+"""),
+    ("callsigns/callsign.go",
+     r"""var clanTagRe = regexp.MustCompile(`\[.*?\]`)
+""",
+     r"""var clanTagRe = regexp.MustCompile(`\[.*?\]`)
+
+// squadronCallsignRe finds a vSFG-7 squadron callsign anywhere in a name or call.
+var squadronCallsignRe = regexp.MustCompile(`(?i)\b(raider|venom)s?\b[\s\-|,]*((?:\d[\s\-]*){1,3})`)
+"""),
     # A paused DCS server (Foothold waits for a player) refuses Tacview, and
     # SkyEye logged an ERROR every 10 s - a red alert on the dashboard all day
     # (operator 2026-10-21: "make the GCI quieter about telemetry when

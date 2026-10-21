@@ -9,6 +9,7 @@ import (
 
 	"github.com/vsfg7/atc/pkg/gci/bearings"
 	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/vsfg7/atc/pkg/gci/callsigns"
 	"github.com/vsfg7/atc/pkg/gci/composer"
 	"github.com/vsfg7/atc/pkg/gci/parser"
 )
@@ -83,5 +84,28 @@ func TestGCIRadioCheckGoodCopy(t *testing.T) {
 	r, _ := gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2"})
 	if !strings.HasSuffix(r.Speech, ", but I don't see you on scope.") || strings.Contains(r.Speech, "Lima") {
 		t.Errorf("radio check off scope: %q", r.Speech)
+	}
+}
+
+// Operator 2026-10-21: "just pay attention to the Raider/Venom XXX part" -
+// names straight from DCSServerBot, and what Whisper writes.
+func TestGCISquadronCallsigns(t *testing.T) {
+	for in, want := range map[string]string{
+		"vSFG-7 | Raider 302 | Jedi": "raider 3 0 2",
+		"Raider 302| Jedi":           "raider 3 0 2",
+		"Venom 212 | Dabs":           "venom 2 1 2",
+		"[CLAN] Bob | Venom 212":     "venom 2 1 2",
+		"RAIDER 031 | BACON":         "raider 0 3 1",
+		"Raider 1-1 | Boss | 333":    "raider 1 1",
+		"Raiders 306":                "raider 3 0 6",
+		"Knight 11 | Someone":        "knight 1 1", // not a Raider/Venom name: SkyEye as before
+	} {
+		if got, ok := callsigns.ParsePilotCallsign(in); !ok || got != want {
+			t.Errorf("%q -> %q, want %q", in, got, want)
+		}
+	}
+	p := parser.New("Darkstar", nil, false)
+	if req, ok := p.Parse("Darkstar, Raiders 306, radio check.").(*brevity.RadioCheckRequest); !ok || req.Callsign != "raider 3 0 6" {
+		t.Errorf("spoken call parsed as %#v", p.Parse("Darkstar, Raiders 306, radio check."))
 	}
 }

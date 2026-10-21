@@ -76,6 +76,9 @@ func stripOrdinalSuffix(s string) string {
 // and space-delimited.
 func ParsePilotCallsign(tx string) (callsign string, isValid bool) {
 	tx = removeClanTags(tx)
+	if m := squadronCallsignRe.FindStringSubmatch(tx); m != nil { // vsfg7 (tools/gci-vendor)
+		tx = strings.ToLower(m[1]) + " " + m[2]
+	}
 	tx = normalize.Normalize(tx)
 	tx = normalize.SpaceDigits(tx)
 
@@ -110,6 +113,9 @@ func ParsePilotCallsign(tx string) (callsign string, isValid bool) {
 }
 
 var clanTagRe = regexp.MustCompile(`\[.*?\]`)
+
+// squadronCallsignRe finds a vSFG-7 squadron callsign anywhere in a name or call.
+var squadronCallsignRe = regexp.MustCompile(`(?i)\b(raider|venom)s?\b[\s\-|,]*((?:\d[\s\-]*){1,3})`)
 
 func removeClanTags(tx string) string {
 	return clanTagRe.ReplaceAllString(tx, "")
