@@ -17,6 +17,7 @@ import (
 	"github.com/vsfg7/atc/pkg/gci/brevity"
 	"github.com/vsfg7/atc/pkg/gci/coalitions"
 	"github.com/vsfg7/atc/pkg/gci/sim"
+	"github.com/vsfg7/atc/pkg/terrain"
 )
 
 // AWACS line of sight, phase 1 (operator 2026-10-21: "Could we do awacs to
@@ -37,7 +38,11 @@ import (
 //
 // A hostile that drops out of coverage is reported to SkyEye as faded, so it
 // leaves the picture and Darkstar calls it faded - what a real AWACS does.
-// Terrain masking is phase 2.
+//
+// Phase 2 (operator 2026-10-21 "start phase 2"): terrain masking. With a height
+// grid for the map (pkg/terrain, Caucasus first) the line from the AWACS to the
+// hostile must also clear the ground - a jet low in a valley behind the main
+// ridge drops off the scope until it climbs or an AWACS gets an angle on it.
 
 // gciRadarRangeNm: detection range against a fighter-size target, by ACMI type.
 //   - E-3A (AN/APY-2): USAF fact sheet "more than 250 miles" (217 nm) against
@@ -79,6 +84,7 @@ type gciCoverage struct {
 	gci       string               // our callsign (logging only since the picture is fused)
 	coalition coalitions.Coalition // our side
 	fades     chan<- sim.Faded     // SkyEye's fade input
+	ground    *terrain.Grid        // terrain masking; nil = radar horizon only
 	now       func() time.Time
 
 	mu      sync.Mutex
@@ -126,10 +132,14 @@ func (c *gciCoverage) platforms() []gciRadar {
 	return out
 }
 
-// sees: inside the radar horizon and the type's range.
-func (r gciRadar) sees(p orb.Point, altFt float64) bool {
+// sees: inside the radar horizon and the type's range, and (with a grid) the
+// line of sight clears the terrain.
+func (r gciRadar) sees(p orb.Point, altFt float64, ground *terrain.Grid) bool {
 	d := haversineNm(r.Pos, p)
-	return d <= r.RangeNm && d <= radarHorizonNm(r.AltFt, altFt)
+	if d > r.RangeNm || d > radarHorizonNm(r.AltFt, altFt) {
+		return false
+	}
+	return ground == nil || ground.Visible(r.Pos.Lat(), r.Pos.Lon(), r.AltFt, p.Lat(), p.Lon(), altFt)
 }
 
 // filter is the radar.CoverageFilter hook: seen by any of our AWACS.
@@ -140,7 +150,7 @@ func (c *gciCoverage) filter(u sim.Updated) bool {
 	radars := c.platforms()
 	visible := false
 	for _, r := range radars {
-		if r.sees(u.Frame.Point, u.Frame.Altitude.Feet()) {
+		if r.sees(u.Frame.Point, u.Frame.Altitude.Feet(), c.ground) {
 			visible = true
 			break
 		}

@@ -11,6 +11,7 @@ import (
 	"github.com/vsfg7/atc/pkg/gci/coalitions"
 	"github.com/vsfg7/atc/pkg/gci/sim"
 	"github.com/vsfg7/atc/pkg/gci/trackfiles"
+	"github.com/vsfg7/atc/pkg/terrain"
 )
 
 func TestRadarHorizon(t *testing.T) {
@@ -145,5 +146,25 @@ func TestGCIOnStation(t *testing.T) {
 func TestGCIOffStationReplies(t *testing.T) {
 	if got := gciOffStation("raider 3 0 2", "Darkstar"); got != "RAIDER 3 0 2, DARKSTAR, off station, no picture." {
 		t.Errorf("%q", got)
+	}
+}
+
+// Phase 2: the Caucasus grid masks a low jet behind the main ridge from an
+// E-3 over Kutaisi; without the grid (other maps) only the horizon counts.
+func TestGCITerrainMasking(t *testing.T) {
+	g, err := terrain.ForMap("caucasus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e3 := gciRadar{Key: "Darkstar 1-1", Type: "E-3A", Pos: orb.Point{42.5, 42.2}, AltFt: 25000, RangeNm: 217}
+	nalchik := orb.Point{43.6, 43.5}
+	if e3.sees(nalchik, 2500, g) {
+		t.Error("low jet behind the ridge seen with terrain")
+	}
+	if !e3.sees(nalchik, 2500, nil) {
+		t.Error("low jet not seen without terrain (horizon only)")
+	}
+	if !e3.sees(nalchik, 30000, g) {
+		t.Error("high jet masked")
 	}
 }

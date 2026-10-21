@@ -26,6 +26,7 @@ import (
 	"github.com/vsfg7/atc/pkg/gci/srsinfo"
 	"github.com/vsfg7/atc/pkg/gci/telemetry"
 	"github.com/vsfg7/atc/pkg/gci/traces"
+	"github.com/vsfg7/atc/pkg/terrain"
 )
 
 // GCI: Darkstar (Day, Night 264.000) and Overlord (Foothold 266.000), the
@@ -60,6 +61,7 @@ var (
 	flagGCISampleOnly      string
 	// AWACS line of sight (gci_coverage.go): the picture is what the mission's AWACS can see.
 	flagGCICoverage bool
+	flagGCITerrain  bool
 	// Command's pointer to the GCI after "fence in" (operator 2026-10-21).
 	flagCommandGCIName string
 	flagCommandGCIFreq float64
@@ -87,6 +89,8 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.StringVar(&flagGCISampleOnly, "gci-sample-only", "", `With --gci-sample: render just this call ("picture", "threat", ...)`)
 	f.BoolVar(&flagGCICoverage, "gci-awacs-coverage", true,
 		"The GCI sees only what the mission's AWACS could (radar horizon + type range); off station with no AWACS up (gci_coverage.go)")
+	f.BoolVar(&flagGCITerrain, "gci-terrain", true,
+		"With --gci-awacs-coverage: terrain masks the AWACS radar, on maps with a height grid (pkg/terrain: caucasus)")
 	f.StringVar(&flagCommandGCIName, "command-gci-name", "",
 		`With --command-only: after "fence in", Command adds "<name> is up on <freq> for picture" ("" = off)`)
 	f.Float64Var(&flagCommandGCIFreq, "command-gci-freq", 0, "With --command-gci-name: the GCI frequency in MHz")
@@ -286,6 +290,14 @@ func runGCI(ctx context.Context, apiKey string) {
 	onStation := func() bool { return true }
 	if flagGCICoverage {
 		cov = newGCICoverage(store, cs, coalition, fades)
+		if flagGCITerrain {
+			if g, err := terrain.ForMap(flagMap); err == nil {
+				cov.ground = g
+				log.Info().Str("map", flagMap).Int("rows", g.Rows).Int("cols", g.Cols).Msg("GCI: terrain masking armed")
+			} else {
+				log.Info().Str("map", flagMap).Msg("GCI: no terrain grid for this map - radar horizon only")
+			}
+		}
 		radar.CoverageFilter = cov.filter
 		onStation = func() bool { on, _, _ := cov.onStation(); return on }
 		log.Info().Msg("GCI: AWACS line of sight armed - the picture is what the mission's AWACS can see")
