@@ -42,7 +42,13 @@ big = ParagraphStyle("b", parent=ss["Normal"], fontSize=15, leading=17, textColo
 small = ParagraphStyle("sm", parent=cell, alignment=1, textColor=GREY)
 
 HEARD = {"recognized", "Command heard", "Marshal heard", "Deckboss heard"}
-REPLIED = {"TX via OpenAI TTS + ExternalAudio", "Command TX", "Marshal TX", "Deckboss TX", "Paddles TX"}
+REPLIED = {"TX via OpenAI TTS + ExternalAudio", "Command TX", "Marshal TX", "Deckboss TX", "Paddles TX", "GCI TX"}
+# GCI (Darkstar / Overlord, cmd/atc/gci.go): a heard call SkyEye's parser could
+# not place is a miss; it also catches pilots talking to each other on 264.
+GCI_MISS = "GCI: not addressed to us or not understood - silent"
+# What the GCI said unprompted, by SkyEye call type (the "call" field of GCI TX).
+GCI_CALLS = {"brevity.ThreatCall": "gci_threat", "brevity.MergedCall": "gci_merged",
+             "brevity.FadedCall": "gci_faded", "brevity.PictureResponse": "gci_picture"}
 # Start-up banners and other lines that are not problems.
 NOISE = re.compile(r"^═|^Speed warnings and conflict detection DISABLED|^TACVIEW OFFLINE|"
                    r"^\.miz weather read failed|^Tacview connected — no air contacts yet")
@@ -97,7 +103,13 @@ def analyse(entry, date):
             m["heard"] += 1
         if msg in REPLIED:
             m["replied"] += 1
-        if "intent miss" in msg or msg == "no callsign in call - not answered":
+        if msg == "GCI TX" and o.get("call") in GCI_CALLS:
+            m[GCI_CALLS[o["call"]]] += 1
+        if msg.startswith("GCI: recovering"):
+            m["gci_held"] += 1
+        if msg.startswith("Whisper prompt echo - recovered"):
+            m["echo_saved"] += 1
+        if "intent miss" in msg or msg == "no callsign in call - not answered" or msg == GCI_MISS:
             m["misses"] += 1
             misses.append((ts[11:16], o.get("text", "")))
         if "SRS disconnected" in msg:
@@ -142,11 +154,19 @@ def status(m, kind):
         why.append("ElevenLabs fallbacks %d" % m["eleven"])
     if m["error"]:
         why.append("errors %d" % m["error"])
+    note = []
+    if kind == "gci":
+        # Not problems - what the GCI did, so a quiet night is told from a dead one.
+        note = ["%s %d" % (k, m[f]) for k, f in (("pictures", "gci_picture"), ("threats", "gci_threat"),
+                                                 ("merged", "gci_merged"), ("faded", "gci_faded"),
+                                                 ("recoveries held", "gci_held")) if m[f]]
+    if m["echo_saved"]:
+        note.append("%d calls saved by the Whisper retry" % m["echo_saved"])
     if red:
-        return "red", ", ".join(why)
+        return "red", ", ".join(why + note)
     if why:
-        return "amber", ", ".join(why)
-    return "green", ""
+        return "amber", ", ".join(why + note)
+    return "green", ", ".join(note)
 
 
 def dot(st):

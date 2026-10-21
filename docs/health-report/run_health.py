@@ -48,7 +48,7 @@ def short(name):
 
 def kind(log_file):
     k = log_file[len("atc-"):-len(".log")] if log_file.startswith("atc-") else log_file
-    return k if k in ("atis", "command", "marshal", "lso") else "tower"
+    return k if k in ("atis", "command", "marshal", "lso", "gci") else "tower"
 
 
 def main():
