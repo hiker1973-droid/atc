@@ -32,7 +32,10 @@ func covFixture(t *testing.T) (*gciCoverage, *tacviewPositions, chan sim.Faded, 
 
 func putAC(store *tacviewPositions, key, typ, side string, lat, alt float64, at time.Time) {
 	store.Set(key, orb.Point{37.0, lat})
-	store.SetInfo(key, tacviewContactInfo{Name: typ, Coalition: side, AltFt: alt, UpdatedAt: at})
+	// As our servers' recorder writes it: Color is the side, Coalition is not
+	// (blue is labelled "Enemies").
+	label := map[string]string{"Blue": "Enemies", "Red": "Allies"}[side]
+	store.SetInfo(key, tacviewContactInfo{Name: typ, Color: side, Coalition: label, AltFt: alt, UpdatedAt: at})
 }
 
 func hostile(id uint64, lat, altFt float64) sim.Updated {
@@ -47,9 +50,9 @@ func hostile(id uint64, lat, altFt float64) sim.Updated {
 func TestGCICoverage(t *testing.T) {
 	c, store, fades, now := covFixture(t)
 	// 1 degree of latitude = 60 nm. An E-3 low at 43N, an E-2 high at 41N.
-	putAC(store, "Darkstar 1-1", "E-3A", "Allies", 43.0, 10000, now)
-	putAC(store, "Wizard 1-1", "E-2C", "Allies", 41.0, 25000, now)
-	putAC(store, "Raider 302", "FA-18C_hornet", "Allies", 43.0, 20000, now)
+	putAC(store, "Darkstar 1-1", "E-3A", "Blue", 43.0, 10000, now)
+	putAC(store, "Wizard 1-1", "E-2C", "Blue", 41.0, 25000, now)
+	putAC(store, "Raider 302", "FA-18C_hornet", "Blue", 43.0, 20000, now)
 	radars := c.platforms()
 	if len(radars) != 2 || gciRadarsText(radars) != "E-3 Darkstar 1-1 + E-2 Wizard 1-1" {
 		t.Fatalf("platforms %q", gciRadarsText(radars))
@@ -98,17 +101,17 @@ func TestGCICoverage(t *testing.T) {
 
 func TestGCIPlatforms(t *testing.T) {
 	c, store, _, now := covFixture(t)
-	putAC(store, "AWACS_BLUE-1", "E-3A", "Allies", 43.0, 30000, now) // Foothold's naming
-	putAC(store, "AWACS_RED-1", "E-3A", "Enemies", 43.0, 30000, now) // theirs
+	putAC(store, "AWACS_BLUE-1", "E-3A", "Blue", 43.0, 30000, now) // Foothold's naming
+	putAC(store, "AWACS_RED-1", "E-3A", "Red", 43.0, 30000, now) // theirs
 	if got := gciRadarsText(c.platforms()); got != "E-3 AWACS_BLUE-1" {
 		t.Errorf("platforms %q", got)
 	}
 	// On the deck, or stale, is not up.
-	putAC(store, "AWACS_BLUE-1", "E-3A", "Allies", 43.0, 200, now)
+	putAC(store, "AWACS_BLUE-1", "E-3A", "Blue", 43.0, 200, now)
 	if len(c.platforms()) != 0 {
 		t.Error("an AWACS on the ground counted")
 	}
-	putAC(store, "AWACS_BLUE-1", "E-3A", "Allies", 43.0, 30000, now.Add(-2*time.Minute))
+	putAC(store, "AWACS_BLUE-1", "E-3A", "Blue", 43.0, 30000, now.Add(-2*time.Minute))
 	if len(c.platforms()) != 0 {
 		t.Error("a stale AWACS counted")
 	}
@@ -128,13 +131,13 @@ func TestGCIOnStation(t *testing.T) {
 		t.Error("fade sent while off station")
 	case <-time.After(100 * time.Millisecond):
 	}
-	putAC(store, "Darkstar 1-1", "E-3A", "Allies", 43.0, 30000, now)
+	putAC(store, "Darkstar 1-1", "E-3A", "Blue", 43.0, 30000, now)
 	if on, changed, _ := c.onStation(); on || changed {
 		t.Errorf("announced before the debounce: on %v changed %v", on, changed)
 	}
 	later := now.Add(gciStationDebounce + time.Second)
 	c.now = func() time.Time { return later }
-	store.SetInfo("Darkstar 1-1", tacviewContactInfo{Name: "E-3A", Coalition: "Allies", AltFt: 30000, UpdatedAt: later})
+	store.SetInfo("Darkstar 1-1", tacviewContactInfo{Name: "E-3A", Color: "Blue", Coalition: "Enemies", AltFt: 30000, UpdatedAt: later})
 	if on, changed, r := c.onStation(); !on || !changed || gciRadarsText(r) != "E-3 Darkstar 1-1" {
 		t.Errorf("after debounce: on %v changed %v %q", on, changed, gciRadarsText(r))
 	}
@@ -166,5 +169,30 @@ func TestGCITerrainMasking(t *testing.T) {
 	}
 	if !e3.sees(nalchik, 30000, g) {
 		t.Error("high jet masked")
+	}
+}
+
+// The lines our Caucasus server's recorder really writes (Tacview 2026-10-17):
+// blue AWACS carry Color=Blue but Coalition=Enemies. Matching on Coalition kept
+// the GCI off station on Day and Night all of 2026-10-21. Wizard 1-1 is on the
+// deck (22 m) and does not count.
+func TestGCIPlatformsFromACMI(t *testing.T) {
+	store := newTacviewPositions()
+	p := newMiniTacviewParser(store)
+	for _, l := range []string{
+		"0,ReferenceLongitude=33",
+		"0,ReferenceLatitude=39",
+		"d402,T=4.1618674|3.8801666|22.32||0.8|100.9|240390.89|-242199.16|98,Type=Air+FixedWing,Name=E-2C,Pilot=Wizard 1-1,Group=Wizard 1,Color=Blue,Coalition=Enemies,Country=us,AGL=22.32",
+		"d602,T=6.5197572|3.5891781|9749.69||0.2|128.5|435521.53|-262272.12|124,Type=Air+FixedWing,Name=E-3A,Pilot=Darkstar 1-1,Group=Darkstar 1,Color=Blue,Coalition=Enemies,Country=us,AGL=9749.69",
+		"d702,T=11.1922666|2.5097789|7312.82|0.4|0.1|26.1|835183.5|-341846.88|18.6,Type=Air+FixedWing,Name=E-2C,Pilot=Overlord 1-1,Group=Overlord 1,Color=Blue,Coalition=Enemies,Country=us,AGL=5795.69",
+	} {
+		p.handleLine(l)
+	}
+	c := newGCICoverage(store, "Darkstar", coalitions.Blue, nil)
+	if got := gciRadarsText(c.platforms()); got != "E-3 Darkstar 1-1 + E-2 Overlord 1-1" {
+		t.Errorf("blue radars %q", got)
+	}
+	if got := newGCICoverage(store, "Darkstar", coalitions.Red, nil).platforms(); len(got) != 0 {
+		t.Errorf("red side sees blue AWACS: %v", got)
 	}
 }

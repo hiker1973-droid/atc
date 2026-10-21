@@ -151,7 +151,8 @@ func gateHandoff(p *trackedPilot, busy bool) handoffGate {
 type tacviewContactInfo struct {
 	AltFt      float64
 	Name       string // ACMI Name= — the aircraft model, e.g. "KC135MPRS"
-	Coalition  string // ACMI Coalition=, e.g. "Allies"
+	Coalition  string // ACMI Coalition=, e.g. "Allies" - the recorder's own label, NOT the side
+	Color      string // ACMI Color=, "Blue" / "Red" - the side (our servers label blue "Enemies")
 	HeadingDeg float64 // true; valid only when HasHeading
 	HasHeading bool
 	UpdatedAt  time.Time
@@ -367,6 +368,7 @@ type miniObject struct {
 	hdg                  float64
 	hasHdg               bool
 	pilot, name, typ, co string
+	color                string
 	weaponNoted          bool
 	parent               string    // ACMI Parent= (a weapon's launcher), object id
 	shooter              string    // store key of the jet a weapon came off
@@ -513,6 +515,8 @@ func (p *miniTacviewParser) handleLine(line string) {
 			o.typ = v
 		case "Coalition":
 			o.co = v
+		case "Color":
+			o.color = v
 		case "Parent":
 			o.parent = v
 		}
@@ -560,7 +564,7 @@ func (p *miniTacviewParser) handleLine(line string) {
 	}
 	p.keys[id] = key
 	p.store.Set(key, pt)
-	p.store.SetInfo(key, tacviewContactInfo{AltFt: o.altFt, Name: o.name, Coalition: o.co,
+	p.store.SetInfo(key, tacviewContactInfo{AltFt: o.altFt, Name: o.name, Coalition: o.co, Color: o.color,
 		HeadingDeg: o.hdg, HasHeading: o.hasHdg, UpdatedAt: p.clock()})
 }
 

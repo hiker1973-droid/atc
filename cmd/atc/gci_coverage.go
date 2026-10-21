@@ -101,12 +101,14 @@ func newGCICoverage(store *tacviewPositions, gci string, side coalitions.Coaliti
 	return &gciCoverage{store: store, gci: gci, coalition: side, fades: fades, now: time.Now, seen: map[uint64]bool{}}
 }
 
-// tacviewSide: the ACMI Coalition string for our side.
+// tacviewSide: the ACMI Color for our side. Not Coalition=: our servers'
+// recorder labels blue "Enemies" (Darkstar 1-1 ... Color=Blue,Coalition=Enemies),
+// which kept the GCI off station on Day and Night all of 2026-10-21.
 func tacviewSide(c coalitions.Coalition) string {
 	if c == coalitions.Red {
-		return "enemies"
+		return "Red"
 	}
-	return "allies"
+	return "Blue"
 }
 
 // platforms is every AWACS of our side that is airborne and recently
@@ -120,7 +122,7 @@ func (c *gciCoverage) platforms() []gciRadar {
 	var out []gciRadar
 	for key, info := range c.store.info {
 		rng, ok := gciRadarRangeNm[info.Name]
-		if !ok || !strings.EqualFold(info.Coalition, side) {
+		if !ok || !strings.EqualFold(info.Color, side) {
 			continue
 		}
 		if c.now().Sub(info.UpdatedAt) > gciAWACSStale || info.AltFt < gciAWACSMinAltFt {
