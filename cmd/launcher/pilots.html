@@ -128,8 +128,10 @@ async function load() {
 function render() {
   if (!data) return;
   const rigs = data.rigs || [];
-  $('rigs').innerHTML = rigs.map(r => r.err
-    ? `<span class="bad">● ${esc(r.rig)}: ${esc(r.err)}</span>`
+  // A rig with no database link (the dev box) is neutral, not a fault.
+  $('rigs').innerHTML = rigs.map(r => !r.configured
+    ? `<span class="muted" title="${esc(r.err)}">○ ${esc(r.rig)}: no DCSServerBot link</span>`
+    : r.err ? `<span class="bad">● ${esc(r.rig)}: ${esc(r.err)}</span>`
     : `<span class="ok">● ${esc(r.rig)}: DCSServerBot</span>`).join('');
   const pilots = (data.pilots || []).map(p => ({ ...p, top: topAircraft(p) }));
   const sum = k => pilots.reduce((a, p) => a + (p[k] || 0), 0);

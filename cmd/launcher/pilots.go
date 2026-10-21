@@ -78,27 +78,53 @@ type PilotsRaw struct {
 
 const pilotsDBEnv = "SKYEYE_DCSSB_DB"
 
-// pilotsSince reads ?days= (default 30; 0 = all time).
-func pilotsSince(r *http.Request) (time.Time, int) {
+// pilotRange is the time window a request asks for: ?date=YYYY-MM-DD is that
+// local calendar day (the nightly report), else ?days=N back from now
+// (default 30; 0 = all time). Until zero = open-ended.
+type pilotRange struct {
+	Since, Until time.Time
+	Days         int
+	Date         string
+}
+
+func pilotsRangeOf(r *http.Request) pilotRange {
+	q := r.URL.Query()
+	if d := q.Get("date"); d != "" {
+		if day, err := time.ParseInLocation("2006-01-02", d, time.Local); err == nil {
+			return pilotRange{Since: day, Until: day.AddDate(0, 0, 1), Days: 1, Date: d}
+		}
+	}
 	days := 30
-	if v := r.URL.Query().Get("days"); v != "" {
+	if v := q.Get("days"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			days = n
 		}
 	}
 	if days == 0 {
-		return time.Time{}, 0
+		return pilotRange{}
 	}
-	return time.Now().AddDate(0, 0, -days), days
+	return pilotRange{Since: time.Now().AddDate(0, 0, -days), Days: days}
+}
+
+// query is the range as a query string for another rig's /api/pilots-raw.
+func (pr pilotRange) query() string {
+	if pr.Date != "" {
+		return "date=" + pr.Date
+	}
+	return fmt.Sprintf("days=%d", pr.Days)
 }
 
 func handlePilotsRaw(w http.ResponseWriter, r *http.Request) {
-	since, _ := pilotsSince(r)
-	writeJSON(w, readPilotsDB(r.Context(), since))
+	writeJSON(w, readPilotsDB(r.Context(), pilotsRangeOf(r)))
 }
 
-// readPilotsDB reads this rig's DCSServerBot rows since since.
-func readPilotsDB(ctx context.Context, since time.Time) PilotsRaw {
+// readPilotsDB reads this rig's DCSServerBot rows in the range: slots and
+// traps that began inside it.
+func readPilotsDB(ctx context.Context, pr pilotRange) PilotsRaw {
+	since, until := pr.Since, pr.Until
+	if until.IsZero() {
+		until = time.Now().AddDate(1, 0, 0)
+	}
 	url := strings.TrimSpace(os.Getenv(pilotsDBEnv))
 	if url == "" {
 		return PilotsRaw{Err: pilotsDBEnv + " is not set on this rig"}
@@ -122,13 +148,13 @@ func readPilotsDB(ctx context.Context, since time.Time) PilotsRaw {
 		out.Err = "no DCSServerBot statistics / missions tables in this database"
 		return out
 	}
-	if out.Sessions, err = readSessions(ctx, conn, cols, since); err != nil {
+	if out.Sessions, err = readSessions(ctx, conn, cols, since, until); err != nil {
 		out.Err = "statistics: " + err.Error()
 		return out
 	}
 	for _, t := range []string{"traps", "greenieboard"} { // greenieboard plugin: traps
 		if cols[t]["player_ucid"] && cols[t]["grade"] {
-			if out.Traps, err = readTraps(ctx, conn, t, cols[t], since); err != nil {
+			if out.Traps, err = readTraps(ctx, conn, t, cols[t], since, until); err != nil {
 				out.Err = t + ": " + err.Error()
 			}
 			break
@@ -181,7 +207,7 @@ func colOr(have map[string]bool, alias, col, fallback string) string {
 	return fallback
 }
 
-func readSessions(ctx context.Context, conn *pgx.Conn, cols map[string]map[string]bool, since time.Time) ([]PilotSession, error) {
+func readSessions(ctx context.Context, conn *pgx.Conn, cols map[string]map[string]bool, since, until time.Time) ([]PilotSession, error) {
 	st := cols["statistics"]
 	n := func(c string) string { return "COALESCE(" + colOr(st, "s", c, "0") + ",0)::int" }
 	name := "s.player_ucid"
@@ -197,10 +223,10 @@ func readSessions(ctx context.Context, conn *pgx.Conn, cols map[string]map[strin
 	if cols["players"]["name"] {
 		q += ` LEFT JOIN players p ON p.ucid = s.player_ucid`
 	}
-	q += ` WHERE s.hop_on >= $1 ORDER BY s.hop_on`
+	q += ` WHERE s.hop_on >= $1 AND s.hop_on < $2 ORDER BY s.hop_on`
 	// DCSServerBot stores UTC wall times in TIMESTAMP (no zone) columns, and
 	// pgx sends a time.Time's own wall clock: hand it UTC.
-	rows, err := conn.Query(ctx, q, since.UTC())
+	rows, err := conn.Query(ctx, q, since.UTC(), until.UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +248,7 @@ func readSessions(ctx context.Context, conn *pgx.Conn, cols map[string]map[strin
 	return out, rows.Err()
 }
 
-func readTraps(ctx context.Context, conn *pgx.Conn, table string, have map[string]bool, since time.Time) ([]PilotTrap, error) {
+func readTraps(ctx context.Context, conn *pgx.Conn, table string, have map[string]bool, since, until time.Time) ([]PilotTrap, error) {
 	tcol := colOr(have, "g", "time", "NULL::timestamp")
 	server := "''"
 	if have["mission_id"] {
@@ -237,11 +263,11 @@ func readTraps(ctx context.Context, conn *pgx.Conn, table string, have map[strin
 		q += ` LEFT JOIN missions m ON m.id = g.mission_id`
 	}
 	if have["time"] {
-		q += ` WHERE g.time >= $1`
+		q += ` WHERE g.time >= $1 AND g.time < $2`
 	} else {
-		q += ` WHERE $1::timestamp IS NOT NULL`
+		q += ` WHERE $1::timestamp IS NOT NULL AND $2::timestamp IS NOT NULL`
 	}
-	rows, err := conn.Query(ctx, q, since.UTC())
+	rows, err := conn.Query(ctx, q, since.UTC(), until.UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +319,9 @@ type PilotStats struct {
 // PilotsReport is the /api/pilots answer.
 type PilotsReport struct {
 	Days   int          `json:"days"`
+	Date   string       `json:"date,omitempty"`
 	Since  time.Time    `json:"since"`
+	Until  time.Time    `json:"until"`
 	At     time.Time    `json:"at"`
 	Pilots []PilotStats `json:"pilots"`
 	Rigs   []PilotsRaw  `json:"rigs"` // per rig: configured / error only
@@ -301,23 +329,23 @@ type PilotsReport struct {
 
 var (
 	pilotsCacheMu sync.Mutex
-	pilotsCache   = map[int]*PilotsReport{}
+	pilotsCache   = map[string]*PilotsReport{}
 )
 
 func handlePilots(w http.ResponseWriter, r *http.Request) {
-	since, days := pilotsSince(r)
+	pr := pilotsRangeOf(r)
 	pilotsCacheMu.Lock()
 	defer pilotsCacheMu.Unlock()
-	if c := pilotsCache[days]; c != nil && time.Since(c.At) < 60*time.Second {
+	if c := pilotsCache[pr.query()]; c != nil && time.Since(c.At) < 60*time.Second {
 		writeJSON(w, c)
 		return
 	}
-	rep := collectPilots(r.Context(), since, days)
-	pilotsCache[days] = rep
+	rep := collectPilots(r.Context(), pr)
+	pilotsCache[pr.query()] = rep
 	writeJSON(w, rep)
 }
 
-func collectPilots(ctx context.Context, since time.Time, days int) *PilotsReport {
+func collectPilots(ctx context.Context, pr pilotRange) *PilotsReport {
 	parts := make([]PilotsRaw, len(fleetRigs))
 	var wg sync.WaitGroup
 	for i, rig := range fleetRigs {
@@ -326,10 +354,10 @@ func collectPilots(ctx context.Context, since time.Time, days int) *PilotsReport
 			defer wg.Done()
 			var raw PilotsRaw
 			if isSelf(rig) {
-				raw = readPilotsDB(ctx, since)
+				raw = readPilotsDB(ctx, pr)
 			} else {
 				c := &http.Client{Timeout: 20 * time.Second}
-				resp, err := c.Get(fmt.Sprintf("http://%s:%d/api/pilots-raw?days=%d", rig.Host, rig.Port, days))
+				resp, err := c.Get(fmt.Sprintf("http://%s:%d/api/pilots-raw?%s", rig.Host, rig.Port, pr.query()))
 				if err != nil {
 					raw.Err = err.Error()
 				} else {
@@ -350,12 +378,12 @@ func collectPilots(ctx context.Context, since time.Time, days int) *PilotsReport
 	}
 	wg.Wait()
 	if len(fleetRigs) == 0 { // no --fleet: this rig alone
-		raw := readPilotsDB(ctx, since)
+		raw := readPilotsDB(ctx, pr)
 		raw.Rig = "this rig"
 		parts = append(parts, raw)
 	}
 	rep := mergePilots(parts, time.Now())
-	rep.Days, rep.Since = days, since
+	rep.Days, rep.Date, rep.Since, rep.Until = pr.Days, pr.Date, pr.Since, pr.Until
 	return rep
 }
 
