@@ -100,3 +100,25 @@ func TestCaucasusGrid(t *testing.T) {
 		t.Error("nevada: want no grid")
 	}
 }
+
+// The embedded Syria grid (Foothold): an AWACS over Cyprus at 25,000 ft loses
+// a jet low over Damascus behind the Lebanon ranges and sees it high; a jet low
+// over the sea off Latakia stays in sight.
+func TestSyriaGrid(t *testing.T) {
+	g, err := ForMap("syria")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := g.HeightM(33.411, 36.516); h < 500 || h > 700 {
+		t.Errorf("Damascus %.0f m, want ~616", h)
+	}
+	if g.Visible(34.8, 33.0, 25000, 33.5, 36.5, 3000) {
+		t.Error("low jet over Damascus visible over the Lebanon ranges")
+	}
+	if !g.Visible(34.8, 33.0, 25000, 33.5, 36.5, 25000) {
+		t.Error("high jet over Damascus masked")
+	}
+	if !g.Visible(34.8, 33.0, 25000, 35.5, 35.6, 1000) {
+		t.Error("low jet over the sea off Latakia masked")
+	}
+}

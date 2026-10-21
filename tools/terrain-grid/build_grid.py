@@ -32,7 +32,7 @@ STEP = 0.01  # degrees
 # DCS map extents (approximate, generous) - lat_min, lat_max, lon_min, lon_max.
 THEATRES = {
     "caucasus": (40.0, 48.0, 27.0, 48.0),
-    "syria": (31.0, 38.0, 31.0, 41.0),
+    "syria": (30.0, 38.5, 30.0, 42.0),
     "kola": (64.0, 72.0, 10.0, 36.0),
 }
 

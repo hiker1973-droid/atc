@@ -40,7 +40,7 @@ import (
 // leaves the picture and Darkstar calls it faded - what a real AWACS does.
 //
 // Phase 2 (operator 2026-10-21 "start phase 2"): terrain masking. With a height
-// grid for the map (pkg/terrain, Caucasus first) the line from the AWACS to the
+// grid for the map (pkg/terrain: Caucasus, Syria) the line from the AWACS to the
 // hostile must also clear the ground - a jet low in a valley behind the main
 // ridge drops off the scope until it climbs or an AWACS gets an angle on it.
 
