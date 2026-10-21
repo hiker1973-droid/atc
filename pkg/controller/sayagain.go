@@ -21,6 +21,7 @@ type lastTransmission struct {
 // to callsign, so a later "say again" can repeat it. Guarded by its own mutex
 // because the proactive monitor transmits outside HandleRequest's lock.
 func (c *ATCController) transmitTo(ctx context.Context, callsign, text string) {
+	text = c.flightAddress(callsign, text)
 	c.lastTxMu.Lock()
 	if c.lastTx == nil {
 		c.lastTx = make(map[string]lastTransmission)
@@ -36,6 +37,7 @@ func (c *ATCController) transmitDepartureTo(ctx context.Context, callsign, text 
 		c.transmitTo(ctx, callsign, text)
 		return
 	}
+	text = c.flightAddress(callsign, text)
 	c.lastTxMu.Lock()
 	if c.lastTx == nil {
 		c.lastTx = make(map[string]lastTransmission)

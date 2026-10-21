@@ -122,6 +122,10 @@ func (c *ATCController) checkUnknownTraffic(ctx context.Context) {
 		if !seen || dist >= prev || ct.DetectedPhase == "departing" {
 			continue
 		}
+		// A wingman of a flight that called in is not unknown (flight.go).
+		if c.isFlightWingman(cs, pt) {
+			continue
+		}
 		candidates = append(candidates, candidate{cs, dist, bearingDegFromTo(center, pt)})
 	}
 	c.allPositionsMu.RUnlock()

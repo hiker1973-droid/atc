@@ -121,6 +121,11 @@ type ATCRequest struct {
 	// Origin is the SRS client the call came from ("" when unknown). One
 	// radio is one aircraft (safety.go reconcileOrigin).
 	Origin string
+	// FlightSize is the jets in a multi-ship flight ("flight of three"; 0 =
+	// not said) and Wingmen the ones named after the lead ("Raider 302").
+	// See flight.go.
+	FlightSize int
+	Wingmen    []string
 }
 
 // ── Controller ────────────────────────────────────────────────────────────────
@@ -192,6 +197,10 @@ type ATCController struct {
 	lastTxMu sync.Mutex
 	lastTx   map[string]lastTransmission
 
+	// flights are the multi-ship flights by lead (flight.go).
+	flightsMu sync.Mutex
+	flights   map[string]*towerFlight
+
 	// lastCarrierChoice remembers the last carrier callsign findCarrierContact
 	// returned so we only log at info on transitions (each pilot call invokes
 	// findCarrierContact; logging every match would spam under live ops).
@@ -246,7 +255,7 @@ func NewATCController(
 	af *airfield.Airfield,
 ) *ATCController {
 	allPos := make(map[string]*TacviewContact)
-	return &ATCController{
+	c := &ATCController{
 		allPositions: allPos,
 		airfieldCallsign:   airfieldCallsign,
 		airfieldState:      state.NewAirfieldState(af),
@@ -255,6 +264,9 @@ func NewATCController(
 		staleThreshold:     10 * time.Minute,
 		goAroundLastTx:     make(map[string]time.Time),
 	}
+	// A multi-ship departure holds the next one longer (flight.go).
+	c.airfieldState.DepartureExtra = c.flightDepartureExtra
+	return c
 }
 
 // SetTransmitFn wires in the TTS→SRS pipeline callback.
@@ -475,7 +487,11 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 			return
 		}
 	}
-	c.reconcileOrigin(req)
+	// A wingman's call is answered as his flight (flight.go); his radio is
+	// not the lead's, so it is not reconciled as the same aircraft.
+	if !c.noteFlight(req) {
+		c.reconcileOrigin(req)
+	}
 
 	s := c.airfieldState
 	wasTracked := s.Get(req.Callsign) != nil
@@ -524,6 +540,10 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 			// "request taxi to parking" after landing: not a departure.
 			s.Remove(req.Callsign)
 			ground = c.groundTransmitFn != nil
+			if spots, names := c.flightParking(req.Callsign, time.Now()); spots != nil {
+				response = c.composer.FlightParking(req.Callsign, c.groundSpeaker(), "", spots, names, s.Airfield.ParkingVia[s.ActiveRunway])
+				break
+			}
 			response = c.composer.TaxiToParking(req.Callsign, c.groundSpeaker(), c.assignParking(req.Callsign, s.Airfield, time.Now()), s.Airfield.ParkingVia[s.ActiveRunway])
 			break
 		}
@@ -644,7 +664,10 @@ func (c *ATCController) HandleRequest(ctx context.Context, req *ATCRequest) {
 				Detail: "called clear of the runway without a landing clearance: " + why, Text: req.Raw})
 		}
 		s.Remove(req.Callsign)
-		if spot := c.assignParking(req.Callsign, s.Airfield, time.Now()); spot != 0 {
+		if spots, names := c.flightParking(req.Callsign, time.Now()); spots != nil {
+			ground = c.groundTransmitFn != nil
+			response = c.composer.FlightParking(req.Callsign, c.groundSpeaker(), s.ActiveRunway, spots, names, s.Airfield.ParkingVia[s.ActiveRunway])
+		} else if spot := c.assignParking(req.Callsign, s.Airfield, time.Now()); spot != 0 {
 			ground = c.groundTransmitFn != nil
 			response = c.composer.RunwayVacatedParking(req.Callsign, c.groundSpeaker(), s.ActiveRunway, spot, s.Airfield.ParkingVia[s.ActiveRunway])
 		} else {
@@ -1407,6 +1430,9 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	// "request for taxi" / "requesting for takeoff" — the extra "for" broke
 	// every "request X" trigger below (live miss, Senaki 2026-09).
 	lower = strings.NewReplacer("requesting for ", "requesting ", "request for ", "request ").Replace(lower)
+	// "flight of two, Raider 301, 302" (flight.go): read and taken out, so
+	// "two" is not a distance and the wingmen's numbers trigger nothing.
+	req.FlightSize, req.Wingmen, lower = parseFlight(lower, req.Callsign)
 	req.Option = parseOption(lower)
 	switch {
 	case containsAny(lower, "mayday", "pan pan", "pan-pan", "emergency"):
@@ -1855,7 +1881,7 @@ func stripTrailingConnectors(cs string) string {
 
 func extractAirframe(lower string) string {
 	for key, name := range map[string]string{
-		"hornet": "Hornet", "f-18": "Hornet", "f/a-18": "Hornet",
+		"hornet": "Hornet", "f-18": "Hornet", "f/a-18": "Hornet", "fa-18": "Hornet", "fa 18": "Hornet",
 		"viper": "Viper", "f-16": "Viper",
 		"warthog": "Warthog", "hog": "Warthog", "a-10": "Warthog",
 	} {

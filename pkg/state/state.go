@@ -211,6 +211,10 @@ type AirfieldState struct {
 	// successful ClearForTakeoff. Used by the controller to enforce
 	// per-airfield departure spacing — see DepartureSpacingSec.
 	LastDepartureClearedAt time.Time
+	// DepartureExtra, when set, is extra spacing after callsign's takeoff
+	// clearance: a multi-ship flight holds the next departure longer
+	// (controller flight.go). Called with s.mu held.
+	DepartureExtra func(callsign string) time.Duration
 
 	// Runway rotation
 	RotationEnabled bool      // when true, runway selection is time-driven, not wind-driven
@@ -1207,6 +1211,9 @@ func (s *AirfieldState) ClearForTakeoff(callsign string) *AircraftState {
 			ac.Phase = PhaseClearedTakeoff
 			s.DepartureQueue = append(s.DepartureQueue[:i], s.DepartureQueue[i+1:]...)
 			s.LastDepartureClearedAt = time.Now()
+			if s.DepartureExtra != nil {
+				s.LastDepartureClearedAt = s.LastDepartureClearedAt.Add(s.DepartureExtra(callsign))
+			}
 			return ac
 		}
 	}

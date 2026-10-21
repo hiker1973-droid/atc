@@ -46,6 +46,7 @@ func (c *ATCController) transmitGroundTo(ctx context.Context, callsign, text str
 		c.transmitTo(ctx, callsign, text)
 		return
 	}
+	text = c.flightAddress(callsign, text)
 	c.lastTxMu.Lock()
 	if c.lastTx == nil {
 		c.lastTx = make(map[string]lastTransmission)

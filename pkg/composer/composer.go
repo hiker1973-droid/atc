@@ -737,6 +737,48 @@ func (c *ATCComposer) RunwayVacatedParking(callsign, speaker, activeRunway strin
 	})
 }
 
+// FlightParking gives every jet of a multi-ship flight its spot, spoken by
+// speaker ("" = the tower): "Raider 301 spot 12, Raider 302 spot 13" when the
+// wingmen were named, else "spots 12 and 13". activeRunway "" = not just off
+// the runway (a taxi-to-parking request). The address gets "flight" from the
+// controller - 2 variations.
+func (c *ATCComposer) FlightParking(callsign, speaker, activeRunway string, spots []int, names []string, via string) string {
+	if speaker == "" {
+		speaker = c.towerCallsign
+	}
+	named := len(names) == len(spots)
+	for _, n := range names {
+		if n == "" {
+			named = false
+		}
+	}
+	var list string
+	if named {
+		parts := make([]string, len(spots))
+		for i, sp := range spots {
+			parts[i] = fmt.Sprintf("%s spot %d", names[i], sp)
+		}
+		list = strings.Join(parts, ", ")
+	} else {
+		parts := make([]string, len(spots))
+		for i, sp := range spots {
+			parts[i] = fmt.Sprint(sp)
+		}
+		list = "spots " + strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
+	}
+	route := parkingRoute(via)
+	if activeRunway != "" {
+		return pick([]string{
+			fmt.Sprintf("%s, %s, runway %s clear, taxi to parking, %s%s.", callsign, speaker, spellRunway(activeRunway), list, route),
+			fmt.Sprintf("%s, %s, welcome back, %s%s.", callsign, speaker, list, route),
+		})
+	}
+	return pick([]string{
+		fmt.Sprintf("%s, %s, taxi to parking, %s%s.", callsign, speaker, list, route),
+		fmt.Sprintf("%s, %s, roger, %s%s.", callsign, speaker, list, route),
+	})
+}
+
 // TaxiToParking answers "request taxi to parking", spoken by speaker ("" =
 // the tower). spot == 0 when the field has no parking spots — 3 variations.
 func (c *ATCComposer) TaxiToParking(callsign, speaker string, spot int, via string) string {
