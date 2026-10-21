@@ -112,12 +112,16 @@ function dot(label, up, title) {
 // SkyEye GCI has three states: running, installed but stopped, and not on this
 // rig at all (grey — not every rig runs GCI). Launchers that predate the probe
 // send no gci field, which also reads grey.
+// Shown as AWACS (operator 2026-10-21); the API field stays "gci".
 function gciDot(h) {
-  if (h.gci === 'online') return dot('GCI', true, `SkyEye GCI running (PID ${h.gciPid})`);
-  if (h.gci === 'offline') return dot('GCI', false, 'SkyEye GCI installed but not running');
-  if (h.gci === 'absent') return dot('GCI', null, 'SkyEye GCI not installed on this rig');
-  return dot('GCI', null, 'unknown — launcher predates the GCI probe, needs redeploy');
+  if (h.gci === 'online') return dot('AWACS', true, `SkyEye AWACS running (PID ${h.gciPid})`);
+  if (h.gci === 'offline') return dot('AWACS', false, 'SkyEye AWACS installed but not running');
+  if (h.gci === 'absent') return dot('AWACS', null, 'SkyEye AWACS not installed on this rig');
+  return dot('AWACS', null, 'unknown — launcher predates the AWACS probe, needs redeploy');
 }
+
+// Role names keep "GCI" (start bats, logs); the dashboard says AWACS.
+function roleLabel(n) { return String(n).replace(/\bGCI\b/g, 'AWACS'); }
 
 // What the rig's DCS server is flying: mission file, DCS link (this launcher's
 // Tacview feed for the rig), traffic, and a red flag when the running roles are
@@ -195,7 +199,7 @@ function rigCard(r) {
       running.forEach(role => { (byRegion[role.region] = byRegion[role.region] || []).push(role); });
       Object.keys(byRegion).sort().forEach(reg => {
         const pills = byRegion[reg].map(role =>
-          `<span class="role-pill">${esc(role.name)}${role.dashboardPort ? ' :'+role.dashboardPort : ''}</span>`).join('');
+          `<span class="role-pill">${esc(roleLabel(role.name))}${role.dashboardPort ? ' :'+role.dashboardPort : ''}</span>`).join('');
         body += `<div class="region"><div class="region-title">${REGION_LABEL[reg] || reg}</div>${pills}</div>`;
       });
     } else {

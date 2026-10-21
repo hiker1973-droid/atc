@@ -88,7 +88,8 @@ function populateRoles() {
   const towers = running.filter(r => /tower$/i.test(r.name));
   let opts = '';
   if (towers.length) opts += `<option value="${ALL_TOWERS}">— All towers (${towers.length}) —</option>`;
-  opts += running.map(r => `<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+  // Role names keep "GCI"; shown as AWACS (operator 2026-10-21).
+  opts += running.map(r => `<option value="${esc(r.name)}">${esc(r.name.replace(/\bGCI\b/g, 'AWACS'))}</option>`).join('');
   roleSel.innerHTML = opts || '<option value="">no roles running</option>';
   resetPane();
 }

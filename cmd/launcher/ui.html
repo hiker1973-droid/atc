@@ -635,7 +635,7 @@ const THEATRES = {
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Caucasus)', roles: ['vSFG-7 Command (Caucasus)'], stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Black Sea carrier UHF',    roles: ['Deckboss (Caucasus)'],       stopLabel: 'Stop Deckboss' },
       // GCI (cmd/atc/gci.go, 2026-10-21): in start_region_caucasus.bat since skyeye.exe left the servers.
-      { id: 'gci',      label: 'GCI Darkstar', freq: '264.000', extras: 'AWACS 264.000', roles: ['vSFG-7 GCI Darkstar (Caucasus)'], stopLabel: 'Stop GCI' },
+      { id: 'gci',      label: 'AWACS Darkstar', freq: '264.000', extras: 'AWACS 264.000', roles: ['vSFG-7 GCI Darkstar (Caucasus)'], stopLabel: 'Stop AWACS' },
     ],
   },
   germany: {
@@ -701,7 +701,7 @@ const THEATRES = {
       { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 ABE · TACAN 72X',   roles: ['Marshal (Syria)'],          stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Syria)',   roles: ['vSFG-7 Command (Syria)'],   stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Eastern Med carrier UHF',  roles: ['Deckboss (Syria)'],         stopLabel: 'Stop Deckboss' },
-      { id: 'gci',      label: 'GCI Overlord', freq: '266.000', extras: 'AWACS 266.000', roles: ['vSFG-7 GCI Overlord (Syria)'], stopLabel: 'Stop GCI' },
+      { id: 'gci',      label: 'AWACS Overlord', freq: '266.000', extras: 'AWACS 266.000', roles: ['vSFG-7 GCI Overlord (Syria)'], stopLabel: 'Stop AWACS' },
     ],
   },
   kola: {
@@ -719,7 +719,7 @@ const THEATRES = {
       { id: 'marshal',  label: 'Marshal',  freq: '306.300', extras: 'CVN-72 ABE · TACAN 72X', roles: ['Marshal (Kola)'],        stopLabel: 'Stop Marshal' },
       { id: 'command',  label: 'Command',  freq: '282.000', extras: 'vSFG-7 Command (Kola)',  roles: ['vSFG-7 Command (Kola)'], stopLabel: 'Stop Command' },
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Vestfjord carrier UHF',  roles: ['Deckboss (Kola)'],       stopLabel: 'Stop Deckboss' },
-      { id: 'gci',      label: 'GCI Darkstar', freq: '264.000', extras: 'AWACS 264.000', roles: ['vSFG-7 GCI Darkstar (Kola)'], stopLabel: 'Stop GCI' },
+      { id: 'gci',      label: 'AWACS Darkstar', freq: '264.000', extras: 'AWACS 264.000', roles: ['vSFG-7 GCI Darkstar (Kola)'], stopLabel: 'Stop AWACS' },
     ],
   },
 };
@@ -1423,11 +1423,14 @@ async function refreshHealth() {
     // feeding its fused picture ("E-3 Darkstar 1-1 + E-2 Wizard 1-1").
     const offStn = gci === 'online' && !both && h.gciOffStation;
     chip.className = 'gci-chip' + (both ? ' offline' : offStn ? ' stby' : (gci === 'online' || gci === 'offline' ? ' ' + gci : ''));
-    chip.textContent = both ? 'GCI ×2' : offStn ? 'GCI · OFF STATION'
-      : (gci === 'online' ? 'GCI ONLINE' + (h.gciRadars ? ' · ' + h.gciRadars : '') : 'GCI OFFLINE');
-    chip.title = both ? `${h.gciName} both running - stop skyeye.exe, they talk over each other`
-      : gci === 'online' ? `GCI running: ${h.gciName || 'SkyEye'} (PID ${h.gciPid})`
-      : 'GCI not running - start the GCI role (Darkstar / Overlord)';
+    // Shown as AWACS (operator 2026-10-21: "rename GCI to AWACS in Dashboard");
+    // the role names and the API keep "gci".
+    const gciLabel = s => String(s || '').replace(/\bGCI\b/g, 'AWACS');
+    chip.textContent = both ? 'AWACS ×2' : offStn ? 'AWACS · OFF STATION'
+      : (gci === 'online' ? 'AWACS ONLINE' + (h.gciRadars ? ' · ' + h.gciRadars : '') : 'AWACS OFFLINE');
+    chip.title = both ? `${gciLabel(h.gciName)} and skyeye.exe both running - stop skyeye.exe, they talk over each other`
+      : gci === 'online' ? `AWACS running: ${gciLabel(h.gciName) || 'SkyEye'} (PID ${h.gciPid})`
+      : 'AWACS not running - start the AWACS role (Darkstar / Overlord)';
   } catch {
     $('serverLine').className = 'server-line down';
     $('tv64Badge').className = 'tv64-badge';
