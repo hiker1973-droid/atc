@@ -3027,6 +3027,7 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 	type objData struct {
 		lon, lat, altFt, speedKts float64
 		headingDeg                float64
+		dcsHeadingDeg             float64 // ACMI "Heading" (9th T= field): DCS's own, off map-grid north
 		vertSpeedFpm              float64
 		prevAltFt                 float64
 		prevTime                  time.Time
@@ -3265,6 +3266,9 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 					if len(coords) >= 6 && coords[5] != "" {
 						fmt.Sscanf(coords[5], "%f", &positions[id].headingDeg)
 					}
+					if len(coords) >= 9 && coords[8] != "" {
+						fmt.Sscanf(coords[8], "%f", &positions[id].dcsHeadingDeg)
+					}
 				}
 			}
 
@@ -3292,6 +3296,9 @@ func tacviewLoop(ctx context.Context, addr string, atcCtrl *controller.ATCContro
 				if wanted {
 					if pos, ok := positions[id]; ok && pos.hasPos {
 						atcCtrl.UpdateAnyPosition(callsign, objectNames[id], objType, pos.lon, pos.lat, pos.altFt, pos.speedKts, pos.headingDeg, pos.vertSpeedFpm)
+						if pos.dcsHeadingDeg > 0 && strings.Contains(objType, "AircraftCarrier") {
+							atcCtrl.SetDCSHeading(callsign, pos.dcsHeadingDeg)
+						}
 						atomic.StoreInt64(lastData, time.Now().UnixNano())
 					}
 				}

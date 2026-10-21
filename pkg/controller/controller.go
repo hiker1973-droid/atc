@@ -141,6 +141,11 @@ type TacviewContact struct {
 	AltFt        float64
 	SpeedKts     float64
 	HeadingDeg   float64
+	// DCSHeadingDeg is DCS's own heading (the ACMI "Heading" field), off the
+	// map grid's north, 0 when not sent. It is what DCS's BRC is said from:
+	// ABE on 2026-10-21 had yaw 103.4 true, Heading 100 (its route in the
+	// editor), and DCS calls BRC 093, not our 096 (operator).
+	DCSHeadingDeg float64
 	VertSpeedFpm float64  // positive = climbing
 	UpdatedAt    time.Time
 	// Detected intent
@@ -2188,6 +2193,15 @@ func (c *ATCController) UpdateAnyPosition(callsign, unitName, objType string, lo
 	c.airfieldState.UpdatePosition(callsign, orb.Point{lon, lat}, altFt, speedKts)
 }
 
+// SetDCSHeading records DCS's own heading for a contact (see DCSHeadingDeg).
+func (c *ATCController) SetDCSHeading(callsign string, deg float64) {
+	c.allPositionsMu.Lock()
+	if contact := c.allPositions[callsign]; contact != nil {
+		contact.DCSHeadingDeg = deg
+	}
+	c.allPositionsMu.Unlock()
+}
+
 // SetWeather injects static weather — used by ATIS-only Training VM mode.
 func (c *ATCController) SetWeather(windDir, windKts, ceilFt, altInHg float64) {
 	c.airfieldState.UpdateWeather(windDir, windKts, altInHg, ceilFt)
@@ -2456,7 +2470,11 @@ func (c *ATCController) GetCarrierBRCFor(callsign string) float64 {
 		log.Info().Msg("GetCarrierBRC no match — returning -1")
 		return -1
 	}
-	log.Info().Str("callsign", cs).Str("caller", callsign).Float64("heading", contact.HeadingDeg).Msg("GetCarrierBRC matched")
+	log.Info().Str("callsign", cs).Str("caller", callsign).Float64("heading", contact.HeadingDeg).Float64("dcsHeading", contact.DCSHeadingDeg).Msg("GetCarrierBRC matched")
+	// The BRC pilots hear from DCS is off its own heading, not the true yaw.
+	if contact.DCSHeadingDeg > 0 {
+		return contact.DCSHeadingDeg
+	}
 	return contact.HeadingDeg
 }
 

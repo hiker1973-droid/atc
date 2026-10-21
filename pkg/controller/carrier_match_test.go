@@ -148,3 +148,19 @@ func TestFindCarrierMatchesNamedCVNWithoutType(t *testing.T) {
 		t.Errorf("BRC = %.1f, want 12.0", brc)
 	}
 }
+
+// Operator 2026-10-21: "The BRC of ABE reports as 96 when it should be 93".
+// Tacview's yaw is true (103.4, matching the lat/lon track); DCS's own
+// Heading field is off the map grid (100, the editor route), and DCS says
+// BRC 093 = 100 - 7.5 variation. The spoken BRC follows DCS.
+func TestCarrierBRCFollowsDCSHeading(t *testing.T) {
+	c := NewATCController("Test", &airfield.Airfield{MagVar: 7.5})
+	c.UpdateAnyPosition("ABE", "CVN_72", "Sea+Watercraft+AircraftCarrier", 41.3, 41.6, 60, 20, 103.4, 0)
+	if brc := c.GetCarrierBRCFor(""); brc != 103.4 {
+		t.Errorf("no DCS heading: BRC = %.1f, want the yaw 103.4", brc)
+	}
+	c.SetDCSHeading("ABE", 100)
+	if brc := c.ToMagnetic(c.GetCarrierBRCFor("")); math.Round(brc) != 93 {
+		t.Errorf("BRC magnetic = %.1f, want 093 as DCS says", brc)
+	}
+}
