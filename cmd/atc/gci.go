@@ -250,7 +250,7 @@ func gciCompose(comp composer.Composer, call any) (composer.NaturalLanguageRespo
 	case brevity.PictureResponse:
 		return comp.ComposePictureResponse(c), true
 	case brevity.RadioCheckResponse:
-		return comp.ComposeRadioCheckResponse(c), true
+		return gciRadioCheck(comp, c), true
 	case brevity.ShoppingResponse:
 		return comp.ComposeShoppingResponse(c), true
 	case brevity.SnaplockResponse:
@@ -273,6 +273,19 @@ func gciCompose(comp composer.Composer, call any) (composer.NaturalLanguageRespo
 		return comp.ComposeSayAgainResponse(c), true
 	}
 	return composer.NaturalLanguageResponse{}, false
+}
+
+// gciRadioCheck answers a radio / comm check with "good copy" (operator
+// 2026-10-21: "For Comms check response instead of Lima Charlie say good
+// copy"). SkyEye's own picks at random from "5 by 5", "loud and clear",
+// "Lima Charlie" and the like. Not on scope is still said - it tells the
+// pilot the GCI cannot see them (wrong DCS name, or still on the ramp).
+func gciRadioCheck(comp composer.Composer, c brevity.RadioCheckResponse) composer.NaturalLanguageResponse {
+	reply := fmt.Sprintf("%s, %s, good copy.", strings.ToUpper(c.Callsign), strings.ToUpper(comp.Callsign))
+	if !c.RadarContact {
+		reply = fmt.Sprintf("%s, %s, good copy, but I don't see you on scope.", strings.ToUpper(c.Callsign), strings.ToUpper(comp.Callsign))
+	}
+	return composer.NaturalLanguageResponse{Subtitle: reply, Speech: reply}
 }
 
 // gciCheckIn answers a plain "checking in". SkyEye's own answer is a joke

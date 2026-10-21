@@ -67,3 +67,16 @@ func TestGCICheckInPlain(t *testing.T) {
 		t.Errorf("check in reply %q", r.Speech)
 	}
 }
+
+// Operator 2026-10-21: "good copy", not "Lima Charlie".
+func TestGCIRadioCheckGoodCopy(t *testing.T) {
+	comp := composer.Composer{Callsign: "Darkstar"}
+	r, _ := gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2", RadarContact: true})
+	if r.Speech != "RAIDER 3 0 2, DARKSTAR, good copy." {
+		t.Errorf("radio check: %q", r.Speech)
+	}
+	r, _ = gciCompose(comp, brevity.RadioCheckResponse{Callsign: "Raider 3 0 2"})
+	if r.Speech != "RAIDER 3 0 2, DARKSTAR, good copy, but I don't see you on scope." {
+		t.Errorf("radio check off scope: %q", r.Speech)
+	}
+}
