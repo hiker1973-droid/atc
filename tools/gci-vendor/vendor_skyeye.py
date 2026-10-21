@@ -77,6 +77,24 @@ PATCHES = [
 // squadronCallsignRe finds a vSFG-7 squadron callsign anywhere in a name or call.
 var squadronCallsignRe = regexp.MustCompile(`(?i)\b(raider|venom)s?\b[\s\-|,]*((?:\d[\s\-]*){1,3})`)
 """),
+    # AWACS line of sight (operator 2026-10-21, phase 1): the GCI only sees what
+    # the mission's AWACS could - radar horizon from both altitudes and the
+    # type's published range. atc.exe sets the hook (cmd/atc/gci_coverage.go);
+    # an update it rejects never reaches the scope. nil = SkyEye's god's-eye view.
+    ("radar/radar.go",
+     r"""// handleUpdate updates the database using the provided update.
+func (r *Radar) handleUpdate(update sim.Updated) {
+""",
+     r"""// CoverageFilter, when set, decides whether the radar can see an update; a
+// rejected update never reaches the scope. vsfg7 (tools/gci-vendor).
+var CoverageFilter func(update sim.Updated) bool
+
+// handleUpdate updates the database using the provided update.
+func (r *Radar) handleUpdate(update sim.Updated) {
+	if CoverageFilter != nil && !CoverageFilter(update) { // vsfg7
+		return
+	}
+"""),
     # Quiet during recoveries (operator 2026-10-21): no THREAT call to a jet in
     # the carrier stack / pattern or a tower's pattern, and the automatic PICTURE
     # waits while a pilot on frequency is recovering. atc.exe sets the hooks

@@ -58,6 +58,8 @@ var (
 	flagGCITacviewPassword string
 	flagGCISampleDir       string
 	flagGCISampleOnly      string
+	// AWACS line of sight (gci_coverage.go): the picture is what the mission's AWACS can see.
+	flagGCICoverage bool
 	// Command's pointer to the GCI after "fence in" (operator 2026-10-21).
 	flagCommandGCIName string
 	flagCommandGCIFreq float64
@@ -83,6 +85,8 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.StringVar(&flagGCITacviewPassword, "gci-tacview-password", "", "Tacview real-time telemetry password, if the server sets one")
 	f.StringVar(&flagGCISampleDir, "gci-sample", "", "Render sample GCI calls in the GCI voice to this folder and exit (gci_sample.go)")
 	f.StringVar(&flagGCISampleOnly, "gci-sample-only", "", `With --gci-sample: render just this call ("picture", "threat", ...)`)
+	f.BoolVar(&flagGCICoverage, "gci-awacs-coverage", true,
+		"The GCI sees only what the mission's AWACS could (radar horizon + type range); off station with no AWACS up (gci_coverage.go)")
 	f.StringVar(&flagCommandGCIName, "command-gci-name", "",
 		`With --command-only: after "fence in", Command adds "<name> is up on <freq> for picture" ("" = off)`)
 	f.Float64Var(&flagCommandGCIFreq, "command-gci-freq", 0, "With --command-gci-name: the GCI frequency in MHz")
@@ -278,8 +282,21 @@ func runGCI(ctx context.Context, apiKey string) {
 	go runMiniTacview(ctx, flagTacviewAddr, store)
 	rec := newGCIRecovery(store, gciFields(flagMap))
 	controller.RecoveryQuiet = rec.quiet
-	controller.AutoPictureQuiet = func() bool { return rec.anyRecovering(gciSRSBook.NamesOnFrequency()) }
 	log.Info().Str("map", flagMap).Int("fields", len(rec.fields)).Msg("GCI: quiet during recoveries armed")
+
+	// AWACS line of sight (gci_coverage.go).
+	var cov *gciCoverage
+	onStation := func() bool { return true }
+	if flagGCICoverage {
+		cov = newGCICoverage(store, cs, coalition, fades)
+		radar.CoverageFilter = cov.filter
+		onStation = func() bool { on, _, _ := cov.onStation(); return on }
+		log.Info().Msg("GCI: AWACS line of sight armed - the picture is what the mission's AWACS can see")
+	}
+	controller.AutoPictureQuiet = func() bool {
+		return !onStation() || rec.anyRecovering(gciSRSBook.NamesOnFrequency())
+	}
+	say := make(chan string, 4) // free text for gciSpeak: on / off station
 
 	var wg sync.WaitGroup
 	wg.Go(func() {
@@ -309,7 +326,35 @@ func runGCI(ctx context.Context, apiKey string) {
 
 	calls := make(chan controller.Call)
 	wg.Go(func() { ctrl.Run(ctx, calls) })
-	wg.Go(func() { gciSpeak(ctx, apiKey, comp, calls) })
+	wg.Go(func() { gciSpeak(ctx, apiKey, comp, calls, say) })
+	if cov != nil {
+		wg.Go(func() {
+			tk := time.NewTicker(10 * time.Second)
+			defer tk.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-tk.C:
+					on, changed, r := cov.onStation()
+					if !changed {
+						continue
+					}
+					msg := fmt.Sprintf("All players, %s, off station.", cs)
+					if on {
+						msg = fmt.Sprintf("All players, %s, on station.", cs)
+						log.Info().Str("awacs", r.Key).Str("type", r.Type).Msg("GCI on station")
+					} else {
+						log.Info().Msg("GCI off station - no AWACS airborne")
+					}
+					select {
+					case say <- msg:
+					default:
+					}
+				}
+			}
+		})
+	}
 
 	requests := make(chan any, 8)
 	wg.Go(func() {
@@ -332,6 +377,9 @@ func runGCI(ctx context.Context, apiKey string) {
 			}
 			if kind, reply := gciAck(text, cs); kind != "" {
 				log.Info().Str("text", text).Str("kind", kind).Msg("GCI: " + strings.ReplaceAll(kind, "_", " "))
+				if kind == "fence_in" && !onStation() {
+					return "", strings.TrimSuffix(reply, " picture follows.") + " off station, no picture."
+				}
 				if kind == "fence_in" {
 					// The picture follows the acknowledgement, not on top of it.
 					pcs, _ := gciCallerCallsign(strings.ToLower(text), cs, gciFenceInRe)
@@ -354,6 +402,11 @@ func runGCI(ctx context.Context, apiKey string) {
 				return "", ""
 			}
 			log.Info().Str("text", text).Any("request", req).Msg("GCI request")
+			if gciNeedsPicture(req) && !onStation() {
+				pcs, _ := callsigns.ParsePilotCallsign(strings.NewReplacer(strings.ToLower(cs), " ", "anyface", " ").Replace(strings.ToLower(text)))
+				log.Info().Str("text", text).Msg("GCI: off station - no picture to give")
+				return "", gciOffStation(pcs, cs)
+			}
 			select {
 			case requests <- req:
 			default:
@@ -471,13 +524,23 @@ func gciCheckIn(comp composer.Composer, c brevity.CheckInResponse) composer.Natu
 }
 
 // gciSpeak speaks the controller's calls one at a time, in order.
-func gciSpeak(ctx context.Context, apiKey string, comp composer.Composer, calls <-chan controller.Call) {
+func gciSpeak(ctx context.Context, apiKey string, comp composer.Composer, calls <-chan controller.Call, say <-chan string) {
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 	vp := gciVoice()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case text := <-say:
+			mp3, err := synthesizeSpeech(ctx, apiKey, text, vp)
+			if err != nil {
+				log.Error().Err(err).Str("text", text).Msg("GCI TTS failed")
+				continue
+			}
+			log.Info().Str("call", "station").Str("text", text).Float64("freq", flagGCIFreq).Msg("GCI TX")
+			broadcastLog("tx", flagGCICallsign+" TX → "+text)
+			noteOwnTX(flagGCIFreq, text)
+			transmitExternalAudioFile(ctx, mp3, flagGCIFreq, flagGCICallsign, srsHost, srsPort, flagExternalAudio)
 		case call := <-calls:
 			resp, ok := gciCompose(comp, call.Call)
 			if !ok || resp.Speech == "" {

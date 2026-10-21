@@ -238,8 +238,15 @@ func (r *Radar) Run(ctx context.Context, wg *sync.WaitGroup) {
 	<-ctx.Done()
 }
 
+// CoverageFilter, when set, decides whether the radar can see an update; a
+// rejected update never reaches the scope. vsfg7 (tools/gci-vendor).
+var CoverageFilter func(update sim.Updated) bool
+
 // handleUpdate updates the database using the provided update.
 func (r *Radar) handleUpdate(update sim.Updated) {
+	if CoverageFilter != nil && !CoverageFilter(update) { // vsfg7
+		return
+	}
 	logger := log.With().
 		Str("callsign", update.Labels.Name).
 		Str("aircraft", update.Labels.ACMIName).
