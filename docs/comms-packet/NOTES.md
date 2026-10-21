@@ -10,7 +10,7 @@ Tower radios · Syria towers · Departure · Arrival · Tower calls · No answer
 ## v1.31 (21 OCT 2026) — the GCI, Darkstar / Overlord, from origin/main `16957f2`
 
 User asked 2026-10-21 to add the new GCI controller to the pilot documentation.
-- **New card 18 DARKSTAR:** SkyEye's GCI brain in atc.exe, our voice (Lily, British).
+- **New card 18 DARKSTAR:** SkyEye's GCI brain in atc.exe, our voice (ElevenLabs library voice vChnJZ1Cu89g2XXumPfT; was Lily).
   Darkstar 264.000 AM Black Sea Day / Night (Hornet COMM 1 CH 5, as on the Caucasus Training
   `fleet.py` and the Hornet New Pilot Pack card); Overlord 266.000 AM Syria / Foothold (dial
   it - channels differ per Foothold card). The flow Command check-in -> GCI check-in -> fence in

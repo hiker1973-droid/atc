@@ -69,9 +69,10 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.Float64Var(&flagGCIFreq, "gci-freq", 264.0, "GCI frequency in MHz (AM)")
 	f.StringVar(&flagGCICallsign, "gci-callsign", "Darkstar", "GCI callsign, spoken and answered (Darkstar on Day/Night, Overlord on Foothold)")
 	f.StringVar(&flagGCIVoice, "gci-voice", "shimmer", "GCI OpenAI TTS voice (the fallback when ElevenLabs is off)")
-	// Operator 2026-10-21: "change to a British female" (was Spartan, calm American baritone).
-	f.StringVar(&flagElevenGCIVoice, "elevenlabs-gci-voice", elLily,
-		`ElevenLabs voice ID for the GCI (default "Lily", confident British woman; "" = OpenAI only)`)
+	// Operator 2026-10-21: Spartan, then "a British female" (Lily), then "use this for GCI
+	// https://elevenlabs.io/voices/vChnJZ1Cu89g2XXumPfT" (library voice).
+	f.StringVar(&flagElevenGCIVoice, "elevenlabs-gci-voice", elGCI,
+		`ElevenLabs voice ID for the GCI (default the operator's library pick vChnJZ1Cu89g2XXumPfT; "" = OpenAI only)`)
 	f.StringVar(&flagGCICoalition, "gci-coalition", "blue", "Coalition the GCI serves: blue or red")
 	f.BoolVar(&flagGCIAutoPicture, "gci-auto-picture", true, "Broadcast a PICTURE on a timer while pilots are on frequency")
 	f.DurationVar(&flagGCIPictureInterval, "gci-picture-interval", 5*time.Minute,
@@ -92,7 +93,10 @@ const styleGCI = "Speak as an AWACS weapons controller on a tactical net, a Brit
 	"Calm, clear and precise, unhurried even when the picture is busy. " +
 	"Read numbers crisply and run grouped numbers together as one phrase."
 
-// gciVoice: Lily on Flash (GCI talks far more than ATC - automatic
+// elGCI is the GCI's voice: the operator's library pick 2026-10-21 (was Lily).
+const elGCI = "vChnJZ1Cu89g2XXumPfT"
+
+// gciVoice: elGCI on Flash (GCI talks far more than ATC - automatic
 // pictures and threat calls - so the cheaper model).
 func gciVoice() voiceProfile {
 	return voiceProfile{voice: flagGCIVoice, speed: flagTTSSpeed * gciSpeedUp, instructions: styleGCI,
