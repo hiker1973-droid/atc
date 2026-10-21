@@ -1,0 +1,53 @@
+package parser
+
+import (
+	"testing"
+
+	"github.com/vsfg7/atc/pkg/gci/bearings"
+	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/martinlindhe/unit"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestParserSpiked(t *testing.T) {
+	t.Parallel()
+	testCases := []parserTestCase{
+		{
+			text: "ANYFACE, EAGLE 1 SPIKED 2-7-0",
+			expected: &brevity.SpikedRequest{
+				Callsign: "eagle 1",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(270) * unit.Degree),
+			},
+		},
+		{
+			text: "Anyface Raven 1-4, Spike 0-2-0",
+			expected: &brevity.SpikedRequest{
+				Callsign: "raven 1 4",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(20) * unit.Degree),
+			},
+		},
+		{
+			text: "Anyface, ELI-1, spiked, one-two-zero.",
+			expected: &brevity.SpikedRequest{
+				Callsign: "eli 1",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(120) * unit.Degree),
+			},
+		},
+		{
+			text: "anyface, Ford 1-1, spiked 1-8-0",
+			expected: &brevity.SpikedRequest{
+				Callsign: "ford 1 1",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(180) * unit.Degree),
+			},
+		},
+	}
+	runParserTestCases(t, New(TestCallsign, []string{}, true), testCases, func(t *testing.T, test parserTestCase, request any) {
+		t.Helper()
+		expected := test.expected.(*brevity.SpikedRequest)
+		require.IsType(t, &brevity.SpikedRequest{}, request)
+		actual := request.(*brevity.SpikedRequest)
+		assert.Equal(t, expected.Callsign, actual.Callsign)
+		assert.Equal(t, expected.Bearing, actual.Bearing)
+	})
+}

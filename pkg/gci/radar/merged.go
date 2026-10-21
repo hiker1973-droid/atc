@@ -1,0 +1,75 @@
+package radar
+
+import (
+	"maps"
+	"slices"
+
+	"github.com/vsfg7/atc/pkg/gci/internal/collections/sets"
+	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/vsfg7/atc/pkg/gci/coalitions"
+	"github.com/vsfg7/atc/pkg/gci/encyclopedia"
+	"github.com/vsfg7/atc/pkg/gci/spatial"
+	"github.com/vsfg7/atc/pkg/gci/trackfiles"
+)
+
+// Merges returns a map of hostile groups of the given coalition to friendly trackfiles.
+func (r *Radar) Merges(coalition coalitions.Coalition) map[brevity.Group][]*trackfiles.Trackfile {
+	visited := sets.New[uint64]()
+	merges := make(map[brevity.Group][]*trackfiles.Trackfile)
+	for contact := range r.contacts.values() {
+		if sets.Contains(visited, contact.Contact.ID) {
+			continue
+		}
+
+		if contact.Contact.Coalition != coalition.Opposite() {
+			continue
+		}
+
+		if !isValidTrack(contact) {
+			continue
+		}
+
+		// Exclude hostile helicopters
+		if data, ok := encyclopedia.GetAircraftData(contact.Contact.ACMIName); ok && data.Category() == brevity.RotaryWing {
+			continue
+		}
+
+		grp := r.findGroupForAircraft(contact)
+		mergedWith := make(map[uint64]*trackfiles.Trackfile)
+		for _, contact := range grp.contacts {
+			sets.Add(visited, contact.Contact.ID)
+			for _, trackfile := range r.mergesForContact(contact) {
+				mergedWith[trackfile.Contact.ID] = trackfile
+			}
+		}
+		if len(mergedWith) == 0 {
+			continue
+		}
+		grp.isThreat = true
+		grp.SetDeclaration(brevity.Furball)
+
+		merges[grp] = slices.Collect(maps.Values(mergedWith))
+	}
+	return merges
+}
+
+// mergesForContact returns the opposing trackfiles that the given trackfile is merged with.
+func (r *Radar) mergesForContact(trackfile *trackfiles.Trackfile) []*trackfiles.Trackfile {
+	mergedWith := make([]*trackfiles.Trackfile, 0)
+	if trackfile.IsLastKnownPointZero() {
+		return mergedWith
+	}
+	for other := range r.contacts.values() {
+		if trackfile.Contact.Coalition == other.Contact.Coalition {
+			continue
+		}
+		if other.IsLastKnownPointZero() {
+			continue
+		}
+		distance := spatial.Distance(trackfile.LastKnown().Point, other.LastKnown().Point, r.withProjection())
+		if distance < brevity.MergeExitDistance {
+			mergedWith = append(mergedWith, other)
+		}
+	}
+	return mergedWith
+}

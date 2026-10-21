@@ -1,0 +1,17 @@
+package telemetry
+
+import (
+	acmi "github.com/dharmab/goacmi/v2/properties/coalitions"
+	skyeye "github.com/vsfg7/atc/pkg/gci/coalitions"
+)
+
+func propertyToCoalition(v string) skyeye.Coalition {
+	switch v {
+	case string(acmi.Allies):
+		return skyeye.Red
+	case string(acmi.Enemies):
+		return skyeye.Blue
+	default:
+		return skyeye.Neutrals
+	}
+}

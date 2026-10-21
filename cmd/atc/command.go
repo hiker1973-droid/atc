@@ -348,6 +348,9 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 					return
 				}
 				srsNames.note(line) // SRS client names: srs_names.go
+				if gciSRSBook != nil {
+					gciSRSBook.Note(line) // who is on the GCI frequency: gci.go
+				}
 				var msg map[string]interface{}
 				if json.Unmarshal(line, &msg) == nil {
 					if msgType, ok := msg["MsgType"].(float64); ok && int(msgType) == 1 {

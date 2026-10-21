@@ -1,0 +1,116 @@
+package radar
+
+import (
+	"slices"
+
+	"github.com/vsfg7/atc/pkg/gci/internal/collections/sets"
+	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/vsfg7/atc/pkg/gci/coalitions"
+	"github.com/vsfg7/atc/pkg/gci/encyclopedia"
+	"github.com/vsfg7/atc/pkg/gci/spatial"
+	"github.com/vsfg7/atc/pkg/gci/trackfiles"
+	"github.com/martinlindhe/unit"
+)
+
+func (r *Radar) enumerateGroups(coalition coalitions.Coalition) []*group {
+	visited := sets.New[uint64]()
+	groups := make([]*group, 0)
+	for trackfile := range r.contacts.values() {
+		if sets.Contains(visited, trackfile.Contact.ID) {
+			continue
+		}
+		sets.Add(visited, trackfile.Contact.ID)
+
+		if trackfile.Contact.Coalition != coalition {
+			continue
+		}
+
+		if !isValidTrack(trackfile) {
+			continue
+		}
+
+		grp := r.findGroupForAircraft(trackfile)
+		if grp == nil {
+			continue
+		}
+		for _, id := range grp.ObjectIDs() {
+			sets.Add(visited, id)
+		}
+		groups = append(groups, grp)
+	}
+
+	return groups
+}
+
+// findGroupForAircraft creates a new group for the given trackfile and adds all nearby aircraft which can be considered part of the group.
+func (r *Radar) findGroupForAircraft(trackfile *trackfiles.Trackfile) *group {
+	if trackfile == nil {
+		return nil
+	}
+	grp := &group{
+		contacts:    make([]*trackfiles.Trackfile, 0),
+		declaration: brevity.Unable,
+	}
+	grp.contacts = append(grp.contacts, trackfile)
+	if !trackfile.IsLastKnownPointZero() {
+		r.addNearbyAircraftToGroup(trackfile, grp)
+	}
+	// Compute bullseye after all contacts are added so g.point() is accurate
+	r.setBullseyeForGroup(grp)
+	return grp
+}
+
+// addNearbyAircraftToGroup recursively adds all nearby aircraft which:
+//   - are of the same coalition
+//   - are within 5 nautical miles in 2D distance of each other
+//   - have similar tags
+//
+// The spread is increased from the ATP numbers beacause the DCS AI isn't amazing at holding formation.
+// We allow mixed platform groups because these are fairly common in DCS.
+func (r *Radar) addNearbyAircraftToGroup(this *trackfiles.Trackfile, group *group) {
+	var tag encyclopedia.AircraftTag
+	thisData, ok := encyclopedia.GetAircraftData(this.Contact.ACMIName)
+	if ok {
+		if thisData.HasTag(encyclopedia.Fighter) {
+			tag = encyclopedia.Fighter
+		} else if thisData.HasTag(encyclopedia.Attack) {
+			tag = encyclopedia.Attack
+		} else if thisData.HasTag(encyclopedia.Unarmed) {
+			tag = encyclopedia.Unarmed
+		}
+	}
+	spreadInterval := 5 * unit.NauticalMile
+	for other := range r.contacts.values() {
+		// Skip if this one is already in the group
+		if slices.Contains(group.ObjectIDs(), other.Contact.ID) {
+			continue
+		}
+
+		// Check coalition, categoty, and filters
+		if !isMatch(other, this.Contact.Coalition, group.category()) {
+			continue
+		}
+
+		// Check tag similarity
+		subCategories := []encyclopedia.AircraftTag{encyclopedia.Fighter, encyclopedia.Attack, encyclopedia.Unarmed}
+		if slices.Contains(subCategories, tag) {
+			data, ok := encyclopedia.GetAircraftData(other.Contact.ACMIName)
+			if !ok {
+				continue
+			}
+			if !data.HasTag(tag) {
+				continue
+			}
+		}
+
+		// Check spread distance
+		distance := spatial.Distance(other.LastKnown().Point, this.LastKnown().Point, r.withProjection())
+		isWithinSpread := distance < spreadInterval
+		if !isWithinSpread {
+			continue
+		}
+
+		group.contacts = append(group.contacts, other)
+		r.addNearbyAircraftToGroup(other, group)
+	}
+}

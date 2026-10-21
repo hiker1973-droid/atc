@@ -1,0 +1,110 @@
+package parser
+
+import (
+	"testing"
+
+	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestParserRadioCheck(t *testing.T) {
+	t.Parallel()
+	testCases := []parserTestCase{
+		{
+			text: "anyface Wildcat11 radio check out.",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "wildcat 1 1",
+			},
+		},
+		{
+			text: "Any face, Wildcat11, radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "wildcat 1 1",
+			},
+		},
+		{
+			text: "anyface intruder 11 radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "intruder 1 1",
+			},
+		},
+		{
+			text: "anyface intruder 1-1 radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "intruder 1 1",
+			},
+		},
+		{
+			text: "anyface intruder five one radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "intruder 5 1",
+			},
+		},
+		{
+			text: "anyface intruder 11 request radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "intruder 1 1",
+			},
+		},
+		{
+			text: "anyface intruder 11 radio check 133 point zero",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "intruder 1 1",
+			},
+		},
+		{
+			text: "anyface intruder 11 radio check on button five",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "intruder 1 1",
+			},
+		},
+		{
+			text: TestCallsign + ", this is Heaven11. Request Mic Check.",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "heaven 1 1",
+			},
+		},
+		{
+			text: TestCallsign + ", this is heaven. Request mic check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "heaven",
+			},
+		},
+		{
+			text: TestCallsign + ", call me '1-2', DRAVIA CHECK.",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "call me 1 2",
+			},
+		},
+		{
+			text: TestCallsign + ", EAGLE-1, RADIOTRIC",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "eagle 1",
+			},
+		},
+		{
+			text: "anyface half wit radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "half wit",
+			},
+		},
+		{
+			text: "anyface Ford 1-1 radio check",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "ford 1 1",
+			},
+		},
+		{
+			text: TestCallsign + ", cobra 21, COMCHACK.",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "cobra 2 1",
+			},
+		},
+	}
+	runParserTestCases(t, New(TestCallsign, []string{}, true), testCases, func(t *testing.T, test parserTestCase, request any) {
+		t.Helper()
+		expected := test.expected.(*brevity.RadioCheckRequest)
+		actual := request.(*brevity.RadioCheckRequest)
+		assert.Equal(t, expected.Callsign, actual.Callsign)
+	})
+}

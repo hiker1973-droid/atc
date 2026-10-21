@@ -1,0 +1,46 @@
+package parser
+
+import (
+	"testing"
+
+	"github.com/vsfg7/atc/pkg/gci/bearings"
+	"github.com/vsfg7/atc/pkg/gci/brevity"
+	"github.com/martinlindhe/unit"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestParserStrobe(t *testing.T) {
+	t.Parallel()
+	testCases := []parserTestCase{
+		{
+			text: "ANYFACE, EAGLE 1 STROBE 2-7-0",
+			expected: &brevity.StrobeRequest{
+				Callsign: "eagle 1",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(270) * unit.Degree),
+			},
+		},
+		{
+			text: "Anyface Raven 1-4, Strobe 0-2-0",
+			expected: &brevity.StrobeRequest{
+				Callsign: "raven 1 4",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(20) * unit.Degree),
+			},
+		},
+		{
+			text: "anyface, Ford 1-1, strobe 2-7-0",
+			expected: &brevity.StrobeRequest{
+				Callsign: "ford 1 1",
+				Bearing:  bearings.NewMagneticBearing(unit.Angle(270) * unit.Degree),
+			},
+		},
+	}
+	runParserTestCases(t, New(TestCallsign, []string{}, true), testCases, func(t *testing.T, test parserTestCase, request any) {
+		t.Helper()
+		expected := test.expected.(*brevity.StrobeRequest)
+		require.IsType(t, &brevity.StrobeRequest{}, request)
+		actual := request.(*brevity.StrobeRequest)
+		assert.Equal(t, expected.Callsign, actual.Callsign)
+		assert.Equal(t, expected.Bearing, actual.Bearing)
+	})
+}

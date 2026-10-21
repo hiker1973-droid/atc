@@ -343,6 +343,7 @@ func main() {
 	f.StringVar(&flagScudwatchBullseye, "scudwatch-bullseye", "",
 		"Bullseye reference for Scudwatch announcements as 'lat,lon' (default: airfield center)")
 	registerLSOFlags(f)
+	registerGCIFlags(f)
 	registerApproachGradeFlags(f)
 	registerTankerFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
@@ -416,6 +417,8 @@ func run(cmd *cobra.Command, args []string) error {
 		logSlug = "marshal"
 	case flagLSOOnly:
 		logSlug = "lso"
+	case flagGCIOnly:
+		logSlug = "gci"
 	case logSlug == "":
 		logSlug = "misc"
 	}
@@ -476,9 +479,10 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagScudwatchOnly { mode = "scudwatch" }
 	if flagMarshalOnly   { mode = "marshal-only" }
 	if flagLSOOnly       { mode = "lso-only" }
+	if flagGCIOnly       { mode = "gci-only" }
 	if flagDeckbossFreq != "0" && flagDeckbossFreq != "" { mode = "deckboss" }
 	log.Info().Str("mode", mode).Str("srs", flagSRSAddr).Msg("vsfg7-atc starting")
-	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly && !flagLSOOnly {
+	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly && !flagLSOOnly && !flagGCIOnly {
 		log.Info().
 			Str("airfield", af.ICAO).
 			Str("callsign", callsign).
@@ -504,6 +508,14 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagLSOOnly {
 		runLSO(ctx, apiKey)
 		log.Info().Msg("Paddles offline")
+		return nil
+	}
+	// The GCI (gci.go) is self-contained too: SkyEye's brain, our voice.
+	if flagGCISampleDir != "" {
+		return renderGCISample(ctx, apiKey, flagGCISampleDir)
+	}
+	if flagGCIOnly {
+		runGCI(ctx, apiKey)
 		return nil
 	}
 

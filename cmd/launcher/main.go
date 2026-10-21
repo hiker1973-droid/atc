@@ -237,6 +237,8 @@ func roleFromCmd(bat, title, cmd string) Role {
 		r.LogFile = "atc-marshal.log"
 	case strings.Contains(cmd, "--lso-only"):
 		r.LogFile = "atc-lso.log"
+	case strings.Contains(cmd, "--gci-only"):
+		r.LogFile = "atc-gci.log"
 	default:
 		r.LogFile = "atc-" + strings.ToLower(r.Airfield) + ".log"
 	}
