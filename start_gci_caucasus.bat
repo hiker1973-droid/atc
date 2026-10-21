@@ -27,10 +27,9 @@ set GOMEMLIMIT=256MiB
 :: GCI brain inside atc.exe (pkg/gci, cmd/atc/gci.go) with our voice: ElevenLabs
 :: "Lily" (British woman) on Flash, OpenAI shimmer as the fallback.
 ::
-:: NOT part of start_region_caucasus.bat: skyeye.exe answers on 264.000 too, and
-:: two GCIs on one frequency talk over each other. Stop skyeye.exe on this rig
-:: first, then start this from the dashboard. Once it has proven itself, the
-:: SkyEye bot comes out of the DCS server and this goes into the region bat.
+:: Started by start_region_caucasus.bat / start_all_caucasus.bat since 2026-10-21,
+:: when skyeye.exe came off the servers (two GCIs on 264 talk over each other -
+:: never run skyeye.exe beside this; the dashboard chip shows GCI x2 if it is).
 ::
 :: --gci-picture-interval 5m: SkyEye's own default is 2m; every PICTURE is
 :: spoken through ElevenLabs. --airfield only tells this atc.exe apart in the

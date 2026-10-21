@@ -30,4 +30,8 @@ call "%~dp0start_deckboss_syria.bat"
 echo [vSFG-7] Launching Paddles (128.300)...
 call "%~dp0start_lso_syria.bat"
 
+echo [vSFG-7] Launching GCI Overlord (266.000)...
+:: In the region since 2026-10-21 (skyeye.exe is off the servers).
+call "%~dp0start_gci_syria.bat"
+
 echo [vSFG-7] Syria region launched.

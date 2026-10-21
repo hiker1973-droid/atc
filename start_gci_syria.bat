@@ -25,5 +25,5 @@ set GOMEMLIMIT=256MiB
 
 :: GCI -- Overlord 266.000 AM (Foothold; operator 2026-10-21). Same role as
 :: start_gci_caucasus.bat (Darkstar on Day and Night); read the notes there.
-:: NOT part of start_region_syria.bat until the SkyEye bot is out of Foothold.
+:: Started by start_region_syria.bat since 2026-10-21 (skyeye.exe is off Foothold).
 start "vSFG-7 GCI Overlord (Syria)" cmd /c "%~dp0atc.exe --gci-only --airfield LCRA --gci-callsign Overlord --gci-freq 266.0 --gci-picture-interval 5m --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"

@@ -31,4 +31,9 @@ call "%~dp0start_deckboss_caucasus.bat"
 echo [vSFG-7] Launching Paddles (128.300)...
 call "%~dp0start_lso_caucasus.bat"
 
+echo [vSFG-7] Launching GCI Darkstar (264.000)...
+:: In the region since 2026-10-21: SkyEye's skyeye.exe is off the servers, so an
+:: Update no longer leaves the GCI stopped (it stops every Caucasus role).
+call "%~dp0start_gci_caucasus.bat"
+
 echo [vSFG-7] Caucasus region launched.
