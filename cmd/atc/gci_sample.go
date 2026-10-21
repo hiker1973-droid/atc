@@ -56,6 +56,9 @@ func renderGCISample(ctx context.Context, apiKey, dir string) error {
 	vp := gciVoice()
 	var parts, script []string
 	for i, c := range calls {
+		if flagGCISampleOnly != "" && c.name != flagGCISampleOnly {
+			continue
+		}
 		resp, ok := gciCompose(comp, c.call)
 		if !ok || resp.Speech == "" {
 			return fmt.Errorf("sample %q: composer had nothing to say", c.name)
@@ -84,6 +87,14 @@ func renderGCISample(ctx context.Context, apiKey, dir string) error {
 		log.Info().Str("call", c.name).Str("text", resp.Subtitle).Msg("GCI sample rendered")
 	}
 
+	if len(parts) == 0 {
+		return fmt.Errorf("no sample call named %q", flagGCISampleOnly)
+	}
+	if len(parts) == 1 {
+		fmt.Println(script[0])
+		log.Info().Str("file", parts[0]).Msg("GCI sample written")
+		return nil
+	}
 	// All of them in one file, a second apart.
 	all := filepath.Join(dir, flagGCICallsign+" GCI sample.mp3")
 	args := []string{"-y", "-loglevel", "error"}

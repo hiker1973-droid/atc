@@ -54,6 +54,7 @@ var (
 	flagGCIThreatRadiusNM  float64
 	flagGCITacviewPassword string
 	flagGCISampleDir       string
+	flagGCISampleOnly      string
 )
 
 // registerGCIFlags is called from the flag block in main.go.
@@ -61,9 +62,10 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.BoolVar(&flagGCIOnly, "gci-only", false, "Run as the GCI (AWACS) controller only - SkyEye's brain, our voice")
 	f.Float64Var(&flagGCIFreq, "gci-freq", 264.0, "GCI frequency in MHz (AM)")
 	f.StringVar(&flagGCICallsign, "gci-callsign", "Darkstar", "GCI callsign, spoken and answered (Darkstar on Day/Night, Overlord on Foothold)")
-	f.StringVar(&flagGCIVoice, "gci-voice", "onyx", "GCI OpenAI TTS voice (the fallback when ElevenLabs is off)")
-	f.StringVar(&flagElevenGCIVoice, "elevenlabs-gci-voice", elSpartan,
-		`ElevenLabs voice ID for the GCI (default "Spartan", calm American baritone; "" = OpenAI only)`)
+	f.StringVar(&flagGCIVoice, "gci-voice", "shimmer", "GCI OpenAI TTS voice (the fallback when ElevenLabs is off)")
+	// Operator 2026-10-21: "change to a British female" (was Spartan, calm American baritone).
+	f.StringVar(&flagElevenGCIVoice, "elevenlabs-gci-voice", elLily,
+		`ElevenLabs voice ID for the GCI (default "Lily", confident British woman; "" = OpenAI only)`)
 	f.StringVar(&flagGCICoalition, "gci-coalition", "blue", "Coalition the GCI serves: blue or red")
 	f.BoolVar(&flagGCIAutoPicture, "gci-auto-picture", true, "Broadcast a PICTURE on a timer while pilots are on frequency")
 	f.DurationVar(&flagGCIPictureInterval, "gci-picture-interval", 5*time.Minute,
@@ -73,14 +75,15 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.Float64Var(&flagGCIThreatRadiusNM, "gci-threat-radius", 25, "Briefed radius for mandatory THREAT calls, nm")
 	f.StringVar(&flagGCITacviewPassword, "gci-tacview-password", "", "Tacview real-time telemetry password, if the server sets one")
 	f.StringVar(&flagGCISampleDir, "gci-sample", "", "Render sample GCI calls in the GCI voice to this folder and exit (gci_sample.go)")
+	f.StringVar(&flagGCISampleOnly, "gci-sample-only", "", `With --gci-sample: render just this call ("picture", "threat", ...)`)
 }
 
 // styleGCI is the OpenAI fallback's delivery brief.
-const styleGCI = "Speak as a US Air Force AWACS weapons controller on a tactical net. " +
+const styleGCI = "Speak as an AWACS weapons controller on a tactical net, a British woman with a clear Received Pronunciation accent. " +
 	"Calm, clear and precise, unhurried even when the picture is busy. " +
 	"Read numbers crisply and run grouped numbers together as one phrase."
 
-// gciVoice: Spartan on Flash (GCI talks far more than ATC - automatic
+// gciVoice: Lily on Flash (GCI talks far more than ATC - automatic
 // pictures and threat calls - so the cheaper model).
 func gciVoice() voiceProfile {
 	return voiceProfile{voice: flagGCIVoice, speed: flagTTSSpeed, instructions: styleGCI,

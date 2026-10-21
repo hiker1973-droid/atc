@@ -2,7 +2,7 @@
 
 > **2026-10-21: built a different way.** Instead of the from-scratch GCI below, atc.exe now runs
 > SkyEye's own GCI brain (vendored in `pkg/gci`, MIT, `tools/gci-vendor/vendor_skyeye.py`) with our
-> ears and voice: `--gci-only` (`cmd/atc/gci.go`), ElevenLabs "Spartan" on Flash. Darkstar 264.000 on
+> ears and voice: `--gci-only` (`cmd/atc/gci.go`), ElevenLabs "Lily" (British woman) on Flash. Darkstar 264.000 on
 > Day and Night (`start_gci_caucasus.bat`), Overlord 266.000 on Foothold (`start_gci_syria.bat`).
 > Neither bat is in its region bat yet: skyeye.exe still answers on those frequencies. Voice sample:
 > `atc.exe --gci-only --gci-sample <dir>`. The plan below is kept for its ideas (shared ATC state).

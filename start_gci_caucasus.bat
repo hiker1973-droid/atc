@@ -25,7 +25,7 @@ set GOMEMLIMIT=256MiB
 
 :: GCI -- Darkstar 264.000 AM (Day and Night; operator 2026-10-21). SkyEye's
 :: GCI brain inside atc.exe (pkg/gci, cmd/atc/gci.go) with our voice: ElevenLabs
-:: "Spartan" on Flash, OpenAI onyx as the fallback.
+:: "Lily" (British woman) on Flash, OpenAI shimmer as the fallback.
 ::
 :: NOT part of start_region_caucasus.bat: skyeye.exe answers on 264.000 too, and
 :: two GCIs on one frequency talk over each other. Stop skyeye.exe on this rig
