@@ -122,3 +122,26 @@ func TestSyriaGrid(t *testing.T) {
 		t.Error("low jet over the sea off Latakia masked")
 	}
 }
+
+// The embedded Kola grid (zoom-7 tiles): an AWACS over the Vestfjord at
+// 25,000 ft loses a jet at 1,500 ft in the Bardufoss valleys behind the
+// Norwegian mountains and sees it at 20,000 ft; a jet low over the sea north
+// of Tromso stays in sight.
+func TestKolaGrid(t *testing.T) {
+	g, err := ForMap("kola")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := g.HeightM(67.822, 20.337); h < 400 || h > 520 {
+		t.Errorf("Kiruna %.0f m, want ~459", h)
+	}
+	if g.Visible(68.4, 15.0, 25000, 68.6, 18.5, 1500) {
+		t.Error("low jet near Bardufoss visible over the mountains")
+	}
+	if !g.Visible(68.4, 15.0, 25000, 68.6, 18.5, 20000) {
+		t.Error("high jet near Bardufoss masked")
+	}
+	if !g.Visible(69.5, 16.0, 25000, 70.0, 19.0, 500) {
+		t.Error("low jet over the sea north of Tromso masked")
+	}
+}

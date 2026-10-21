@@ -90,7 +90,7 @@ func registerGCIFlags(f *flag.FlagSet) {
 	f.BoolVar(&flagGCICoverage, "gci-awacs-coverage", true,
 		"The GCI sees only what the mission's AWACS could (radar horizon + type range); off station with no AWACS up (gci_coverage.go)")
 	f.BoolVar(&flagGCITerrain, "gci-terrain", true,
-		"With --gci-awacs-coverage: terrain masks the AWACS radar, on maps with a height grid (pkg/terrain: caucasus, syria)")
+		"With --gci-awacs-coverage: terrain masks the AWACS radar, on maps with a height grid (pkg/terrain: caucasus, syria, kola)")
 	f.StringVar(&flagCommandGCIName, "command-gci-name", "",
 		`With --command-only: after "fence in", Command adds "<name> is up on <freq> for picture" ("" = off)`)
 	f.Float64Var(&flagCommandGCIFreq, "command-gci-freq", 0, "With --command-gci-name: the GCI frequency in MHz")

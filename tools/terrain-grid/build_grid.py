@@ -36,6 +36,10 @@ THEATRES = {
     "kola": (64.0, 72.0, 10.0, 36.0),
 }
 
+# Tile zoom per theatre: Kola at zoom 7 (90 tiles, not 323 at zoom 8); at 68 N a
+# zoom-7 pixel is still ~460 m, finer than the 0.01-degree grid.
+ZOOMS = {"kola": 7}
+
 
 def tile_xy(lat, lon, z):
     n = 2 ** z
@@ -64,17 +68,18 @@ def build(name):
     lats = lat0 + STEP * np.arange(rows)
     lons = lon0 + STEP * np.arange(cols)
     # Every tile the grid touches.
-    xa, ya = tile_xy(lat1, lon0, ZOOM)
-    xb, yb = tile_xy(lat0, lon1, ZOOM)
+    zoom = ZOOMS.get(name, ZOOM)
+    xa, ya = tile_xy(lat1, lon0, zoom)
+    xb, yb = tile_xy(lat0, lon1, zoom)
     tiles = {}
     for tx in range(int(xa), int(xb) + 1):
         for ty in range(int(ya), int(yb) + 1):
-            tiles[(tx, ty)] = tile(ZOOM, tx, ty)
-    print("%s: %d tiles at zoom %d, grid %d x %d" % (name, len(tiles), ZOOM, rows, cols))
+            tiles[(tx, ty)] = tile(zoom, tx, ty)
+    print("%s: %d tiles at zoom %d, grid %d x %d" % (name, len(tiles), zoom, rows, cols))
     out = np.zeros((rows, cols), dtype=np.int16)
     for r, lat in enumerate(lats):
         for c, lon in enumerate(lons):
-            fx, fy = tile_xy(lat, lon, ZOOM)
+            fx, fy = tile_xy(lat, lon, zoom)
             tx, ty = int(fx), int(fy)
             px = min(int((fx - tx) * 256), 255)
             py = min(int((fy - ty) * 256), 255)

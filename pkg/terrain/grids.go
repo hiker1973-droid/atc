@@ -8,8 +8,8 @@ import (
 )
 
 // The grids built by tools/terrain-grid/build_grid.py, embedded so a rig needs
-// nothing but atc.exe. Caucasus + Syria 2026-10-21 (1.4 + 1.0 MB, 0.01 deg); Kola
-// to follow.
+// nothing but atc.exe, all 0.01 deg, 2026-10-21: Caucasus 1.4 MB, Syria 1.0 MB,
+// Kola 1.6 MB (zoom-7 tiles: peaks read low, valleys and ridgelines hold).
 //
 //go:embed grids/*.grid.gz
 var grids embed.FS
