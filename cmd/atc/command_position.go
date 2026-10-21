@@ -59,6 +59,14 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 	if resp := wrongRadioMarshal(text, callsign, channelName); resp != "" {
 		return resp
 	}
+	// "302 ejecting", "Raider 301, 302 is down" (combat_calls.go).
+	var byNumber func(string) string
+	if store != nil {
+		byNumber = store.CallsignByNumber
+	}
+	if who, ok := downedCallsign(text, byNumber); ok {
+		return downReply(channelName, who)
+	}
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
 	}
@@ -87,7 +95,9 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 }
 
 var (
-	foxRe     = regexp.MustCompile(`\bfox[\s-]*(1|2|3|one|two|three)\b`)
+	// No \b after the number: Whisper writes "Fox 3, 11 for 56" as "Fox 311"
+	// (Day 2026-10-21 16:43, an intent miss).
+	foxRe     = regexp.MustCompile(`\bfox[\s-]*(one|two|three|1|2|3)`)
 	splashRe  = regexp.MustCompile(`\bsplash(ed)?\b`)
 	bareNumRe = regexp.MustCompile(`^(\d{2,3})\b`)
 	// The attack calls a pilot makes to Command when no JTAC is up (Day

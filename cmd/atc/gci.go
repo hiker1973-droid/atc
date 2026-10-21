@@ -402,6 +402,11 @@ func runGCI(ctx context.Context, apiKey string) {
 				}
 				return "", reply
 			}
+			// "302 Fox 3 ...", "302 splash", "302 ejecting": no address needed.
+			if kind, reply := gciCombatCall(text, cs, store.CallsignByNumber); kind != "" {
+				log.Info().Str("text", text).Str("kind", kind).Msg("GCI: " + kind + " call")
+				return "", reply
+			}
 			if t := gciAliases(text); t != text {
 				log.Info().Str("text", text).Str("as", t).Msg("GCI: fast / slow movers -> bogey dope")
 				text = t
