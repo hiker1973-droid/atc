@@ -385,3 +385,22 @@ func TestDeckbossCallsignFlown20261015(t *testing.T) {
 		t.Errorf("callsign = %q, want Raider 302", got)
 	}
 }
+
+// Day 2026-10-20 (Training 1): one jet held two cats under two spellings of its
+// modex, and two acks read back a garbled address as part of the callsign.
+func TestDeckbossCallsignFlown20261020(t *testing.T) {
+	cases := []struct{ text, want string }{
+		{"Deck boss, Raider 3-0-2, green jet.", "Raider 302"},
+		{"Deck boss, Raider 302, green jet.", "Raider 302"},
+		{"TechOps Raider 319 airborne.", "Raider 319"},
+		{"Deck boss ready 303, airborne.", "Raider 303"},
+		{"Tech boss, Raider 302 airborne.", "Raider 302"},
+		{"Deck boss Raider 031 under tension cat 4.", "Raider 031"},
+		{"Deck boss, Raider 319, Greenjet, request taxi.", "Raider 319"},
+	}
+	for _, tc := range cases {
+		if got := deckbossCallsign(tc.text); got != tc.want {
+			t.Errorf("deckbossCallsign(%q) = %q, want %q", tc.text, got, tc.want)
+		}
+	}
+}

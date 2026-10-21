@@ -217,14 +217,73 @@ func TestLSODeckFoul(t *testing.T) {
 	if tv.deckFoul(now, "") {
 		t.Error("parked for 2 min: want clear")
 	}
-	tv.onDeck["a1"] = [2]time.Time{now.Add(-20 * time.Second), now.Add(-5 * time.Second)}
+	// Stopped on the deck: Tacview sends nothing while it doesn't move.
+	tv.onDeck["a1"] = [2]time.Time{now.Add(-20 * time.Second), now.Add(-15 * time.Second)}
+	if !tv.deckFoul(now, "") {
+		t.Error("stopped on the wires, no update for 15 s: want foul")
+	}
+	tv.onDeck["a1"] = [2]time.Time{now.Add(-20 * time.Minute), now.Add(-11 * time.Minute)}
 	if tv.deckFoul(now, "") || len(tv.onDeck) != 0 {
-		t.Error("left the area 5 s ago: want clear and forgotten")
+		t.Error("no update for 11 min: want clear and forgotten")
 	}
 	// Over the ramp the landing jet itself is in the area (every trap in the
 	// 2026-10-17 Day recording was waved off "foul deck" by itself).
 	tv.onDeck["a2"] = [2]time.Time{now.Add(-time.Second), now}
 	if tv.deckFoul(now, "a2") {
 		t.Error("only the landing jet itself: want clear")
+	}
+}
+
+// Raider 303 parked on the edge of the landing area, Day 2026-10-20
+// 19:12-19:22, with Tacview updates seconds apart: once parked he stays
+// parked, and the logged deck state doesn't flip with whose update came in.
+func TestLSODeckFoulParkedSparse(t *testing.T) {
+	tv := newLSOTacview(newLSOFeed(lso.NimitzParams(), func(lso.Call) {}))
+	t0 := time.Date(2026, 10, 20, 19, 12, 30, 0, time.UTC)
+	tv.onDeck["303"] = [2]time.Time{t0, t0}
+	for i := 1; i <= 120; i++ { // ten minutes, an update every 5 s
+		now := t0.Add(time.Duration(i) * 5 * time.Second)
+		seen := tv.onDeck["303"]
+		seen[1] = now
+		tv.onDeck["303"] = seen
+		foul := tv.deckFoul(now, "319")
+		if parked := now.Sub(t0) >= foulMaxAge; foul == parked {
+			t.Fatalf("t+%v: foul for 319 = %v", now.Sub(t0), foul)
+		}
+		if tv.deckFoul(now, "303") {
+			t.Fatalf("t+%v: 303 fouls his own pass", now.Sub(t0))
+		}
+		if tv.lastFoul != !(now.Sub(t0) >= foulMaxAge) {
+			t.Fatalf("t+%v: logged deck state %v flips with the caller", now.Sub(t0), tv.lastFoul)
+		}
+	}
+}
+
+// After the ball the newest call wins and the call just said is not said again.
+func TestLSOQueueFlown20261020(t *testing.T) {
+	q := make(chan lsoTX, 8)
+	now := time.Now()
+	for _, c := range []string{"A little high.", "A little high.", "Right for lineup.", "Come left."} {
+		q <- lsoTX{text: c, queued: now}
+	}
+	first := <-q
+	if got := lsoLatest(first, q); got.text != "Come left." || len(q) != 0 {
+		t.Errorf("latest = %q, %d left", got.text, len(q))
+	}
+	wo := string(lso.FoulDeckCall("Raider 319"))
+	q <- lsoTX{text: wo, queued: now}
+	q <- lsoTX{text: "Come left.", queued: now}
+	if got := lsoLatest(lsoTX{text: "Power!", queued: now}, q); got.text != wo {
+		t.Errorf("wave-off lost behind %q", got.text)
+	}
+	last := lsoTX{text: "A little high.", queued: now}
+	if !lsoRepeat(lsoTX{text: "A little high."}, last, now.Add(time.Second)) {
+		t.Error("same call 1 s after: want dropped")
+	}
+	if lsoRepeat(lsoTX{text: "A little high."}, last, now.Add(3*time.Second)) {
+		t.Error("same call 3 s after: want said")
+	}
+	if lsoRepeat(lsoTX{text: wo}, lsoTX{text: wo, queued: now}, now) {
+		t.Error("wave-off repeated: want said")
 	}
 }

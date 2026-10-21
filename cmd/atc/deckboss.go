@@ -28,7 +28,32 @@ var deckbossAddrPrefixes = []string{"deckboss", "deck boss", "duck boss", "duckb
 	"dark boss", "darkboss", "black boss", "blackboss",
 	// DCS3 2026-10-15 14:49:43: "Tac boss, Raider 302 airborne" was answered
 	// "Tac boss, Deckboss, copy airborne".
-	"tac boss", "tacboss", "tack boss", "tackboss"}
+	"tac boss", "tacboss", "tack boss", "tackboss",
+	// Day 2026-10-20 18:31:39: "TechOps Raider 319 airborne." was answered
+	// "TechOps Raider 319 airborne., Deckboss, copy airborne".
+	"techops", "tech ops", "tech-ops"}
+
+// deckbossCallsign is the caller's callsign as Deckboss keys its cats.
+//
+// Day 2026-10-20: Raider 302 checked in as "Raider 302" (cat 3) and again as
+// "Raider 3-0-2" (cat 1). Deckboss held both, cleared cat 3 after the launch
+// and kept cat 1 for 53 minutes until the stale-slot reclaim, so the digits
+// are folded back into one modex. The same night "Deck boss ready 303,
+// airborne" was answered "ready 303, Deckboss": "ready" is Whisper's
+// "Raider". Anything left in front of the "<word> <modex>" pair is a garbled
+// address and is dropped.
+func deckbossCallsign(text string) string {
+	cs := joinCallsignDigits(extractCallsignSkippingAddress(text, deckbossAddrPrefixes...))
+	f := strings.Fields(cs)
+	if n := len(f); n >= 2 && isAllDigits(f[n-1]) {
+		f = f[n-2:]
+		if strings.EqualFold(f[0], "ready") {
+			f[0] = "Raider"
+		}
+		return strings.Join(f, " ")
+	}
+	return cs
+}
 
 // catNumRe captures the cat number from "cat 1" / "CAT 2" / "cat3".
 var catNumRe = regexp.MustCompile(`\bcat\s*(\d)\b`)
@@ -549,7 +574,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 							}
 							text = srsCorrect(text, origin)
 							log.Info().Str("text", text).Msg("Deckboss heard")
-							cs := extractCallsignSkippingAddress(text, deckbossAddrPrefixes...)
+							cs := deckbossCallsign(text)
 							handleDeckbossCall(text, cs)
 						}(frames)
 					}

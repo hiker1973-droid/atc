@@ -111,6 +111,44 @@ func lsoMaxAge(text string) time.Duration {
 	return 1500 * time.Millisecond
 }
 
+// After the ball the tracker may make a call every second, which is faster
+// than one radio call takes to say: on Day 2026-10-20 19:15 Raider 319 heard
+// "Right for lineup" four times and "A little high" six, up to 1.8 s late,
+// with three more dropped as too late. So the radio says the newest call in
+// the queue (a wave-off or bolter call first, whatever is newer), and not the
+// call it has just finished saying.
+const lsoRepeatGap = 2500 * time.Millisecond
+
+func lsoUrgent(text string) bool {
+	return lso.IsWaveOff(lso.Call(text)) || lso.Call(text) == lso.CallBolter
+}
+
+// lsoLatest takes everything waiting behind tx and returns the call to say.
+func lsoLatest(tx lsoTX, q chan lsoTX) lsoTX {
+	for {
+		select {
+		case nx := <-q:
+			switch {
+			case lsoUrgent(tx.text) && !lsoUrgent(nx.text):
+				log.Info().Str("text", nx.text).Msg("Paddles: call dropped, wave-off first")
+			default:
+				if !lsoUrgent(tx.text) {
+					log.Info().Str("text", tx.text).Msg("Paddles: call dropped, superseded")
+				}
+				tx = nx
+			}
+		default:
+			return tx
+		}
+	}
+}
+
+// lsoRepeat: tx is the call just said, again, too soon to be news. Wave-offs
+// are always repeated.
+func lsoRepeat(tx, last lsoTX, now time.Time) bool {
+	return !lsoUrgent(tx.text) && tx.text == last.text && now.Sub(last.queued) < lsoRepeatGap
+}
+
 func runLSO(ctx context.Context, apiKey string) {
 	vp := lsoVoice()
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
@@ -125,11 +163,17 @@ func runLSO(ctx context.Context, apiKey string) {
 
 	txq := make(chan lsoTX, 8)
 	go func() {
+		var last lsoTX // the call last transmitted, queued = when it ended
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case tx := <-txq:
+				tx = lsoLatest(tx, txq)
+				if lsoRepeat(tx, last, time.Now()) {
+					log.Info().Str("text", tx.text).Msg("Paddles: call dropped, just said")
+					continue
+				}
 				if age := time.Since(tx.queued); age > lsoMaxAge(tx.text) {
 					log.Info().Str("text", tx.text).Dur("late", age).Msg("Paddles: call dropped, too late")
 					continue
@@ -142,6 +186,7 @@ func runLSO(ctx context.Context, apiKey string) {
 				log.Info().Str("text", tx.text).Float64("freq", flagLSOFreq).Dur("lag", time.Since(tx.queued)).Msg("Paddles TX")
 				noteOwnTX(flagLSOFreq, tx.text)
 				transmitExternalAudioFile(ctx, mp3, flagLSOFreq, flagLSOName, srsHost, srsPort, flagExternalAudio)
+				last = lsoTX{text: tx.text, queued: time.Now()}
 			}
 		}
 	}()
@@ -332,7 +377,17 @@ type lsoTacview struct {
 	lastFoul bool
 }
 
-const foulMaxAge = 90 * time.Second
+const (
+	foulMaxAge = 90 * time.Second
+	// onDeckKeep: a jet stays on the landing area at its last known position
+	// until Tacview shows it outside, removes it, or this long passes with no
+	// update. Tacview sends a position only when it changes, so the old rule
+	// ("not seen for 3 s = gone") forgot a jet stopped on the deck: Raider 303,
+	// parked on the edge of the area (Day 2026-10-20 19:12-19:22), kept
+	// re-entering it as new, fouled the deck for another 90 s each time, and
+	// the log flipped foul/clear several times a second.
+	onDeckKeep = 10 * time.Minute
+)
 
 func newLSOTacview(feed *lsoFeed) *lsoTacview {
 	return &lsoTacview{feed: feed, objs: make(map[string]*lsoObj), onDeck: make(map[string][2]time.Time), now: time.Now}
@@ -374,6 +429,7 @@ func (t *lsoTacview) handleLine(line string) {
 	}
 	if strings.HasPrefix(line, "-") {
 		delete(t.objs, strings.TrimPrefix(line, "-"))
+		delete(t.onDeck, strings.TrimPrefix(line, "-"))
 		return
 	}
 	id, rest, ok := strings.Cut(line, ",")
@@ -508,26 +564,33 @@ func (t *lsoTacview) handleLine(line string) {
 // deckFoul: something other than the jet in the groove (self) has been on the
 // landing area in the last 3 s, and not so long that it is parked there. Over
 // the ramp the landing jet itself is inside the area.
+//
+// The return value excludes self; the logged deck state does not, so the log
+// changes when the deck does, not each time a different jet's update arrives.
 func (t *lsoTacview) deckFoul(now time.Time, self string) bool {
-	foul := ""
+	foulForSelf, anyFoul := false, ""
 	for id, seen := range t.onDeck {
 		switch {
-		case now.Sub(seen[1]) > 3*time.Second:
+		case now.Sub(seen[1]) > onDeckKeep:
 			delete(t.onDeck, id) // left the picture
-		case id == self:
-		case now.Sub(seen[0]) < foulMaxAge:
-			foul = id
+		case now.Sub(seen[0]) >= foulMaxAge:
+			// parked
+		default:
+			anyFoul = id
+			if id != self {
+				foulForSelf = true
+			}
 		}
 	}
-	if (foul != "") != t.lastFoul {
-		t.lastFoul = foul != ""
+	if (anyFoul != "") != t.lastFoul {
+		t.lastFoul = anyFoul != ""
 		name := ""
-		if o := t.objs[foul]; o != nil {
+		if o := t.objs[anyFoul]; o != nil {
 			name = o.pilot
 		}
 		log.Info().Bool("foul", t.lastFoul).Str("by", name).Msg("Paddles: landing area")
 	}
-	return t.lastFoul
+	return foulForSelf
 }
 
 // runLSOTacview mirrors runMiniTacview's connection and handshake.

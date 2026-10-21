@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"bufio"
 	"context"
 	"encoding/binary"
@@ -191,7 +192,10 @@ const (
 // position 3, angels 2" (flown on DCS3 2026-10-14, missed twice). Our own ack
 // "<callsign>, Union Marshal, entering stack at angels ..." leads with the
 // callsign, so the address guard still drops it as an echo.
-var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b|\bentering (?:the )?stack\b`)
+//
+// "Raider 303 overhead, angels 2" (Day 2026-10-20 19:02:00, an intent miss) is
+// the same report.
+var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b|\bentering (?:the )?stack\b|\boverhead\b.*\bangels?\b`)
 
 // brcWordRe catches a BRC question however it's phrased: "BRC", "B R C",
 // "B.R.C.", and Whisper's "VRC".
@@ -662,19 +666,23 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		log.Info().Str("callsign", cs).Str("text", text).Msg("Marshal: stack call without the address - accepted")
 		callsign = cs
 	}
+	fuelState := extractFuelStateMarshal(lower)
+	if fuelState == 0 {
+		fuelState = bareMarshalState(lower)
+	}
+	intent := classifyMarshalCall(lower, fuelState)
+	if marshalResolvesAlias(intent) {
+		callsign = resolveStackCallsign(callsign, lower, stack) // marshal_alias.go
+	}
 	// Every response leads with the callsign. Without one the TX would open
 	// ", Union Marshal, …" and its echo would pass the guard above.
 	if callsign == "" {
 		log.Info().Str("text", text).Msg("Marshal: no callsign in call — ignored")
 		return
 	}
-	fuelState := extractFuelStateMarshal(lower)
-	if fuelState == 0 {
-		fuelState = bareMarshalState(lower)
-	}
 	ceilingFt, altimeter := atcCtrl.GetWeatherState()
 	visNm := atcCtrl.GetVisibilityNm()
-	switch classifyMarshalCall(lower, fuelState) {
+	switch intent {
 	case marshalRadioCheck:
 		log.Info().Str("callsign", callsign).Msg("Marshal: radio check")
 		transmit(comp.RadioCheck(callsign))
@@ -781,6 +789,22 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		transmit(comp.MarshalCopyState(callsign, fuelState))
 
 	case marshalEstablished:
+		if _, ok := stack.GetAircraft(callsign); !ok {
+			// A jet in the stack that never marked mom's with us. It used to
+			// be acked "angels six, position one" and held nowhere, so it
+			// never got Charlie. Put it in the stack at the angels it reports
+			// (or the next free one) so the Charlie watcher can see it.
+			stack.Enqueue(callsign, fuelState)
+			angels := 0
+			if m := angelsInCallRe.FindStringSubmatch(lower); m != nil {
+				angels, _ = strconv.Atoi(m[1])
+			}
+			if angels < marshalMinAngels || angels > marshalMaxAngels {
+				angels = atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, stack.ReservedAngels(callsign))
+			}
+			stack.SetAngels(callsign, angels)
+			log.Info().Str("callsign", callsign).Int("angels", angels).Msg("Marshal: established without marking mom's - added to the stack")
+		}
 		stack.SetPhase(callsign, "holding")
 		angels := 6
 		position := 1
