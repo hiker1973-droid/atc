@@ -174,7 +174,50 @@ func (c *ATCController) noteFlight(req *ATCRequest) (wingman bool) {
 			}
 		}
 	}
-	return false
+	// "Raider 301, flight of two, full stop" and then "Raider 302, final":
+	// an unnamed wingman is the jet flying with a lead whose flight has a
+	// free place. Positions are read with flightsMu released (lock order
+	// allPositionsMu -> flightsMu, see isFlightWingman).
+	var open []string
+	for _, f := range c.flights {
+		if f.size > len(f.wingmen)+1 && callsignName(f.lead) == callsignName(req.Callsign) {
+			open = append(open, f.lead)
+		}
+	}
+	if len(open) == 0 {
+		return false
+	}
+	c.flightsMu.Unlock()
+	lead := c.closeLead(req.Callsign, open)
+	c.flightsMu.Lock()
+	f := c.flights[compactCallsign(lead)]
+	if lead == "" || f == nil || f.size <= len(f.wingmen)+1 {
+		return false
+	}
+	f.wingmen = append(append([]string(nil), f.wingmen...), req.Callsign)
+	f.at = now
+	drop = append(drop, req.Callsign)
+	log.Info().Str("wingman", req.Callsign).Str("lead", f.lead).Msg("tower: unnamed wingman joined his flight (flying with the lead)")
+	req.Callsign = f.lead
+	return true
+}
+
+// closeLead is the lead in leads flying within flightJoinNm of callsign, or "".
+func (c *ATCController) closeLead(callsign string, leads []string) string {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	me := c.lookupContact(callsign)
+	if me == nil || time.Since(me.UpdatedAt) > contactFreshFor {
+		return ""
+	}
+	for _, l := range leads {
+		lc := c.lookupContact(l)
+		if lc != nil && time.Since(lc.UpdatedAt) <= contactFreshFor &&
+			haversineNm(orb.Point{lc.Lon, lc.Lat}, orb.Point{me.Lon, me.Lat}) <= flightJoinNm {
+			return l
+		}
+	}
+	return ""
 }
 
 // flightOf returns the live flight led by callsign, or nil (single ship).

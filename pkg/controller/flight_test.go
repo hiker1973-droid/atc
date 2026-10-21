@@ -146,3 +146,32 @@ func TestFlightWingmanNotUnknown(t *testing.T) {
 		t.Error("a stranger 4 nm away counted as a wingman")
 	}
 }
+
+// Operator 2026-10-21: "also arrivals, flight of 2 full stop". The lead's
+// "flight of two, full stop" clears the flight to land; the wingman, never
+// named, calls final and is answered as the flight because he is flying with
+// the lead. A jet of the same squadron miles away is not taken in.
+func TestFlightOfTwoFullStop(t *testing.T) {
+	c, sent, handle := departureController(t)
+	last := func() string { return (*sent)[len(*sent)-1] }
+	putContact(c, "Raider 301", airplane, 2, testFieldElevFt+800)
+	putContact(c, "Raider 302", airplane, 2.3, testFieldElevFt+800)
+	putContact(c, "Raider 310", airplane, 9, testFieldElevFt+3000)
+
+	handle("Test Tower, Raider 301, flight of 2, full stop")
+	if got := last(); !strings.HasPrefix(got, "Raider 301 flight, ") || !strings.Contains(got, "flight of two") ||
+		!strings.Contains(got, "cleared to land") {
+		t.Errorf("flight of 2 full stop -> %q", got)
+	}
+	handle("Test Tower, Raider 302, final, gear down, full stop")
+	if got := last(); !strings.HasPrefix(got, "Raider 301 flight, ") {
+		t.Errorf("unnamed wingman on final -> %q, want the flight", got)
+	}
+	handle("Test Tower, Raider 310, 9 miles, inbound full stop")
+	if got := last(); !strings.HasPrefix(got, "Raider 310, ") {
+		t.Errorf("another Raider 9 nm out -> %q, want his own reply", got)
+	}
+	if f := c.flightOf("Raider 301"); f == nil || len(f.wingmen) != 1 || f.wingmen[0] != "Raider 302" {
+		t.Errorf("flight %+v, want Raider 302 as the wingman", f)
+	}
+}
