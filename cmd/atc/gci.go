@@ -86,9 +86,20 @@ const styleGCI = "Speak as an AWACS weapons controller on a tactical net, a Brit
 // gciVoice: Lily on Flash (GCI talks far more than ATC - automatic
 // pictures and threat calls - so the cheaper model).
 func gciVoice() voiceProfile {
-	return voiceProfile{voice: flagGCIVoice, speed: flagTTSSpeed, instructions: styleGCI,
-		eleven: elevenVoice{ID: flagElevenGCIVoice, Name: flagGCICallsign, Stability: 0.55, Style: 0.25, Speed: 1.05, Model: elFlash}}
+	return voiceProfile{voice: flagGCIVoice, speed: flagTTSSpeed * gciSpeedUp, instructions: styleGCI,
+		eleven: elevenVoice{ID: flagElevenGCIVoice, Name: flagGCICallsign, Stability: 0.55, Style: 0.25,
+			Speed: gciBaseSpeed, Tempo: gciSpeedUp, Model: elFlash}}
 }
+
+// gciSpeedUp: operator 2026-10-21 "speed up 30%" on the Lily sample, which
+// was ElevenLabs speed gciBaseSpeed. ElevenLabs stops at 1.2 and its speed is
+// not linear (1.05 -> 1.2 plus a 1.14 stretch came out 1.7x faster), so the
+// delivery stays the one heard at gciBaseSpeed and is time-stretched exactly
+// 1.30 (Tempo, pitch kept).
+const (
+	gciBaseSpeed = 1.05
+	gciSpeedUp   = 1.30
+)
 
 // gciSRSBook is the SRS client list the GCI's controller and radar read
 // (who is on frequency). voiceNetLoop feeds it from its SRS connection.

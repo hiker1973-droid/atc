@@ -38,6 +38,10 @@ type elevenVoice struct {
 	Style     float64
 	Speed     float64
 	Model     string // "" = --elevenlabs-model
+	// Tempo > 1 speeds the clip up further after synthesis (ffmpeg atempo,
+	// pitch kept): ElevenLabs stops at speed 1.2 and is not linear; the GCI
+	// keeps its 1.05 delivery and is stretched 1.30.
+	Tempo float64
 }
 
 // Stock ElevenLabs voices (present on every account, free tier included).
@@ -256,5 +260,32 @@ func speakElevenLabs(ctx context.Context, text string, v voiceProfile) ([]byte, 
 		return nil, false
 	}
 	log.Debug().Str("voice", v.eleven.Name).Int64("ms", time.Since(start).Milliseconds()).Msg("ElevenLabs TTS")
+	if v.eleven.Tempo > 1 {
+		if fast, err := tempoMP3(mp3, v.eleven.Tempo); err != nil {
+			log.Warn().Err(err).Str("voice", v.eleven.Name).Msg("tempo change failed - sending at ElevenLabs speed")
+		} else {
+			mp3 = fast
+		}
+	}
 	return mp3, true
+}
+
+// tempoMP3 plays mp3 tempo times faster, pitch unchanged (ffmpeg atempo takes 0.5-2).
+func tempoMP3(mp3 []byte, tempo float64) ([]byte, error) {
+	in, err := os.CreateTemp("", "atc-tempo-*.mp3")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(in.Name())
+	if _, err := in.Write(mp3); err != nil {
+		in.Close()
+		return nil, err
+	}
+	in.Close()
+	out := in.Name() + ".fast.mp3"
+	defer os.Remove(out)
+	if err := runAudioFilter(flagFFmpeg, in.Name(), out, fmt.Sprintf("[0:a]atempo=%.4f[out]", tempo)); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(out)
 }
