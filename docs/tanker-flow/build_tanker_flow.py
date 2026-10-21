@@ -20,8 +20,8 @@ from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Table
 HERE = os.path.dirname(os.path.abspath(__file__))
 BUILD = "SkyEye 823cf86, 20 Oct 2026"
 OUT_NAME = "Texaco Tanker Comms Flow.pdf"
-DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation",
-           r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev"]
+# Documentation only: the second copy in the folder root went with the 2026-10-21 tidy.
+DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"]
 
 ss = getSampleStyleSheet()
 NAVY = colors.HexColor("#1f3350")

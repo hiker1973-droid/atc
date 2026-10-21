@@ -684,7 +684,22 @@ def build():
     d.pdf.save(out, deflate=True, garbage=3)
     if os.path.isdir(DESKTOP_COPY):
         shutil.copy2(out, os.path.join(DESKTOP_COPY, OUT_NAME))
+        retire_old_versions(DESKTOP_COPY, "vSFG7_ATC_Phraseology_", OUT_NAME)
     print("PDF %d pages, %d phrases -> %s (%.1f MB)" % (d.n, len(PHRASES), out, os.path.getsize(out) / 1e6))
+
+
+def retire_old_versions(folder, prefix, keep):
+    """Move older versions of this PDF in the Desktop Documentation folder to its Old\
+    (what was done by hand at every version; operator 2026-10-21 tidy)."""
+    old = os.path.join(folder, "Old")
+    for f in os.listdir(folder):
+        if f.startswith(prefix) and f.endswith(".pdf") and f != keep:
+            os.makedirs(old, exist_ok=True)
+            dst = os.path.join(old, f)
+            if os.path.exists(dst):
+                os.remove(os.path.join(folder, f))
+            else:
+                shutil.move(os.path.join(folder, f), dst)
 
 
 if __name__ == "__main__":

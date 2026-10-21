@@ -94,7 +94,8 @@ import newpilot_kit as NK  # noqa: E402  guards + patch + draw-call recording
 import newpilot_slides as NS  # noqa: E402  the 16:9 PDF
 
 PACKET = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\SkyEye ATC Comms Packet"
+# The pilot handouts folder (2026-10-21 tidy; was Desktop\SkyEye ATC Comms Packet).
+DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 CACHE = os.path.join(PACKET, "_tools", "_cache")
 CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed the PDF
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
@@ -1067,6 +1068,21 @@ def main():
     print("PDF  %d pages  ->  %s (%.1f MB)" % (n, out, os.path.getsize(out) / 1e6))
     if os.path.isdir(DESKTOP_COPY):
         shutil.copy2(out, os.path.join(DESKTOP_COPY, os.path.basename(out)))
+        retire_old_versions(DESKTOP_COPY, "vSFG-7_SkyEye_ATC_Comms_v", os.path.basename(out))
+
+
+def retire_old_versions(folder, prefix, keep):
+    """Move older versions of this PDF in the Desktop Documentation folder to its Old\
+    (what was done by hand at every version; operator 2026-10-21 tidy)."""
+    old = os.path.join(folder, "Old")
+    for f in os.listdir(folder):
+        if f.startswith(prefix) and f.endswith(".pdf") and f != keep:
+            os.makedirs(old, exist_ok=True)
+            dst = os.path.join(old, f)
+            if os.path.exists(dst):
+                os.remove(os.path.join(folder, f))
+            else:
+                shutil.move(os.path.join(folder, f), dst)
 
 
 if __name__ == "__main__":

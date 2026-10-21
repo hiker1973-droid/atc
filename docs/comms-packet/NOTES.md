@@ -127,7 +127,7 @@ release to say "expect handoff at seven" (`404e399`), then "update docs".
 
 The packet now lives in **SkyeyeATC `docs/comms-packet/`** (operator: "make sure we push
 documentation to git"). Build from the repo root: `python -I docs/comms-packet/_tools/build_skyeye_packet.py`;
-it copies the PDF to the Desktop `SkyEye ATC Comms Packet` folder. Old versions are git history.
+it copies the PDF to the Desktop `Documentation` folder and moves the previous version to `Documentation\Old` (2026-10-21 tidy; the old `SkyEye ATC Comms Packet` folder is in `Archive`). Old versions are also git history.
 See `docs/README.md`. Same day, still v1.22 (unreleased):
 - **Marshal 306.300 / COMM 1 CH 3 in every theatre** (operator ruling 2026-09-20, `527c0ed`;
   every `start_marshal*.bat`). v1.21 and the first v1.22 build printed 306.100 / CH 2 for Syria
