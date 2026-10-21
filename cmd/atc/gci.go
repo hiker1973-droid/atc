@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -224,7 +226,7 @@ func gciCompose(comp composer.Composer, call any) (composer.NaturalLanguageRespo
 	case brevity.BogeyDopeResponse:
 		return comp.ComposeBogeyDopeResponse(c), true
 	case brevity.CheckInResponse:
-		return comp.ComposeCheckInResponse(c), true
+		return gciCheckIn(comp, c), true
 	case brevity.DeclareResponse:
 		return comp.ComposeDeclareResponse(c), true
 	case brevity.FadedCall:
@@ -257,6 +259,16 @@ func gciCompose(comp composer.Composer, call any) (composer.NaturalLanguageRespo
 		return comp.ComposeSayAgainResponse(c), true
 	}
 	return composer.NaturalLanguageResponse{}, false
+}
+
+// gciCheckIn answers a plain "checking in". SkyEye's own answer is a joke
+// ("did you want a radio check or an alpha check? Or are you just trying to
+// get my attention? In that case, I'm flattered."); operator 2026-10-21:
+// replace it. The controller only sends this once the callsign is on the
+// scope, so it is radar contact.
+func gciCheckIn(comp composer.Composer, c brevity.CheckInResponse) composer.NaturalLanguageResponse {
+	reply := fmt.Sprintf("%s, %s, radar contact.", strings.ToUpper(c.Callsign), strings.ToUpper(comp.Callsign))
+	return composer.NaturalLanguageResponse{Subtitle: reply, Speech: reply}
 }
 
 // gciSpeak speaks the controller's calls one at a time, in order.

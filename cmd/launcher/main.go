@@ -74,8 +74,12 @@ type Health struct {
 	Tacview   bool      `json:"tacview"`
 	Tacview64 bool      `json:"tacview64"`
 	OpenAI    bool      `json:"openai"`
-	GCI       string    `json:"gci"` // SkyEye GCI: online | offline | absent
+	GCI       string    `json:"gci"` // GCI: online | offline | absent
 	GCIPID    int       `json:"gciPid,omitempty"`
+	// GCIName says which GCI is up: our atc.exe role ("Darkstar (atc.exe)")
+	// or "skyeye.exe". GCIBoth: both at once - they talk over each other.
+	GCIName string `json:"gciName,omitempty"`
+	GCIBoth bool   `json:"gciBoth,omitempty"`
 	At        time.Time `json:"at"`
 }
 
@@ -337,10 +341,49 @@ func updateHealth() {
 		Tacview64: tacview64Probe(),
 		OpenAI:    openaiProbe(3 * time.Second),
 	}
-	h.GCI, h.GCIPID = skyeyeProbe()
+	h.GCI, h.GCIPID, h.GCIName, h.GCIBoth = gciProbe()
 	healthMu.Lock()
 	cachedHealth = h
 	healthMu.Unlock()
+}
+
+// gciProbe reports the rig's GCI: our atc.exe --gci-only role (Darkstar /
+// Overlord, cmd/atc/gci.go, since 2026-10-21) or the old skyeye.exe. With
+// neither running it is "offline" when the GCI role's theatre has other roles
+// running (the rig is flying it, so GCI should be up) or SkyEye is installed,
+// else "absent" - the dev box shows no chip.
+func gciProbe() (status string, pid int, name string, both bool) {
+	rolesMu.Lock()
+	all := make([]Role, len(roles))
+	copy(all, roles)
+	rolesMu.Unlock()
+	pids := detectRunning(all)
+	gciRegions := map[string]bool{}
+	ours := 0
+	for i, r := range all {
+		if !strings.Contains(r.cmd, "--gci-only") {
+			continue
+		}
+		gciRegions[r.Region] = true
+		if pids[i] != 0 && ours == 0 {
+			ours, name = pids[i], r.Name
+		}
+	}
+	sStatus, sPID := skyeyeProbe()
+	switch {
+	case ours != 0 && sStatus == "online":
+		return "online", ours, name + " and skyeye.exe", true
+	case ours != 0:
+		return "online", ours, name, false
+	case sStatus == "online":
+		return "online", sPID, "skyeye.exe", false
+	}
+	for i, r := range all {
+		if pids[i] != 0 && gciRegions[r.Region] && !strings.Contains(r.cmd, "--gci-only") {
+			return "offline", 0, "", false
+		}
+	}
+	return sStatus, 0, "", false
 }
 
 // skyeyeProbe reports whether the SkyEye GCI server is running on this rig:

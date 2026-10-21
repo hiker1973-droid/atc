@@ -59,3 +59,11 @@ func TestGCIComposeCovers(t *testing.T) {
 		t.Error("an unknown call was composed")
 	}
 }
+
+// Operator 2026-10-21: no joke on "checking in".
+func TestGCICheckInPlain(t *testing.T) {
+	r, ok := gciCompose(composer.Composer{Callsign: "Darkstar"}, brevity.CheckInResponse{Callsign: "Raider 1 1"})
+	if !ok || r.Speech != "RAIDER 1 1, DARKSTAR, radar contact." {
+		t.Errorf("check in reply %q", r.Speech)
+	}
+}

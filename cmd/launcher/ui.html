@@ -1411,9 +1411,13 @@ async function refreshHealth() {
     // predates the probe.
     const gci = h && h.gci;
     const chip = $('gciChip');
-    chip.className = 'gci-chip' + (gci === 'online' || gci === 'offline' ? ' ' + gci : '');
-    chip.textContent = gci === 'online' ? 'GCI ONLINE' : 'GCI OFFLINE';
-    chip.title = gci === 'online' ? `SkyEye GCI running (PID ${h.gciPid})` : 'SkyEye GCI installed but not running';
+    // Both our GCI role and skyeye.exe up = two controllers on one frequency.
+    const both = gci === 'online' && h.gciBoth;
+    chip.className = 'gci-chip' + (both ? ' offline' : (gci === 'online' || gci === 'offline' ? ' ' + gci : ''));
+    chip.textContent = both ? 'GCI ×2' : (gci === 'online' ? 'GCI ONLINE' : 'GCI OFFLINE');
+    chip.title = both ? `${h.gciName} both running - stop skyeye.exe, they talk over each other`
+      : gci === 'online' ? `GCI running: ${h.gciName || 'SkyEye'} (PID ${h.gciPid})`
+      : 'GCI not running - start the GCI role (Darkstar / Overlord)';
   } catch {
     $('serverLine').className = 'server-line down';
     $('tv64Badge').className = 'tv64-badge';
