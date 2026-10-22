@@ -35,5 +35,7 @@ __pycache__/
 
 # ElevenLabs usage log written by atc.exe, read by the launcher dashboard
 elevenlabs_usage/
+# fixed TTS lines kept on disk by atc.exe (tts_disk.go)
+tts_cache/
 # one-click update: outcome and build scratch, per rig
 update_last.json

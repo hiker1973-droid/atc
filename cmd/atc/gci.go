@@ -564,7 +564,8 @@ func gciSpeak(ctx context.Context, apiKey string, comp composer.Composer, calls 
 		case <-ctx.Done():
 			return
 		case text := <-say:
-			mp3, err := synthesizeSpeech(ctx, apiKey, text, vp)
+			// "on station" / "off station": the same two lines every day, kept on disk.
+			mp3, err := synthesizeSpeechKept(ctx, apiKey, text, vp)
 			if err != nil {
 				log.Error().Err(err).Str("text", text).Msg("GCI TTS failed")
 				continue
@@ -579,7 +580,11 @@ func gciSpeak(ctx context.Context, apiKey string, comp composer.Composer, calls 
 				log.Debug().Type("call", call.Call).Msg("GCI: nothing to say for call")
 				continue
 			}
-			mp3, err := synthesizeSpeech(ctx, apiKey, resp.Speech, vp)
+			synth := synthesizeSpeech
+			if _, sunrise := call.Call.(brevity.SunriseCall); sunrise {
+				synth = synthesizeSpeechKept // said at every start
+			}
+			mp3, err := synth(ctx, apiKey, resp.Speech, vp)
 			if err != nil {
 				log.Error().Err(err).Str("text", resp.Speech).Msg("GCI TTS failed")
 				continue

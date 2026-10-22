@@ -154,8 +154,10 @@ func runLSO(ctx context.Context, apiKey string) {
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 
 	// Render every fixed call now so a call costs only the ExternalAudio start.
+	// Kept on disk (tts_disk.go): a restart reads them back instead of paying
+	// ElevenLabs again.
 	for _, c := range lso.AllCalls {
-		if _, err := synthesizeSpeech(ctx, apiKey, string(c), lsoVoiceFor(string(c))); err != nil {
+		if _, err := synthesizeSpeechKept(ctx, apiKey, string(c), lsoVoiceFor(string(c))); err != nil {
 			log.Warn().Err(err).Str("text", string(c)).Msg("Paddles: TTS prewarm failed")
 		}
 	}
