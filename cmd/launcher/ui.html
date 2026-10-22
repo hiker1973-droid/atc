@@ -636,6 +636,11 @@ const THEATRES = {
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Black Sea carrier UHF',    roles: ['Deckboss (Caucasus)'],       stopLabel: 'Stop Deckboss' },
       // GCI (cmd/atc/gci.go, 2026-10-21): in start_region_caucasus.bat since skyeye.exe left the servers.
       { id: 'gci',      label: 'AWACS Darkstar', freq: '264.000', extras: 'AWACS 264.000', roles: ['vSFG-7 GCI Darkstar (Caucasus)'], stopLabel: 'Stop AWACS' },
+      // RED side on demand (start_red_caucasus.bat, operator 2026-10-22 BFM night): one bat
+      // starts both, so Start fires it once (start); Stop stops both. Not in the region bat -
+      // an Update stops it and does not bring it back.
+      { id: 'red',      label: 'RED Command + Mozdok', freq: '280.000', extras: 'Red Command 280.000 · Mozdok Tower 266.000 · on demand',
+        roles: ['vSFG-7 Red Command (Caucasus)', 'Mozdok Tower'], start: ['vSFG-7 Red Command (Caucasus)'], stopLabel: 'Stop RED' },
     ],
   },
   germany: {
@@ -857,7 +862,7 @@ function renderCards() {
         <div class="actions">
           ${runAny
             ? `<button class="btn stop" onclick="stopGroup(${JSON.stringify(c.roles).replace(/"/g,'&quot;')})">${esc(c.stopLabel)}</button>`
-            : `<button class="btn start" onclick="startGroup(${JSON.stringify(c.roles).replace(/"/g,'&quot;')})">Start</button>`}
+            : `<button class="btn start" onclick="startGroup(${JSON.stringify(c.start || c.roles).replace(/"/g,'&quot;')})">Start</button>`}
         </div>
       </div>`);
   }
