@@ -67,6 +67,26 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 	if who, ok := downedCallsign(text, byNumber); ok {
 		return downReply(who)
 	}
+	// "I'm hit", "battle damage", "mayday": the nearest field (emergency_divert.go).
+	if isDamagedCall(strings.ToLower(text)) {
+		who := callsign
+		if m := bareNumRe.FindStringSubmatch(who); m != nil {
+			who = m[1]
+			if byNumber != nil {
+				if full := byNumber(m[1]); full != "" {
+					who = full
+				}
+			}
+		}
+		if who != "" {
+			var pos orb.Point
+			var ok bool
+			if store != nil {
+				pos, ok = store.Get(who)
+			}
+			return divertReply(who, channelName, pos, ok, airfield.FieldsForMap(flagMap))
+		}
+	}
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {
 		return resp
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	flag "github.com/spf13/pflag"
 
+	"github.com/vsfg7/atc/pkg/airfield"
 	"github.com/vsfg7/atc/pkg/gci/brevity"
 	"github.com/vsfg7/atc/pkg/gci/callsigns"
 	"github.com/vsfg7/atc/pkg/gci/coalitions"
@@ -406,6 +407,14 @@ func runGCI(ctx context.Context, apiKey string) {
 			if kind, reply := gciCombatCall(text, cs, store.CallsignByNumber); kind != "" {
 				log.Info().Str("text", text).Str("kind", kind).Msg("GCI: " + kind + " call")
 				return "", reply
+			}
+			// "I'm hit", "battle damage", "mayday": the nearest field (emergency_divert.go).
+			if isDamagedCall(strings.ToLower(text)) {
+				if who, ok := leadCallsign(text, store.CallsignByNumber); ok {
+					pos, have := store.Get(who)
+					log.Info().Str("text", text).Str("callsign", who).Bool("onScope", have).Msg("GCI: damaged - nearest field")
+					return "", divertReply(gciSpoken(who), strings.ToUpper(cs), pos, have, airfield.FieldsForMap(flagMap))
+				}
 			}
 			if t := gciAliases(text); t != text {
 				log.Info().Str("text", text).Str("as", t).Msg("GCI: fast / slow movers -> bogey dope")
