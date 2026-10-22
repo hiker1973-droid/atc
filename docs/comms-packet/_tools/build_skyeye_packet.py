@@ -1348,6 +1348,11 @@ def kb_towers(th):
 
 
 def kneeboards(pages):
+    """The squadron kneeboard format (Missions/_MISSION_TOOLKIT/README.md "Squadron standard -
+    kneeboard card style", the New Pilot packs' KNEEBOARD_DROP-IN): each card as rendered,
+    1289 px wide at its own portrait height (save_card already refuses a landscape card and
+    pins the footer). Never rescaled or squeezed to a fixed page - DCS sizes the type off the
+    width, so a card shrunk to fit would print smaller in the pit (operator 2026-10-22)."""
     if not os.path.isdir(DESKTOP_COPY):
         return
     from PIL import Image
@@ -1359,23 +1364,11 @@ def kneeboards(pages):
     for jet in KNEEBOARD_JETS:
         os.makedirs(os.path.join(OMM_MOD, "Kneeboard", jet))
     for i, src in enumerate(pages, 1):
+        w, h = Image.open(src).size
+        assert w == 1289 and h >= w * 1.149, "%s is %dx%d - not a kneeboard card" % (src, w, h)
         name = "SkyEye_%02d_%s.jpg" % (i, os.path.splitext(os.path.basename(src))[0].split("_", 1)[1])
-        im = Image.open(src).convert("RGB")
-        # DCS shows a kneeboard page at about 1:1.5; a long card is shrunk to fit, never cropped.
-        w, h = im.size
-        H = int(w * 1.5)
-        if h < H:
-            canvas = Image.new("RGB", (w, H), im.getpixel((2, h - 2)))
-            canvas.paste(im, (0, 0))
-            im = canvas
-        elif h > H:
-            nw = int(w * H / h)
-            canvas = Image.new("RGB", (w, H), im.getpixel((2, 2)))
-            canvas.paste(im.resize((nw, H), Image.LANCZOS), ((w - nw) // 2, 0))
-            im = canvas
-        im = im.resize((1024, 1536), Image.LANCZOS)
         for jet in KNEEBOARD_JETS:
-            im.save(os.path.join(OMM_MOD, "Kneeboard", jet, name), quality=90)
+            shutil.copy2(src, os.path.join(OMM_MOD, "Kneeboard", jet, name))
     with open(os.path.join(OMM_MOD, "README.txt"), "w", encoding="utf-8", newline="\r\n") as f:
         f.write("vSFG-7 SkyEye ATC kneeboards  %s  %s\n\n" % (VER, DATE))
         f.write("OMM / OvGME: put the \"SkyEye ATC Kneeboards\" folder in your Saved Games mods\n"
