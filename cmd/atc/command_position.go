@@ -84,7 +84,7 @@ func commandReply(text, callsign, channelName string, store *tacviewPositions) s
 			if store != nil {
 				pos, ok = store.Get(who)
 			}
-			return divertReply(who, channelName, pos, ok, airfield.FieldsForMap(flagMap))
+			return divertReply(who, channelName, pos, ok, divertFields())
 		}
 	}
 	if resp := commandPositionResponse(text, callsign, channelName, store, nearestFieldMagVar); resp != "" {

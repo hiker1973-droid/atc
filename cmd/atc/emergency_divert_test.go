@@ -58,3 +58,25 @@ func TestDivertReply(t *testing.T) {
 		t.Errorf("Command %q: %q", in, got)
 	}
 }
+
+// Foothold: a red-held field is never the divert (operator 2026-10-21).
+func TestDivertSkipsRedFields(t *testing.T) {
+	near := &airfield.Airfield{Name: "Bassel Al-Assad", Center: orb.Point{35.95, 35.40}}
+	far := &airfield.Airfield{Name: "Akrotiri", Center: orb.Point{32.98, 34.59}}
+	byPos := &airfield.Airfield{Name: "Beirut", Center: orb.Point{35.49, 33.82}}
+	zones := []footholdZone{
+		{Name: "Bassel Al-Assad", Side: footholdSideRed},
+		{Name: "Akrotiri", Side: footholdSideBlue},
+		{Name: "Beirut Intl", Side: footholdSideRed, Pos: orb.Point{35.50, 33.83}},
+	}
+	got := withoutRedFields([]*airfield.Airfield{near, far, byPos}, zones)
+	if len(got) != 1 || got[0] != far {
+		t.Fatalf("fields left %v, want Akrotiri only", got)
+	}
+	if r := divertReply("Raider 302", "Overlord", orb.Point{35.9, 35.5}, true, got); !strings.Contains(r, "Nearest field Akrotiri") {
+		t.Errorf("reply %q, want Akrotiri", r)
+	}
+	if r := divertReply("Raider 302", "Overlord", orb.Point{35.9, 35.5}, true, nil); !strings.Contains(r, "No friendly field") {
+		t.Errorf("all red: %q", r)
+	}
+}

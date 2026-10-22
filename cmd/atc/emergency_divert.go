@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strings"
 
 	"github.com/paulmach/orb"
+	"github.com/rs/zerolog/log"
+
 	"github.com/vsfg7/atc/pkg/airfield"
 )
 
@@ -67,7 +70,7 @@ func divertReply(who, station string, pos orb.Point, havePos bool, fields []*air
 	}
 	fld, brg, nm := divertField(pos, fields)
 	if fld == nil {
-		return head + " No field on my scope, say position."
+		return head + " No friendly field available, say intentions."
 	}
 	resp := fmt.Sprintf("%s Nearest field %s, bearing %s, %d miles, elevation %d.", head, fld.Name,
 		spokenBearing(toMagnetic(brg, fld.MagVar)), int(nm+0.5), fld.ElevationFt)
@@ -75,4 +78,53 @@ func divertReply(who, station string, pos orb.Point, havePos bool, fields []*air
 		resp += fmt.Sprintf(" %s tower %s, declare your emergency.", fld.Name, spokenFreq1(fld.TowerFreqMHz))
 	}
 	return resp
+}
+
+// divertSave reads the Foothold campaign save for who holds each field.
+var divertSave = &footholdSave{paths: footholdSavePaths}
+
+// divertFields is the map's fields a damaged jet may be sent to: on Foothold
+// (Syria) those the red side holds are left out (operator 2026-10-21: "yes
+// for sure"). Without a readable save every field is offered.
+func divertFields() []*airfield.Airfield {
+	fields := airfield.FieldsForMap(flagMap)
+	if !strings.EqualFold(strings.TrimSpace(flagMap), "syria") {
+		return fields
+	}
+	zones, err := divertSave.Zones()
+	if len(zones) == 0 {
+		if err != nil {
+			log.Debug().Err(err).Msg("divert: no Foothold save - every field offered")
+		}
+		return fields
+	}
+	return withoutRedFields(fields, zones)
+}
+
+// withoutRedFields drops each field whose Foothold zone is red.
+func withoutRedFields(fields []*airfield.Airfield, zones []footholdZone) []*airfield.Airfield {
+	var out []*airfield.Airfield
+	for _, f := range fields {
+		if z := fieldZone(f, zones); z != nil && z.Side == footholdSideRed {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// fieldZone is the Foothold zone for a field: the one named after it (zones
+// carry the field's name, "Bassel Al-Assad"), else one within 5 nm of it.
+func fieldZone(f *airfield.Airfield, zones []footholdZone) *footholdZone {
+	for i := range zones {
+		if strings.EqualFold(zones[i].Name, f.Name) || (f.DCSName != "" && strings.EqualFold(zones[i].Name, f.DCSName)) {
+			return &zones[i]
+		}
+	}
+	for i := range zones {
+		if zones[i].Pos != (orb.Point{}) && haversineNm(zones[i].Pos, f.Center) <= 5 {
+			return &zones[i]
+		}
+	}
+	return nil
 }
