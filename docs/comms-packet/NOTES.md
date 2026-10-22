@@ -1,11 +1,22 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 21 OCT 2026.  v1.34.  Product = one full-screen 16:9 PDF, 29 pages.**
-`vSFG-7_SkyEye_ATC_Comms_v1.34.pdf` — cover + 28 cards: How it works · Frequencies ·
+**Built 22 OCT 2026.  v1.35.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
+`vSFG-7_SkyEye_ATC_Comms_v1.35.pdf` — cover + 28 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
-Overlord Actual · Texaco · **Darkstar** · **GCI calls** · A full sortie · Airfield ATC ·
+Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
+
+## v1.35 (22 OCT 2026) — combat calls card + OMM kneeboards
+
+Operator: "go ahead and make comms kneeboards but lets make a seperate folder so I can install
+them via OMM". New card 20 COMBAT CALLS from origin/main 4721177 (cmd/atc/combat_calls.go,
+emergency_divert.go): Fox / splash copies with no station name, "302 ejecting" -> "Raider 302 down,
+launching CSAR.", hit / damaged / mayday -> nearest friendly field (bearing, miles, elevation, tower;
+Foothold skips red-held fields). Card 1 roles row and card 12 Command row point at it. Cards 20 - 28
+are now 21 - 29. The builder also writes every card as a 1024 x 1536 kneeboard page (short cards
+padded, long ones shrunk to fit) to Desktop Documentation\OMM\SkyEye ATC Kneeboards\Kneeboard{FA-18C_hornet, F-16C_50} - an OMM / OvGME mod folder mirroring Saved Games\DCS, rebuilt whole each run.
+Phraseology Reference not yet updated for the combat calls.
 
 ## v1.34 (21 OCT 2026) — multi-ship flights, AWACS presets, terrain
 

@@ -74,6 +74,14 @@ pkg/controller/flight.go). Card 18: Viper COMM 1 CH 4 on the Black Sea; Foothold
 Hornet CH 7 / Viper CH 5 (CH 5 / CH 4 = 264 there reach the DCS AI E-3, not ours). Card 19:
 terrain hides low bandits (pkg/terrain). Card 27 of v1.33 is now 28.
 
+v1.35 (operator 2026-10-22 "go ahead and make comms kneeboards", separate folder for OMM)
+follows origin/main 4721177: new card 20 COMBAT CALLS - Fox / splash copied by the AWACS or
+Command with no station name, "302 ejecting" -> "Raider 302 down, launching CSAR.", and hit /
+damaged / mayday -> the nearest friendly field (cmd/atc/combat_calls.go, emergency_divert.go;
+Foothold skips red-held fields). Cards 20 - 28 of v1.34 are now 21 - 29. Every card is also
+written as a DCS kneeboard page to Documentation/OMM/SkyEye ATC Kneeboards (an OMM mod:
+Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -117,8 +125,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.34"
-DATE = "21 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.35"
+DATE = "22 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -151,11 +159,11 @@ TANKER2_F, H_TANKER2 = "252.300", "COMM 2 CH 10"
 H_GCI, V_GCI = "COMM 1 CH 5", "COMM 1 CH 4"
 H_GCI_SY, V_GCI_SY = "CH 7", "CH 5"
 
-TOTAL = 28
+TOTAL = 29
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
 FACTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                                     "phraseology", "facts.json"), encoding="utf-8"))
-TOWER_CARDS = "cards 21 - 27"
+TOWER_CARDS = "cards 22 - 28"
 _CAU = next(t for t in FACTS if t["key"] == "caucasus")
 _SYR = next(t for t in FACTS if t["key"] == "syria")
 GCI_BS = (_CAU["gci_name"], "%.3f" % _CAU["gci"])     # Darkstar 264.000
@@ -196,6 +204,7 @@ def c01_how():
           ("RANGE AREAS + OVERLORD  -  on Command", "cards 15 - 16"),
           ("TEXACO 1-1 / 3-1  -  tankers, Black Sea", "%s / %s AM  ·  card 17" % (TANKER_F[:5], TANKER2_F[:5])),
           ("DARKSTAR / OVERLORD  -  GCI", "%s / %s AM  ·  cards 18 - 19" % (GCI_BS[1][:5], GCI_SY[1][:5])),
+          ("COMBAT CALLS  -  shots, CSAR, damaged jet", "AWACS or Command  ·  card 20"),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
     NK.band(c, "HOW TO BE HEARD", "every call")
     c.bullets([
@@ -588,6 +597,7 @@ def c11_command():
         ("checking in  /  check in", "proceed mission"),
         ("fence in  /  fence check", "cleared hot  ·  where the GCI is"),
         ("in hot  /  pickle  /  Fox 3  /  splash", "cleared hot  ·  copy"),
+        ("302 ejecting  /  I'm hit  /  mayday", "CSAR  ·  nearest field  -  card 20"),
         ("on station", "good hunting"),
         ("off station  /  departing station", "proceed to assigned pattern"),
         ("fence out", "safe passage"),
@@ -861,9 +871,50 @@ def c17_gci_calls():
     return save(c, "17_gci_calls.jpg")
 
 
+def c17_combat():
+    # cmd/atc/combat_calls.go (gciCombatCall, downReply), command_position.go
+    # (commandShotResponse) and emergency_divert.go (damagedRe, divertReply, divertFields),
+    # origin/main 4721177. Operator wording for the down call (2026-10-21).
+    c = card("COMBAT ", "CALLS", ["Shots, kills, ejections, battle damage  ·  on the AWACS or Command",
+                                  "No station name needed - just your number first."], 20, EYE_GCI)
+    NK.band(c, "SHOTS AND KILLS", "the AWACS copies  ·  Command copies too")
+    c.kv([
+        ("302, Fox 3, 080 for 56, 25,000", "Raider 302, Darkstar, copy Fox three"),
+        ("302, splash one", "Raider 302, Darkstar, copy splash one"),
+        ("splash one  (no callsign)", "Darkstar, copy splash one"),
+    ], size=14, rh=27)
+    NK.band(c, "DOWN", "you, your wingman, or anyone who sees it")
+    c.kv([
+        ("302 ejecting  /  eject, eject  /  bailing out", "Raider 302 down, launching CSAR."),
+        ("Raider 301, 302 is down", "Raider 302 down, launching CSAR."),
+    ], size=14, rh=27)
+    NK.subtle(c, "\"302 down to angels 5\" is not a down call. CSAR is the radio call only - nothing spawns.")
+    NK.band(c, "HIT OR DAMAGED", "the nearest friendly field")
+    c.kv([
+        ("Command, Raider 302, I'm hit", "nearest field, bearing, miles"),
+        ("mayday  /  pan pan  /  declaring an emergency", "elevation, tower frequency"),
+        ("engine fire  /  lost an engine  /  hydraulic failure", "same answer"),
+        ("fuel leak  /  battle damage  /  request nearest field", "same answer"),
+    ], size=14, rh=27)
+    c.bullets([
+        [("Example:", True),
+         ("\"Raider 302, Command, copy. Nearest field Kobuleti, bearing zero-eight-three, 18 miles, "
+          "elevation 59. Kobuleti tower two six two point zero, declare your emergency.\"", False)],
+        [("Bearing is magnetic, from where Tacview has you.", True),
+         ("Not on the scope: \"No radar contact, say position, and the nearest field.\"", False)],
+        [("Foothold never sends you to a red-held field.", True),
+         ("Read from the campaign save. None friendly: \"No friendly field available, say intentions.\"", False)],
+        [("Then call that tower with your emergency.", True),
+         ("It gives you the runway you name and copies souls and fuel - card 27.", False)],
+        [("Any AWACS name works.", True),
+         ("Darkstar, Overlord, Magic or Wizard - the SkyEye AWACS on your frequency answers.", False)],
+    ])
+    return save(c, "17_combat.jpg")
+
+
 def c12_sortie():
     c = card("A FULL ", "SORTIE", ["Off the boat and back  ·  every SkyEye call, in order",
-                                  "Hornet, Case I, Persian Gulf frequencies."], 20, EYE_CVN)
+                                  "Hornet, Case I, Persian Gulf frequencies."], 21, EYE_CVN)
     NK.band(c, "OUTBOUND")
     NK.steps(c, [
         ("DECKBOSS 128.6", "request taxi  ·  ready cat N  ·  airborne"),
@@ -897,7 +948,7 @@ def c12_sortie():
 def c13_towers():
     c = card("AIRFIELD ", "ATC", ["One AI tower per field  ·  UHF AM  ·  Gulf, Black Sea, Syria",
                                   "Same calls at every field; only name and frequency change."],
-             21, EYE_TWR)
+             22, EYE_TWR)
     NK.band(c, "HOW TO BE HEARD", "every tower call")
     c.bullets([
         [("Open with the field name, then your callsign.", True),
@@ -934,7 +985,7 @@ def c13_towers():
 def c14_tower_radios():
     c = card("TOWER ", "RADIOS", ["Gulf and Black Sea  ·  tower, ATIS, COMM 1 preset",
                                   "Presets read off the squadron Hornet and Viper cards."],
-             22, EYE_TWR)
+             23, EYE_TWR)
     NK.band(c, "PERSIAN GULF", "Hornet  /  Viper")
     c.kv([
         ("AL DHAFRA TOWER  251.100  ·  ATIS 248.200", "CH 8  /  CH 12"),
@@ -971,7 +1022,7 @@ def c15_syria_towers():
     atis = {a["icao"]: a["freq"] for a in th["atis"]}
     c = card("SYRIA ", "TOWERS", ["Eastern Med  ·  Foothold  ·  %d fields  ·  tower and ATIS" % len(th["towers"]),
                                   "Read from the start scripts - dial the frequency."],
-             23, EYE_TWR)
+             24, EYE_TWR)
     NK.band(c, "THE TOWERS", "tower  ·  ATIS")
     c.kv([(t["name"].upper(), "%.3f   ATIS %.3f" % (t["freq"], atis[t["icao"]]) if t["icao"] in atis
            else "%.3f" % t["freq"]) for t in th["towers"]])
@@ -990,7 +1041,7 @@ def c15_syria_towers():
 
 def c16_tower_departure():
     c = card("DEPART", "URE", ["Parking to Command  ·  every SkyEye field",
-                               "Wait for each reply before the next call."], 24, EYE_TWR)
+                               "Wait for each reply before the next call."], 25, EYE_TWR)
     NK.band(c, "THE DEPARTURE", "in order")
     NK.steps(c, [
         ("REQUEST TAXI", "Minhad Tower, Raider 1, request taxi."),
@@ -1031,7 +1082,7 @@ def c16_tower_departure():
 
 def c17_tower_arrival():
     c = card("ARRI", "VAL", ["Overhead or straight in  ·  one call per leg",
-                             "Give your distance with inbound, initial or final."], 25, EYE_TWR)
+                             "Give your distance with inbound, initial or final."], 26, EYE_TWR)
     NK.band(c, "THE OVERHEAD", "VMC")
     NK.steps(c, [
         ("INBOUND", "Minhad Tower, Raider 1, 10 mile initial."),
@@ -1079,7 +1130,7 @@ def c17_tower_arrival():
 
 def c18_tower_calls():
     c = card("TOWER ", "CALLS", ["Every call a tower answers  ·  lead with the field name",
-                                 "Silent calls are heard but get no reply."], 26, EYE_TWR)
+                                 "Silent calls are heard but get no reply."], 27, EYE_TWR)
     NK.band(c, "GROUND AND DEPARTURE", "tower replies")
     c.kv([
         ("request taxi  /  ready to taxi", "taxi, hold short"),
@@ -1120,7 +1171,7 @@ def c18_multiship():
     # pkg/controller/flight.go (origin/main 0aab154, 2026-10-21): one takeoff and one landing
     # clearance cover the flight (operator ruling).
     c = card("MULTI-", "SHIP", ["Flights of 2 - 6  ·  one clearance for the whole flight",
-                                "The lead talks. Name the wingmen on the first call."], 27, EYE_TWR)
+                                "The lead talks. Name the wingmen on the first call."], 28, EYE_TWR)
     NK.band(c, "DEPARTURE", "the lead calls")
     NK.steps(c, [
         ("HOLDING SHORT", "Senaki Tower, Raider 301, flight of three,"),
@@ -1157,7 +1208,7 @@ def c18_multiship():
 
 def c19_trouble():
     c = card("NO ", "ANSWER?", ["Work down the list  ·  most misses are the first three",
-                                "Tell the operator what you said, word for word."], 28)
+                                "Tell the operator what you said, word for word."], 29)
     NK.band(c, "CHECK", "in order")
     NK.steps(c, [
         ("1", "Waited 2 - 3 seconds?"),
@@ -1185,14 +1236,14 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 0aab154, 21 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 4721177, 22 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
 CARD_FUNCS = [c01_how, c02_freqs, c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1,
               c06_marshal_case3, c07_marshal_calls_inbound, c08_marshal_calls_stack,
               c09_marshal_calls_case3, c10_paddles, c10_departure, c11_command, c12_jtac_flow,
-              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c17_gci, c17_gci_calls, c12_sortie, c13_towers,
+              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c17_gci, c17_gci_calls, c17_combat, c12_sortie, c13_towers,
               c14_tower_radios, c15_syria_towers, c16_tower_departure, c17_tower_arrival,
               c18_tower_calls, c18_multiship, c19_trouble]
 
@@ -1215,9 +1266,50 @@ def main():
                      page_logo=LOGO, page_logo_mode="circle", cache=CACHE, balance=True,
                      footer="vSFG-7  ·  SKYEYE ATC COMMS  ·  %s" % STAMP, divider_text="")
     print("PDF  %d pages  ->  %s (%.1f MB)" % (n, out, os.path.getsize(out) / 1e6))
+    kneeboards(pages)
     if os.path.isdir(DESKTOP_COPY):
         shutil.copy2(out, os.path.join(DESKTOP_COPY, os.path.basename(out)))
         retire_old_versions(DESKTOP_COPY, "vSFG-7_SkyEye_ATC_Comms_v", os.path.basename(out))
+
+
+# An OMM / OvGME mod (operator 2026-10-22): its folder mirrors Saved Games\DCS, so enabling
+# it drops the cards into the Hornet's and the Viper's kneeboard. Rebuilt whole each time.
+OMM_MOD = os.path.join(DESKTOP_COPY, "OMM", "SkyEye ATC Kneeboards")
+KNEEBOARD_JETS = ["FA-18C_hornet", "F-16C_50"]
+
+
+def kneeboards(pages):
+    if not os.path.isdir(DESKTOP_COPY):
+        return
+    from PIL import Image
+    if os.path.isdir(OMM_MOD):
+        shutil.rmtree(OMM_MOD)
+    for jet in KNEEBOARD_JETS:
+        os.makedirs(os.path.join(OMM_MOD, "Kneeboard", jet))
+    for i, src in enumerate(pages, 1):
+        name = "SkyEye_%02d_%s.jpg" % (i, os.path.splitext(os.path.basename(src))[0].split("_", 1)[1])
+        im = Image.open(src).convert("RGB")
+        # DCS shows a kneeboard page at about 1:1.5; a long card is shrunk to fit, never cropped.
+        w, h = im.size
+        H = int(w * 1.5)
+        if h < H:
+            canvas = Image.new("RGB", (w, H), im.getpixel((2, h - 2)))
+            canvas.paste(im, (0, 0))
+            im = canvas
+        elif h > H:
+            nw = int(w * H / h)
+            canvas = Image.new("RGB", (w, H), im.getpixel((2, 2)))
+            canvas.paste(im.resize((nw, H), Image.LANCZOS), ((w - nw) // 2, 0))
+            im = canvas
+        im = im.resize((1024, 1536), Image.LANCZOS)
+        for jet in KNEEBOARD_JETS:
+            im.save(os.path.join(OMM_MOD, "Kneeboard", jet, name), quality=90)
+    with open(os.path.join(OMM_MOD, "README.txt"), "w", encoding="utf-8", newline="\r\n") as f:
+        f.write("vSFG-7 SkyEye ATC kneeboards  %s  %s\n\n" % (VER, DATE))
+        f.write("OMM / OvGME: put the \"SkyEye ATC Kneeboards\" folder in your Saved Games mods\n"
+                "folder and enable it. It installs %d pages into Saved Games\\DCS\\Kneeboard\\\n"
+                "%s.\nBy hand: copy the Kneeboard folder into Saved Games\\DCS.\n" % (len(pages), " and ".join(KNEEBOARD_JETS)))
+    print("kneeboards  %d pages x %d jets  ->  %s" % (len(pages), len(KNEEBOARD_JETS), OMM_MOD))
 
 
 def retire_old_versions(folder, prefix, keep):
