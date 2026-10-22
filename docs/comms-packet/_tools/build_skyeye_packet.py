@@ -122,7 +122,9 @@ PACKET = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 CACHE = os.path.join(PACKET, "_tools", "_cache")
 CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed the PDF
-LOGO = os.path.join(MISSIONS, "New Pilot packs", "VMFA225_patch.png")   # vSFG-7 group patch
+# vSFG-7 group patch, docs/vsfg7_patch.png (operator 2026-10-22: "use this logo and update
+# anything we have future with this one"; was Missions\New Pilot packs\VMFA225_patch.png).
+LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
 VER = "v1.35"
@@ -1285,26 +1287,50 @@ def kb_freqs():
     def f(x):
         return "%.3f" % x
 
-    c = card("AI ATC ", "FREQS", ["What SkyEye listens on  ·  AM unless marked FM",
-                                        "Channels are on the mission comms card."], 2)
+    c = card("AI ATC ", "FREQS", ["What SkyEye listens on, and the preset that reaches it",
+                                  "H = Hornet, V = Viper  ·  1-4 = COMM 1 channel 4  ·  AM unless FM"], 2)
     cau = _CAU
-    NK.band(c, "BLACK SEA", "Caucasus Day / Night")
-    rows = [("COMMAND", f(cau["command"])),
-            ("%s  -  AWACS" % cau["gci_name"].upper(), f(cau["gci"])),
-            ("HITMAN 1-1  /  2-1  -  JTAC", "%s  /  %s FM" % (f(cau["jtac"]), f(cau["jtac2"]))),
-            ("TEXACO 1-1  /  3-1  -  tankers", "%s  /  %s" % (f(cau["tanker"]), f(cau["tanker2"]))),
-            ("DECKBOSS  ·  MARSHAL  ·  PADDLES", "%s  ·  %s  ·  %s" % (f(cau["deckboss"]), f(cau["marshal"]), f(cau["lso"])))]
+    NK.band(c, "BLACK SEA", "Caucasus Day / Night  ·  Hornet  ·  Viper")
+    rows = [("COMMAND  %s" % f(cau["command"]), KB_CH["caucasus"]["command"]),
+            ("%s AWACS  %s" % (cau["gci_name"].upper(), f(cau["gci"])), KB_CH["caucasus"]["gci"]),
+            ("HITMAN 1-1  %s FM" % f(cau["jtac"]), KB_CH["caucasus"]["jtac"]),
+            ("HITMAN 2-1  %s FM" % f(cau["jtac2"]), KB_CH["caucasus"]["jtac2"]),
+            ("TEXACO 1-1  %s" % f(cau["tanker"]), KB_CH["caucasus"]["tanker"]),
+            ("TEXACO 3-1  %s" % f(cau["tanker2"]), KB_CH["caucasus"]["tanker2"]),
+            ("DECKBOSS  %s" % f(cau["deckboss"]), KB_CH["caucasus"]["deckboss"]),
+            ("MARSHAL  %s" % f(cau["marshal"]), KB_CH["caucasus"]["marshal"]),
+            ("PADDLES  %s" % f(cau["lso"]), KB_CH["caucasus"]["lso"])]
     rows += kb_towers(cau)
-    c.kv(rows, size=14, rh=27)
+    c.kv(rows, size=13, rh=25)
     syr = _SYR
-    NK.band(c, "SYRIA", "Foothold")
-    rows = [("COMMAND", f(syr["command"])),
-            ("%s  -  AWACS" % syr["gci_name"].upper(), f(syr["gci"])),
-            ("DECKBOSS  ·  MARSHAL  ·  PADDLES", "%s  ·  %s  ·  %s" % (f(syr["deckboss"]), f(syr["marshal"]), f(syr["lso"])))]
+    NK.band(c, "SYRIA", "Foothold  ·  Hornet  ·  Viper")
+    rows = [("COMMAND  %s" % f(syr["command"]), KB_CH["syria"]["command"]),
+            ("%s AWACS  %s" % (syr["gci_name"].upper(), f(syr["gci"])), KB_CH["syria"]["gci"]),
+            ("DECKBOSS  %s" % f(syr["deckboss"]), KB_CH["syria"]["deckboss"]),
+            ("MARSHAL  %s" % f(syr["marshal"]), KB_CH["syria"]["marshal"]),
+            ("PADDLES  %s" % f(syr["lso"]), KB_CH["syria"]["lso"])]
     rows += kb_towers(syr)
-    c.kv(rows, size=14, rh=27)
-    NK.subtle(c, "Towers: tower  ·  ATIS (listen only).  Marshal 306.300 is SkyEye; 306.200 is a live Marshal.")
+    c.kv(rows, size=13, rh=25)
+    NK.subtle(c, "Tower row: tower channel; ATIS is the next one up (Foothold Viper: dial it). \"dial\" = no preset.")
     return save(c, "02_ai_atc_freqs.jpg")
+
+
+# Presets that reach each SkyEye role, read off the mission preset kneeboard cards
+# (2026-10-22): Caucasus Training V1.35 _BUILD/_cards/01_bs_{hornet,viper}_presets.png and
+# Foothold v1.15 _assets/cards/_presets_{FA-18C_hornet,F-16C_50}.html. Those missions are
+# built elsewhere - re-read the cards when their comm ladders change. "H 1-4" = Hornet COMM 1
+# CH 4; Viper ATIS on Foothold has no preset.
+KB_CH = {
+    "caucasus": {"command": "H 1-4  ·  V 1-1", "gci": "H 1-5  ·  V 1-4", "jtac": "H 2-12  ·  V 2-8",
+                 "jtac2": "dial", "tanker": "H 2-8  ·  V dial", "tanker2": "H 2-10  ·  V dial",
+                 "deckboss": "H 1-1", "marshal": "H 1-3", "lso": "H 2-4",
+                 "UGSB": "H 1-8  ·  V 1-12", "UG5X": "H 1-10  ·  V 1-14", "UGKO": "H 1-12  ·  V 1-18",
+                 "UGKS": "H 1-14  ·  V 1-16", "UGTB": "H 1-18  ·  V 1-10"},
+    "syria": {"command": "H 1-4  ·  V 1-1", "gci": "H 1-7  ·  V 1-5", "deckboss": "H 1-1",
+              "marshal": "H 1-3", "lso": "dial",
+              "LCRA": "H 1-12  ·  V 1-18", "OSLK": "H 1-14  ·  V 1-17", "OLBA": "H 1-16  ·  V dial",
+              "LTAG": "H 1-8  ·  V 1-15", "LLRD": "H 1-10  ·  V 1-16"},
+}
 
 
 def kb_towers(th):
@@ -1312,7 +1338,9 @@ def kb_towers(th):
     rows = []
     for tw in sorted(th["towers"], key=lambda x: x["name"]):
         a = atis.get(tw.get("icao"))
-        rows.append(("%s" % tw["name"].upper(), "%.3f%s" % (tw["freq"], "  ·  ATIS %.3f" % a if a else "")))
+        name = tw["name"].upper().replace(" TOWER", "")
+        rows.append(("%s  %.3f%s" % (name, tw["freq"], "  ·  ATIS %.3f" % a if a else ""),
+                     KB_CH[th["key"]][tw["icao"]]))
     return rows
 
 

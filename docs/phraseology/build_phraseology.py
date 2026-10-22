@@ -32,7 +32,8 @@ VER = "v2.8"
 DATE = "21 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
-LOGO = r"C:\Users\afhin\Saved Games\DCS\Missions\New Pilot packs\VMFA225_patch.png"
+# vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
+LOGO = os.path.join(os.path.dirname(HERE), "vsfg7_patch.png")
 FONTS = {"reg": r"C:\Windows\Fonts\arial.ttf", "bold": r"C:\Windows\Fonts\arialbd.ttf",
          "mono": r"C:\Windows\Fonts\consola.ttf"}
 
