@@ -47,6 +47,31 @@ func TestOwnEchoLetsPilotCallsThrough(t *testing.T) {
 	}
 }
 
+// Day 2026-10-22 17:19: a repeated radio check shares the callsign and the
+// station name with our reply, and was dropped four times.
+func TestOwnEchoLetsRepeatedRadioChecksThrough(t *testing.T) {
+	resetOwnTX()
+	noteOwnTX(280, "Raider 302, Red-Command, loud and clear.")
+	noteOwnTX(282, "Raider 302, vSFG-7-Command, five by five.")
+	for _, c := range []struct {
+		freq  float64
+		heard string
+	}{
+		{280, "Command, Raider 302, comm check."},
+		{280, "Red command, Raider 302, comm check."},
+		{280, "Red Command, Raider 302, com check."},
+		{280, "Red Command Raider 302 comm check."},
+		{282, "vSFG-7 Command, Raider 302, radio check."},
+	} {
+		if isOwnEcho(c.freq, c.heard) {
+			t.Errorf("radio check dropped as our echo: %q", c.heard)
+		}
+	}
+	if got := strings.Join(echoMessage("Raider 302, Hitland 11. Copy off. Egress 360.100"), " "); got != "copy off egress 360100" {
+		t.Errorf("echoMessage = %q", got)
+	}
+}
+
 func TestOwnEchoCatchesTheBrief(t *testing.T) {
 	resetOwnTX()
 	noteOwnTX(61, "Raider 302, Hitman one one, target 3, Fuel Depot, IP Cobra. Cobra bears two-niner-four for 26. Read back.")

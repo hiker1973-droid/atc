@@ -20,11 +20,17 @@ import (
 //
 // So compare against what we actually said: a call that repeats most of a
 // line we transmitted on the same frequency moments ago is our own echo.
+//
+// Only the message is compared, not the "Raider 302, Red-Command," address in
+// front of it: a pilot's call names the same callsign and station as our reply
+// to it. Day 2026-10-22 17:19: Red Command answered "Raider 302, Red-Command,
+// loud and clear." and then dropped four of Raider 302's repeated "Red Command,
+// Raider 302, comm check." as its own echo (4 of 6 words shared).
 
 const (
 	ownEchoWindow   = 45 * time.Second
 	ownEchoMinShare = 0.6 // share of the heard words found in our TX
-	ownEchoMinWords = 4   // shorter calls ("Raider 302, copy") are never echoes
+	ownEchoMinWords = 4   // shorter messages ("Raider 302, copy") are never echoes
 	// ownEchoMinLength: an echo is about as long as what we said; a pilot's
 	// readback of the brief repeats its words but is much shorter.
 	ownEchoMinLength = 0.7
@@ -102,9 +108,38 @@ func echoWords(s string) []string {
 	return out
 }
 
+// echoAddressWords is the most words one part of a call's address has
+// ("Raider 302", "vSFG-7-Command", "BSFG7 command").
+const echoAddressWords = 3
+
+// echoMessage is echoWords of a call without its address: the first two
+// comma- or full-stop-separated parts, each of at most echoAddressWords words
+// ("Raider 302, Hitland 11. Copy off ..." -> "copy off ..."). A call that does
+// not start like that is kept whole.
+func echoMessage(s string) []string {
+	rest := s
+	for part := 0; part < 2; part++ {
+		cut := -1
+		for i := 0; i < len(rest); i++ {
+			if c := rest[i]; (c == ',' || c == '.') && (i+1 == len(rest) || rest[i+1] == ' ') {
+				cut = i
+				break
+			}
+		}
+		if cut < 0 {
+			break
+		}
+		if n := len(echoWords(rest[:cut])); n == 0 || n > echoAddressWords {
+			break
+		}
+		rest = rest[cut+1:]
+	}
+	return echoWords(rest)
+}
+
 // noteOwnTX records a line about to be transmitted on freq.
 func noteOwnTX(freq float64, text string) {
-	all := echoWords(text)
+	all := echoMessage(text)
 	set := make(map[string]bool)
 	for _, w := range all {
 		set[w] = true
@@ -124,7 +159,7 @@ func noteOwnTX(freq float64, text string) {
 // isOwnEcho reports whether heard on freq repeats a line we sent there within
 // ownEchoWindow.
 func isOwnEcho(freq float64, heard string) bool {
-	words := echoWords(heard)
+	words := echoMessage(heard)
 	if len(words) < ownEchoMinWords {
 		return false
 	}
