@@ -50,10 +50,18 @@ type docTheatre struct {
 	LSO      float64      `json:"lso,omitempty"`
 	Tanker   float64      `json:"tanker,omitempty"`
 	Tanker2  float64      `json:"tanker2,omitempty"`
+	Tankers  []docTanker  `json:"tankers,omitempty"` // --tanker-net: Texaco 2-1, the Shells
 	GCI      float64      `json:"gci,omitempty"`
 	GCIName  string       `json:"gci_name,omitempty"`
 	Towers   []docStation `json:"towers"`
 	ATIS     []docStation `json:"atis"`
+}
+
+// docTanker is one --tanker-net net.
+type docTanker struct {
+	Name    string  `json:"name"` // "Shell 1-1"
+	FreqMHz float64 `json:"freq"`
+	Boom    bool    `json:"boom,omitempty"`
 }
 
 // docTheatres lists the theatres the document covers and their start scripts.
@@ -131,6 +139,17 @@ func currentDocFacts(t *testing.T) []docTheatre {
 			Tanker:   batFreq(t, "start_command"+th.suffix+".bat", "tanker-freq"),
 			Tanker2:  batFreq(t, "start_command"+th.suffix+".bat", "tanker2-freq"),
 			GCI:      batFreq(t, "start_gci"+th.suffix+".bat", "gci-freq"),
+		}
+		clines, _ := batLaunches(t, "start_command"+th.suffix+".bat")
+		for _, l := range clines {
+			for _, m := range regexp.MustCompile(`--tanker-net[ =](\S+)`).FindAllStringSubmatch(l, -1) {
+				cfg, err := parseTankerNet(strings.Trim(m[1], `"`))
+				if err != nil {
+					t.Errorf("%s: %v", th.key, err)
+					continue
+				}
+				d.Tankers = append(d.Tankers, docTanker{Name: cfg.Tacview, FreqMHz: cfg.FreqMHz, Boom: cfg.Boom})
+			}
 		}
 		if d.GCI > 0 {
 			lines, _ := batLaunches(t, "start_gci"+th.suffix+".bat")

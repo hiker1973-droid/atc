@@ -7,6 +7,16 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.37 (22 OCT 2026) — Texaco 2-1 and the Shells
+
+Operator: "we need to add 2 Shells for 16's and Texaco 2-1 for 18's". New SkyEye nets via
+`--tanker-net` in start_command_caucasus.bat: Texaco 2-1 KC-135 MPRS 252.200 (Hornet COMM 2
+CH 9, Hank), Shell 1-1 253.100 / Shell 2-1 253.200 KC-135 boom (Viper COMM 1 CH 7 / CH 8,
+Charlie / Daniel). Card 17 Texaco lists all three; **new card 18 SHELL** (boom flow: one jet
+on the boom, "cleared to the boom"); cards 18 - 29 became 19 - 30 (30 cards). Kneeboards: the
+Hornet deck has Texaco and no Shell (29 pages), the Viper deck Shell and no Texaco (19 pages);
+each AI ATC FREQS page lists only its own jet's tankers.
+
 ## v1.36 (22 OCT 2026) — Paddles abeam wording
 
 Operator: "Paddles Contact Raider XXX, Hornet in the groove, at 3/4 of a mile call the ball" -

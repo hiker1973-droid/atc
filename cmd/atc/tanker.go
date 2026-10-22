@@ -45,6 +45,13 @@ import (
 // --tanker2-freq: KC-135 MPRS, 252.300 AM (Hornet COMM2 CH10), TACAN 53Y TX3,
 // angels 24 at Mach 0.65 (the builder's tankers.py), two wing pods - the same
 // port / starboard flow. Its own net and its own voice (Brian, not Eric).
+//
+// More nets (operator 2026-10-22: "we need to add 2 Shells for 16's and Texaco
+// 2-1 for 18's"), one --tanker-net each: Texaco 2-1 KC-135 MPRS 252.200 (Hornet
+// COMM2 CH9, Hank), and the boom tankers Shell 1-1 253.100 / Shell 2-1 253.200
+// (Viper COMM1 CH7 / CH8, Charlie / Daniel), angels 22 at Mach 0.68. A boom has
+// one receiver at a time: the same port observation / starboard reform, but
+// "Boom open" and "cleared to the boom" in place of the baskets.
 
 var (
 	flagTankerFreq        float64
@@ -64,7 +71,15 @@ var (
 	flagTanker2KIAS        int
 	flagTanker2Voice       string
 	flagElevenTanker2Voice string
+
+	flagTankerNets []string
 )
+
+// tankerNetVoices are the ElevenLabs voices a --tanker-net can name.
+var tankerNetVoices = map[string]string{
+	"eric": elEric, "brian": elBrian, "hank": elHank, "charlie": elCharlie,
+	"daniel": elDaniel, "adam": elAdam, "george": elGeorge, "gideon": elGideon,
+}
 
 func registerTankerFlags(f *flag.FlagSet) {
 	f.Float64Var(&flagTankerFreq, "tanker-freq", 0,
@@ -86,6 +101,42 @@ func registerTankerFlags(f *flag.FlagSet) {
 	f.IntVar(&flagTanker2KIAS, "tanker2-kias", 265, "The second tanker's indicated speed until Tacview has its track (Mach 0.65 at angels 24)")
 	f.StringVar(&flagTanker2Voice, "tanker2-voice", "verse", "OpenAI TTS voice for the second tanker (the ElevenLabs fallback)")
 	f.StringVar(&flagElevenTanker2Voice, "elevenlabs-tanker2-voice", elBrian, "ElevenLabs voice ID for the second tanker (default Brian)")
+
+	f.StringArrayVar(&flagTankerNets, "tanker-net", nil,
+		"With --command-only: one more tanker net, FREQ/Callsign-N-N/angels/KIAS/basket|boom/voice, "+
+			"e.g. 253.1/Shell-1-1/22/288/boom/charlie (repeatable)")
+}
+
+// parseTankerNet reads one --tanker-net: "253.1/Shell-1-1/22/288/boom/charlie".
+func parseTankerNet(spec string) (tankerConfig, error) {
+	p := strings.Split(spec, "/")
+	if len(p) != 6 {
+		return tankerConfig{}, fmt.Errorf("want FREQ/Callsign-N-N/angels/KIAS/basket|boom/voice, got %q", spec)
+	}
+	freq, err1 := strconv.ParseFloat(p[0], 64)
+	angels, err2 := strconv.Atoi(p[2])
+	kias, err3 := strconv.Atoi(p[3])
+	if err1 != nil || err2 != nil || err3 != nil || freq <= 0 {
+		return tankerConfig{}, fmt.Errorf("bad number in %q", spec)
+	}
+	if p[4] != "basket" && p[4] != "boom" {
+		return tankerConfig{}, fmt.Errorf("%q: want basket or boom", p[4])
+	}
+	id, ok := tankerNetVoices[strings.ToLower(p[5])]
+	if !ok {
+		id = p[5] // a raw ElevenLabs voice ID
+	}
+	// "Shell-1-1" -> Tacview "Shell 1-1", spoken "Shell one one".
+	tacview := strings.Replace(p[1], "-", " ", 1)
+	words := strings.Fields(strings.ReplaceAll(p[1], "-", " "))
+	for i, w := range words[1:] {
+		if n, err := strconv.Atoi(w); err == nil {
+			words[i+1] = spokenDigits(n)
+		}
+	}
+	return tankerConfig{FreqMHz: freq, Name: p[1], Spoken: strings.Join(words, " "), Tacview: tacview,
+		Angels: angels, KIAS: kias, Boom: p[4] == "boom",
+		Voice: voiceProfile{voice: "ash", speed: flagTTSSpeed, eleven: elTower(id, tacview)}}, nil
 }
 
 // tankerConfig is one tanker net: Texaco 1-1 (--tanker-freq) and, when set,
@@ -97,6 +148,7 @@ type tankerConfig struct {
 	Tacview string // "Texaco 1-1"
 	Angels  int
 	KIAS    int
+	Boom    bool // a KC-135 boom (the Shells), not two baskets
 	Voice   voiceProfile
 }
 
@@ -110,6 +162,14 @@ func tankerConfigs() []tankerConfig {
 		cfgs = append(cfgs, tankerConfig{FreqMHz: flagTanker2Freq, Name: flagTanker2Name, Spoken: flagTanker2Spoken,
 			Tacview: flagTanker2Tacview, Angels: flagTanker2Angels, KIAS: flagTanker2KIAS,
 			Voice: voiceProfile{voice: flagTanker2Voice, speed: flagTTSSpeed, eleven: elTower(flagElevenTanker2Voice, "Texaco 3-1")}})
+	}
+	for _, spec := range flagTankerNets {
+		cfg, err := parseTankerNet(spec)
+		if err != nil {
+			log.Error().Err(err).Msg("--tanker-net ignored")
+			continue
+		}
+		cfgs = append(cfgs, cfg)
 	}
 	return cfgs
 }
@@ -142,6 +202,7 @@ type tankerNet struct {
 	Short  string // "Texaco", after the first call
 	angels func() int
 	kias   func() int
+	boom   bool // one receiver on the boom, not port and starboard baskets
 
 	mu      sync.Mutex
 	flights map[string]*tankerFlight
@@ -170,7 +231,8 @@ var (
 	tankerTrailRe       = regexp.MustCompile(`\b(mile trail|in trail|trail|one mile|1 mile|astern)\b`)
 	tankerEstablishedRe = regexp.MustCompile(`\b(established|establish(ing)?|in position|stabilized|in place)\b`)
 	tankerObservationRe = regexp.MustCompile(`\bobservation\b`)
-	tankerBasketRe      = regexp.MustCompile(`\b(?:(port|starboard|left|right)\s+)?(basket|drogue|hose)\b`)
+	tankerBasketRe      = regexp.MustCompile(`\b(?:(port|starboard|left|right)\s+)?(basket|drogue|hose|boom)\b`)
+	tankerMovingRe      = regexp.MustCompile(`\b(moving|move|request(ing)?|cleared?)\b`)
 	tankerPreContactRe  = regexp.MustCompile(`\bpre-?\s?contact\b`)
 	tankerReformRe      = regexp.MustCompile(`\b(reform|satisfied|complete|completed|disconnect(ed|ing)?|done)\b`)
 	tankerCheckOutRe    = regexp.MustCompile(`\b(checking out|check out|resuming (navigation|mission|nav)|pushing|departing|leaving|clear(ing)? (of|the) tanker|moving on|on (to )?(the )?mission|proceeding (to )?(the )?mission|back to (the )?mission)\b`)
@@ -285,6 +347,12 @@ func (n *tankerNet) basketHolder(side, cs string) string {
 // openBaskets: "Port and starboard baskets open." / "Starboard basket open." /
 // "" when both are taken.
 func (n *tankerNet) openBaskets(cs string) string {
+	if n.boom {
+		if n.basketHolder("boom", cs) == "" {
+			return "Boom open."
+		}
+		return ""
+	}
 	port, stbd := n.basketHolder("port", cs) == "", n.basketHolder("starboard", cs) == ""
 	switch {
 	case port && stbd:
@@ -335,7 +403,7 @@ func (n *tankerNet) Response(text, cs string) string {
 		// "Ready pre-contact." with no callsign (Day 2026-10-19 19:38): the
 		// one jet on the tanker said it. A call that names the tanker and no
 		// callsign still gets "say again your callsign".
-		if strings.Contains(lower, "texaco") || strings.Contains(lower, "tanker") {
+		if strings.Contains(lower, strings.ToLower(n.Short)) || strings.Contains(lower, "tanker") {
 			return fmt.Sprintf("Station calling %s, say again your callsign.", n.Spoken)
 		}
 		if cs = n.onlyFlight(now); cs == "" {
@@ -363,6 +431,12 @@ func (n *tankerNet) Response(text, cs string) string {
 	preContact := tankerPreContactRe.MatchString(lower)
 	basket := tankerBasketRe.FindStringSubmatch(lower)
 	reform := strings.Contains(lower, "reform")
+
+	if n.boom {
+		if r, ok := n.boomResponse(lower, cs, f, basket != nil, preContact, established, reform); ok {
+			return r
+		}
+	}
 
 	switch {
 	// "Texaco 1-1, Raider 302, comm check": loud and clear, and the flight
@@ -475,6 +549,34 @@ func (n *tankerNet) Response(text, cs string) string {
 	return ""
 }
 
+// boomResponse is a boom tanker's reply where it differs from the baskets'
+// (false = answer as a basket tanker): one receiver at a time.
+//
+//	"Shell 1-1, Venom 1-1, moving to the boom"     -> "Venom 11, Shell, cleared to the boom."
+//	"Venom 1-1, established pre-contact"           -> "Venom 11, Shell, copy, call ready pre-contact."
+//	"Venom 1-2, established port observation" (boom taken) -> "... copy, boom occupied. Hold port observation."
+func (n *tankerNet) boomResponse(lower, cs string, f *tankerFlight, boom, preContact, established, reform bool) (string, bool) {
+	switch {
+	case reform || tankerReformRe.MatchString(lower) && f.stage > 0:
+		return "", false
+	case boom || preContact:
+		if established || preContact && !tankerMovingRe.MatchString(lower) {
+			f.stage, f.basket = tankerBasket, "boom"
+			return fmt.Sprintf("%s, %s, copy, call ready pre-contact.", cs, n.Short), true
+		}
+		if n.basketHolder("boom", cs) != "" {
+			return fmt.Sprintf("%s, %s, standby, boom occupied. Hold port observation.", cs, n.Short), true
+		}
+		f.stage, f.basket = tankerBasket, "boom"
+		return fmt.Sprintf("%s, %s, cleared to the boom.", cs, n.Short), true
+	case established && (tankerObservationRe.MatchString(lower) || f.stage > 0 && f.stage < tankerBasket) &&
+		n.basketHolder("boom", cs) != "":
+		f.stage = tankerObservation
+		return fmt.Sprintf("%s, %s, copy, boom occupied. Hold port observation.", cs, n.Short), true
+	}
+	return "", false
+}
+
 // tankerCallsign is the pilot's callsign in a call to the tanker, without
 // the address: "Texaco 1-1, Raider 302, one Hornet, 15 miles" -> "Raider 302".
 func tankerCallsign(text string) string {
@@ -483,7 +585,11 @@ func tankerCallsign(text string) string {
 	text = tankerFlightDescRe.ReplaceAllString(text, "$1")
 	cs := extractCallsignSkippingAddress(text, "texaco one-one", "texaco one one", "texaco 1-1", "texaco 1 1", "texaco 11",
 		"texaco three-one", "texaco three one", "texaco 3-1", "texaco 3 1", "texaco 31",
-		"texaco one", "texaco 1", "texaco three", "texaco 3", "texaco", "tanker")
+		"texaco two-one", "texaco two one", "texaco 2-1", "texaco 2 1", "texaco 21",
+		"shell one-one", "shell one one", "shell 1-1", "shell 1 1", "shell 11",
+		"shell two-one", "shell two one", "shell 2-1", "shell 2 1", "shell 21",
+		"texaco one", "texaco 1", "texaco three", "texaco 3", "texaco two", "texaco 2",
+		"shell one", "shell 1", "shell two", "shell 2", "texaco", "shell", "tanker")
 	cs = strings.TrimSpace(cs)
 	if jtacBareNumberRe.MatchString(cs) {
 		return ""
@@ -551,8 +657,13 @@ func startTanker(ctx context.Context, apiKey string, store *tacviewPositions, cf
 		}()
 	}
 	tn := newTankerNet(cfg.Spoken, angels, kias)
+	tn.boom = cfg.Boom
+	position := "moving to starboard basket"
+	if cfg.Boom {
+		position = "Venom, moving to the boom, established pre-contact"
+	}
 	prompt := strings.Replace(cfg.Name, "-", " ", 1) + ", Knight, Raider, flight of two, 15 mile initial for port observation, " +
-		"intent to refuel, request, thousand pounds, 1 mile trail, established port observation, moving to starboard basket, " +
+		"intent to refuel, request, thousand pounds, 1 mile trail, established port observation, " + position + ", " +
 		"ready pre-contact, satisfied, moving to starboard reform, checking out, resuming navigation, pushing 282"
 	go voiceNetLoop(ctx, flagSRSAddr, cfg.FreqMHz, cfg.Name, apiKey, flagEAMPassword, cfg.Voice, flagExternalAudio,
 		prompt, nil, func(text string) (string, string) {

@@ -61,6 +61,22 @@
   "lso": 128.3,
   "tanker": 252.1,
   "tanker2": 252.3,
+  "tankers": [
+   {
+    "name": "Texaco 2-1",
+    "freq": 252.2
+   },
+   {
+    "name": "Shell 1-1",
+    "freq": 253.1,
+    "boom": true
+   },
+   {
+    "name": "Shell 2-1",
+    "freq": 253.2,
+    "boom": true
+   }
+  ],
   "gci": 264,
   "gci_name": "Darkstar",
   "towers": [

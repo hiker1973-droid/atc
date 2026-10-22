@@ -130,7 +130,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.36"
+VER = "v1.37"
 DATE = "22 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -157,6 +157,12 @@ PADDLES_F = "128.300"
 TANKER_F, H_TANKER = "252.100", "COMM 2 CH 8"
 # Texaco 3-1, the second tanker net (--tanker2-freq, 2026-10-19): KC-135 MPRS, COMM 2 CH 10.
 TANKER2_F, H_TANKER2 = "252.300", "COMM 2 CH 10"
+# Texaco 2-1 and the Shells (--tanker-net, operator 2026-10-22: "2 Shells for 16's and Texaco
+# 2-1 for 18's"): Texaco 2-1 KC-135 MPRS Hornet COMM 2 CH 9; Shell 1-1 / 2-1 KC-135 boom on
+# Viper COMM 1 CH 7 / CH 8 (the Caucasus Training V1.35 ladder).
+TANKER21_F, H_TANKER21 = "252.200", "COMM 2 CH 9"
+SHELL_F, V_SHELL = "253.100", "COMM 1 CH 7"
+SHELL2_F, V_SHELL2 = "253.200", "COMM 1 CH 8"
 
 # GCI (cmd/atc/gci.go, start_gci_{caucasus,syria}.bat, 2026-10-21). Black Sea: Hornet COMM 1
 # CH 5 "DARKSTAR 1" on the Caucasus Training and Hornet New Pilot Pack cards; Viper COMM 1 CH 4.
@@ -164,11 +170,11 @@ TANKER2_F, H_TANKER2 = "252.300", "COMM 2 CH 10"
 H_GCI, V_GCI = "COMM 1 CH 5", "COMM 1 CH 4"
 H_GCI_SY, V_GCI_SY = "CH 7", "CH 5"
 
-TOTAL = 29
+TOTAL = 30
 # Generated frequencies shared with the Phraseology Reference (docs/phraseology).
 FACTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                                     "phraseology", "facts.json"), encoding="utf-8"))
-TOWER_CARDS = "cards 22 - 28"
+TOWER_CARDS = "cards 23 - 29"
 _CAU = next(t for t in FACTS if t["key"] == "caucasus")
 _SYR = next(t for t in FACTS if t["key"] == "syria")
 GCI_BS = (_CAU["gci_name"], "%.3f" % _CAU["gci"])     # Darkstar 264.000
@@ -207,9 +213,10 @@ def c01_how():
           ("PADDLES  -  LSO, Black Sea + Syria", "%s AM  ·  card 10" % PADDLES_F),
           ("HITMAN 1-1 / 2-1  -  JTAC, Black Sea", "%s / %s FM  ·  cards 13 - 14" % (JTAC_F[:4], JTAC2_F[:4])),
           ("RANGE AREAS + OVERLORD  -  on Command", "cards 15 - 16"),
-          ("TEXACO 1-1 / 3-1  -  tankers, Black Sea", "%s / %s AM  ·  card 17" % (TANKER_F[:5], TANKER2_F[:5])),
-          ("DARKSTAR / OVERLORD  -  GCI", "%s / %s AM  ·  cards 18 - 19" % (GCI_BS[1][:5], GCI_SY[1][:5])),
-          ("COMBAT CALLS  -  shots, CSAR, damaged jet", "AWACS or Command  ·  card 20"),
+          ("TEXACO 1-1 / 2-1 / 3-1  -  Hornet tankers", "252.1 / .2 / .3 AM  ·  card 17"),
+          ("SHELL 1-1 / 2-1  -  Viper boom tankers", "%s / %s AM  ·  card 18" % (SHELL_F[:5], SHELL2_F[:5])),
+          ("DARKSTAR / OVERLORD  -  GCI", "%s / %s AM  ·  cards 19 - 20" % (GCI_BS[1][:5], GCI_SY[1][:5])),
+          ("COMBAT CALLS  -  shots, CSAR, damaged jet", "AWACS or Command  ·  card 21"),
           ("TOWERS  -  one per airfield", TOWER_CARDS)])
     NK.band(c, "HOW TO BE HEARD", "every call")
     c.bullets([
@@ -575,7 +582,7 @@ def c10_departure():
         ("", "push vSFG-7-Command,"),
         ("", "two eight two point zero, channel four, for tasking."),
         ("3  COMMAND", "Command, Raider 1, checking in."),
-        ("4  %s" % GCI_BS[0].upper(), "Black Sea: %s %s for picture - card 18." % (GCI_BS[0], GCI_BS[1][:5])),
+        ("4  %s" % GCI_BS[0].upper(), "Black Sea: %s %s for picture - card 19." % (GCI_BS[0], GCI_BS[1][:5])),
     ], split=250)
     NK.band(c, "GET THE CLEAR CALL RIGHT")
     c.bullets([
@@ -602,14 +609,14 @@ def c11_command():
         ("checking in  /  check in", "proceed mission"),
         ("fence in  /  fence check", "cleared hot  ·  where the GCI is"),
         ("in hot  /  pickle  /  Fox 3  /  splash", "cleared hot  ·  copy"),
-        ("302 ejecting  /  I'm hit  /  mayday", "CSAR  ·  nearest field  -  card 20"),
+        ("302 ejecting  /  I'm hit  /  mayday", "CSAR  ·  nearest field  -  card 21"),
         ("on station", "good hunting"),
         ("off station  /  departing station", "proceed to assigned pattern"),
         ("fence out", "safe passage"),
         ("RTB  /  request recovery  /  bingo home plate", "expect handoff at 30 nm"),
         ("state 5.2", "copy state"),
         ("say bullseye  /  request bullseye", "bullseye NNN for NN"),
-        ("request tanker  /  say texaco", "bearing, range, angels  ·  Black Sea: card 17"),
+        ("request tanker  /  say texaco", "bearing, range, angels  ·  Black Sea: cards 17 - 18"),
         ("request tasking  (Black Sea training)", "contact Hitman 1-1 or 2-1  -  card 13"),
         ("proceeding to / request Alpha  (Black Sea)", "range areas  -  cards 15 - 16"),
     ])
@@ -766,10 +773,10 @@ def c15_overlord():
 
 # ---------------------------------------------------------- Texaco (cmd/atc/tanker.go)
 def c16_texaco():
-    c = card("TEXA", "CO", ["Texaco 1-1 and Texaco 3-1  ·  Black Sea Day / Night",
-                            "the same calls on both  ·  pick the nearer one"],
+    c = card("TEXA", "CO", ["Texaco 1-1, 2-1 and 3-1  ·  Black Sea Day / Night",
+                            "the same calls on all three  ·  pick the nearest"],
              17, "vSFG-7  ·  SKYEYE ATC  ·  HORNET  ·  TANKER")
-    NK.band(c, "THE FLOW", "both tankers, two baskets each  ·  \"Texaco 1 (or 3), Raider 1-1\"")
+    NK.band(c, "THE FLOW", "two baskets each  ·  \"Texaco 1 (2 or 3), Raider 1-1\"")
     NK.steps(c, [
         ("COMMAND", "request tanker  ->  bearing, range, contact the nearest Texaco"),
         ("INITIAL", "15 mile initial for port observation, intent to refuel"),
@@ -797,10 +804,50 @@ def c16_texaco():
     NK.band(c, "THE TANKERS", "Hornet presets")
     c.kv([("TEXACO 1-1  -  KC-130  ·  TACAN 51Y", "%s AM  ·  %s" % (TANKER_F, H_TANKER)),
           ("     angels 13, about 260 KIAS", ""),
+          ("TEXACO 2-1  -  KC-135 MPRS  ·  TACAN 52Y", "%s AM  ·  %s" % (TANKER21_F, H_TANKER21)),
+          ("     angels 24, about 265 KIAS", ""),
           ("TEXACO 3-1  -  KC-135 MPRS  ·  TACAN 53Y", "%s AM  ·  %s" % (TANKER2_F, H_TANKER2)),
           ("     angels 24, about 265 KIAS", "")])
     NK.subtle(c, "Radio check any time - loud and clear.  Angels and velocity come live off Tacview.")
     return save(c, "16_texaco.jpg")
+
+
+# ------------------------------------------------- Shell, the Viper's boom (cmd/atc/tanker.go)
+def c16_shell():
+    c = card("SHE", "LL", ["Shell 1-1 and Shell 2-1  ·  Black Sea Day / Night",
+                           "KC-135 boom  ·  the same calls on both  ·  pick the nearer one"],
+             18, "vSFG-7  ·  SKYEYE ATC  ·  VIPER  ·  TANKER")
+    NK.band(c, "THE FLOW", "one boom, one jet  ·  \"Shell 1 (or 2), Venom 1-1\"")
+    NK.steps(c, [
+        ("COMMAND", "request tanker  ->  bearing, range, contact the nearest Shell"),
+        ("INITIAL", "15 mile initial for port observation, intent to refuel"),
+        ("", "->  cleared port observation ... How much do you request?"),
+        ("GIVE", "request 5.0  (or full)  ->  copies five thousand pounds"),
+        ("TRAIL", "1 mile trail for port observation  ->  continue"),
+        ("OBSERVATION", "established port observation  ->  boom open"),
+        ("BOOM", "moving to the boom  ->  cleared to the boom"),
+        ("", "established pre-contact  ->  call ready pre-contact"),
+        ("DCS MENU", "Ready pre-contact  ->  cleared contact, boom on, take fuel"),
+        ("REFORM", "satisfied, moving to starboard reform  ->  cleared"),
+        ("CHECK OUT", "checking out  /  moving on to mission  ->  cleared to depart"),
+    ], split=170)
+    NK.band(c, "RULES")
+    c.bullets([
+        [("Observation is always port, reform always starboard.", True),
+         ("Lead makes the initial, trail, observation and check-out calls; each jet its own "
+          "boom and reform calls.", False)],
+        [("One jet on the boom.", True),
+         ("The next gets \"standby, boom occupied\" and holds port observation - the boom frees "
+          "when that jet calls reform, or after 10 minutes.", False)],
+        [("Fuel won't flow?", True),
+         ("SkyEye is radio only - DCS still needs the AI menu Ready pre-contact.", False)],
+    ])
+    NK.band(c, "THE TANKERS", "Viper presets")
+    c.kv([("SHELL 1-1  -  KC-135  ·  TACAN 61Y", "%s AM  ·  %s" % (SHELL_F, V_SHELL)),
+          ("SHELL 2-1  -  KC-135  ·  TACAN 62Y", "%s AM  ·  %s" % (SHELL2_F, V_SHELL2)),
+          ("     both angels 22, Mach 0.68 (about 288 KIAS)", "")])
+    NK.subtle(c, "Radio check any time - loud and clear.  Angels and velocity come live off Tacview.")
+    return save(c, "16_shell.jpg")
 
 
 # ------------------------------------------------- GCI (cmd/atc/gci.go, gci_recovery.go)
@@ -810,7 +857,7 @@ EYE_GCI = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER  ·  GCI"
 def c17_gci():
     c = card("DARK", "STAR", ["GCI  ·  %s %s AM Black Sea  ·  %s %s AM Syria" % (GCI_BS + GCI_SY),
                               "SkyEye's AWACS controller, our voice. Picture, threats, bogey dope."],
-             18, EYE_GCI)
+             19, EYE_GCI)
     NK.band(c, "THE FREQUENCIES", "Hornet  ·  Viper preset")
     c.kv([("%s  -  Black Sea Day / Night, Kola" % GCI_BS[0].upper(),
            "%s AM  ·  %s  ·  %s" % (GCI_BS[1], H_GCI.replace("COMM 1 ", ""), V_GCI.replace("COMM 1 ", ""))),
@@ -821,7 +868,7 @@ def c17_gci():
         ("COMMAND", "checking in on 282  ·  Command still runs your recovery"),
         ("CHECK IN", "checking in  ->  radar contact"),
         ("FENCE IN", "fence in  ->  copy fence in, picture follows"),
-        ("FLY", "picture  ·  bogey dope  ·  declare  ·  splash  -  card 19"),
+        ("FLY", "picture  ·  bogey dope  ·  declare  ·  splash  -  card 20"),
         ("FENCE OUT", "fence out  ->  copy fence out"),
         ("CHECK OUT", "checking out  ->  copy, good day.  Then Command: RTB"),
     ], split=170)
@@ -842,7 +889,7 @@ def c17_gci():
 
 def c17_gci_calls():
     c = card("GCI ", "CALLS", ["Every call the GCI answers  ·  as Raider 302 hears them",
-                              "Bullseye and BRAA numbers are examples."], 19, EYE_GCI)
+                              "Bullseye and BRAA numbers are examples."], 20, EYE_GCI)
     NK.band(c, "YOU SAY", "%s replies" % GCI_BS[0])
     c.kv([
         ("radio check  /  comm check", "good copy  ·  5 by 5"),
@@ -881,7 +928,7 @@ def c17_combat():
     # (commandShotResponse) and emergency_divert.go (damagedRe, divertReply, divertFields),
     # origin/main 4721177. Operator wording for the down call (2026-10-21).
     c = card("COMBAT ", "CALLS", ["Shots, kills, ejections, battle damage  ·  on the AWACS or Command",
-                                  "No station name needed - just your number first."], 20, EYE_GCI)
+                                  "No station name needed - just your number first."], 21, EYE_GCI)
     NK.band(c, "SHOTS AND KILLS", "the AWACS copies  ·  Command copies too")
     c.kv([
         ("302, Fox 3, 080 for 56, 25,000", "Raider 302, Darkstar, copy Fox three"),
@@ -910,7 +957,7 @@ def c17_combat():
         [("Foothold never sends you to a red-held field.", True),
          ("Read from the campaign save. None friendly: \"No friendly field available, say intentions.\"", False)],
         [("Then call that tower with your emergency.", True),
-         ("It gives you the runway you name and copies souls and fuel - card 27.", False)],
+         ("It gives you the runway you name and copies souls and fuel - card 28.", False)],
         [("Any AWACS name works.", True),
          ("Darkstar, Overlord, Magic or Wizard - the SkyEye AWACS on your frequency answers.", False)],
     ])
@@ -919,7 +966,7 @@ def c17_combat():
 
 def c12_sortie():
     c = card("A FULL ", "SORTIE", ["Off the boat and back  ·  every SkyEye call, in order",
-                                  "Hornet, Case I, Persian Gulf frequencies."], 21, EYE_CVN)
+                                  "Hornet, Case I, Persian Gulf frequencies."], 22, EYE_CVN)
     NK.band(c, "OUTBOUND")
     NK.steps(c, [
         ("DECKBOSS 128.6", "request taxi  ·  ready cat N  ·  airborne"),
@@ -953,7 +1000,7 @@ def c12_sortie():
 def c13_towers():
     c = card("AIRFIELD ", "ATC", ["One AI tower per field  ·  UHF AM  ·  Gulf, Black Sea, Syria",
                                   "Same calls at every field; only name and frequency change."],
-             22, EYE_TWR)
+             23, EYE_TWR)
     NK.band(c, "HOW TO BE HEARD", "every tower call")
     c.bullets([
         [("Open with the field name, then your callsign.", True),
@@ -990,7 +1037,7 @@ def c13_towers():
 def c14_tower_radios():
     c = card("TOWER ", "RADIOS", ["Gulf and Black Sea  ·  tower, ATIS, COMM 1 preset",
                                   "Presets read off the squadron Hornet and Viper cards."],
-             23, EYE_TWR)
+             24, EYE_TWR)
     NK.band(c, "PERSIAN GULF", "Hornet  /  Viper")
     c.kv([
         ("AL DHAFRA TOWER  251.100  ·  ATIS 248.200", "CH 8  /  CH 12"),
@@ -1027,7 +1074,7 @@ def c15_syria_towers():
     atis = {a["icao"]: a["freq"] for a in th["atis"]}
     c = card("SYRIA ", "TOWERS", ["Eastern Med  ·  Foothold  ·  %d fields  ·  tower and ATIS" % len(th["towers"]),
                                   "Read from the start scripts - dial the frequency."],
-             24, EYE_TWR)
+             25, EYE_TWR)
     NK.band(c, "THE TOWERS", "tower  ·  ATIS")
     c.kv([(t["name"].upper(), "%.3f   ATIS %.3f" % (t["freq"], atis[t["icao"]]) if t["icao"] in atis
            else "%.3f" % t["freq"]) for t in th["towers"]])
@@ -1046,7 +1093,7 @@ def c15_syria_towers():
 
 def c16_tower_departure():
     c = card("DEPART", "URE", ["Parking to Command  ·  every SkyEye field",
-                               "Wait for each reply before the next call."], 25, EYE_TWR)
+                               "Wait for each reply before the next call."], 26, EYE_TWR)
     NK.band(c, "THE DEPARTURE", "in order")
     NK.steps(c, [
         ("REQUEST TAXI", "Minhad Tower, Raider 1, request taxi."),
@@ -1087,7 +1134,7 @@ def c16_tower_departure():
 
 def c17_tower_arrival():
     c = card("ARRI", "VAL", ["Overhead or straight in  ·  one call per leg",
-                             "Give your distance with inbound, initial or final."], 26, EYE_TWR)
+                             "Give your distance with inbound, initial or final."], 27, EYE_TWR)
     NK.band(c, "THE OVERHEAD", "VMC")
     NK.steps(c, [
         ("INBOUND", "Minhad Tower, Raider 1, 10 mile initial."),
@@ -1135,7 +1182,7 @@ def c17_tower_arrival():
 
 def c18_tower_calls():
     c = card("TOWER ", "CALLS", ["Every call a tower answers  ·  lead with the field name",
-                                 "Silent calls are heard but get no reply."], 27, EYE_TWR)
+                                 "Silent calls are heard but get no reply."], 28, EYE_TWR)
     NK.band(c, "GROUND AND DEPARTURE", "tower replies")
     c.kv([
         ("request taxi  /  ready to taxi", "taxi, hold short"),
@@ -1176,7 +1223,7 @@ def c18_multiship():
     # pkg/controller/flight.go (origin/main 0aab154, 2026-10-21): one takeoff and one landing
     # clearance cover the flight (operator ruling).
     c = card("MULTI-", "SHIP", ["Flights of 2 - 6  ·  one clearance for the whole flight",
-                                "The lead talks. Name the wingmen on the first call."], 28, EYE_TWR)
+                                "The lead talks. Name the wingmen on the first call."], 29, EYE_TWR)
     NK.band(c, "DEPARTURE", "the lead calls")
     NK.steps(c, [
         ("HOLDING SHORT", "Senaki Tower, Raider 301, flight of three,"),
@@ -1213,7 +1260,7 @@ def c18_multiship():
 
 def c19_trouble():
     c = card("NO ", "ANSWER?", ["Work down the list  ·  most misses are the first three",
-                                "Tell the operator what you said, word for word."], 29)
+                                "Tell the operator what you said, word for word."], 30)
     NK.band(c, "CHECK", "in order")
     NK.steps(c, [
         ("1", "Waited 2 - 3 seconds?"),
@@ -1221,8 +1268,8 @@ def c19_trouble():
         ("3", "Said your full callsign?"),
         ("4", "Used a trigger word from the calls cards?"),
         ("5", "Half-second pause after keying - call not clipped?"),
-        ("6", "Frequency? Marshal 306.3, Paddles 128.3, Texaco 252.1/3, Hitman 61FM."),
-        ("", "GCI: Darkstar 264.0, Overlord 266.0."),
+        ("6", "Frequency? Marshal 306.3, Paddles 128.3, Hitman 61FM."),
+        ("", "Texaco 252.1/2/3, Shell 253.1/2.  GCI: Darkstar 264.0, Overlord 266.0."),
         ("7", "SRS shows your TX light? Radio AM (Hitman FM), encryption off?"),
     ], split=120)
     NK.band(c, "KNOWN QUIRKS")
@@ -1248,7 +1295,7 @@ def c19_trouble():
 CARD_FUNCS = [c01_how, c02_freqs, c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1,
               c06_marshal_case3, c07_marshal_calls_inbound, c08_marshal_calls_stack,
               c09_marshal_calls_case3, c10_paddles, c10_departure, c11_command, c12_jtac_flow,
-              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c17_gci, c17_gci_calls, c17_combat, c12_sortie, c13_towers,
+              c13_jtac_checks, c14_range_areas, c15_overlord, c16_texaco, c16_shell, c17_gci, c17_gci_calls, c17_combat, c12_sortie, c13_towers,
               c14_tower_radios, c15_syria_towers, c16_tower_departure, c17_tower_arrival,
               c18_tower_calls, c18_multiship, c19_trouble]
 
@@ -1300,7 +1347,8 @@ def kb_freqs(viper=False):
     carrier = (("DECKBOSS", "deckboss"), ("MARSHAL", "marshal"), ("PADDLES", "lso"))
     if viper:
         c = card("AI ATC ", "FREQS", ["What SkyEye listens on, and the Viper preset",
-                                      "1-4 = COMM 1 channel 4  ·  AM unless FM"], 2)
+                                      "1-4 = COMM 1 channel 4  ·  AM unless FM"], 2,
+                 "vSFG-7  ·  SKYEYE ATC  ·  VIPER")
     else:
         c = card("AI ATC ", "FREQS", ["What SkyEye listens on, and the preset that reaches it",
                                       "H = Hornet, V = Viper  ·  1-4 = COMM 1 channel 4  ·  AM unless FM"], 2)
@@ -1311,8 +1359,14 @@ def kb_freqs(viper=False):
             ("%s AWACS  %s" % (cau["gci_name"].upper(), f(cau["gci"])), ch("caucasus", "gci")),
             ("HITMAN 1-1  %s FM" % f(cau["jtac"]), ch("caucasus", "jtac")),
             ("HITMAN 2-1  %s FM" % f(cau["jtac2"]), ch("caucasus", "jtac2")),
-            ("TEXACO 1-1  %s" % f(cau["tanker"]), ch("caucasus", "tanker")),
-            ("TEXACO 3-1  %s" % f(cau["tanker2"]), ch("caucasus", "tanker2"))]
+            ]
+    nets = {n["name"]: n for n in cau.get("tankers", [])}
+    if viper:
+        rows += [("%s  %s" % (n.upper(), f(nets[n]["freq"])), ch("caucasus", n)) for n in ("Shell 1-1", "Shell 2-1")]
+    else:
+        rows += [("TEXACO 1-1  %s" % f(cau["tanker"]), ch("caucasus", "tanker")),
+                 ("TEXACO 2-1  %s" % f(nets["Texaco 2-1"]["freq"]), ch("caucasus", "Texaco 2-1")),
+                 ("TEXACO 3-1  %s" % f(cau["tanker2"]), ch("caucasus", "tanker2"))]
     if not viper:
         rows += [("%s  %s" % (n, f(cau[k])), ch("caucasus", k)) for n, k in carrier]
     rows += kb_towers(cau, ch)
@@ -1343,7 +1397,8 @@ def kb_freqs_viper():
 # CH 4; Viper ATIS on Foothold has no preset.
 KB_CH = {
     "caucasus": {"command": "H 1-4  ·  V 1-1", "gci": "H 1-5  ·  V 1-4", "jtac": "H 2-12  ·  V 2-8",
-                 "jtac2": "dial", "tanker": "H 2-8  ·  V dial", "tanker2": "H 2-10  ·  V dial",
+                 "jtac2": "dial", "tanker": "H 2-8", "tanker2": "H 2-10", "Texaco 2-1": "H 2-9",
+                 "Shell 1-1": "V 1-7", "Shell 2-1": "V 1-8",
                  "deckboss": "H 1-1", "marshal": "H 1-3", "lso": "H 2-4",
                  "UGSB": "H 1-8  ·  V 1-12", "UG5X": "H 1-10  ·  V 1-14", "UGKO": "H 1-12  ·  V 1-18",
                  "UGKS": "H 1-14  ·  V 1-16", "UGTB": "H 1-18  ·  V 1-10"},
@@ -1368,15 +1423,16 @@ def kb_towers(th, ch):
 # Each jet's kneeboard deck: the comms cards with card 2 swapped for the plain frequencies
 # card. The Viper has no carrier, so no Deckboss, Marshal, Paddles or boat cards (operator
 # 2026-10-22: "16's do not need marshal, LSO, Deckboss"). Pages keep their packet numbers so
-# "card 20" still means card 20.
+# "card 21" still means card 21. The Hornet gets Texaco (baskets), the Viper Shell (boom).
 CARRIER_CARDS = [c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1, c06_marshal_case3,
                  c07_marshal_calls_inbound, c08_marshal_calls_stack, c09_marshal_calls_case3,
                  c10_paddles, c10_departure, c12_sortie]
 JET_DECKS = {
-    "FA-18C_hornet": [kb_freqs if f is c02_freqs else f for f in CARD_FUNCS],
-    "F-16C_50": [kb_freqs_viper if f is c02_freqs else f for f in CARD_FUNCS if f not in CARRIER_CARDS],
+    "FA-18C_hornet": [kb_freqs if f is c02_freqs else f for f in CARD_FUNCS if f is not c16_shell],
+    "F-16C_50": [kb_freqs_viper if f is c02_freqs else f for f in CARD_FUNCS
+                 if f not in CARRIER_CARDS and f is not c16_texaco],
 }
-KNEEBOARD_FUNCS = JET_DECKS["FA-18C_hornet"] + [kb_freqs_viper]
+KNEEBOARD_FUNCS = JET_DECKS["FA-18C_hornet"] + [kb_freqs_viper, c16_shell]
 
 
 def kneeboards(pages):

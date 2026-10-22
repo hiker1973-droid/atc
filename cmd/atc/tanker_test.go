@@ -203,3 +203,62 @@ func TestTankerDay1019Flow(t *testing.T) {
 		t.Errorf("moving on to mission: %q", got)
 	}
 }
+
+// The Shells and Texaco 2-1 (operator 2026-10-22: "we need to add 2 Shells for
+// 16's and Texaco 2-1 for 18's"), each from one --tanker-net.
+func TestParseTankerNet(t *testing.T) {
+	cfg, err := parseTankerNet("253.1/Shell-1-1/22/288/boom/charlie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FreqMHz != 253.1 || cfg.Name != "Shell-1-1" || cfg.Spoken != "Shell one one" || cfg.Tacview != "Shell 1-1" ||
+		cfg.Angels != 22 || cfg.KIAS != 288 || !cfg.Boom || cfg.Voice.eleven.ID != elCharlie {
+		t.Errorf("Shell 1-1: %+v", cfg)
+	}
+	cfg, err = parseTankerNet("252.2/Texaco-2-1/24/265/basket/hank")
+	if err != nil || cfg.Spoken != "Texaco two one" || cfg.Tacview != "Texaco 2-1" || cfg.Boom || cfg.Voice.eleven.ID != elHank {
+		t.Errorf("Texaco 2-1: %+v %v", cfg, err)
+	}
+	for _, bad := range []string{"253.1/Shell-1-1/22/288/boom", "x/Shell-1-1/22/288/boom/charlie", "253.1/Shell-1-1/22/288/probe/charlie"} {
+		if _, err := parseTankerNet(bad); err == nil {
+			t.Errorf("%q: no error", bad)
+		}
+	}
+}
+
+func TestTankerCallsignShellTexaco21(t *testing.T) {
+	for in, want := range map[string]string{
+		"Shell 1-1, Venom 1-1, flight of 2, 15 mile initial for port observation with intent to refuel": "Venom 11",
+		"Shell one one, Venom 2-1, comm check.":                                                         "Venom 21",
+		"Shell 2-1 Venom 212 request 5.0":                                                               "Venom 212",
+		"Texaco 2-1, Raider 302, 15 mile initial, intent to refuel.":                                    "Raider 302",
+		"Texaco two one, Raider 3-0-2, comm check.":                                                     "Raider 302",
+	} {
+		if got := tankerCallsign(in); got != want {
+			t.Errorf("%q: callsign %q, want %q", in, got, want)
+		}
+	}
+}
+
+// A boom takes one jet at a time; the flow is otherwise the baskets' flow.
+func TestTankerBoomFlow(t *testing.T) {
+	tn := newTankerNet("Shell one one", func() int { return 22 }, func() int { return 288 })
+	tn.boom = true
+	at := time.Date(2026, 10, 22, 20, 0, 0, 0, time.UTC)
+	tn.now = func() time.Time { return at }
+	tn.pick = func(o [3]string) string { return o[0] }
+	runTanker(t, tn, []struct{ call, want string }{
+		{"Shell 1-1, Venom 1-1, flight of 2, 15 mile initial for port observation with intent to refuel",
+			"Venom 11, Shell one one, cleared port observation, two two thousand, velocity two eight eight. How much do you request?"},
+		{"Venom 1-1, request 5.0", "Venom 11, Shell copies five thousand pounds."},
+		{"Venom 1-1, established port observation", "Venom 11, Shell, copy. Boom open."},
+		{"Venom 1-1, moving to the boom", "Venom 11, Shell, cleared to the boom."},
+		{"Venom 1-2, established port observation", "Venom 12, Shell, copy, boom occupied. Hold port observation."},
+		{"Venom 1-2, moving to the boom", "Venom 12, Shell, standby, boom occupied. Hold port observation."},
+		{"Venom 1-1, established pre-contact", "Venom 11, Shell, copy, call ready pre-contact."},
+		{"Venom 1-1, satisfied, moving to starboard reform", "Venom 11, Shell, cleared starboard reform."},
+		{"Venom 1-2, moving to pre-contact", "Venom 12, Shell, cleared to the boom."},
+		{"Shell, Venom 1-1, checking out, resuming navigation, pushing 282",
+			"Venom 11, Shell, copy, cleared to depart. Fortuna super te, Viking."},
+	})
+}
