@@ -1278,10 +1278,51 @@ OMM_MOD = os.path.join(DESKTOP_COPY, "OMM", "SkyEye ATC Kneeboards")
 KNEEBOARD_JETS = ["FA-18C_hornet", "F-16C_50"]
 
 
+def kb_freqs():
+    """Kneeboard page 2 (operator 2026-10-22): the mission comms card already gives the
+    presets, so the kneeboard set gets only what each AI ATC role listens on - per theatre
+    we fly, straight from facts.json (read out of the start scripts by TestDocFacts)."""
+    def f(x):
+        return "%.3f" % x
+
+    c = card("AI ATC ", "FREQS", ["What SkyEye listens on  ·  AM unless marked FM",
+                                        "Channels are on the mission comms card."], 2)
+    cau = _CAU
+    NK.band(c, "BLACK SEA", "Caucasus Day / Night")
+    rows = [("COMMAND", f(cau["command"])),
+            ("%s  -  AWACS" % cau["gci_name"].upper(), f(cau["gci"])),
+            ("HITMAN 1-1  /  2-1  -  JTAC", "%s  /  %s FM" % (f(cau["jtac"]), f(cau["jtac2"]))),
+            ("TEXACO 1-1  /  3-1  -  tankers", "%s  /  %s" % (f(cau["tanker"]), f(cau["tanker2"]))),
+            ("DECKBOSS  ·  MARSHAL  ·  PADDLES", "%s  ·  %s  ·  %s" % (f(cau["deckboss"]), f(cau["marshal"]), f(cau["lso"])))]
+    rows += kb_towers(cau)
+    c.kv(rows, size=14, rh=27)
+    syr = _SYR
+    NK.band(c, "SYRIA", "Foothold")
+    rows = [("COMMAND", f(syr["command"])),
+            ("%s  -  AWACS" % syr["gci_name"].upper(), f(syr["gci"])),
+            ("DECKBOSS  ·  MARSHAL  ·  PADDLES", "%s  ·  %s  ·  %s" % (f(syr["deckboss"]), f(syr["marshal"]), f(syr["lso"])))]
+    rows += kb_towers(syr)
+    c.kv(rows, size=14, rh=27)
+    NK.subtle(c, "Towers: tower  ·  ATIS (listen only).  Marshal 306.300 is SkyEye; 306.200 is a live Marshal.")
+    return save(c, "02_ai_atc_freqs.jpg")
+
+
+def kb_towers(th):
+    atis = {a["icao"]: a["freq"] for a in th["atis"]}
+    rows = []
+    for tw in sorted(th["towers"], key=lambda x: x["name"]):
+        a = atis.get(tw.get("icao"))
+        rows.append(("%s" % tw["name"].upper(), "%.3f%s" % (tw["freq"], "  ·  ATIS %.3f" % a if a else "")))
+    return rows
+
+
 def kneeboards(pages):
     if not os.path.isdir(DESKTOP_COPY):
         return
     from PIL import Image
+    # The kneeboard set swaps the presets card for a plain list of the AI ATC frequencies.
+    pages = list(pages)
+    pages[1] = kb_freqs()
     if os.path.isdir(OMM_MOD):
         shutil.rmtree(OMM_MOD)
     for jet in KNEEBOARD_JETS:
