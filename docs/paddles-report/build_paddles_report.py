@@ -219,7 +219,7 @@ def collect(logs, start, end):
                 ev["deck"].append(o)
             elif msg == "Paddles: groove call":
                 ev["groove"].append(o)
-            elif msg in ("Command TX", "Paddles TX") and "In the groove at three-quarter mile" in o.get("text", ""):
+            elif msg in ("Command TX", "Paddles TX") and re.search(r"in the groove,? at three-quarter", o.get("text", ""), re.I):
                 ev["abeam"].append(o)
             elif msg == "Command intent miss" and o.get("channel") == "Paddles":
                 ev["miss"].append(o)
@@ -617,7 +617,7 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None)
     if ic_all:
         notes.append("Average glideslope in close on traps: %+.1f&deg;." % (sum(ic_all) / len(ic_all)))
     for m in ev["miss"]:
-        if re.search(r"three-quarter mile|3/4 mile", m.get("text", ""), re.I):
+        if re.search(r"three-quarters? (?:of a )?mile|3/4 (?:of a )?mile", m.get("text", ""), re.I):
             notes.append("A ball call without \"ball\" (\"%s\") went unanswered: say \"Hornet ball\"." % m.get("text", ""))
             break
     if notes:

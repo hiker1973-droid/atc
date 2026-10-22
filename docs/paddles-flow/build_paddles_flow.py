@@ -77,7 +77,7 @@ S.append(section("1. Marshal (306.300): get handed to Paddles",
 S.append(section("2. Abeam (the 180)",
     table(["Pilot", "Paddles"], [
         ["\"<b>302 abeam</b>\" (or \"Paddles, Raider 302, abeam\")",
-         "\"<b>Paddles contact, 302. In the groove at three-quarter mile, call the ball.</b>\""],
+         "\"<b>Paddles contact, 302, Hornet in the groove, at three-quarters of a mile call the ball.</b>\""],
         ["\"Paddles, Raider 302, <b>radio check</b>\" (or \"comm check\", \"how copy\")",
          "\"Raider 302, Paddles, loud and clear.\""],
     ], [3.3, 4.1]),

@@ -82,6 +82,9 @@ Foothold skips red-held fields). Cards 20 - 28 of v1.34 are now 21 - 29. Every c
 written as a DCS kneeboard page to Documentation/OMM/SkyEye ATC Kneeboards (an OMM mod:
 Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 
+v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
+groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
+
 v1.27 (operator 2026-10-18): red deck / green deck. After a trap the pilot calls "red deck",
 then "green deck" once clear of the landing area; no green deck by the time the next jet is
 at 1/4 nm (or Tacview shows the landing area foul) and Paddles calls "<callsign>, foul deck,
@@ -127,7 +130,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.35"
+VER = "v1.36"
 DATE = "22 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -530,8 +533,8 @@ def c10_paddles():
     NK.band(c, "ABEAM AND THE BALL CALL", "after Marshal's \"contact paddles\"")
     NK.steps(c, [
         ("ABEAM", "302 abeam."),
-        ("PADDLES", "Paddles contact, 302. In the groove at"),
-        ("", "three-quarter mile, call the ball."),
+        ("PADDLES", "Paddles contact, 302, Hornet in the groove,"),
+        ("", "at three-quarters of a mile call the ball."),
         ("YOU", "302, Hornet ball, 5.5."),
         ("PADDLES", "Roger ball."),
         ("CLARA", "302, Clara, 5.0.  ->  Paddles contact, keep it coming."),

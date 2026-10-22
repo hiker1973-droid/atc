@@ -49,12 +49,12 @@ func TestLSOBallCalls(t *testing.T) {
 			t.Errorf("heard(%q) = %q (said %v), want %q", in, resp, said, want)
 		}
 	}
-	// "302 abeam" (operator 2026-10-18): Paddles contact, set up the ball call.
+	// "302 abeam" (operator 2026-10-18, wording 2026-10-22): Paddles contact, set up the ball call.
 	for in, want := range map[string]string{
-		"302 abeam.":                  "Paddles contact, 302. In the groove at three-quarter mile, call the ball.",
-		"302, a beam.":                "Paddles contact, 302. In the groove at three-quarter mile, call the ball.",
-		"Paddles, Raider 302, abeam.": "Paddles contact, Raider 302. In the groove at three-quarter mile, call the ball.",
-		"3-0-2 beam, 5.8.":            "Paddles contact, 302. In the groove at three-quarter mile, call the ball.",
+		"302 abeam.":                  "Paddles contact, 302, Hornet in the groove, at three-quarters of a mile call the ball.",
+		"302, a beam.":                "Paddles contact, 302, Hornet in the groove, at three-quarters of a mile call the ball.",
+		"Paddles, Raider 302, abeam.": "Paddles contact, Raider 302, Hornet in the groove, at three-quarters of a mile call the ball.",
+		"3-0-2 beam, 5.8.":            "Paddles contact, 302, Hornet in the groove, at three-quarters of a mile call the ball.",
 	} {
 		said = nil
 		if _, resp := f.heard(in); resp != want || len(said) != 0 {

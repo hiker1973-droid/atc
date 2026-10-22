@@ -7,6 +7,12 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.36 (22 OCT 2026) — Paddles abeam wording
+
+Operator: "Paddles Contact Raider XXX, Hornet in the groove, at 3/4 of a mile call the ball" -
+cmd/atc/lso.go lsoAbeamReply; card 10 updated. Phraseology v2.9 and the Paddles flow sheet the same.
+Kneeboard page 2 (AI ATC FREQS) prints the Hornet / Viper channel for each role and tower.
+
 ## v1.35 (22 OCT 2026) — combat calls card + OMM kneeboards
 
 Operator: "go ahead and make comms kneeboards but lets make a seperate folder so I can install

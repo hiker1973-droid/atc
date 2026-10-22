@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.8"
-DATE = "21 OCT 2026"          # change together with VER
+VER = "v2.9"
+DATE = "22 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -174,7 +174,7 @@ MARSHAL = [
 PADDLES = [
     ("Radio check", "radio check", "Loud and clear", "radio_check"),
     ("In the break", "in the break", "Roger, call abeam", "break"),
-    ("Abeam (the 180)", "abeam", "Paddles contact, in the groove at three-quarter mile, call the ball", "abeam"),
+    ("Abeam (the 180)", "abeam", "Paddles contact, Hornet in the groove, at three-quarters of a mile call the ball", "abeam"),
     ("Ball call", "Hornet ball, 5.5  /  three-quarter mile, 5.4", "Roger ball", "ball"),
     ("No ball in sight", "Clara, 5.0", "Paddles contact, keep it coming", "clara"),
     ("After the trap", "red deck", "No reply - the deck is foul, the next jet is waved off at 1/4 nm", "red_deck"),
@@ -670,7 +670,7 @@ def build():
     d.table(("Intent", "Say something like", "Response"),
             table_rows("lso", PADDLES, "Paddles", cs="Raider 302"), (0.22, 0.38, 0.40))
     d.dialogue([("Pilot", "Paddles, Raider 302, abeam."),
-                ("Paddles", "Paddles contact, Raider 302. In the groove at three-quarter mile, call the ball."),
+                ("Paddles", "Paddles contact, Raider 302, Hornet in the groove, at three-quarters of a mile call the ball."),
                 ("Pilot", "302, Hornet ball, 5.5."),
                 ("Paddles", "Roger ball."),
                 ("Paddles", "You're high, bring it down."),

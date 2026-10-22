@@ -322,7 +322,8 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		if cs == "" {
 			return "", ""
 		}
-		return cs, "Paddles contact, " + cs + ". In the groove at three-quarter mile, call the ball."
+		// Wording: operator 2026-10-22.
+		return cs, lsoAbeamReply(cs)
 	case lsoBreakRe.MatchString(text):
 		// "302 in the break": Paddles copies and asks for the abeam call,
 		// which sets up the ball call.
@@ -342,6 +343,12 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		return cs, cs + ", Paddles, loud and clear."
 	}
 	return "", ""
+}
+
+// lsoAbeamReply is Paddles' answer to "302 abeam" (operator 2026-10-22:
+// "Paddles contact Raider XXX, Hornet in the groove, at 3/4 of a mile call the ball").
+func lsoAbeamReply(cs string) string {
+	return "Paddles contact, " + cs + ", Hornet in the groove, at three-quarters of a mile call the ball."
 }
 
 // lsoObj is one ACMI object's last state (properties arrive only on change).
