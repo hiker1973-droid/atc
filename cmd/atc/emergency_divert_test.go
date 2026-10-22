@@ -16,6 +16,8 @@ func TestDamagedCallWords(t *testing.T) {
 		"command, raider 302, battle damage, rtb.":              true,
 		"302, took a hit, left engine fire.":                    true,
 		"mayday mayday, raider 302.":                            true,
+		"command, raider 302, declaring an emergency.":          true,
+		"darkstar, raider 302, pan pan, hydraulic failure.":     true,
 		"command, raider 302, request nearest field.":           true,
 		"raider 302, lost my right engine.":                     true,
 		"hitman, raider 302, request bda.":                      false,

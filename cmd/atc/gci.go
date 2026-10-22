@@ -382,6 +382,10 @@ func runGCI(ctx context.Context, apiKey string) {
 	voiceNetLoop(ctx, flagSRSAddr, flagGCIFreq, cs, apiKey, flagEAMPassword, gciVoice(), flagExternalAudio,
 		gciWhisperPrompt(cs), nil,
 		func(text string) (string, string) {
+			if t := gciOwnName(text, cs); t != text {
+				log.Info().Str("text", text).Str("as", t).Msg("GCI: called by another AWACS name")
+				text = t
+			}
 			if reply := gciCheckOut(text, cs); reply != "" {
 				log.Info().Str("text", text).Msg("GCI: checking out")
 				return "", reply // voiceNetLoop speaks it

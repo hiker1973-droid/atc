@@ -87,22 +87,46 @@ func gciCombatCall(text, gci string, byNumber func(string) string) (kind, reply 
 	}
 	who, ok := leadCallsign(text, byNumber)
 	if !ok {
+		// "Splash one." with no callsign (Foothold 2026-10-21 17:41) is
+		// still copied, to no one in particular.
+		if bareSplashRe.MatchString(text) {
+			return "splash", strings.ToUpper(gci) + ", " + gciSplashCopy(text)
+		}
 		return "", ""
 	}
 	head := fmt.Sprintf("%s, %s, ", gciSpoken(who), strings.ToUpper(gci))
 	if n := foxNumber(text); n != "" {
 		return "fox", head + "copy Fox " + n + "."
 	}
-	if m := gciSplashRe.FindStringSubmatch(text); m != nil {
-		if n := m[1]; n != "" {
-			if w, ok := gciNumberWords[n]; ok {
-				n = w
-			}
-			return "splash", head + "copy splash " + strings.ToLower(n) + "."
-		}
-		return "splash", head + "copy splash."
+	if gciSplashRe.MatchString(text) {
+		return "splash", head + gciSplashCopy(text)
 	}
 	return "", ""
+}
+
+// bareSplashRe: the whole call is "splash", maybe with a count.
+var bareSplashRe = regexp.MustCompile(`(?i)^\W*splash(?:ed)?\b(?:[\s,]+(?:one|two|three|four|five|six|[1-6]))?\W*$`)
+
+// gciSplashCopy is "copy splash." or "copy splash two."
+func gciSplashCopy(text string) string {
+	if m := gciSplashRe.FindStringSubmatch(text); m != nil && m[1] != "" {
+		n := m[1]
+		if w, ok := gciNumberWords[n]; ok {
+			n = w
+		}
+		return "copy splash " + strings.ToLower(n) + "."
+	}
+	return "copy splash."
+}
+
+// otherAWACSRe: a GCI is answered under any AWACS name - Jedi called
+// Overlord "Darkstar" twice on Foothold (2026-10-21 17:39, 17:47) and got
+// silence.
+var otherAWACSRe = regexp.MustCompile(`(?i)\b(?:darkstar|overlord|magic|wizard)\b`)
+
+// gciOwnName puts this GCI's name in place of any other AWACS name.
+func gciOwnName(text, gci string) string {
+	return otherAWACSRe.ReplaceAllString(text, gci)
 }
 
 // gciSpoken writes a callsign the way the GCI says it ("RAIDER 3 0 2").

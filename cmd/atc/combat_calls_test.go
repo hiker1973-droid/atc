@@ -18,6 +18,8 @@ func TestGCICombatCalls(t *testing.T) {
 		{"302 Fox 311 for 56, 21,000.", "fox", "RAIDER 3 0 2, DARKSTAR, copy Fox three."},
 		{"Darkstar, Raider 302, fox two.", "fox", "RAIDER 3 0 2, DARKSTAR, copy Fox two."},
 		{"302 splash.", "splash", "RAIDER 3 0 2, DARKSTAR, copy splash."},
+		// Foothold 2026-10-21 17:41:42: no callsign at all.
+		{"Splash one.", "splash", "DARKSTAR, copy splash one."},
 		{"302 ejecting.", "down", "RAIDER 3 0 2 down, launching CSAR."},
 		{"302, eject, eject, eject!", "down", "RAIDER 3 0 2 down, launching CSAR."},
 		{"Darkstar, Raider 301, 302 is down.", "down", "RAIDER 3 0 2 down, launching CSAR."},
@@ -52,5 +54,15 @@ func TestCommandCombatCalls(t *testing.T) {
 	cs := joinCallsignDigits(extractCallsignSkippingAddress(in, commandAddresses...))
 	if got := commandReply(in, cs, "vSFG-7-Command", store); got == "" || !strings.Contains(got, "Fox three") {
 		t.Errorf("%q: %q, want a Fox three copy", in, got)
+	}
+}
+
+// Foothold 2026-10-21 17:39, 17:47: Jedi called Overlord "Darkstar".
+func TestGCIOwnName(t *testing.T) {
+	if got := gciOwnName("Darkstar Raider 302 requests bogey dope.", "Overlord"); got != "Overlord Raider 302 requests bogey dope." {
+		t.Errorf("got %q", got)
+	}
+	if got := gciOwnName("Overlord, Raider 302, picture.", "Overlord"); got != "Overlord, Raider 302, picture." {
+		t.Errorf("own name changed: %q", got)
 	}
 }
