@@ -176,7 +176,11 @@ var (
 
 func commandRangeAreaBoard() *rangeAreaBoard {
 	commandRangeAreasOnce.Do(func() {
-		commandRangeAreas = &rangeAreaBoard{areas: rangeAreasForMap(flagMap), working: make(map[string]rangeWork), now: time.Now,
+		areas := rangeAreasForMap(flagMap)
+		if redSide() {
+			areas = nil // blue's ranges
+		}
+		commandRangeAreas = &rangeAreaBoard{areas: areas, working: make(map[string]rangeWork), now: time.Now,
 			toJTAC:  func(key string, numbers []int) *jtacNet { return commandTaskingBoard().handOffTarget(key, numbers) },
 			pending: make(map[string]*overlordRequest),
 			after:   func(d time.Duration, f func()) { time.AfterFunc(d, f) },

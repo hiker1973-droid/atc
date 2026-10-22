@@ -310,6 +310,14 @@ func (c *ATCComposer) HoldForSpacing(callsign, runway string, secondsLeft int) s
 // HandoffToCommand issues frequency change to command net — 3 variations.
 func (c *ATCComposer) HandoffToCommand(callsign, handoffCallsign string, freqMHz float64, preset string) string {
 	freq := spellFrequency(freqMHz)
+	if preset == "" {
+		// Mozdok: red's Command sits on a different button in each jet.
+		return pick([]string{
+			fmt.Sprintf("%s, %s, contact %s, %s. Good day.", callsign, c.towerCallsign, handoffCallsign, freq),
+			fmt.Sprintf("%s, %s, switch to %s, %s. Safe skies.", callsign, c.towerCallsign, handoffCallsign, freq),
+			fmt.Sprintf("%s, %s, frequency change approved, %s on %s.", callsign, c.towerCallsign, handoffCallsign, freq),
+		})
+	}
 	return pick([]string{
 		fmt.Sprintf("%s, %s, contact %s, %s, %s. Good day.", callsign, c.towerCallsign, handoffCallsign, freq, preset),
 		fmt.Sprintf("%s, %s, switch to %s, %s, %s. Safe skies.", callsign, c.towerCallsign, handoffCallsign, freq, preset),

@@ -242,6 +242,8 @@ func roleFromCmd(bat, title, cmd string) Role {
 	switch {
 	case strings.Contains(cmd, "--atis-only"):
 		r.LogFile = "atc-atis.log"
+	case strings.Contains(cmd, "--command-only") && strings.Contains(cmd, "--coalition red"):
+		r.LogFile = "atc-command-red.log"
 	case strings.Contains(cmd, "--command-only"):
 		r.LogFile = "atc-command.log"
 	case strings.Contains(cmd, "--marshal-only"):

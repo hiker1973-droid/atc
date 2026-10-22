@@ -33,7 +33,7 @@ var radioCheckPhrases = []string{"radio check", "comm check", "comms check", "co
 // a pilot on the wrong radio still gets his own callsign back. Longest first:
 // extractCallsignSkippingAddress takes the first exact prefix followed by a
 // space or comma, so "union marshal" would not match "Union Marshall".
-var commandAddresses = []string{"vsfg-7-command", "vsfg 7 command", "command",
+var commandAddresses = []string{"vsfg-7-command", "vsfg 7 command", "red-command", "red command", "command",
 	"union marshall", "union marshal", "unit marshall", "marshall", "marshal",
 	"deck boss", "deckboss", "hitman 1-1", "hitman one one", "hitman",
 	"overlord actual", "overlord"}

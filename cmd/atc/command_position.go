@@ -8,7 +8,6 @@ import (
 
 	"github.com/paulmach/orb"
 
-	"github.com/vsfg7/atc/pkg/airfield"
 	"github.com/vsfg7/atc/pkg/composer"
 )
 
@@ -24,7 +23,7 @@ type magVarFn func(orb.Point) float64
 // spoken three-digit bearing resolves anyway.
 func nearestFieldMagVar(p orb.Point) float64 {
 	best, bestNm := 0.0, math.MaxFloat64
-	for _, fld := range airfield.FieldsForMap(flagMap) {
+	for _, fld := range commandFields() {
 		if d := haversineNm(p, fld.Center); d < bestNm {
 			best, bestNm = fld.MagVar, d
 		}

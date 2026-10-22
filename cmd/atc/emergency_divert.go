@@ -87,7 +87,7 @@ var divertSave = &footholdSave{paths: footholdSavePaths}
 // (Syria) those the red side holds are left out (operator 2026-10-21: "yes
 // for sure"). Without a readable save every field is offered.
 func divertFields() []*airfield.Airfield {
-	fields := airfield.FieldsForMap(flagMap)
+	fields := commandFields()
 	if !strings.EqualFold(strings.TrimSpace(flagMap), "syria") {
 		return fields
 	}

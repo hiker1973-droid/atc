@@ -7,6 +7,7 @@ import "strings"
 var registry = map[string]*Airfield{
 	"OMDM": OMDM, "OMAM": OMAM, "OMAL": OMAL, // Persian Gulf
 	"UGSB": UGSB, "UG5X": UG5X, "UGKS": UGKS, "UGKO": UGKO, "UGTB": UGTB, // Caucasus / Black Sea
+	"XRMF": XRMF, // Caucasus RED side only (start_red_caucasus.bat) - not in Caucasus below
 	"ETAR": ETAR, "ETAD": ETAD, "EDFH": EDFH, "EDDF": EDDF, // Cold War Germany
 	"EDDK": EDDK, "EDDL": EDDL, "EDDV": EDDV, "EDDH": EDDH, // Cold War Germany
 	"ORAA": ORAA, "ORSH": ORSH, "ORBR": ORBR, "ORBI": ORBI, // Iraq

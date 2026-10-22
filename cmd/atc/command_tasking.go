@@ -144,7 +144,11 @@ var (
 
 func commandTaskingBoard() *taskingBoard {
 	commandTaskingOnce.Do(func() {
-		commandTasking = newTaskingBoard(taskingTargetsForMap(flagMap))
+		targets := taskingTargetsForMap(flagMap)
+		if redSide() {
+			targets = nil // the Caucasus targets are blue's ranges
+		}
+		commandTasking = newTaskingBoard(targets)
 	})
 	return commandTasking
 }

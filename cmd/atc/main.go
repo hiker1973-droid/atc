@@ -346,6 +346,7 @@ func main() {
 	registerGCIFlags(f)
 	registerApproachGradeFlags(f)
 	registerTankerFlags(f)
+	registerCoalitionFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
 	f.BoolVar(&flagMarshalTestTx, "marshal-test-tx", false,
@@ -411,6 +412,8 @@ func run(cmd *cobra.Command, args []string) error {
 	switch {
 	case flagATISOnly:
 		logSlug = "atis"
+	case flagCommandOnly && redSide():
+		logSlug = "command-red" // beside blue Command on the same rig
 	case flagCommandOnly:
 		logSlug = "command"
 	case flagMarshalOnly:
@@ -1718,7 +1721,7 @@ func buildEAM(guid, callsign string, freqHz float64, password string) []byte {
 			"ClientGuid":  guid,
 			"Name":        callsign,
 			"Seat":        0,
-			"Coalition":   2,
+			"Coalition":   srsCoalition(),
 			"AllowRecord": true,
 			"RadioInfo": map[string]interface{}{
 				"radios": []map[string]interface{}{
@@ -1765,7 +1768,7 @@ func buildSync(guid, callsign string, freqHz float64) []byte {
 			"ClientGuid":  guid,
 			"Name":        callsign,
 			"Seat":        0,
-			"Coalition":   2,
+			"Coalition":   srsCoalition(),
 			"AllowRecord": true,
 			"RadioInfo": map[string]interface{}{
 				"radios": []map[string]interface{}{
@@ -2126,8 +2129,12 @@ func departureProfile(towerVoice string) voiceProfile {
 const commandSpeedUp = 1.10
 
 func commandVoice(v string) voiceProfile {
+	ev := elCommand(flagElevenCommandVoice)
+	if redSide() {
+		ev.Name = "Red Command" // its own line in the ElevenLabs usage
+	}
 	return voiceProfile{voice: v, speed: flagTTSSpeed * commandSpeedUp, instructions: flagVoiceStyleCommand,
-		eleven: elCommand(flagElevenCommandVoice)}
+		eleven: ev}
 }
 
 func atisVoice(v string) voiceProfile {
@@ -2842,7 +2849,7 @@ func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64,
 			"--file", file,
 			"--freqs", fmt.Sprintf("%.3f", freqMHz),
 			"--modulations", srsModulationName(freqMHz),
-			"-c", "2",
+			"-c", srsCoalitionArg(),
 			"-n", safeName,
 			"-p", srsPort,
 			"-v", "1",
@@ -2979,7 +2986,7 @@ func transmitExternalAudio(text string, freqMHz float64, callsign, srsHost, srsP
 		"--text", text,
 		"--freqs", fmt.Sprintf("%.3f", freqMHz),
 		"--modulations", srsModulationName(freqMHz),
-		"-c", "2",
+		"-c", srsCoalitionArg(),
 		"-n", safeName,
 		"-p", srsPort,
 		"-g", "female",

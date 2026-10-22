@@ -111,3 +111,21 @@ func TestParseProcJSON(t *testing.T) {
 		t.Fatalf("output with a leading progress record: %+v", noisy)
 	}
 }
+
+// Red Command (start_red_caucasus.bat) runs beside blue Command on Day: its own
+// log, and neither bat's command claims the other's process.
+func TestRedCommandRole(t *testing.T) {
+	blue := `atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --srs-addr %SRS% %MIZ_FLAG%`
+	red := `atc.exe --command-only --coalition red --map caucasus --command-fields XRMF --command-freq 280.0 --command-name Red-Command --srs-addr %SRS% %MIZ_FLAG%`
+	if r := roleFromCmd("start_red_caucasus.bat", "vSFG-7 Red Command (Caucasus)", red); r.LogFile != "atc-command-red.log" || r.Region != "caucasus" {
+		t.Fatalf("red role %+v", r)
+	}
+	if r := roleFromCmd("start_command_caucasus.bat", "vSFG-7 Command (Caucasus)", blue); r.LogFile != "atc-command.log" {
+		t.Fatalf("blue role %+v", r)
+	}
+	flags, _ := flagSet(splitCmdLine(red)[1:])
+	redProc := atcProc{PID: 1, flags: flags}
+	if roleMatchesProc(blue, redProc) || !roleMatchesProc(red, redProc) {
+		t.Fatal("red Command process matched to the wrong role")
+	}
+}

@@ -1,0 +1,46 @@
+package airfield
+
+import "github.com/paulmach/orb"
+
+// XRMF is Mozdok, Russia — Caucasus theatre, the RED field (operator
+// 2026-10-22: "a red Command 280.00 ... Red will be using mozdok airfield",
+// "Mozdok tower is 266"; the BFM Venom vs Raider mission, V1.16+). Run on
+// demand by start_red_caucasus.bat with --coalition red; it is NOT in the
+// Caucasus list below, so blue Command never sends a jet here.
+//
+// Centre, elevation and runway edges are the live Mission Editor's
+// (`dcs-sms me airbase get --name Mozdok`, kept in the BFM build's
+// mozdok_stands.json), converted from DCS x/y to lat/lon here (the same
+// conversion puts Senaki's centre within 40 m of its TACAN). The runway runs
+// 090.8 true. MagVar is the map-wide 7.5: Mozdok sits between DimOn's 2025
+// +7 and +8 lines. Tower 266.000 UHF is DCS's (Radio.lua); no ATIS, no ILS.
+// The ME edges may not be the pavement ends (Tbilisi's were not).
+var XRMF = &Airfield{
+	ICAO:            "XRMF",
+	Name:            "Mozdok",
+	DCSName:         "Mozdok",
+	Center:          orb.Point{44.6059, 43.7917}, // [lon, lat] — DCS airbase reference point
+	ElevationFt:     507,
+	MagVar:          7.5,
+	PatternAltFt:    1500,
+	TowerFreqMHz:    266.000,
+	ApproachFreqMHz: 266.000,
+	ATISFreqMHz:     0, // none
+	DepartureDistNm: 7,
+	DepartureAngels: 3,
+	// Red's own Command (start_red_caucasus.bat): Hornet COMM2 CH4, Viper
+	// COMM1 CH3 in the BFM mission - two different buttons, so no preset.
+	HandoffCallsign: "Red Command",
+	HandoffFreqMHz:  280.000,
+	HandoffPreset:   "",
+	BreakDirections: map[string]string{
+		"08": "left", // TODO verify pattern side against the ramp (south of the runway)
+		"26": "left",
+	},
+	RunwayPairs: []RunwayPair{
+		{
+			Primary:    Runway{Designator: "08", MagneticHeading: 83.3, ThresholdLatLon: orb.Point{44.5914, 43.7918}},
+			Reciprocal: Runway{Designator: "26", MagneticHeading: 263.3, ThresholdLatLon: orb.Point{44.6204, 43.7916}},
+		},
+	},
+}

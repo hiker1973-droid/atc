@@ -622,7 +622,7 @@ func runCommandHandoffWatch(
 	store *tacviewPositions,
 	tx func(text, callsign string),
 ) {
-	fields := airfield.FieldsForMap(flagMap)
+	fields := commandFields()
 	ticker := time.NewTicker(handoffCheckInterval)
 	defer ticker.Stop()
 	for {
@@ -688,8 +688,8 @@ func runCommandHandoffWatch(
 					tail = "switching now approved, call marking mom."
 				}
 				text := fmt.Sprintf(
-					"%s, vSFG-7-Command, contact %s on %s, %s",
-					cs, recoveryName, formatFreqMHz(recoveryFreq), tail,
+					"%s, %s, contact %s on %s, %s",
+					cs, flagCommandName, recoveryName, formatFreqMHz(recoveryFreq), tail,
 				)
 				tx(text, cs)
 				pilot.handedOff = true
