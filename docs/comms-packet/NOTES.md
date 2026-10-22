@@ -20,8 +20,9 @@ them via OMM". New card 20 COMBAT CALLS from origin/main 4721177 (cmd/atc/combat
 emergency_divert.go): Fox / splash copies with no station name, "302 ejecting" -> "Raider 302 down,
 launching CSAR.", hit / damaged / mayday -> nearest friendly field (bearing, miles, elevation, tower;
 Foothold skips red-held fields). Card 1 roles row and card 12 Command row point at it. Cards 20 - 28
-are now 21 - 29. The builder also writes every card as a kneeboard page (since 22 OCT pm: the
-squadron format - 1289 px wide at the card's own portrait height, never rescaled) to Desktop Documentation\OMM\SkyEye ATC Kneeboards\Kneeboard\
+are now 21 - 29. The builder also writes every card as a kneeboard page in the squadron format:
+EXACTLY 1289 x 2190 (Caucasus Training NOTES "THE KNEEBOARD PAGE FORMAT", the F:\OMM pack), each card
+re-rendered by _tools/fit_kneeboards.py at the largest type scale that fills one page (1.50 - 2.58) to Desktop Documentation\OMM\SkyEye ATC Kneeboards\Kneeboard\
 {FA-18C_hornet, F-16C_50} - an OMM / OvGME mod folder mirroring Saved Games\DCS, rebuilt whole each run.
 Phraseology Reference not yet updated for the combat calls.
 

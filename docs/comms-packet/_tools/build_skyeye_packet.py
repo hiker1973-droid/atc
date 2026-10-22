@@ -1347,28 +1347,30 @@ def kb_towers(th):
     return rows
 
 
+KNEEBOARD_FUNCS = [kb_freqs if f is c02_freqs else f for f in CARD_FUNCS]
+
+
 def kneeboards(pages):
-    """The squadron kneeboard format (Missions/_MISSION_TOOLKIT/README.md "Squadron standard -
-    kneeboard card style", the New Pilot packs' KNEEBOARD_DROP-IN): each card as rendered,
-    1289 px wide at its own portrait height (save_card already refuses a landscape card and
-    pins the footer). Never rescaled or squeezed to a fixed page - DCS sizes the type off the
-    width, so a card shrunk to fit would print smaller in the pit (operator 2026-10-22)."""
+    """The squadron kneeboard format: every page EXACTLY 1289 x 2190, each card re-rendered at
+    the largest type scale that fills one page (fit_kneeboards.py; Caucasus Training NOTES.md
+    "THE KNEEBOARD PAGE FORMAT", operator-approved 2026-10-13). Never a picture shrunk to fit -
+    operator 2026-10-22 "make sure cards are properly formated for kneeboards"."""
     if not os.path.isdir(DESKTOP_COPY):
         return
-    from PIL import Image
-    # The kneeboard set swaps the presets card for a plain list of the AI ATC frequencies.
-    pages = list(pages)
-    pages[1] = kb_freqs()
+    import fit_kneeboards
+    stage = os.path.join(CACHE, "kneeboard_pages")
+    if os.path.isdir(stage):
+        shutil.rmtree(stage)
+    fitted = fit_kneeboards.fit(stage)
     if os.path.isdir(OMM_MOD):
         shutil.rmtree(OMM_MOD)
     for jet in KNEEBOARD_JETS:
-        os.makedirs(os.path.join(OMM_MOD, "Kneeboard", jet))
-    for i, src in enumerate(pages, 1):
-        w, h = Image.open(src).size
-        assert w == 1289 and h >= w * 1.149, "%s is %dx%d - not a kneeboard card" % (src, w, h)
-        name = "SkyEye_%02d_%s.jpg" % (i, os.path.splitext(os.path.basename(src))[0].split("_", 1)[1])
-        for jet in KNEEBOARD_JETS:
-            shutil.copy2(src, os.path.join(OMM_MOD, "Kneeboard", jet, name))
+        d = os.path.join(OMM_MOD, "Kneeboard", jet)
+        os.makedirs(d)
+        for name, _ in fitted:
+            shutil.copy2(os.path.join(stage, name), os.path.join(d, name))
+    pages = fitted
+    print("kneeboard type scale %.2f - %.2f (PDF cards 1.95)" % (min(s for _, s in fitted), max(s for _, s in fitted)))
     with open(os.path.join(OMM_MOD, "README.txt"), "w", encoding="utf-8", newline="\r\n") as f:
         f.write("vSFG-7 SkyEye ATC kneeboards  %s  %s\n\n" % (VER, DATE))
         f.write("OMM / OvGME: put the \"SkyEye ATC Kneeboards\" folder in your Saved Games mods\n"
