@@ -75,7 +75,7 @@ def run(scale, out):
 
 
 def fit(dest):
-    """{function name: (file name, scale, path)} - every card at 1289 x 2190."""
+    """{function name: (file in dest, scale)} - every card at 1289 x 2190."""
     from PIL import Image
     work = os.path.join(HERE, "_cache", "kneeboard_fit")
     best, names = {}, None
@@ -95,16 +95,15 @@ def fit(dest):
     missing = [n for n in names if n not in best]
     assert not missing, "%s do not fit %d px even at scale %.2f - split the card" % (missing, PAGE_H, SCALES[-1])
     os.makedirs(dest, exist_ok=True)
-    out = []
-    for i, fn in enumerate(names, 1):
+    out = {}
+    for fn in names:
         name, s, p = best[fn]
-        dst = os.path.join(dest, "SkyEye_%02d_%s" % (i, name.split("_", 1)[1]))
-        shutil.copy2(p, dst)
-        out.append((os.path.basename(dst), s))
+        shutil.copy2(p, os.path.join(dest, name))
+        out[fn] = (name, s)
     shutil.rmtree(work, ignore_errors=True)
     return out
 
 
 if __name__ == "__main__":
-    for n, s in fit(sys.argv[1]):
-        print("  %-36s scale %.2f" % (n, s))
+    for fn, (n, s) in fit(sys.argv[1]).items():
+        print("  %-28s %-34s scale %.2f" % (fn, n, s))

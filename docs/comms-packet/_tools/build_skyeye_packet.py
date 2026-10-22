@@ -1283,39 +1283,57 @@ OMM_MOD = os.path.join(DESKTOP_COPY, "OMM", "SkyEye ATC Kneeboards")
 KNEEBOARD_JETS = ["FA-18C_hornet", "F-16C_50"]
 
 
-def kb_freqs():
+def kb_freqs(viper=False):
     """Kneeboard page 2 (operator 2026-10-22): the mission comms card already gives the
     presets, so the kneeboard set gets only what each AI ATC role listens on - per theatre
-    we fly, straight from facts.json (read out of the start scripts by TestDocFacts)."""
+    we fly, straight from facts.json (read out of the start scripts by TestDocFacts).
+    The Viper's page has no carrier roles and only Viper channels."""
     def f(x):
         return "%.3f" % x
 
-    c = card("AI ATC ", "FREQS", ["What SkyEye listens on, and the preset that reaches it",
-                                  "H = Hornet, V = Viper  ·  1-4 = COMM 1 channel 4  ·  AM unless FM"], 2)
+    def ch(th, key):
+        v = KB_CH[th][key]
+        if not viper:
+            return v
+        return next((p[2:] for p in v.split("  ·  ") if p.startswith("V ")), "dial")
+
+    carrier = (("DECKBOSS", "deckboss"), ("MARSHAL", "marshal"), ("PADDLES", "lso"))
+    if viper:
+        c = card("AI ATC ", "FREQS", ["What SkyEye listens on, and the Viper preset",
+                                      "1-4 = COMM 1 channel 4  ·  AM unless FM"], 2)
+    else:
+        c = card("AI ATC ", "FREQS", ["What SkyEye listens on, and the preset that reaches it",
+                                      "H = Hornet, V = Viper  ·  1-4 = COMM 1 channel 4  ·  AM unless FM"], 2)
+    jets = "Viper" if viper else "Hornet  ·  Viper"
     cau = _CAU
-    NK.band(c, "BLACK SEA", "Caucasus Day / Night  ·  Hornet  ·  Viper")
-    rows = [("COMMAND  %s" % f(cau["command"]), KB_CH["caucasus"]["command"]),
-            ("%s AWACS  %s" % (cau["gci_name"].upper(), f(cau["gci"])), KB_CH["caucasus"]["gci"]),
-            ("HITMAN 1-1  %s FM" % f(cau["jtac"]), KB_CH["caucasus"]["jtac"]),
-            ("HITMAN 2-1  %s FM" % f(cau["jtac2"]), KB_CH["caucasus"]["jtac2"]),
-            ("TEXACO 1-1  %s" % f(cau["tanker"]), KB_CH["caucasus"]["tanker"]),
-            ("TEXACO 3-1  %s" % f(cau["tanker2"]), KB_CH["caucasus"]["tanker2"]),
-            ("DECKBOSS  %s" % f(cau["deckboss"]), KB_CH["caucasus"]["deckboss"]),
-            ("MARSHAL  %s" % f(cau["marshal"]), KB_CH["caucasus"]["marshal"]),
-            ("PADDLES  %s" % f(cau["lso"]), KB_CH["caucasus"]["lso"])]
-    rows += kb_towers(cau)
+    NK.band(c, "BLACK SEA", "Caucasus Day / Night  ·  " + jets)
+    rows = [("COMMAND  %s" % f(cau["command"]), ch("caucasus", "command")),
+            ("%s AWACS  %s" % (cau["gci_name"].upper(), f(cau["gci"])), ch("caucasus", "gci")),
+            ("HITMAN 1-1  %s FM" % f(cau["jtac"]), ch("caucasus", "jtac")),
+            ("HITMAN 2-1  %s FM" % f(cau["jtac2"]), ch("caucasus", "jtac2")),
+            ("TEXACO 1-1  %s" % f(cau["tanker"]), ch("caucasus", "tanker")),
+            ("TEXACO 3-1  %s" % f(cau["tanker2"]), ch("caucasus", "tanker2"))]
+    if not viper:
+        rows += [("%s  %s" % (n, f(cau[k])), ch("caucasus", k)) for n, k in carrier]
+    rows += kb_towers(cau, ch)
     c.kv(rows, size=13, rh=25)
     syr = _SYR
-    NK.band(c, "SYRIA", "Foothold  ·  Hornet  ·  Viper")
-    rows = [("COMMAND  %s" % f(syr["command"]), KB_CH["syria"]["command"]),
-            ("%s AWACS  %s" % (syr["gci_name"].upper(), f(syr["gci"])), KB_CH["syria"]["gci"]),
-            ("DECKBOSS  %s" % f(syr["deckboss"]), KB_CH["syria"]["deckboss"]),
-            ("MARSHAL  %s" % f(syr["marshal"]), KB_CH["syria"]["marshal"]),
-            ("PADDLES  %s" % f(syr["lso"]), KB_CH["syria"]["lso"])]
-    rows += kb_towers(syr)
+    NK.band(c, "SYRIA", "Foothold  ·  " + jets)
+    rows = [("COMMAND  %s" % f(syr["command"]), ch("syria", "command")),
+            ("%s AWACS  %s" % (syr["gci_name"].upper(), f(syr["gci"])), ch("syria", "gci"))]
+    if not viper:
+        rows += [("%s  %s" % (n, f(syr[k])), ch("syria", k)) for n, k in carrier]
+    rows += kb_towers(syr, ch)
     c.kv(rows, size=13, rh=25)
+    if viper:
+        NK.subtle(c, "Tower row: tower channel; ATIS is the next one up (Foothold: dial it). \"dial\" = no preset.")
+        return save(c, "02_ai_atc_freqs_viper.jpg")
     NK.subtle(c, "Tower row: tower channel; ATIS is the next one up (Foothold Viper: dial it). \"dial\" = no preset.")
     return save(c, "02_ai_atc_freqs.jpg")
+
+
+def kb_freqs_viper():
+    return kb_freqs(viper=True)
 
 
 # Presets that reach each SkyEye role, read off the mission preset kneeboard cards
@@ -1336,18 +1354,29 @@ KB_CH = {
 }
 
 
-def kb_towers(th):
+def kb_towers(th, ch):
     atis = {a["icao"]: a["freq"] for a in th["atis"]}
     rows = []
     for tw in sorted(th["towers"], key=lambda x: x["name"]):
         a = atis.get(tw.get("icao"))
         name = tw["name"].upper().replace(" TOWER", "")
         rows.append(("%s  %.3f%s" % (name, tw["freq"], "  ·  ATIS %.3f" % a if a else ""),
-                     KB_CH[th["key"]][tw["icao"]]))
+                     ch(th["key"], tw["icao"])))
     return rows
 
 
-KNEEBOARD_FUNCS = [kb_freqs if f is c02_freqs else f for f in CARD_FUNCS]
+# Each jet's kneeboard deck: the comms cards with card 2 swapped for the plain frequencies
+# card. The Viper has no carrier, so no Deckboss, Marshal, Paddles or boat cards (operator
+# 2026-10-22: "16's do not need marshal, LSO, Deckboss"). Pages keep their packet numbers so
+# "card 20" still means card 20.
+CARRIER_CARDS = [c03_deckboss_flow, c04_deckboss_calls, c05_marshal_case1, c06_marshal_case3,
+                 c07_marshal_calls_inbound, c08_marshal_calls_stack, c09_marshal_calls_case3,
+                 c10_paddles, c10_departure, c12_sortie]
+JET_DECKS = {
+    "FA-18C_hornet": [kb_freqs if f is c02_freqs else f for f in CARD_FUNCS],
+    "F-16C_50": [kb_freqs_viper if f is c02_freqs else f for f in CARD_FUNCS if f not in CARRIER_CARDS],
+}
+KNEEBOARD_FUNCS = JET_DECKS["FA-18C_hornet"] + [kb_freqs_viper]
 
 
 def kneeboards(pages):
@@ -1364,19 +1393,24 @@ def kneeboards(pages):
     fitted = fit_kneeboards.fit(stage)
     if os.path.isdir(OMM_MOD):
         shutil.rmtree(OMM_MOD)
+    counts = []
     for jet in KNEEBOARD_JETS:
         d = os.path.join(OMM_MOD, "Kneeboard", jet)
         os.makedirs(d)
-        for name, _ in fitted:
-            shutil.copy2(os.path.join(stage, name), os.path.join(d, name))
-    pages = fitted
-    print("kneeboard type scale %.2f - %.2f (PDF cards 1.95)" % (min(s for _, s in fitted), max(s for _, s in fitted)))
+        for i, f in enumerate(JET_DECKS[jet], 1):
+            name = fitted[f.__name__][0]
+            stem = os.path.splitext(name)[0].split("_", 1)[1].replace("_viper", "")
+            shutil.copy2(os.path.join(stage, name), os.path.join(d, "SkyEye_%02d_%s.jpg" % (i, stem)))
+        counts.append("%s %d" % (jet, len(JET_DECKS[jet])))
+    scales = [s for _, s in fitted.values()]
+    print("kneeboard type scale %.2f - %.2f (PDF cards 1.95)" % (min(scales), max(scales)))
     with open(os.path.join(OMM_MOD, "README.txt"), "w", encoding="utf-8", newline="\r\n") as f:
         f.write("vSFG-7 SkyEye ATC kneeboards  %s  %s\n\n" % (VER, DATE))
         f.write("OMM / OvGME: put the \"SkyEye ATC Kneeboards\" folder in your Saved Games mods\n"
-                "folder and enable it. It installs %d pages into Saved Games\\DCS\\Kneeboard\\\n"
-                "%s.\nBy hand: copy the Kneeboard folder into Saved Games\\DCS.\n" % (len(pages), " and ".join(KNEEBOARD_JETS)))
-    print("kneeboards  %d pages x %d jets  ->  %s" % (len(pages), len(KNEEBOARD_JETS), OMM_MOD))
+                "folder and enable it. It installs into Saved Games\\DCS\\Kneeboard\\: %s pages.\n"
+                "The Viper deck has no carrier cards. By hand: copy the Kneeboard folder into\n"
+                "Saved Games\\DCS.\n" % ", ".join(counts))
+    print("kneeboards  %s  ->  %s" % (", ".join(counts), OMM_MOD))
 
 
 def retire_old_versions(folder, prefix, keep):
