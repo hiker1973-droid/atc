@@ -181,6 +181,13 @@
   .tv-chip.stale { color: var(--amber, #d9a400); border-color: var(--amber, #d9a400); }
   .tv-chip.off { color: var(--red); border-color: var(--red); }
   .build-badge.warn { color: var(--amber, #d9a400); border-color: var(--amber, #d9a400); }
+  /* Licence badge: beside the build badge, in the same strip. */
+  .lic-badge { position: absolute; top: 0.2rem; right: 11.5rem; font: 0.66rem/1.35 ui-monospace, Consolas, monospace;
+               background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.45rem;
+               text-decoration: none; letter-spacing: 0.04em; display: none; }
+  .lic-badge.ok { color: var(--green); border-color: var(--green-dim, #238636); }
+  .lic-badge.warn { color: var(--amber, #d9a400); border-color: var(--amber, #d9a400); }
+  .lic-badge.bad { color: var(--red); border-color: var(--red); }
   .cr-list { max-height: 18rem; overflow-y: auto; margin-top: 0.5rem; border-top: 1px solid var(--border); }
   .cr-row { display: grid; grid-template-columns: 4.2rem 9.5rem 1fr; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--label); }
   .cr-row b { color: var(--text); font-weight: 600; }
@@ -350,6 +357,7 @@
     <a href="/settings" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Settings</a>
     <a href="/help/" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Help</a>
   </div>
+  <a class="lic-badge" id="licBadge" href="/settings#licence"></a>
   <div class="build-badge" id="buildBadge" title="Build this rig is running">build …</div>
   <div class="server">
     <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv-chip" id="tvChip" title="Tacview real-time telemetry">TACVIEW …</span><span class="gci-chip" id="gciChip"></span><span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
@@ -588,6 +596,27 @@ async function checkSetup() {
     const l = await fetch('/api/licence').then(r => r.json());
     if (l.state === 'expired') banner('/settings#licence', '⛔ ' + l.message + ' →', true);
     else if (l.state === 'trial') banner('/settings#licence', '⏳ ' + l.message + ' →', l.daysLeft <= 3);
+    // The badge in the header strip: licensed (and days left on a key that
+    // ends), the trial's days, or ended. Nothing on a rig without a key.
+    const lb = $('licBadge'), days = n => `${n} DAY${n === 1 ? '' : 'S'} LEFT`;
+    let text = '', cls = '';
+    if (l.state === 'licensed') {
+      const exp = l.licence && l.licence.exp;
+      text = exp ? `LICENSED · ${days(l.daysLeft)}` : `LICENSED · ${(l.licence && l.licence.sq) || ''}`;
+      cls = exp && l.daysLeft <= 14 ? 'warn' : 'ok';
+    } else if (l.state === 'trial') {
+      text = `TRIAL · ${days(l.daysLeft)}`;
+      cls = l.daysLeft <= 3 ? 'bad' : 'warn';
+    } else if (l.state === 'expired') {
+      text = 'LICENCE ENDED';
+      cls = 'bad';
+    }
+    if (text) {
+      lb.textContent = text.replace(/ · $/, '');
+      lb.className = 'lic-badge ' + cls;
+      lb.title = l.message + ' Click for Settings > Licence.';
+      lb.style.display = 'block';
+    }
   } catch (e) { /* no banner */ }
   try {
     // A newer SkyEye-Setup release (appupdate.go); a git checkout never has one.
