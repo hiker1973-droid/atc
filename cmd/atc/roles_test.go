@@ -158,6 +158,17 @@ func TestRoleOff(t *testing.T) {
 	if err != nil || !res.Off {
 		t.Fatalf("%+v %v", res, err)
 	}
+	// A field the squadron unticked in Setup: its tower does not start; the
+	// others do.
+	f.Theatres["caucasus"] = rolecfg.Theatre{Towers: map[string]rolecfg.Override{"UGTB": {Off: true}}}
+	tw := pflag.NewFlagSet("t", pflag.ContinueOnError)
+	tw.String("tts-voice", "nova", "")
+	if res, _ := f.Apply("caucasus", rolecfg.OwnerTower, "UGTB", pflagFlags{tw}); !res.Off {
+		t.Fatal("Tbilisi Tower switched off but starts")
+	}
+	if res, _ := f.Apply("caucasus", rolecfg.OwnerTower, "UGSB", pflagFlags{tw}); res.Off {
+		t.Fatal("Batumi Tower off too")
+	}
 }
 
 // Command moved in Settings: towers handing off to "command" follow it, a

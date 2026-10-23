@@ -49,6 +49,9 @@ var roleConfigResult struct {
 // applyRoleConfig reads roles.json and applies this process's changes. It
 // runs first thing, before the logger exists; logRoleConfig reports it.
 func applyRoleConfig(fs *pflag.FlagSet) {
+	if flagSay != "" {
+		return // the Setup test call is not a role
+	}
 	given := map[string]string{}
 	fs.Visit(func(f *pflag.Flag) { given[f.Name] = f.Value.String() })
 	if fs.Changed("map") {

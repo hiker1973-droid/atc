@@ -74,7 +74,7 @@
   <img class="patch" src="/logo.png" alt="">
   <span class="logo">vSFG-7</span><span class="title">Settings</span>
   <span class="spacer"></span>
-  <a href="/">Dashboard</a><a href="/fleet">Fleet</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a>
+  <a href="/">Dashboard</a><a href="/setup">Setup</a><a href="/fleet">Fleet</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a>
 </header>
 <main>
   <div class="banner" id="viewer">You can look but not change anything here: settings need operator rights.</div>
@@ -235,10 +235,9 @@ function roleRow(kind, id, label, note, s, ov) {
     ? `<input class="speed ${ch(eff.speed, bat.speed)}" inputmode="decimal" data-f="speed" value="${eff.speed || ''}" data-bat="${bat.speed}" oninput="markRole(this)" ${dis}>`
     : '<span class="muted">fixed</span>';
   const on = !ov.off;
-  const canOff = kind !== 'tower';
   return `<tr data-kind="${kind}" data-id="${esc(id)}" class="${on ? '' : 'offrow'}">
     <td><b>${esc(label)}</b>${note ? `<span class="note2">${esc(note)}</span>` : ''}</td>
-    <td>${canOff ? `<input type="checkbox" data-f="on" ${on ? 'checked' : ''} ${dis} title="${s.main ? 'Off: this role does not start' : 'Off: this station stays silent'}">` : ''}</td>
+    <td><input type="checkbox" data-f="on" ${on ? 'checked' : ''} ${dis} title="${kind === 'tower' || s.main ? 'Off: this role does not start' : 'Off: this station stays silent'}"></td>
     <td>${freqCell}</td>
     <td>${nameCell}</td>
     <td style="white-space:nowrap"><select data-f="eleven" data-bat="${esc(bat.eleven)}" class="${ch(eff.eleven, bat.eleven)}" onchange="markRole(this)" ${dis}>${elevenOptions(eff.eleven, kind === 'tower')}</select><button class="play" title="Play" onclick="playSample('eleven', this)">▶</button></td>

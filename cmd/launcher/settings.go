@@ -56,7 +56,8 @@ const userEnvKey = `Environment`
 
 // userEnv reads a user environment variable as setx stored it, falling back
 // to this process (a machine-wide value, or one passed in by the shell).
-func userEnv(name string) string {
+// It is a var so a test can stand in for a fresh install.
+var userEnv = func(name string) string {
 	if k, err := registry.OpenKey(registry.CURRENT_USER, userEnvKey, registry.QUERY_VALUE); err == nil {
 		defer k.Close()
 		if v, _, err := k.GetStringValue(name); err == nil && v != "" {

@@ -355,6 +355,7 @@ func newRootCommand() *cobra.Command {
 	registerApproachGradeFlags(f)
 	registerTankerFlags(f)
 	registerCoalitionFlags(f)
+	registerSayFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
 	f.BoolVar(&flagMarshalTestTx, "marshal-test-tx", false,
@@ -417,6 +418,8 @@ func run(cmd *cobra.Command, args []string) error {
 	// their own file.
 	logSlug := strings.ToLower(flagAirfield)
 	switch {
+	case flagSay != "":
+		logSlug = "setup"
 	case flagATISOnly:
 		logSlug = "atis"
 	case flagCommandOnly && redSide():
@@ -483,6 +486,9 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if apiKey == "" {
 		return fmt.Errorf("OpenAI API key required")
+	}
+	if flagSay != "" {
+		return sayOnce(apiKey) // the Setup page's test call: one line, then exit
 	}
 
 	if _, err := os.Stat(flagExternalAudio); err != nil {

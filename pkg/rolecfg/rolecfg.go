@@ -361,6 +361,10 @@ func (f File) Apply(theatre, owner, icao string, fl Flags) (Result, error) {
 	}
 	if owner == OwnerTower {
 		if o, ok := th.Towers[strings.ToUpper(icao)]; ok {
+			if o.Off { // a field the squadron does not use (Setup page)
+				res.Off = true
+				return res, nil
+			}
 			if o.Voice != "" {
 				if err := set(TowerVoiceFlag, o.Voice); err != nil {
 					return res, err

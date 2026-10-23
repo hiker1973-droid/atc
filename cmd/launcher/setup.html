@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vSFG-7 Setup</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --panel-2:#1c2330; --border:#30363d; --text:#c9d1d9; --muted:#8b949e;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel); }
+  .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
+    box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
+  header .logo { font-weight: 800; color: var(--blue); }
+  header .title { font-weight: 600; }
+  .spacer { flex: 1; }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; border: 1px solid var(--border);
+    padding: 0.28rem 0.6rem; border-radius: 5px; }
+  button, input { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 0.4rem 0.7rem; font-size: 0.88rem; font-family: inherit; }
+  button { cursor: pointer; white-space: nowrap; }
+  button:hover:not(:disabled) { border-color: var(--blue); }
+  button:disabled, input:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  main { padding: 1.2rem; max-width: 820px; margin: 0 auto 3rem; }
+  .steps { display: flex; gap: 0.3rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+  .steps div { flex: 1; min-width: 6.5rem; padding: 0.45rem 0.6rem; border-radius: 5px; border: 1px solid var(--border);
+    color: var(--muted); font-size: 0.8rem; cursor: pointer; }
+  .steps div b { display: block; font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; }
+  .steps div.cur { border-color: var(--blue); color: var(--text); background: #1f2d44; }
+  .steps div.ok b::after { content: " ✓"; color: var(--green); }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.2rem; display: none; }
+  section.cur { display: block; }
+  h2 { margin: 0 0 0.3rem; font-size: 1.15rem; }
+  .sub { color: var(--muted); margin: 0 0 1rem; line-height: 1.45; }
+  .field { margin: 0.9rem 0; }
+  .field label { display: block; font-weight: 600; margin-bottom: 0.3rem; }
+  .field label small { color: var(--muted); font-weight: 400; }
+  .line { display: flex; gap: 0.4rem; }
+  .line input { flex: 1; min-width: 0; }
+  .state { font-size: 0.8rem; margin-top: 0.3rem; min-height: 1.1em; }
+  .ok { color: var(--green); } .bad { color: var(--red); } .warn { color: var(--amber); } .muted { color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; margin-top: 1.3rem; gap: 0.5rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.5rem; }
+  .card { border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.7rem; cursor: pointer; }
+  .card.sel { border-color: var(--blue); background: #1f2d44; }
+  .card b { display: block; } .card span { color: var(--muted); font-size: 0.78rem; }
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.25rem 1rem; margin-top: 0.5rem; }
+  .list label { display: flex; gap: 0.45rem; align-items: center; padding: 0.2rem 0; }
+  .list label small { color: var(--muted); }
+  h3 { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0 0.2rem; }
+  .check { display: flex; gap: 0.5rem; align-items: baseline; margin: 0.35rem 0; }
+  .banner { border: 1px solid var(--amber); color: var(--amber); border-radius: 6px; padding: 0.6rem 0.8rem;
+    margin-bottom: 1rem; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <img class="patch" src="/logo.png" alt="">
+  <span class="logo">vSFG-7</span><span class="title">Setup</span>
+  <span class="spacer"></span>
+  <a href="/">Dashboard</a><a href="/settings">Settings</a>
+</header>
+<main>
+  <div class="banner" id="viewer">Setup needs operator rights: you can look, but not change anything.</div>
+  <div class="steps" id="steps"></div>
+
+  <section data-step="0">
+    <h2>Voice services</h2>
+    <p class="sub">SkyEye speaks through OpenAI text-to-speech, and through ElevenLabs when you have it (more natural
+      voices; OpenAI stays the fallback). Keys stay on this PC.</p>
+    <div class="field" data-var="OPENAI_API_KEY">
+      <label>OpenAI API key <small>required · platform.openai.com → API keys</small></label>
+      <div class="line"><input type="password" autocomplete="off" placeholder="sk-…"><button class="primary" onclick="saveVar(this)">Save</button></div>
+      <div class="state"></div>
+    </div>
+    <div class="field" data-var="ELEVENLABS_API_KEY">
+      <label>ElevenLabs API key <small>optional · elevenlabs.io → Developers → API keys</small></label>
+      <div class="line"><input type="password" autocomplete="off" placeholder="paste key"><button class="primary" onclick="saveVar(this)">Save</button></div>
+      <div class="state"></div>
+    </div>
+    <div class="nav"><span></span><button class="primary" onclick="go(1)">Next →</button></div>
+  </section>
+
+  <section data-step="1">
+    <h2>DCS server</h2>
+    <p class="sub">SkyEye joins your DCS-SRS server as radio stations and reads the air picture from Tacview's
+      real-time telemetry. Run it on the DCS server PC, or point it at one.</p>
+    <div class="field" data-var="SKYEYE_SRS">
+      <label>SRS server <small>host:port, e.g. localhost:5002</small></label>
+      <div class="line"><input type="text" spellcheck="false" placeholder="localhost:5002"><button class="primary" onclick="saveVar(this)">Save</button></div>
+      <div class="state"></div>
+    </div>
+    <div class="field" data-var="SRS_EAM">
+      <label>SRS external-audio (EAM) password <small>the SRS server's External AWACS Mode password</small></label>
+      <div class="line"><input type="password" autocomplete="off"><button class="primary" onclick="saveVar(this)">Save</button></div>
+      <div class="state"></div>
+    </div>
+    <div class="field" data-var="SKYEYE_TACVIEW">
+      <label>Tacview real-time telemetry <small>host:port, usually localhost:42674</small></label>
+      <div class="line"><input type="text" spellcheck="false" placeholder="localhost:42674"><button class="primary" onclick="saveVar(this)">Save</button></div>
+      <div class="state"></div>
+    </div>
+    <div class="check" id="eaCheck"></div>
+    <div class="nav"><button onclick="go(0)">← Back</button><button class="primary" onclick="go(2)">Next →</button></div>
+  </section>
+
+  <section data-step="2">
+    <h2>Theatre</h2>
+    <p class="sub">Pick the map your server flies, then untick anything you don't want on the radio. You can change
+      all of this later under Settings → Roles.</p>
+    <div class="cards" id="theatres"></div>
+    <div id="theatreRoles"></div>
+    <div class="state" id="theatreMsg"></div>
+    <div class="nav"><button onclick="go(1)">← Back</button><button class="primary" onclick="go(3)">Next →</button></div>
+  </section>
+
+  <section data-step="3">
+    <h2>Test call</h2>
+    <p class="sub">Tune an SRS radio (in DCS or the SRS client's overlay) to the frequency below, then send. SkyEye
+      speaks one short radio check: if you hear it, keys, voice and SRS all work.</p>
+    <div class="field">
+      <label>Frequency <small>MHz</small></label>
+      <div class="line"><input id="testFreq" inputmode="decimal" style="max-width:9rem"><button class="primary" id="sendBtn" onclick="sendTest()">📻 Send test call</button></div>
+      <div class="state" id="testMsg"></div>
+    </div>
+    <div class="nav"><button onclick="go(2)">← Back</button><button class="primary" onclick="go(4)">Next →</button></div>
+  </section>
+
+  <section data-step="4">
+    <h2>Ready</h2>
+    <p class="sub">That's it. Start the theatre now, or later from the dashboard.</p>
+    <div id="summary"></div>
+    <div class="nav">
+      <button onclick="go(3)">← Back</button>
+      <span style="display:flex;gap:0.5rem">
+        <button id="startBtn" onclick="finish(true)">▶ Start and finish</button>
+        <button class="primary" onclick="finish(false)">Finish</button>
+      </span>
+    </div>
+    <div class="state" id="finishMsg"></div>
+  </section>
+</main>
+<script>
+const STEPS = ['Voice', 'Server', 'Theatre', 'Test call', 'Ready'];
+let step = 0, setup = null, settings = null, tested = false;
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const mhz = f => f ? Number(f).toFixed(3) : '';
+const $ = id => document.getElementById(id);
+
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+  const t = await r.text();
+  if (!r.ok) return { ok: false, msg: t.trim() || ('HTTP ' + r.status) };
+  try { return JSON.parse(t); } catch (e) { return { ok: true, msg: t }; }
+}
+function state(el, ok, msg) { el.className = 'state ' + (ok === null ? 'muted' : ok ? 'ok' : 'bad'); el.textContent = msg; }
+
+function stepDone(i) {
+  const c = setup.checks;
+  return [c.openai, c.srs && c.eam, !!setup.theatre, tested, setup.done][i];
+}
+function renderSteps() {
+  $('steps').innerHTML = STEPS.map((s, i) =>
+    `<div class="${i === step ? 'cur' : ''} ${stepDone(i) ? 'ok' : ''}" onclick="go(${i})"><b>Step ${i + 1}</b>${s}</div>`).join('');
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('cur', +s.dataset.step === step));
+}
+function go(i) { step = i; renderSteps(); if (i === 2) renderTheatres(); if (i === 3) prepTest(); if (i === 4) renderSummary(); }
+
+// Steps 1-2: the Settings page's variables.
+function renderVars() {
+  for (const f of document.querySelectorAll('.field[data-var]')) {
+    const v = settings.vars.find(v => v.name === f.dataset.var);
+    if (v && v.set) state(f.querySelector('.state'), true, '✓ set' + (v.value ? ' (' + v.value + ')' : ''));
+    else state(f.querySelector('.state'), null, 'not set');
+  }
+  const ea = setup.checks.externalAudio;
+  $('eaCheck').innerHTML = ea ? '<span class="ok">✓</span> DCS-SRS ExternalAudio found on this PC.'
+    : '<span class="warn">⚠</span> DCS-SRS ExternalAudio not found. Install DCS-SRS on this PC: SkyEye transmits through it.';
+}
+async function saveVar(btn) {
+  const f = btn.closest('.field'), name = f.dataset.var, input = f.querySelector('input'), st = f.querySelector('.state');
+  const value = input.value.trim();
+  if (!value) { state(st, false, 'Type a value first.'); return; }
+  if (name !== 'SRS_EAM') {
+    state(st, null, 'Checking…');
+    const t = await post('/api/settings', { op: 'test', name, value });
+    if (!t.ok) { state(st, false, t.msg + ' — not saved.'); return; }
+  }
+  const r = await post('/api/settings', { op: 'set', name, value });
+  input.value = '';
+  await load();
+  state(f.querySelector('.state'), r.ok, r.ok ? '✓ saved' : r.msg);
+}
+
+// Step 3: theatre and what runs in it.
+function renderTheatres() {
+  const ts = setup.theatres || [];
+  $('theatres').innerHTML = ts.length ? ts.map(t => `<div class="card ${t.key === setup.theatre ? 'sel' : ''}" onclick="pickTheatre('${t.key}')">
+      <b>${esc(t.label)}</b><span>${t.roles} roles in the start scripts</span></div>`).join('')
+    : '<span class="bad">No start scripts found next to the launcher.</span>';
+  const roles = setup.theatre && settings.roles[setup.theatre];
+  if (!roles) { $('theatreRoles').innerHTML = ''; return; }
+  const dis = setup.canEdit ? '' : 'disabled';
+  const box = (kind, id, label, ov, sub) => `<label><input type="checkbox" ${ov && ov.off ? '' : 'checked'} ${dis}
+      onchange="toggleRole('${kind}', '${esc(id)}', this)"> ${esc(label)} <small>${sub}</small></label>`;
+  $('theatreRoles').innerHTML =
+    `<h3>Stations</h3><div class="list">${roles.stations.map(s => box('station', s.key, s.label, s.override,
+        s.bat.freq ? mhz(s.override.freq || s.bat.freq) : '')).join('')}</div>
+     <h3>Towers</h3><div class="list">${roles.towers.map(t => box('tower', t.icao, t.name + ' Tower', t.override, t.icao)).join('')}</div>`;
+}
+async function pickTheatre(k) {
+  const r = await post('/api/setup', { op: 'theatre', theatre: k });
+  if (!r.ok) { state($('theatreMsg'), false, r.msg); return; }
+  await load(); renderTheatres();
+}
+async function toggleRole(kind, id, box) {
+  const roles = settings.roles[setup.theatre];
+  const cur = kind === 'tower' ? roles.towers.find(t => t.icao === id) : roles.stations.find(s => s.key === id);
+  const override = Object.assign({}, cur.override || {});
+  if (box.checked) delete override.off; else override.off = true;
+  const body = { op: 'role', theatre: setup.theatre, override };
+  if (kind === 'tower') body.icao = id; else body.key = id;
+  const r = await post('/api/settings', body);
+  if (!r.ok) { box.checked = !box.checked; state($('theatreMsg'), false, r.msg); return; }
+  await load();
+  state($('theatreMsg'), true, (box.checked ? 'On: ' : 'Off: ') + (cur.label || cur.name + ' Tower'));
+}
+
+// Step 4: test call.
+function prepTest() {
+  if ($('testFreq').value) return;
+  const t = (setup.theatres || []).find(t => t.key === setup.theatre);
+  $('testFreq').value = mhz(t && t.testFreq ? t.testFreq : 251);
+}
+async function sendTest() {
+  const freq = parseFloat($('testFreq').value);
+  if (!(freq >= 30 && freq <= 400)) { state($('testMsg'), false, 'Frequency must be 30-400 MHz.'); return; }
+  $('sendBtn').disabled = true;
+  state($('testMsg'), null, 'Making the call and sending it to SRS… (up to a minute)');
+  const r = await post('/api/setup', { op: 'testcall', freq });
+  $('sendBtn').disabled = !setup.canEdit;
+  tested = tested || r.ok;
+  state($('testMsg'), r.ok, r.msg);
+  renderSteps();
+}
+
+// Step 5.
+function renderSummary() {
+  const c = setup.checks, t = (setup.theatres || []).find(t => t.key === setup.theatre);
+  const row = (ok, text, warn) => `<div class="check"><span class="${ok ? 'ok' : warn ? 'warn' : 'bad'}">${ok ? '✓' : warn ? '•' : '✗'}</span> ${text}</div>`;
+  $('summary').innerHTML =
+    row(c.openai, 'OpenAI key') + row(c.elevenlabs, c.elevenlabs ? 'ElevenLabs key' : 'No ElevenLabs key: every voice uses OpenAI', true) +
+    row(c.srs && c.eam, 'SRS server and password') + row(c.tacview, c.tacview ? 'Tacview telemetry' : 'No Tacview: Command and the GCI cannot see aircraft', true) +
+    row(c.externalAudio, 'DCS-SRS ExternalAudio on this PC') + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
+    row(tested, tested ? 'Test call sent' : 'Test call not sent yet', true);
+  $('startBtn').disabled = !t || !setup.canEdit;
+  $('startBtn').textContent = t ? '▶ Start ' + t.label + ' and finish' : '▶ Start and finish';
+}
+async function finish(start) {
+  if (start && setup.theatre) {
+    const r = await fetch('/api/start-region?region=' + encodeURIComponent(setup.theatre), { method: 'POST' });
+    if (!r.ok && r.status !== 409) { state($('finishMsg'), false, 'Start failed: ' + (await r.text()).trim()); return; }
+  }
+  const r = await post('/api/setup', { op: 'done' });
+  if (!r.ok) { state($('finishMsg'), false, r.msg); return; }
+  location.href = '/';
+}
+
+async function load() {
+  [setup, settings] = await Promise.all([fetch('/api/setup').then(r => r.json()), fetch('/api/settings').then(r => r.json())]);
+  $('viewer').style.display = setup.canEdit ? 'none' : 'block';
+  document.querySelectorAll('section input, section button').forEach(el => {
+    if (!el.closest('.nav') && !setup.canEdit) el.disabled = true;
+  });
+  renderVars(); renderSteps();
+}
+load().then(() => {
+  // Open on the first step that still needs doing.
+  const first = [0, 1, 2].find(i => !stepDone(i));
+  go(first === undefined ? 3 : first);
+});
+</script>
+</body>
+</html>

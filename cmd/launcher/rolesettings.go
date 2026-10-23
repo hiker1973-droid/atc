@@ -266,8 +266,8 @@ func setRoleOverride(theatre, key, icao string, o rolecfg.Override) error {
 		if tv == nil {
 			return fmt.Errorf("no %s tower in %s", icao, theatre)
 		}
-		if o.Freq != 0 || o.Name != "" || o.Off {
-			return fmt.Errorf("a tower's frequency is in the Frequencies table; towers cannot be switched off here")
+		if o.Freq != 0 || o.Name != "" {
+			return fmt.Errorf("a tower's frequency is in the Frequencies table")
 		}
 		if err := rolecfg.Validate(nil, o); err != nil {
 			return err

@@ -42,4 +42,5 @@ update_last.json
 # Settings page and tower Side switch, per rig
 frequencies.json
 roles.json
+setup.json
 sides.json

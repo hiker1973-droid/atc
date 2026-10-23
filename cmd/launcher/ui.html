@@ -568,6 +568,20 @@ async function switchRig(name) {
 //
 // Only ever called on a rig change or at boot, so a deliberate theatre click
 // stands until you move rigs.
+// A fresh install (no OpenAI key or SRS address yet, setup not finished) gets
+// a banner pointing at the Setup wizard. Working rigs never see it.
+async function checkSetup() {
+  try {
+    const s = await fetch('/api/setup').then(r => r.json());
+    if (!s.needsSetup) return;
+    const b = document.createElement('a');
+    b.href = '/setup';
+    b.textContent = '⚙ SkyEye is not set up on this PC yet: run Setup (keys, SRS server, theatre, test call) →';
+    b.style.cssText = 'display:block;background:#3d2e00;color:#e3b341;border-bottom:1px solid #d29922;padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;';
+    document.body.prepend(b);
+  } catch (e) { /* no banner */ }
+}
+
 async function followRunningTheatre() {
   try {
     const roles = await fetch(api('/api/roles')).then(r => r.json());
@@ -578,7 +592,13 @@ async function followRunningTheatre() {
       }
     }
     const ranked = Object.keys(running).sort((a, b) => running[b] - running[a]);
-    const best = ranked[0];
+    let best = ranked[0];
+    if (!best) {
+      // Nothing up: the theatre picked in Setup.
+      const s = await fetch(api('/api/setup')).then(r => r.json()).catch(() => ({}));
+      if (s.theatre && THEATRES[s.theatre] && s.theatre !== currentTheatre) switchTheatre(s.theatre);
+      return;
+    }
     // Ties keep the current theatre rather than flapping between equals.
     if (best && best !== currentTheatre && running[best] > (running[currentTheatre] || 0)) {
       switchTheatre(best);
@@ -1683,6 +1703,7 @@ setInterval(refreshComms, 60000);
 setInterval(refreshEleven, 60000);
 updateRegionButtons();
 loadIdentity();
+checkSetup();
 loadRigs().then(followRunningTheatre);   // loadRigs may reset a stale saved rig
 refreshAll();
 setInterval(refreshAll, 3000);
