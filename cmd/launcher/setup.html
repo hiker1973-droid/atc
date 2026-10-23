@@ -91,7 +91,7 @@
 
   <section data-step="1">
     <h2>Voice services</h2>
-    <p class="sub">The OpenAI key is required: it is how SkyEye understands what pilots say. SkyEye speaks with the free
+    <p class="sub">The OpenAI key is required: it is how Readback understands what pilots say. Readback speaks with the free
       Windows voices to start with; turn on OpenAI's natural voices in Settings, and an ElevenLabs key adds premium voices.
       Keys stay on this PC.</p>
     <div class="field" data-var="OPENAI_API_KEY">
@@ -109,8 +109,8 @@
 
   <section data-step="2">
     <h2>DCS server</h2>
-    <p class="sub">SkyEye joins your DCS-SRS server as radio stations and reads the air picture from Tacview's
-      real-time telemetry. <b>Install SkyEye on the PC that runs the SRS server</b>: SRS only takes SkyEye's
+    <p class="sub">Readback joins your DCS-SRS server as radio stations and reads the air picture from Tacview's
+      real-time telemetry. <b>Install Readback on the PC that runs the SRS server</b>: SRS only takes Readback's
       transmissions from the same PC, so the server is localhost and its port (5002 unless you changed it).</p>
     <div class="field" data-var="SKYEYE_SRS">
       <label>SRS server <small>host:port, e.g. localhost:5002</small></label>
@@ -143,7 +143,7 @@
 
   <section data-step="4">
     <h2>Test call</h2>
-    <p class="sub">Tune an SRS radio (in DCS or the SRS client's overlay) to the frequency below, then send. SkyEye
+    <p class="sub">Tune an SRS radio (in DCS or the SRS client's overlay) to the frequency below, then send. Readback
       speaks one short radio check: if you hear it, keys, voice and SRS all work.</p>
     <div class="field">
       <label>Frequency <small>MHz</small></label>
@@ -237,7 +237,7 @@ function prereqHTML(c) {
   return line(c.dotnet, 'Microsoft .NET 10 is installed.',
       `Microsoft .NET 10 is missing: DCS-SRS 2.4 and its installer need it. ${link(LINKS.dotnet, 'Download the .NET 10 Desktop Runtime')} (Windows x64), install it, then install DCS-SRS.`) +
     line(c.externalAudio, 'DCS-SRS ExternalAudio found on this PC.',
-      `DCS-SRS ExternalAudio not found: SkyEye transmits through it. ${link(LINKS.srs, 'Download DCS-SRS')} and run its installer (after .NET 10).`) +
+      `DCS-SRS ExternalAudio not found: Readback transmits through it. ${link(LINKS.srs, 'Download DCS-SRS')} and run its installer (after .NET 10).`) +
     line(c.ffmpeg, 'ffmpeg found: calls get the radio effect.',
       `ffmpeg not found (optional): calls go out clean, without the radio effect. ${link(LINKS.ffmpeg, 'Get ffmpeg')} (ffmpeg-master-latest-win64-gpl.zip) and unzip it to C:\\ffmpeg-master-latest-win64-gpl.`);
 }

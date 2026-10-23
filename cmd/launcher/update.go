@@ -82,7 +82,7 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 	// An Update is git pull + go build: a SkyEye-Setup install has neither,
 	// and is updated by running a newer SkyEye-Setup.exe.
 	if _, err := os.Stat(filepath.Join(rootDir, ".git")); err != nil {
-		http.Error(w, "this copy was installed by SkyEye-Setup.exe: run a newer SkyEye-Setup.exe to update it", http.StatusConflict)
+		http.Error(w, "this copy was installed by Readback-Setup.exe: update it from Settings > Updates, or run a newer Readback-Setup.exe", http.StatusConflict)
 		return
 	}
 	updMu.Lock()

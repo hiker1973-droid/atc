@@ -34,10 +34,10 @@ import (
 // empty on a source build.
 var productVersion = ""
 
-var flagReleases = flag.String("releases", "hiker1973-droid/skyeye-atc-releases",
-	"Public GitHub repo whose releases carry SkyEye-Setup.exe, for installed copies' update check")
+var flagReleases = flag.String("releases", "hiker1973-droid/readback-atc-releases",
+	"Public GitHub repo whose releases carry Readback-Setup.exe, for installed copies' update check")
 
-const setupAsset = "SkyEye-Setup.exe"
+const setupAsset = "Readback-Setup.exe"
 
 type appRelease struct {
 	Version   string    `json:"version"`
@@ -111,7 +111,7 @@ var githubAPI = "https://api.github.com"
 func fetchLatestRelease() (*appRelease, error) {
 	req, _ := http.NewRequest(http.MethodGet, githubAPI+"/repos/"+*flagReleases+"/releases/latest", nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "SkyEye-ATC-launcher")
+	req.Header.Set("User-Agent", "Readback-ATC-launcher")
 	resp, err := githubClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach GitHub")
@@ -192,9 +192,9 @@ func downloadRelease(rel *appRelease) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	path := filepath.Join(dir, "SkyEye-Setup-"+rel.Version+".exe")
+	path := filepath.Join(dir, "Readback-Setup-"+rel.Version+".exe")
 	req, _ := http.NewRequest(http.MethodGet, rel.URL, nil)
-	req.Header.Set("User-Agent", "SkyEye-ATC-launcher")
+	req.Header.Set("User-Agent", "Readback-ATC-launcher")
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -263,7 +263,7 @@ func installAppUpdate() {
 		os.WriteFile(restartFile(), b, 0o644)
 	}
 	set("installing " + rel.Version + " - the launcher restarts")
-	cmd := exec.Command("cmd", "/c", "start", "SkyEye update", "/min", path, "--dir", rootDir, "--update")
+	cmd := exec.Command("cmd", "/c", "start", "Readback ATC update", "/min", path, "--dir", rootDir, "--update")
 	cmd.Dir = filepath.Dir(path)
 	if err := cmd.Start(); err != nil {
 		os.Remove(restartFile())

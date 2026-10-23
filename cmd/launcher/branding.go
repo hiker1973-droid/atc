@@ -55,7 +55,7 @@ func writeBranding(b brandingFile) error {
 }
 
 // squadronName is what the pages call the install: the name set in Setup, or
-// vSFG-7 where the vSFG-7 pack (hand-made start files) is, else SkyEye.
+// vSFG-7 where the vSFG-7 pack (hand-made start files) is, else Readback ATC.
 func squadronName(b brandingFile) string {
 	if b.Name != "" {
 		return b.Name
@@ -65,7 +65,7 @@ func squadronName(b brandingFile) string {
 			return "vSFG-7"
 		}
 	}
-	return "SkyEye"
+	return "Readback ATC"
 }
 
 // customLogo is the uploaded logo's path, "" when the built-in one is used.

@@ -143,7 +143,7 @@ func testCall(freq float64, text string) (string, error) {
 		return "", fmt.Errorf("set the SRS server first")
 	}
 	if text == "" {
-		text = "Radio check. This is Sky Eye, set up and transmitting on this frequency. How do you read?"
+		text = "Radio check. This is Readback, set up and transmitting on this frequency. How do you read?"
 	}
 	refreshKeyEnv()
 	args := []string{"--say", text, "--freq", fmt.Sprintf("%.3f", freq), "--srs-addr", srs, "--tts-voice", "nova"}

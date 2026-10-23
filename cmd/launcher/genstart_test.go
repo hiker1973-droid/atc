@@ -70,6 +70,11 @@ func TestGenerateKeepsHandMadeFiles(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "start_skyeye_syria.bat")); err == nil {
 		t.Fatal("wrote a file anyway")
 	}
+	// Files Setup wrote before the rename are still its own, not hand-made.
+	os.WriteFile(filepath.Join(root, "start_skyeye_kola.bat"), []byte(startgen.LegacyMarker+"\r\n"), 0o644)
+	if _, err := generateStartFiles("kola", startgen.Defaults()); err != nil {
+		t.Fatalf("pre-rename generated file taken for hand-made: %v", err)
+	}
 	// start_launcher.bat is the launcher's own: Persian Gulf is still free.
 	if _, err := generateStartFiles("pg", startgen.Defaults()); err != nil {
 		t.Fatal(err)

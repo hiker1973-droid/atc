@@ -112,7 +112,7 @@
     <h2>Licence</h2>
     <p class="sub" id="licStatus">Checking…</p>
     <div class="row" style="grid-template-columns: 15rem 1fr auto" id="licEntry">
-      <div class="lab">Licence key<small>starts SKYEYE1-</small></div>
+      <div class="lab">Licence key<small>starts READBACK1-</small></div>
       <input id="licKey" spellcheck="false" autocomplete="off" placeholder="paste the key you were sent">
       <button class="primary" onclick="activateLicence()">Activate</button>
       <div class="msg" id="licMsg"></div>
@@ -122,7 +122,7 @@
   <section>
     <h2>Voice services</h2>
     <p class="sub">Keys stay on this rig. The page only ever shows the last four characters.
-      The OpenAI key is needed in any case: it is how SkyEye understands the pilots.</p>
+      The OpenAI key is needed in any case: it is how Readback understands the pilots.</p>
     <div class="row" style="grid-template-columns: 15rem 1fr">
       <div class="lab">Voices</div>
       <div>
@@ -466,7 +466,7 @@ function renderUpdate(u) {
   if (u.installing) { st.className = 'sub warn'; st.textContent = 'Updating: ' + (u.step || 'starting') + '…'; return; }
   if (u.available) {
     st.className = 'sub warn';
-    st.textContent = `SkyEye ${u.latest.version} is available - you have ${u.current}.`;
+    st.textContent = `Readback ATC ${u.latest.version} is available - you have ${u.current}.`;
     if (u.latest.notes) { notes.textContent = u.latest.notes; notes.style.display = ''; }
     return;
   }

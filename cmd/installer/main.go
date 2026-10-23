@@ -36,14 +36,14 @@ var (
 )
 
 const (
-	appName    = "SkyEye ATC"
+	appName    = "Readback ATC"
 	listenPort = 7000
 )
 
 var programs = []string{"atc.exe", "launcher.exe"}
 
 var (
-	flagDir       = flag.String("dir", filepath.Join(os.Getenv("LOCALAPPDATA"), "SkyEye"), "Install folder")
+	flagDir       = flag.String("dir", filepath.Join(os.Getenv("LOCALAPPDATA"), "Readback ATC"), "Install folder")
 	flagUninstall = flag.Bool("uninstall", false, "Remove the programs and shortcuts; settings and logs stay")
 	flagQuiet     = flag.Bool("quiet", false, "Ask nothing: no start-with-Windows shortcut, no pause at the end")
 	flagNoStart   = flag.Bool("no-start", false, "Install only; do not start the launcher")
@@ -78,7 +78,7 @@ func main() {
 func install(dir string) error {
 	for _, p := range programs {
 		if _, err := fs.Stat(payload, "payload/"+p); err != nil {
-			return fmt.Errorf("this SkyEye-Setup.exe was built without %s - rebuild it with build_installer.bat", p)
+			return fmt.Errorf("this Readback-Setup.exe was built without %s - rebuild it with build_installer.bat", p)
 		}
 	}
 	fmt.Printf("Installing to %s\n", dir)
@@ -86,7 +86,7 @@ func install(dir string) error {
 		return err
 	}
 	if n := stopRunning(dir); n > 0 {
-		fmt.Printf("  closed %d running SkyEye program(s) from this folder\n", n)
+		fmt.Printf("  closed %d running Readback program(s) from this folder\n", n)
 		time.Sleep(time.Second) // let Windows release the files
 	}
 	for _, p := range programs {
@@ -107,7 +107,7 @@ func install(dir string) error {
 	}
 	os.WriteFile(filepath.Join(dir, "version.txt"), []byte(productVersion+" ("+version+")\r\n"), 0o644)
 	self, _ := os.Executable()
-	copyFile(self, filepath.Join(dir, "SkyEye-Setup.exe")) // kept for --uninstall
+	copyFile(self, filepath.Join(dir, "Readback-Setup.exe")) // kept for --uninstall
 
 	launcher := filepath.Join(dir, "launcher.exe")
 	args := launcherArgs()
@@ -156,15 +156,15 @@ func addShortcuts(dir, launcher, args string) {
 	fmt.Println("\nShortcuts")
 	for _, where := range []string{startMenuDir(), desktopDir()} {
 		lnk := filepath.Join(where, appName+".lnk")
-		if err := shortcut(lnk, launcher, args, dir, "Start SkyEye ATC and open its dashboard"); err != nil {
+		if err := shortcut(lnk, launcher, args, dir, "Start Readback ATC and open its dashboard"); err != nil {
 			fmt.Printf("  could not add %s: %v\n", lnk, err)
 		} else {
 			fmt.Printf("  %s\n", lnk)
 		}
 	}
 	shortcut(filepath.Join(startMenuDir(), "Uninstall "+appName+".lnk"),
-		filepath.Join(dir, "SkyEye-Setup.exe"), "--uninstall", dir, "Remove SkyEye ATC")
-	if !*flagQuiet && ask("Start SkyEye when Windows starts? [y/N] ", false) {
+		filepath.Join(dir, "Readback-Setup.exe"), "--uninstall", dir, "Remove Readback ATC")
+	if !*flagQuiet && ask("Start Readback ATC when Windows starts? [y/N] ", false) {
 		if err := shortcut(filepath.Join(startupDir(), appName+".lnk"), launcher, args, dir, appName); err == nil {
 			fmt.Println("  added to Startup")
 		}
@@ -181,7 +181,7 @@ func launcherArgs() string {
 func uninstall(dir string) error {
 	fmt.Printf("Removing %s from %s\n", appName, dir)
 	if n := stopRunning(dir); n > 0 {
-		fmt.Printf("  closed %d running SkyEye program(s)\n", n)
+		fmt.Printf("  closed %d running Readback program(s)\n", n)
 		time.Sleep(time.Second)
 	}
 	for _, p := range []string{
@@ -250,7 +250,7 @@ func checkPrerequisites() {
 		"needed by DCS-SRS 2.4 and its installer: install the .NET 10 Desktop Runtime (Windows x64) from "+dotnetURL)
 	srs := exists(`C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`)
 	report(srs, "DCS-SRS (ExternalAudio)",
-		"SkyEye talks on SRS through it: install DCS-SRS (after .NET 10) from "+srsURL)
+		"Readback talks on SRS through it: install DCS-SRS (after .NET 10) from "+srsURL)
 	report(exists(`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`), "ffmpeg (radio effect)",
 		"optional: without it calls go out clean. Unzip an ffmpeg build to C:\\ffmpeg-master-latest-win64-gpl")
 	// The console's links cannot be clicked: offer to open the pages.

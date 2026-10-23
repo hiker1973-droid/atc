@@ -47,10 +47,10 @@ func TestCheckLogo(t *testing.T) {
 }
 
 // The vSFG-7 rigs keep their name with no branding.json; a fresh install is
-// SkyEye until Setup names it. An uploaded logo replaces the other format's.
+// Readback ATC until Setup names it. An uploaded logo replaces the other format's.
 func TestBrandingDefaultsAndUpload(t *testing.T) {
 	root := withRoot(t)
-	if got := brandingSnapshot()["name"]; got != "SkyEye" {
+	if got := brandingSnapshot()["name"]; got != "Readback ATC" {
 		t.Fatalf("fresh install named %v", got)
 	}
 	os.WriteFile(filepath.Join(root, "start_towers_caucasus.bat"), []byte("@echo off\r\n"), 0o644)

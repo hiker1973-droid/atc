@@ -30,7 +30,10 @@ import (
 const TrialDays = 14
 
 // keyPrefix starts every key, so a pasted key is recognisable.
-const keyPrefix = "SKYEYE1-"
+const keyPrefix = "READBACK1-"
+
+// oldKeyPrefix: keys issued before the rename (2026-10-23) still read.
+const oldKeyPrefix = "SKYEYE1-"
 
 // Licence is what a key says.
 type Licence struct {
@@ -64,16 +67,22 @@ func Sign(l Licence, priv ed25519.PrivateKey) (string, error) {
 }
 
 // ErrBadKey: not a SkyEye key, or one that was altered.
-var ErrBadKey = errors.New("that is not a valid SkyEye licence key")
+var ErrBadKey = errors.New("that is not a valid Readback ATC licence key")
 
 // Parse checks a key's signature against pub and returns what it says.
 // Spaces and line breaks from copying are ignored.
 func Parse(key string, pub ed25519.PublicKey) (Licence, error) {
 	key = strings.Join(strings.Fields(key), "")
-	if !strings.HasPrefix(key, keyPrefix) {
+	var rest string
+	switch {
+	case strings.HasPrefix(key, keyPrefix):
+		rest = strings.TrimPrefix(key, keyPrefix)
+	case strings.HasPrefix(key, oldKeyPrefix):
+		rest = strings.TrimPrefix(key, oldKeyPrefix)
+	default:
 		return Licence{}, ErrBadKey
 	}
-	body, sigStr, ok := strings.Cut(strings.TrimPrefix(key, keyPrefix), ".")
+	body, sigStr, ok := strings.Cut(rest, ".")
 	if !ok {
 		return Licence{}, ErrBadKey
 	}
@@ -215,10 +224,10 @@ func (c *Checker) Check() Status {
 	if now.Before(end) {
 		left := daysLeft(end, now)
 		return Status{State: Trial, TrialStart: start, DaysLeft: left,
-			Message: fmt.Sprintf("Trial: %d day%s left. Enter a licence key in Settings to keep SkyEye running.", left, plural(left))}
+			Message: fmt.Sprintf("Trial: %d day%s left. Enter a licence key in Settings to keep Readback ATC running.", left, plural(left))}
 	}
 	return Status{State: Expired, TrialStart: start,
-		Message: "The 14-day trial has ended. Enter a licence key in Settings to start SkyEye again."}
+		Message: "The 14-day trial has ended. Enter a licence key in Settings to start Readback ATC again."}
 }
 
 // Activate checks a key and saves it.

@@ -589,11 +589,11 @@ async function checkSetup() {
   try {
     // A newer SkyEye-Setup release (appupdate.go); a git checkout never has one.
     const u = await fetch('/api/app-update').then(r => r.json());
-    if (u.available && u.latest) banner('/settings#updates', `⬆ SkyEye ${u.latest.version} is available (you have ${u.current}): see what's new and update →`);
+    if (u.available && u.latest) banner('/settings#updates', `⬆ Readback ATC ${u.latest.version} is available (you have ${u.current}): see what's new and update →`);
   } catch (e) { /* no banner */ }
   try {
     const s = await fetch('/api/setup').then(r => r.json());
-    if (s.needsSetup) banner('/setup', '⚙ SkyEye is not set up on this PC yet: run Setup (keys, SRS server, theatre, test call) →');
+    if (s.needsSetup) banner('/setup', '⚙ Readback ATC is not set up on this PC yet: run Setup (keys, SRS server, theatre, test call) →');
   } catch (e) { /* no banner */ }
 }
 
@@ -814,11 +814,12 @@ async function refreshRoles() {
     roleAlias = {};
     for (const x of (list||[])) {
       roleStatus[x.name] = x.status;
-      // Setup's generated start files name roles "SkyEye ..." where the
+      // Setup's generated start files name roles "Readback ..." where the
       // vSFG-7 bats say "vSFG-7 ...": the cards below are written with the
       // vSFG-7 names, so answer for both.
-      if (x.name.startsWith('SkyEye ')) {
-        const card = 'vSFG-7 ' + x.name.slice(7);
+      const generic = ['Readback ', 'SkyEye '].find(p => x.name.startsWith(p)); // SkyEye: before the rename
+      if (generic) {
+        const card = 'vSFG-7 ' + x.name.slice(generic.length);
         if (!(card in roleStatus)) { roleStatus[card] = x.status; roleAlias[card] = x.name; }
       }
     }

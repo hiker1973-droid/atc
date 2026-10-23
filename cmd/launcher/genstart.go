@@ -15,13 +15,18 @@ import (
 // region Start/Stop, Restart and Update work on them unchanged. Nothing here
 // overwrites a bat without startgen.Marker: the vSFG-7 pack stays as it is.
 
+// isGenerated: the file carries Setup's marker, either name.
+func isGenerated(text string) bool {
+	return strings.Contains(text, startgen.Marker) || strings.Contains(text, startgen.LegacyMarker)
+}
+
 // handMade reports whether a file exists and was not written by Setup.
 func handMade(path string) bool {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	return !strings.Contains(string(b), startgen.Marker)
+	return !isGenerated(string(b))
 }
 
 // theatreHasHandMadeFiles: the vSFG-7 pack (or any operator's own bats)
@@ -44,7 +49,7 @@ func theatreHasHandMadeFiles(theatre string) bool {
 // theatreGenerated: Setup wrote this theatre's start files.
 func theatreGenerated(theatre string) bool {
 	b, err := os.ReadFile(filepath.Join(rootDir, startgen.RolesBat(theatre)))
-	return err == nil && strings.Contains(string(b), startgen.Marker)
+	return err == nil && isGenerated(string(b))
 }
 
 func theatreLabel(theatre string) string {

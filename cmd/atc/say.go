@@ -25,7 +25,7 @@ var (
 
 func registerSayFlags(f *pflag.FlagSet) {
 	f.StringVar(&flagSay, "say", "", "Setup test call: speak this line once on --freq and exit (the launcher's Setup page)")
-	f.StringVar(&flagSayName, "say-name", "SkyEye-Setup", "SRS client name for --say (no spaces)")
+	f.StringVar(&flagSayName, "say-name", "Readback-Setup", "SRS client name for --say (no spaces)")
 }
 
 // sayOnce speaks flagSay on --freq in the --tts-voice / --elevenlabs-tower-voice

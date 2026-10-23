@@ -37,7 +37,7 @@ func TestAppUpdateCheckAndDownload(t *testing.T) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/releases/latest"):
 			fmt.Fprintf(w, `{"tag_name":"v0.2.0","body":"Faster towers.","html_url":"x","assets":[
-				{"name":"SkyEye-Setup.exe","browser_download_url":"%s/dl","size":%d,"digest":"%s"}]}`, srv.URL, len(setup), digest)
+				{"name":"Readback-Setup.exe","browser_download_url":"%s/dl","size":%d,"digest":"%s"}]}`, srv.URL, len(setup), digest)
 		case r.URL.Path == "/dl":
 			w.Write(setup)
 		}

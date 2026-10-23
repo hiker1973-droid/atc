@@ -74,7 +74,7 @@ func initKeys(args []string) error {
 	if err := os.MkdirAll(filepath.Dir(*file), 0o700); err != nil {
 		return err
 	}
-	text := "SkyEye ATC licence signing key - PRIVATE. Keep a backup somewhere safe; never share or commit it.\r\n" +
+	text := "Readback ATC licence signing key - PRIVATE. Keep a backup somewhere safe; never share or commit it.\r\n" +
 		base64.StdEncoding.EncodeToString(priv) + "\r\n"
 	if err := os.WriteFile(*file, []byte(text), 0o600); err != nil {
 		return err
@@ -111,7 +111,7 @@ func issue(args []string) error {
 		return err
 	}
 	if !priv.Public().(ed25519.PublicKey).Equal(license.PublicKey) {
-		return fmt.Errorf("this signing key is not the one built into SkyEye (pkg/license/pubkey.go): its keys would be rejected")
+		return fmt.Errorf("this signing key is not the one built into Readback ATC (pkg/license/pubkey.go): its keys would be rejected")
 	}
 	now := time.Now().UTC()
 	l := license.Licence{Squadron: strings.TrimSpace(*squadron), ID: *id, Issued: now.Format("2006-01-02")}

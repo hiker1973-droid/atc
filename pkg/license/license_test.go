@@ -46,6 +46,11 @@ func TestSignParse(t *testing.T) {
 	if _, err := Parse("hello", pub); err == nil {
 		t.Fatal("junk accepted")
 	}
+	// Keys issued before the rename (SKYEYE1-) still read.
+	old := oldKeyPrefix + strings.TrimPrefix(key, keyPrefix)
+	if l, err := Parse(old, pub); err != nil || l.ID != "x1" {
+		t.Fatalf("pre-rename key: %+v %v", l, err)
+	}
 }
 
 func TestTrial(t *testing.T) {

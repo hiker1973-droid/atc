@@ -6,11 +6,11 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// RegistryStore keeps the trial dates in HKCU\Software\SkyEye ATC, which an
+// RegistryStore keeps the trial dates in HKCU\Software\Readback ATC, which an
 // uninstall and reinstall do not touch.
 type RegistryStore struct{}
 
-const regPath = `Software\SkyEye ATC`
+const regPath = `Software\Readback ATC`
 
 func (RegistryStore) Load() (start, lastSeen time.Time) {
 	k, err := registry.OpenKey(registry.CURRENT_USER, regPath, registry.QUERY_VALUE)
