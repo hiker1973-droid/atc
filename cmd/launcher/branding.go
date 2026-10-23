@@ -133,6 +133,7 @@ func brandingSnapshot() map[string]any {
 	out := map[string]any{"name": squadronName(b), "nameSet": b.Name != "", "customLogo": false, "logoVersion": 0}
 	if p := customLogo(b); p != "" {
 		out["customLogo"] = true
+		out["wide"] = logoIsWide(p)
 		if st, err := os.Stat(p); err == nil {
 			out["logoVersion"] = st.ModTime().Unix()
 		}
@@ -225,13 +226,52 @@ func serveLogo(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, p)
 		return
 	}
-	data, err := uiFS.ReadFile("logo.png")
+	serveBuiltInLogo(w)
+}
+
+// builtInLogo is the logo with none uploaded: the vSFG-7 patch where the
+// vSFG-7 pack is (the rigs), else the Readback ATC tower.
+func builtInLogo() string {
+	if squadronName(brandingFile{}) == "vSFG-7" {
+		return "logo.png"
+	}
+	return "readback.png"
+}
+
+func serveBuiltInLogo(w http.ResponseWriter) {
+	data, err := uiFS.ReadFile(builtInLogo())
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(data)
+}
+
+// logoIsWide: a banner rather than a badge (the Readback logo is 1600x600).
+// The pages show it whole, and the tab icon falls back to the built-in one.
+func logoIsWide(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	cfg, _, err := image.DecodeConfig(f)
+	return err == nil && cfg.Height > 0 && float64(cfg.Width)/float64(cfg.Height) > 1.6
+}
+
+// serveIcon is the browser-tab icon: the uploaded logo when it is roughly
+// square, else the built-in one (a banner is unreadable at 16 pixels).
+func serveIcon(w http.ResponseWriter, r *http.Request) {
+	brandingMu.Lock()
+	p := customLogo(readBranding())
+	brandingMu.Unlock()
+	w.Header().Set("Cache-Control", "no-cache")
+	if p != "" && !logoIsWide(p) {
+		serveLogo(w, r)
+		return
+	}
+	serveBuiltInLogo(w)
 }
 
 // brandingJS puts the squadron's name and logo on a page (the header label,
@@ -241,13 +281,20 @@ const brandingJS = `(() => {
   let shownName = 'vSFG-7'; // what the page's own title starts with
   window.applyBranding = b => {
     const v = '/logo.png?v=' + (b.logoVersion || 0);
-    document.querySelectorAll('.logo').forEach(e => { e.textContent = b.name; });
-    document.querySelectorAll('img.patch, img.squadron-logo').forEach(e => { e.src = v; e.alt = b.name + ' logo'; });
+    document.querySelectorAll('.logo').forEach(e => { e.textContent = b.name; e.style.display = b.wide ? 'none' : ''; });
+    document.querySelectorAll('img.patch, img.squadron-logo').forEach(e => {
+      e.src = v; e.alt = b.name + ' logo';
+      // A banner logo already carries the name: show it whole, not in a circle.
+      if (b.wide) {
+        e.style.width = 'auto'; e.style.borderRadius = '4px'; e.style.boxShadow = 'none'; e.style.objectFit = 'contain';
+        if (e.classList.contains('patch')) e.style.height = '46px'; // the header: big enough to read
+      } else { e.style.width = ''; e.style.height = ''; e.style.borderRadius = ''; e.style.boxShadow = ''; e.style.objectFit = ''; }
+    });
     if (document.title.startsWith(shownName)) document.title = b.name + document.title.slice(shownName.length);
     shownName = b.name;
     let icon = document.querySelector('link[rel="icon"]');
     if (!icon) { icon = document.createElement('link'); icon.rel = 'icon'; document.head.appendChild(icon); }
-    icon.href = v;
+    icon.href = '/icon.png?v=' + (b.logoVersion || 0);
     window.squadron = b;
     document.dispatchEvent(new CustomEvent('branding', { detail: b }));
   };

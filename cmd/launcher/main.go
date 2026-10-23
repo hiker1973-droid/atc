@@ -33,7 +33,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html logs.html pilots.html settings.html setup.html logo.png
+//go:embed ui.html fleet.html logs.html pilots.html settings.html setup.html logo.png readback.png
 var uiFS embed.FS
 
 var (
@@ -134,6 +134,7 @@ func main() {
 	mux.HandleFunc("/setup", serveSetupUI)
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/branding.js", serveBrandingJS)
+	mux.HandleFunc("/icon.png", serveIcon)
 	// GET = squadron name and logo (viewer); POST = change them (control, checked inside).
 	mux.HandleFunc("/api/branding", handleBranding)
 	mux.HandleFunc("/api/me", handleMe)
