@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vsfg7/atc/pkg/license"
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
@@ -410,16 +411,22 @@ func healthLoop() {
 	}
 }
 
-// probeAddr is where the health check looks for SRS or Tacview: the
-// --srs-addr / --tacview-addr the rig's start_launcher.bat passes, else the
-// address saved in Setup (a SkyEye-Setup install starts the launcher without
-// them), else the flag's default.
+// probeAddr is where the health check and the air picture look for SRS or
+// Tacview: the --srs-addr / --tacview-addr the rig's start_launcher.bat
+// passes, else the address saved in Setup or Settings. Only a vSFG-7 rig (a
+// source install) falls back to the flag's default, which is a vSFG-7 LAN
+// address: an installed copy with nothing saved has none (operator
+// 2026-10-23: the laptop showed the Night rig's live aircraft - "it should
+// be blank").
 func probeAddr(flagName, envName string) string {
 	given := false
 	flag.Visit(func(f *flag.Flag) { given = given || f.Name == flagName })
 	if !given {
 		if v := userEnv(envName); v != "" {
 			return v
+		}
+		if !license.IsSource(rootDir) {
+			return ""
 		}
 	}
 	return flag.Lookup(flagName).Value.String()
@@ -557,6 +564,9 @@ func tacview64Probe() bool {
 }
 
 func tcpProbe(addr string, timeout time.Duration) bool {
+	if addr == "" { // not set up yet
+		return false
+	}
 	c, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
 		return false
