@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/vsfg7/atc/pkg/debrief"
+	"github.com/vsfg7/atc/pkg/miz"
 )
 
 // Reports page (operator 2026-10-23: "lets add reporting functions",
@@ -34,12 +35,15 @@ func reportsDir() string { return filepath.Join(rootDir, "reports") }
 
 // A prepared debrief waits here between Preview and Generate.
 type preparedReport struct {
-	Records string
-	Title   string
-	From    time.Time
-	To      time.Time
-	Sources []string
-	At      time.Time
+	Records  string
+	Title    string
+	From     time.Time
+	To       time.Time
+	Sources  []string
+	At       time.Time
+	ReportNo string
+	Mission  string
+	Facts    []debrief.Fact
 }
 
 var (
@@ -47,16 +51,21 @@ var (
 	prepared   = map[string]*preparedReport{}
 )
 
-// reportMeta is saved beside each debrief (<name>.json next to <name>.md).
+// reportMeta is saved beside each report (<name>.json next to <name>.md).
+// An AAR (ReportNo set) keeps only Claude's sections in the .md; its header
+// and data block come from here. Earlier debriefs kept a whole page there.
 type reportMeta struct {
-	Name    string        `json:"name"`
-	Title   string        `json:"title"`
-	Created time.Time     `json:"created"`
-	From    time.Time     `json:"from"`
-	To      time.Time     `json:"to"`
-	Model   string        `json:"model"`
-	Usage   debrief.Usage `json:"usage"`
-	Sources []string      `json:"sources"`
+	Name     string         `json:"name"`
+	Title    string         `json:"title"`
+	Created  time.Time      `json:"created"`
+	From     time.Time      `json:"from"`
+	To       time.Time      `json:"to"`
+	Model    string         `json:"model"`
+	Usage    debrief.Usage  `json:"usage"`
+	Sources  []string       `json:"sources"`
+	ReportNo string         `json:"reportNo,omitempty"`
+	Mission  string         `json:"mission,omitempty"`
+	Facts    []debrief.Fact `json:"facts,omitempty"`
 }
 
 // localSource is a dcs.log or Tacview recording found on this PC.
@@ -107,6 +116,60 @@ func localTacview() []localSource {
 	return out
 }
 
+// localMissions: the mission the DCS server has loaded (the hook's
+// current_mission.txt), then the newest .miz files under the Missions
+// folder and its subfolders.
+func localMissions() []localSource {
+	out := []localSource{}
+	seen := map[string]bool{}
+	addFile := func(p, label string) {
+		if seen[strings.ToLower(p)] {
+			return
+		}
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			seen[strings.ToLower(p)] = true
+			out = append(out, localSource{Path: p, Label: label, Size: st.Size(), Modified: st.ModTime()})
+		}
+	}
+	watch := *flagMizWatch
+	if watch == "" {
+		watch = filepath.Join(rootDir, "current_mission.txt")
+	}
+	if p := currentMissionFromHook(watch); p != "" {
+		addFile(p, "Loaded on the server now: "+filepath.Base(p))
+	}
+	if p := *flagMizPath; p != "" {
+		addFile(p, filepath.Base(p))
+	}
+	dir, _ := resolveMizDir()
+	if dir == "" {
+		return out
+	}
+	var found []localSource
+	filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && strings.Count(strings.TrimPrefix(p, dir), string(os.PathSeparator)) > 4 {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() && strings.EqualFold(filepath.Ext(p), ".miz") {
+			if st, err := d.Info(); err == nil {
+				found = append(found, localSource{Path: p, Label: filepath.Base(p), Size: st.Size(), Modified: st.ModTime()})
+			}
+		}
+		return nil
+	})
+	sort.Slice(found, func(i, j int) bool { return found[i].Modified.After(found[j].Modified) })
+	for _, f := range found {
+		if len(out) >= 20 {
+			break
+		}
+		addFile(f.Path, f.Label)
+	}
+	return out
+}
+
 // pickLocal returns path only if it is one of the listed files: the page
 // cannot name any other file on the PC.
 func pickLocal(path string, list []localSource) (string, error) {
@@ -144,6 +207,7 @@ func handleReports(w http.ResponseWriter, r *http.Request) {
 		"models":      models,
 		"dcsLogs":     localDCSLogs(),
 		"tacview":     localTacview(),
+		"missions":    localMissions(),
 		"saved":       savedReports(),
 	})
 }
@@ -207,6 +271,29 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 		in.Server = s
 		sources = append(sources, "dcs.log "+sourceName(r, "dcslog", "dcsPath"))
 	}
+	mizPath, cleanup3, err := reportSource(r, "miz", "mizPath", localMissions())
+	defer cleanup3()
+	if err != nil {
+		http.Error(w, "Mission file: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if mizPath != "" {
+		b, err := miz.ReadBriefing(mizPath)
+		if err != nil {
+			http.Error(w, "Mission file: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if r.FormValue("mizPath") == "" { // an upload: name it after the file, not the temp copy
+			if _, h, err := r.FormFile("miz"); err == nil {
+				if b.Name == strings.TrimSuffix(filepath.Base(mizPath), filepath.Ext(mizPath)) { // no sortie name: the temp file's
+					b.Name = strings.TrimSuffix(h.Filename, filepath.Ext(h.Filename))
+				}
+				b.File = h.Filename
+			}
+		}
+		in.Mission = b
+		sources = append(sources, "mission "+b.File)
+	}
 
 	// The window for Readback's radio logs: the Tacview recording's hours
 	// when asked, else the times given, else the dcs.log's.
@@ -231,9 +318,7 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nothing to report from: choose a Tacview recording or a dcs.log, or a time window with Readback radio traffic", http.StatusBadRequest)
 		return
 	}
-	if title == "" {
-		title = "Session"
-	}
+	title = debrief.MissionName(in)
 	switch {
 	case in.Tacview != nil && !in.Tacview.Start.IsZero():
 		title = fmt.Sprintf("%s - %s", title, in.Tacview.Start.UTC().Format("2 Jan 2006 15:04Z"))
@@ -248,10 +333,12 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 			delete(prepared, k)
 		}
 	}
-	prepared[id] = &preparedReport{Records: records, Title: title, From: from, To: to, Sources: sources, At: time.Now()}
+	facts := debrief.Facts(in, sources)
+	prepared[id] = &preparedReport{Records: records, Title: title, From: from, To: to, Sources: sources, At: time.Now(),
+		ReportNo: debrief.ReportNumber(in), Mission: debrief.MissionName(in), Facts: facts}
 	preparedMu.Unlock()
 
-	stats := map[string]any{"sources": sources, "chars": len(records), "approxTokens": len(records) / 4}
+	stats := map[string]any{"sources": sources, "chars": len(records), "approxTokens": len(records) / 4, "facts": facts}
 	if in.Tacview != nil {
 		humans := 0
 		for _, f := range in.Tacview.Flights {
@@ -354,18 +441,51 @@ func handleReportGenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	meta := reportMeta{Title: p.Title, Created: time.Now(), From: p.From, To: p.To, Model: body.Model, Usage: usage, Sources: p.Sources}
+	meta := reportMeta{Title: p.Title, Created: time.Now(), From: p.From, To: p.To, Model: body.Model, Usage: usage,
+		Sources: p.Sources, ReportNo: p.ReportNo, Mission: p.Mission, Facts: p.Facts}
 	meta.Name = meta.Created.Format("2006-01-02_150405")
 	if err := os.MkdirAll(reportsDir(), 0o755); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	md := "# Debrief: " + p.Title + "\n\n" + text + "\n"
-	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(md), 0o644)
+	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(strings.TrimSpace(text)+"\n"), 0o644)
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".records.txt"), []byte(p.Records), 0o644)
 	mb, _ := json.MarshalIndent(meta, "", "  ")
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".json"), mb, 0o644)
-	writeJSON(w, map[string]any{"meta": meta, "markdown": md})
+	writeJSON(w, map[string]any{"meta": meta})
+}
+
+// loadReport reads a saved report's meta and Markdown.
+func loadReport(name string) (reportMeta, string, error) {
+	var meta reportMeta
+	if !reportName.MatchString(name) {
+		return meta, "", fmt.Errorf("bad name")
+	}
+	md, err := os.ReadFile(filepath.Join(reportsDir(), name+".md"))
+	if err != nil {
+		return meta, "", fmt.Errorf("not found")
+	}
+	if b, err := os.ReadFile(filepath.Join(reportsDir(), name+".json")); err == nil {
+		json.Unmarshal(b, &meta)
+	}
+	meta.Name = name
+	return meta, string(md), nil
+}
+
+// fullMarkdown is the whole AAR as one Markdown file: header, data block,
+// sections (an older debrief's file already is).
+func fullMarkdown(meta reportMeta, md string) string {
+	if meta.ReportNo == "" {
+		return md
+	}
+	var b strings.Builder
+	squadron, _ := brandingSnapshot()["name"].(string)
+	fmt.Fprintf(&b, "# AFTER ACTION REPORT\n\n**%s** - %s - %s\n\n| | |\n|---|---|\n", squadron, meta.ReportNo, meta.Mission)
+	for _, f := range meta.Facts {
+		fmt.Fprintf(&b, "| %s | %s |\n", f.Label, strings.ReplaceAll(f.Value, "|", "/"))
+	}
+	b.WriteString("\n" + md)
+	return b.String()
 }
 
 var reportName = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{6}$`)
@@ -383,31 +503,35 @@ func handleReportFile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		for _, ext := range []string{".md", ".json", ".records.txt"} {
+		for _, ext := range []string{".md", ".json", ".records.txt", ".pdf"} {
 			os.Remove(filepath.Join(reportsDir(), body.Name+ext))
 		}
 		writeJSON(w, map[string]any{"ok": true})
 		return
 	}
 	name := r.URL.Query().Get("name")
-	if !reportName.MatchString(name) {
-		http.Error(w, "bad name", http.StatusBadRequest)
-		return
-	}
-	md, err := os.ReadFile(filepath.Join(reportsDir(), name+".md"))
+	meta, md, err := loadReport(name)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
-	}
-	var meta reportMeta
-	if b, err := os.ReadFile(filepath.Join(reportsDir(), name+".json")); err == nil {
-		json.Unmarshal(b, &meta)
 	}
 	if r.URL.Query().Get("download") == "1" {
 		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="Debrief `+name+`.md"`)
-		w.Write(md)
+		w.Header().Set("Content-Disposition", `attachment; filename="`+reportFileName(meta)+`.md"`)
+		io.WriteString(w, fullMarkdown(meta, md))
 		return
 	}
-	writeJSON(w, map[string]any{"meta": meta, "markdown": string(md)})
+	writeJSON(w, map[string]any{"meta": meta, "markdown": md})
+}
+
+// reportFileName: "AAR-20261023-0015 Caucasus Training" for downloads.
+func reportFileName(meta reportMeta) string {
+	if meta.ReportNo == "" {
+		return "Debrief " + meta.Name
+	}
+	n := strings.TrimSpace(unsafeChars.ReplaceAllString(meta.Mission, " "))
+	if len(n) > 60 {
+		n = n[:60]
+	}
+	return strings.TrimSpace(meta.ReportNo + " " + n)
 }

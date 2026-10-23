@@ -133,6 +133,7 @@ func main() {
 	mux.HandleFunc("/settings", serveSettingsUI)
 	mux.HandleFunc("/setup", serveSetupUI)
 	mux.HandleFunc("/reports", serveReportsUI)
+	mux.HandleFunc("/reports/aar", handleAARPage) // one report as its printable page (aar.go)
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/branding.js", serveBrandingJS)
 	mux.HandleFunc("/icon.png", serveIcon)
@@ -163,6 +164,7 @@ func main() {
 	mux.HandleFunc("/api/reports", handleReports)
 	// GET = one saved debrief (viewer); POST = delete it (control, checked inside).
 	mux.HandleFunc("/api/reports/file", handleReportFile)
+	mux.HandleFunc("/api/reports/pdf", handleAARPDF)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(requireLicence(handleStart)))

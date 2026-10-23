@@ -39,7 +39,7 @@
   .src .lab { font-weight: 600; padding-top: 0.3rem; }
   .src .lab small { display: block; color: var(--muted); font-weight: 400; font-size: 0.75rem; }
   .pick { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-  .pick select { max-width: 30rem; }
+  .pick select { max-width: 32rem; }
   .or { color: var(--muted); font-size: 0.8rem; }
   input[type=file] { padding: 0.25rem; max-width: 22rem; }
   textarea { width: 100%; min-height: 3.2rem; resize: vertical; }
@@ -49,6 +49,9 @@
     margin-bottom: 1rem; font-size: 0.85rem; display: none; }
   .stats { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0.6rem; }
   .chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.78rem; }
+  table.facts { border-collapse: collapse; margin: 0.4rem 0 0.6rem; font-size: 0.82rem; width: 100%; }
+  table.facts th { text-align: left; color: var(--muted); font-weight: 600; padding: 0.2rem 0.6rem 0.2rem 0; width: 9rem; vertical-align: top; }
+  table.facts td { padding: 0.2rem 0; }
   pre.records { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 0.7rem;
     max-height: 22rem; overflow: auto; font: 0.76rem/1.4 Consolas, monospace; white-space: pre-wrap; }
   details summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0; }
@@ -60,30 +63,9 @@
   table.saved th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
   table.saved tr.sel td { background: var(--panel-2); }
   table.saved td.t { cursor: pointer; color: var(--blue); }
-  /* The debrief itself: a light page, as it prints. */
+  table.saved .no { font-family: Consolas, monospace; font-size: 0.78rem; color: var(--muted); display: block; }
   #report { display: none; }
-  .paper { background: #fff; color: #1d2128; border-radius: 6px; padding: 1.6rem 2rem; line-height: 1.5; font-size: 14.5px; }
-  .paper h1 { font-size: 1.45rem; margin: 0 0 0.6rem; color: #1d1f23; border-bottom: 3px solid var(--orange); padding-bottom: 0.3rem; }
-  .paper h2 { font-size: 1.15rem; margin: 1.3rem 0 0.4rem; color: #1d1f23; border-bottom: 1px solid #d6d9de; padding-bottom: 0.15rem; }
-  .paper h3 { font-size: 1rem; margin: 1rem 0 0.3rem; color: #c44d14; }
-  .paper p { margin: 0.4rem 0; }
-  .paper ul, .paper ol { margin: 0.3rem 0 0.5rem; padding-left: 1.4rem; }
-  .paper li { margin: 0.15rem 0; }
-  .paper code { background: #f1f2f4; padding: 0 3px; border-radius: 3px; }
-  .paper table { border-collapse: collapse; margin: 0.5rem 0; }
-  .paper th, .paper td { border: 1px solid #d6d9de; padding: 0.3rem 0.5rem; text-align: left; }
-  .paper .meta { color: #6b717b; font-size: 0.8rem; margin-bottom: 0.8rem; }
-  .paper .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem; }
-  .paper .brand img { height: 38px; }
-  @media print {
-    body { background: #fff; }
-    header, #make, #savedSec, .noprint, #viewer { display: none !important; }
-    main { padding: 0; max-width: none; }
-    #report { display: block !important; border: none; padding: 0; background: none; }
-    .paper { padding: 0; font-size: 11pt; }
-    .paper h2, .paper h3 { break-after: avoid; }
-    .paper li, .paper tr { break-inside: avoid; }
-  }
+  #report iframe { width: 100%; height: 80vh; border: 1px solid var(--border); border-radius: 5px; background: #e9ebee; }
 </style>
 </head>
 <body>
@@ -94,17 +76,25 @@
   <a href="/">Dashboard</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a><a href="/settings">Settings</a><a href="/help/">Help</a>
 </header>
 <main>
-  <div class="banner" id="viewer">You can read saved debriefs here; writing a new one needs operator rights.</div>
+  <div class="banner" id="viewer">You can read saved reports here; writing a new one needs operator rights.</div>
   <div class="banner" id="nokey">No Claude API key yet: add yours in <a href="/settings#aiKey">Settings, under Reports</a>
-    to write debriefs. You can still preview what a debrief would be written from.</div>
+    to write reports. You can still preview what a report would be written from.</div>
 
   <section id="make">
-    <h2>New debrief</h2>
+    <h2>New After Action Report</h2>
     <p class="sub">Pick the session's records. They are summarised on this PC - a Tacview recording becomes a few KB of
       flights, shots and losses - and you see exactly what will be sent before anything leaves the PC.</p>
 
     <div class="src">
-      <div class="lab">Tacview recording<small>.acmi or .zip.acmi</small></div>
+      <div class="lab">Mission file<small>the .miz: what was planned</small></div>
+      <div class="pick">
+        <select id="mizPath"><option value="">- none -</option></select>
+        <span class="or">or upload</span>
+        <input type="file" id="mizFile" accept=".miz">
+      </div>
+    </div>
+    <div class="src">
+      <div class="lab">Tacview recording<small>.acmi or .zip.acmi: what happened</small></div>
       <div class="pick">
         <select id="acmiPath"><option value="">- none -</option></select>
         <span class="or">or upload</span>
@@ -142,36 +132,37 @@
 
     <div id="preview" style="display:none;margin-top:0.9rem;border-top:1px solid var(--border);padding-top:0.8rem">
       <b id="pvTitle"></b>
+      <table class="facts" id="pvFacts"></table>
       <div class="stats" id="pvStats"></div>
       <details><summary>Show exactly what will be sent to Claude</summary><pre class="records" id="pvRecords"></pre></details>
       <div class="actions">
         <select id="model"></select>
-        <button class="primary" id="genBtn" onclick="generate()">Write the debrief</button>
+        <button class="primary" id="genBtn" onclick="generate()">Write the AAR</button>
         <span class="msg" id="genMsg"></span>
       </div>
-      <p class="sub" style="margin-top:0.5rem">Sent with your own Claude key and billed to your Anthropic account. A debrief
-        usually takes under a minute.</p>
+      <p class="sub" style="margin-top:0.5rem">Sent with your own Claude key and billed to your Anthropic account. A report
+        usually takes under a minute. The data block above is worked out on this PC and printed as it is.</p>
     </div>
   </section>
 
   <section id="report">
-    <div class="actions noprint" style="margin:0 0 0.8rem">
-      <button onclick="window.print()">Print or save as PDF</button>
+    <div class="actions" style="margin:0 0 0.8rem">
+      <button class="primary" onclick="pdf(true)">Download PDF</button>
+      <button onclick="pdf(false)">Open PDF</button>
+      <button onclick="$('aarFrame').contentWindow.print()">Print</button>
       <button onclick="download()">Download (.md)</button>
       <button onclick="closeReport()">Close</button>
+      <span class="msg" id="pdfMsg"></span>
       <span class="spacer"></span>
-      <button id="delBtn" onclick="del()" style="margin-left:auto">Delete</button>
+      <button id="delBtn" onclick="del()">Delete</button>
     </div>
-    <div class="paper">
-      <div class="brand"><img src="/logo.png" alt="" id="paperLogo"><b id="paperSquadron"></b></div>
-      <div id="paper"></div>
-    </div>
+    <iframe id="aarFrame" title="After Action Report"></iframe>
   </section>
 
   <section id="savedSec">
-    <h2>Saved debriefs</h2>
+    <h2>Saved reports</h2>
     <p class="sub">Kept in the <code>reports</code> folder beside Readback.</p>
-    <table class="saved"><thead><tr><th>Session</th><th>Written</th><th>From</th><th>Model</th></tr></thead>
+    <table class="saved"><thead><tr><th>Mission</th><th>Written</th><th>From</th><th>Model</th></tr></thead>
       <tbody id="saved"></tbody></table>
   </section>
 </main>
@@ -186,16 +177,20 @@ const localInput = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).to
 async function load() {
   state = await (await fetch('/api/reports')).json();
   $('viewer').style.display = state.canGenerate ? 'none' : 'block';
-  $('nokey').style.display = state.keySet ? 'none' : 'block';
+  $('nokey').style.display = state.keySet || !state.canGenerate ? 'none' : 'block';
   $('make').style.display = state.canGenerate ? '' : 'none';
-  const opts = (list, keep) => '<option value="">- none -</option>' + list.map(s =>
-    `<option value="${esc(s.path)}" ${s.path === keep ? 'selected' : ''}>${esc(s.label)} - ${when(s.modified)}, ${kb(s.size)}</option>`).join('');
-  $('acmiPath').innerHTML = opts(state.tacview || [], $('acmiPath').value);
-  $('dcsPath').innerHTML = opts(state.dcsLogs || [], $('dcsPath').value);
-  $('model').innerHTML = state.models.map(m => `<option value="${m.id}">${esc(m.label)}</option>`).join('');
-  state.saved = state.saved || [];
-  $('saved').innerHTML = state.saved.length ? state.saved.map(s => `<tr data-name="${s.name}" class="${current && current.name === s.name ? 'sel' : ''}">
-      <td class="t" onclick="history.replaceState(null, '', '?name=${s.name}'); openReport('${s.name}')">${esc(s.title)}</td><td>${when(s.created)}</td>
+  const opts = (list, keep, first) => '<option value="">- none -</option>' + (list || []).map((s, i) =>
+    `<option value="${esc(s.path)}" ${s.path === keep || (keep === null && first && i === 0 && s.label.startsWith('Loaded')) ? 'selected' : ''}>${esc(s.label)} - ${when(s.modified)}, ${kb(s.size)}</option>`).join('');
+  const firstLoad = !$('mizPath').dataset.loaded;
+  $('mizPath').innerHTML = opts(state.missions, firstLoad ? null : $('mizPath').value, true); // preselect the server's loaded mission
+  $('mizPath').dataset.loaded = '1';
+  $('acmiPath').innerHTML = opts(state.tacview, $('acmiPath').value);
+  $('dcsPath').innerHTML = opts(state.dcsLogs, $('dcsPath').value);
+  $('model').innerHTML = (state.models || []).map(m => `<option value="${m.id}">${esc(m.label)}</option>`).join('');
+  const saved = state.saved || [];
+  $('saved').innerHTML = saved.length ? saved.map(s => `<tr class="${current === s.name ? 'sel' : ''}">
+      <td class="t" onclick="openReport('${s.name}')">${esc(s.mission || s.title)}<span class="no">${esc(s.reportNo || 'debrief')}</span></td>
+      <td>${when(s.created)}</td>
       <td class="muted" style="font-size:0.8rem">${esc((s.sources || []).join(', '))}</td><td class="muted" style="font-size:0.8rem">${esc(s.model)}</td></tr>`).join('')
     : '<tr><td colspan="4" class="muted">None yet.</td></tr>';
   $('delBtn').style.display = state.canGenerate ? '' : 'none';
@@ -205,7 +200,9 @@ function syncWindow() { $('window').style.opacity = $('matchTacview').checked ? 
 
 async function prepare() {
   const f = new FormData();
-  if ($('acmiFile').files[0]) f.append('acmi', $('acmiFile').files[0]); else f.append('acmiPath', $('acmiPath').value);
+  const src = (file, field, sel) => { if ($(file).files[0]) f.append(field, $(file).files[0]); else f.append(field + 'Path', $(sel).value); };
+  src('mizFile', 'miz', 'mizPath');
+  src('acmiFile', 'acmi', 'acmiPath');
   if ($('dcsFile').files[0]) f.append('dcslog', $('dcsFile').files[0]); else f.append('dcsPath', $('dcsPath').value);
   f.append('radio', $('radio').checked ? '1' : '0');
   f.append('matchTacview', $('matchTacview').checked ? '1' : '0');
@@ -213,7 +210,7 @@ async function prepare() {
   if ($('to').value) f.append('to', new Date($('to').value).toISOString());
   f.append('focus', $('focus').value);
   $('prepBtn').disabled = true; $('preview').style.display = 'none';
-  const big = ($('acmiFile').files[0]?.size || 0) + ($('dcsFile').files[0]?.size || 0) > 20 << 20;
+  const big = ['acmiFile', 'dcsFile', 'mizFile'].reduce((n, id) => n + ($(id).files[0]?.size || 0), 0) > 20 << 20;
   $('prepMsg').innerHTML = `<span class="spin"></span> ${big ? 'Uploading and reading the files…' : 'Reading the records…'}`;
   try {
     const r = await fetch('/api/reports/prepare', { method: 'POST', body: f });
@@ -222,10 +219,9 @@ async function prepare() {
     prep = JSON.parse(t);
     $('prepMsg').textContent = '';
     $('pvTitle').textContent = prep.title;
-    const s = prep.stats, chips = [];
-    (s.sources || []).forEach(x => chips.push(x));
-    if (s.players != null) chips.push(`${s.players} player aircraft, ${s.aircraft} aircraft in all`);
-    if (s.losses != null) chips.push(`${s.losses} destroyed`);
+    const s = prep.stats;
+    $('pvFacts').innerHTML = (s.facts || []).map(x => `<tr><th>${esc(x.label)}</th><td>${esc(x.value)}</td></tr>`).join('');
+    const chips = [];
     if (s.serverProblems != null) chips.push(`${s.serverProblems} kinds of server error`);
     chips.push(`about ${Math.round(s.approxTokens / 100) / 10}k tokens to send`);
     $('pvStats').innerHTML = chips.map(c => `<span class="chip">${esc(c)}</span>`).join('');
@@ -241,7 +237,7 @@ async function prepare() {
 
 async function generate() {
   $('genBtn').disabled = true;
-  $('genMsg').innerHTML = '<span class="spin"></span> Claude is writing the debrief…';
+  $('genMsg').innerHTML = '<span class="spin"></span> Claude is writing the After Action Report…';
   try {
     const r = await fetch('/api/reports/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: prep.id, model: $('model').value }) });
@@ -249,81 +245,48 @@ async function generate() {
     if (!r.ok) throw new Error(t.trim() || 'HTTP ' + r.status);
     const res = JSON.parse(t);
     $('genMsg').innerHTML = `<span class="ok">Done</span> <span class="muted">(${res.meta.usage.input_tokens} tokens in, ${res.meta.usage.output_tokens} out)</span>`;
-    show(res.meta, res.markdown);
-    await load();
+    openReport(res.meta.name);
   } catch (e) {
     $('genMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
   } finally { $('genBtn').disabled = !state.keySet; }
 }
 
-async function openReport(name) {
-  const r = await fetch('/api/reports/file?name=' + encodeURIComponent(name));
-  if (!r.ok) return;
-  const res = await r.json();
-  show(res.meta, res.markdown);
+function openReport(name) {
+  current = name;
+  history.replaceState(null, '', '?name=' + encodeURIComponent(name));
+  $('aarFrame').src = '/reports/aar?name=' + encodeURIComponent(name);
+  $('pdfMsg').textContent = '';
+  $('report').style.display = 'block';
+  $('report').scrollIntoView({ behavior: 'smooth' });
   load();
 }
 
-document.addEventListener('branding', e => { $('paperSquadron').textContent = e.detail.name || ''; });
-
-function show(meta, md) {
-  current = meta;
-  $('paperSquadron').textContent = (window.squadron && window.squadron.name) || '';
-  const sources = (meta.sources || []).join(' · ');
-  $('paper').innerHTML = markdown(md).replace('</h1>',
-    `</h1><div class="meta">Written ${esc(when(meta.created))} by ${esc(meta.model)} from ${esc(sources)}</div>`);
-  $('report').style.display = 'block';
-  $('report').scrollIntoView({ behavior: 'smooth' });
+async function pdf(save) {
+  if (!current) return;
+  const url = '/api/reports/pdf?name=' + encodeURIComponent(current);
+  $('pdfMsg').innerHTML = '<span class="spin"></span> Making the PDF…';
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error((await r.text()).trim());
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const name = (cd.match(/filename="([^"]+)"/) || [])[1] || 'After Action Report.pdf';
+    const href = URL.createObjectURL(blob);
+    if (save) { const a = document.createElement('a'); a.href = href; a.download = name; a.click(); }
+    else window.open(href, '_blank');
+    setTimeout(() => URL.revokeObjectURL(href), 60000);
+    $('pdfMsg').textContent = '';
+  } catch (e) {
+    $('pdfMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+  }
 }
 
 function closeReport() { $('report').style.display = 'none'; current = null; history.replaceState(null, '', '/reports'); load(); }
-function download() { if (current) location.href = '/api/reports/file?download=1&name=' + current.name; }
+function download() { if (current) location.href = '/api/reports/file?download=1&name=' + current; }
 async function del() {
-  if (!current || !confirm('Delete this debrief?')) return;
-  await fetch('/api/reports/file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'delete', name: current.name }) });
+  if (!current || !confirm('Delete this report?')) return;
+  await fetch('/api/reports/file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'delete', name: current }) });
   closeReport();
-}
-
-// markdown: the subset Claude's debriefs use - headings, lists, tables,
-// bold/italic/code, rules and paragraphs. Escaped first, so nothing in the
-// text can become markup.
-function markdown(src) {
-  const inline = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>');
-  const lines = src.replace(/\r/g, '').split('\n'), out = [];
-  let list = null, para = [];
-  const flush = () => {
-    if (para.length) { out.push('<p>' + para.map(inline).join(' ') + '</p>'); para = []; }
-    if (list) { out.push(`</${list}>`); list = null; }
-  };
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    let m;
-    if (!l.trim()) { flush(); continue; }
-    if ((m = l.match(/^(#{1,4})\s+(.*)/))) { flush(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); continue; }
-    if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) { flush(); out.push('<hr>'); continue; }
-    if (l.trim().startsWith('|') && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
-      flush();
-      const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => inline(c.trim()));
-      let html = '<table><tr>' + cells(l).map(c => `<th>${c}</th>`).join('') + '</tr>';
-      i += 2;
-      for (; i < lines.length && lines[i].trim().startsWith('|'); i++) html += '<tr>' + cells(lines[i]).map(c => `<td>${c}</td>`).join('') + '</tr>';
-      i--;
-      out.push(html + '</table>');
-      continue;
-    }
-    if ((m = l.match(/^\s*([-*]|\d+\.)\s+(.*)/))) {
-      if (para.length) { out.push('<p>' + para.map(inline).join(' ') + '</p>'); para = []; }
-      const kind = /\d/.test(m[1]) ? 'ol' : 'ul';
-      if (list !== kind) { if (list) out.push(`</${list}>`); out.push(`<${kind}>`); list = kind; }
-      out.push(`<li>${inline(m[2])}</li>`);
-      continue;
-    }
-    if (list) { out.push(`</${list}>`); list = null; }
-    para.push(l.trim());
-  }
-  flush();
-  return out.join('\n');
 }
 
 const now = new Date();
@@ -331,7 +294,7 @@ $('to').value = localInput(now);
 $('from').value = localInput(new Date(now - 4 * 3600e3));
 syncWindow();
 load();
-const linked = new URLSearchParams(location.search).get('name'); // /reports?name=… opens that debrief
+const linked = new URLSearchParams(location.search).get('name'); // /reports?name=… opens that report
 if (linked) openReport(linked);
 </script>
 <script src="/branding.js"></script>

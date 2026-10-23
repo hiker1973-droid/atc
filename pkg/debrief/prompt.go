@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/vsfg7/atc/pkg/miz"
 )
 
 // Inputs is what a debrief is written from. Any source may be missing.
@@ -15,22 +17,36 @@ type Inputs struct {
 	Tacview  *Recording
 	Server   *ServerLog
 	Radio    *Radio
+	Mission  *miz.Briefing // the .miz: what was planned
 }
 
-// System is the instruction Claude gets with every debrief.
-const System = `You are the debriefing officer for a DCS World virtual squadron. The squadron flies with Readback ATC, an AI air traffic control system: its towers, ATIS, Command, AWACS, Marshal and LSO talk to pilots over SRS radio, and speech recognition turns the pilots' calls into text (so a garbled pilot line may be a recognition fault, not the pilot's).
+// System is the instruction Claude gets with every report: a standard
+// military after action report (operator 2026-10-23: "we want it to be a
+// after action report", standard military AAR, branded PDF).
+const System = `You are the operations officer of a DCS World virtual squadron, writing the After Action Report (AAR) for a session. The squadron flies with Readback ATC, an AI air traffic control system: its towers, ATIS, Command, AWACS, Marshal and LSO talk to pilots over SRS radio, and speech recognition turns the pilots' calls into text (so a garbled pilot line may be a recognition fault, not the pilot's).
 
-Write a debrief of the session from the records provided. Use only what the records show; say when something is uncertain (weapon-to-kill matches are inferred from impact points and are "likely", not certain). Times are UTC.
+Write the AAR from the records provided: the mission file (the plan), the Tacview recording (what happened in the air), Readback's radio log and comms report, and the DCS server log. Use only what the records show and say plainly when something is uncertain or not recorded. Kills are matched to shooters from weapon impact points, so call them "likely". Times are UTC (Z).
 
-Format in Markdown with these sections, leaving out any the records cannot support:
-## Summary - what was flown, by whom, and how it went, in a short paragraph.
-## Timeline - the key moments in order (takeoffs, check-ins, engagements, kills and losses, recoveries).
-## Flights - one short subsection per human flight or pilot: what they did, results, and comms (procedure, readbacks, brevity, missed or wrong calls).
-## Air traffic control - how the radio went: calls not understood, near misses and clearance problems from the comms report, and whether faults look like the pilot's phrasing or Readback's recognition.
-## Server - only if the server log shows problems worth acting on (crashes, script errors, disconnects).
-## Lessons and recommendations - specific, actionable points for the next session.
+The report's header and data block (unit, mission, date, times, weather, sorties, weapons, kills, losses) are printed above your text from the same records, so do not repeat them as a table or a title. Start directly with section 1 and use exactly these Markdown headings, in this order:
 
-Keep it professional and constructive, like a real squadron debrief. Refer to pilots by callsign.`
+## 1. Mission Overview
+Begin with a line "**BLUF:** ..." (bottom line up front: the outcome in one or two sentences). Then the mission's purpose, the package that flew and the conditions.
+## 2. What Was Planned
+The intent and tasks from the mission briefing, the flights available and any focus the squadron gave. If the mission file is missing, say what can be inferred and that the plan was not provided.
+## 3. What Happened
+A chronological account, with a short timeline of key events (as a bullet list "HH:MMZ - event"): takeoffs, check-ins, tasking, engagements, kills and losses, recoveries, landings.
+## 4. Results
+Effects against the plan: sorties flown, kills (likely) and losses, weapons expended and their effectiveness, objectives met or not.
+## 5. Flight Summaries
+One "### <flight or callsign>" subsection per player flight: aircraft, what it did, results, and its radio work (procedure, readbacks, brevity, missed or wrong calls).
+## 6. Analysis
+Why things happened as they did: the causes behind the successes and the problems, including air traffic control and comms (calls not understood, near misses, clearance problems; the pilot's phrasing or Readback's recognition), and server issues only if they affected the flying.
+## 7. Sustain / Improve
+Two lists: "**Sustain**" (what went well and should be repeated) and "**Improve**" (what fell short), each point specific.
+## 8. Recommendations and Follow-up Actions
+A numbered list of concrete actions for the next session, each ending with who owns it in brackets, e.g. "[Flight leads]", "[Mission designer]", "[All pilots]", "[ATC admin]".
+
+Write in the concise, factual, constructive style of a real squadron AAR. Refer to pilots by callsign.`
 
 // Build turns the inputs into the message sent to Claude.
 func Build(in Inputs) string {
@@ -46,6 +62,34 @@ func Build(in Inputs) string {
 	}
 	if f := strings.TrimSpace(in.Focus); f != "" {
 		w("\nThe squadron asks: %s", f)
+	}
+
+	if m := in.Mission; m != nil {
+		w("\n## Mission plan (mission file %s)", m.File)
+		w("Mission: %s. Map: %s. In-mission date %s, start %s.", m.Name, m.Theatre, m.Date, m.StartTime)
+		if wx := WeatherLine(m); wx != "" {
+			w("Weather at start: %s", wx)
+		}
+		if m.Description != "" {
+			w("\n### Briefing\n%s", clip(m.Description, 5000))
+		}
+		if m.BlueTask != "" {
+			w("\n### Blue task\n%s", clip(m.BlueTask, 2500))
+		}
+		if m.RedTask != "" {
+			w("\n### Red task\n%s", clip(m.RedTask, 1500))
+		}
+		if len(m.Flights) > 0 {
+			var fl []string
+			for i, f := range m.Flights {
+				if i == 80 {
+					fl = append(fl, fmt.Sprintf("... and %d more", len(m.Flights)-80))
+					break
+				}
+				fl = append(fl, fmt.Sprintf("%s (%s, %dx %s, %s)", f.Group, f.Coalition, f.Slots, f.Aircraft, f.Task))
+			}
+			w("\n### Flights with player slots (%d)\n%s", len(m.Flights), strings.Join(fl, "; "))
+		}
 	}
 
 	if r := in.Tacview; r != nil {

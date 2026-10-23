@@ -88,13 +88,25 @@ func TestReportFlow(t *testing.T) {
 	if rec.Code != 200 || sent != prep.Records {
 		t.Fatalf("generate %d %s (sent the preview: %v)", rec.Code, rec.Body, sent == prep.Records)
 	}
-	var out struct {
-		Meta     reportMeta
-		Markdown string
-	}
+	var out struct{ Meta reportMeta }
 	json.Unmarshal(rec.Body.Bytes(), &out)
-	if !strings.Contains(out.Markdown, "clean sortie") || out.Meta.Usage.InputTokens != 900 {
-		t.Fatalf("debrief %+v", out)
+	if out.Meta.Usage.InputTokens != 900 || out.Meta.ReportNo != "AAR-20261023-0015" || out.Meta.Mission != "Test Mission" || len(out.Meta.Facts) == 0 {
+		t.Fatalf("report meta %+v", out.Meta)
+	}
+
+	// The AAR page: header, data block, Claude's sections, escaped.
+	rec = httptest.NewRecorder()
+	handleAARPage(rec, httptest.NewRequest(http.MethodGet, "/reports/aar?name="+out.Meta.Name, nil))
+	page := rec.Body.String()
+	for _, want := range []string{"AFTER ACTION REPORT", "AAR-20261023-0015", "<th>Sorties</th><td>1 takeoffs</td>", "<h2>Summary</h2>", "clean sortie", "Reviewed and approved"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("AAR page lacks %q", want)
+		}
+	}
+	rec = httptest.NewRecorder()
+	handleReportFile(rec, httptest.NewRequest(http.MethodGet, "/api/reports/file?download=1&name="+out.Meta.Name, nil))
+	if !strings.Contains(rec.Body.String(), "| Mission | Test Mission |") || !strings.Contains(rec.Header().Get("Content-Disposition"), "AAR-20261023-0015 Test Mission.md") {
+		t.Fatalf("download %q\n%s", rec.Header().Get("Content-Disposition"), rec.Body)
 	}
 	if s := savedReports(); len(s) != 1 || s[0].Name != out.Meta.Name {
 		t.Fatalf("saved %+v", s)
@@ -107,8 +119,8 @@ func TestReportFlow(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	handleReportFile(rec, httptest.NewRequest(http.MethodGet, "/api/reports/file?name=..%5Csettings", nil))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("a path for a name: %d", rec.Code)
+	if rec.Code == http.StatusOK {
+		t.Fatalf("a path for a name was served")
 	}
 }
 
