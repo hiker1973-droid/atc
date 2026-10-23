@@ -131,6 +131,9 @@ func main() {
 	mux.HandleFunc("/settings", serveSettingsUI)
 	mux.HandleFunc("/setup", serveSetupUI)
 	mux.HandleFunc("/logo.png", serveLogo)
+	mux.HandleFunc("/branding.js", serveBrandingJS)
+	// GET = squadron name and logo (viewer); POST = change them (control, checked inside).
+	mux.HandleFunc("/api/branding", handleBranding)
 	mux.HandleFunc("/api/me", handleMe)
 	mux.HandleFunc("/api/fleet", handleFleet)
 	mux.HandleFunc("/api/version", handleVersion)
@@ -985,19 +988,6 @@ func pollFleet(rigs []Rig) []RigStatus {
 
 func handleFleet(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, pollFleet(fleetRigs))
-}
-
-// serveLogo serves the squadron patch shown in every page header. Embedded so
-// the launcher stays a single portable binary.
-func serveLogo(w http.ResponseWriter, _ *http.Request) {
-	data, err := uiFS.ReadFile("logo.png")
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	w.Write(data)
 }
 
 func serveFleetUI(w http.ResponseWriter, _ *http.Request) {

@@ -69,6 +69,27 @@
   <div class="steps" id="steps"></div>
 
   <section data-step="0">
+    <h2>Your squadron</h2>
+    <p class="sub">Your squadron's name and logo go on the dashboard, these pages and the browser tab.
+      You can change them later in Settings.</p>
+    <div class="field">
+      <label>Squadron name <small>e.g. VFA-103 Jolly Rogers</small></label>
+      <div class="line"><input id="sqName" maxlength="40" spellcheck="false"><button class="primary" onclick="saveSquadronName()">Save</button></div>
+      <div class="state" id="sqNameMsg"></div>
+    </div>
+    <div class="field">
+      <label>Logo <small>.png or .jpg under 2 MB; square works best</small></label>
+      <div class="line" style="align-items:center;gap:0.8rem">
+        <img class="squadron-logo" src="/logo.png" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+        <input type="file" id="sqFile" accept="image/png,image/jpeg" onchange="uploadSquadronLogo()" style="flex:1">
+        <button onclick="resetSquadronLogo()">Use default</button>
+      </div>
+      <div class="state" id="sqLogoMsg"></div>
+    </div>
+    <div class="nav"><span></span><button class="primary" onclick="go(1)">Next →</button></div>
+  </section>
+
+  <section data-step="1">
     <h2>Voice services</h2>
     <p class="sub">SkyEye speaks through OpenAI text-to-speech, and through ElevenLabs when you have it (more natural
       voices; OpenAI stays the fallback). Keys stay on this PC.</p>
@@ -82,10 +103,10 @@
       <div class="line"><input type="password" autocomplete="off" placeholder="paste key"><button class="primary" onclick="saveVar(this)">Save</button></div>
       <div class="state"></div>
     </div>
-    <div class="nav"><span></span><button class="primary" onclick="go(1)">Next →</button></div>
+    <div class="nav"><button onclick="go(0)">← Back</button><button class="primary" onclick="go(2)">Next →</button></div>
   </section>
 
-  <section data-step="1">
+  <section data-step="2">
     <h2>DCS server</h2>
     <p class="sub">SkyEye joins your DCS-SRS server as radio stations and reads the air picture from Tacview's
       real-time telemetry. Run it on the DCS server PC, or point it at one.</p>
@@ -105,20 +126,20 @@
       <div class="state"></div>
     </div>
     <div class="check" id="eaCheck"></div>
-    <div class="nav"><button onclick="go(0)">← Back</button><button class="primary" onclick="go(2)">Next →</button></div>
+    <div class="nav"><button onclick="go(1)">← Back</button><button class="primary" onclick="go(3)">Next →</button></div>
   </section>
 
-  <section data-step="2">
+  <section data-step="3">
     <h2>Theatre</h2>
     <p class="sub">Pick the map your server flies, then untick anything you don't want on the radio. You can change
       all of this later under Settings → Roles.</p>
     <div class="cards" id="theatres"></div>
     <div id="theatreRoles"></div>
     <div class="state" id="theatreMsg"></div>
-    <div class="nav"><button onclick="go(1)">← Back</button><button class="primary" onclick="go(3)">Next →</button></div>
+    <div class="nav"><button onclick="go(2)">← Back</button><button class="primary" onclick="go(4)">Next →</button></div>
   </section>
 
-  <section data-step="3">
+  <section data-step="4">
     <h2>Test call</h2>
     <p class="sub">Tune an SRS radio (in DCS or the SRS client's overlay) to the frequency below, then send. SkyEye
       speaks one short radio check: if you hear it, keys, voice and SRS all work.</p>
@@ -127,15 +148,15 @@
       <div class="line"><input id="testFreq" inputmode="decimal" style="max-width:9rem"><button class="primary" id="sendBtn" onclick="sendTest()">📻 Send test call</button></div>
       <div class="state" id="testMsg"></div>
     </div>
-    <div class="nav"><button onclick="go(2)">← Back</button><button class="primary" onclick="go(4)">Next →</button></div>
+    <div class="nav"><button onclick="go(3)">← Back</button><button class="primary" onclick="go(5)">Next →</button></div>
   </section>
 
-  <section data-step="4">
+  <section data-step="5">
     <h2>Ready</h2>
     <p class="sub">That's it. Start the theatre now, or later from the dashboard.</p>
     <div id="summary"></div>
     <div class="nav">
-      <button onclick="go(3)">← Back</button>
+      <button onclick="go(4)">← Back</button>
       <span style="display:flex;gap:0.5rem">
         <button id="startBtn" onclick="finish(true)">▶ Start and finish</button>
         <button class="primary" onclick="finish(false)">Finish</button>
@@ -145,7 +166,7 @@
   </section>
 </main>
 <script>
-const STEPS = ['Voice', 'Server', 'Theatre', 'Test call', 'Ready'];
+const STEPS = ['Squadron', 'Voice', 'Server', 'Theatre', 'Test call', 'Ready'];
 let step = 0, setup = null, settings = null, tested = false;
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -163,14 +184,34 @@ function state(el, ok, msg) { el.className = 'state ' + (ok === null ? 'muted' :
 function stepDone(i) {
   const c = setup.checks;
   const t = (setup.theatres || []).find(t => t.key === setup.theatre);
-  return [c.openai, c.srs && c.eam, !!t && t.files !== 'none', tested, setup.done][i];
+  return [!!(window.squadron && squadron.nameSet), c.openai, c.srs && c.eam, !!t && t.files !== 'none', tested, setup.done][i];
 }
 function renderSteps() {
   $('steps').innerHTML = STEPS.map((s, i) =>
     `<div class="${i === step ? 'cur' : ''} ${stepDone(i) ? 'ok' : ''}" onclick="go(${i})"><b>Step ${i + 1}</b>${s}</div>`).join('');
   document.querySelectorAll('section').forEach(s => s.classList.toggle('cur', +s.dataset.step === step));
 }
-function go(i) { step = i; renderSteps(); if (i === 2) renderTheatres(); if (i === 3) prepTest(); if (i === 4) renderSummary(); }
+function go(i) { step = i; renderSteps(); if (i === 0) prepSquadron(); if (i === 3) renderTheatres(); if (i === 4) prepTest(); if (i === 5) renderSummary(); }
+
+// Step 1: squadron name and logo (branding.js does the saving).
+function prepSquadron() { if (window.squadron && !$('sqName').value) $('sqName').value = squadron.nameSet ? squadron.name : ''; }
+document.addEventListener('branding', () => { prepSquadron(); if (setup) renderSteps(); });
+async function saveSquadronName() {
+  const name = $('sqName').value.trim();
+  if (!name) { state($('sqNameMsg'), false, 'Type your squadron\'s name first.'); return; }
+  try { await squadronSave({ op: 'name', name }); state($('sqNameMsg'), true, '✓ saved'); renderSteps(); }
+  catch (e) { state($('sqNameMsg'), false, e.message); }
+}
+async function uploadSquadronLogo() {
+  state($('sqLogoMsg'), null, 'Uploading…');
+  try { await squadronUploadLogo($('sqFile').files[0]); state($('sqLogoMsg'), true, '✓ logo saved'); }
+  catch (e) { state($('sqLogoMsg'), false, e.message); }
+  $('sqFile').value = '';
+}
+async function resetSquadronLogo() {
+  try { await squadronSave({ op: 'reset-logo' }); state($('sqLogoMsg'), true, 'Back to the default logo.'); }
+  catch (e) { state($('sqLogoMsg'), false, e.message); }
+}
 
 // Steps 1-2: the Settings page's variables.
 function renderVars() {
@@ -312,9 +353,10 @@ async function load() {
 }
 load().then(() => {
   // Open on the first step that still needs doing.
-  const first = [0, 1, 2].find(i => !stepDone(i));
-  go(first === undefined ? 3 : first);
+  const first = [0, 1, 2, 3].find(i => !stepDone(i));
+  go(first === undefined ? 4 : first);
 });
 </script>
+<script src="/branding.js"></script>
 </body>
 </html>

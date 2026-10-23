@@ -80,6 +80,24 @@
   <div class="banner" id="viewer">You can look but not change anything here: settings need operator rights.</div>
 
   <section>
+    <h2>Squadron</h2>
+    <p class="sub">The name and logo on the dashboard, these pages and the browser tab.</p>
+    <div class="row" style="grid-template-columns: 15rem 1fr auto">
+      <div class="lab">Squadron name</div>
+      <input id="sqName" maxlength="40" spellcheck="false">
+      <button class="primary" onclick="saveSquadronName()">Save</button>
+      <div class="msg" id="sqNameMsg"></div>
+    </div>
+    <div class="row" style="grid-template-columns: 15rem auto 1fr auto">
+      <div class="lab">Logo<small>.png or .jpg, under 2 MB</small></div>
+      <img class="squadron-logo" src="/logo.png" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+      <input type="file" id="sqFile" accept="image/png,image/jpeg" onchange="uploadSquadronLogo()">
+      <button onclick="resetSquadronLogo()">Use default</button>
+      <div class="msg" id="sqLogoMsg"></div>
+    </div>
+  </section>
+
+  <section>
     <h2>Voice services</h2>
     <p class="sub">Keys stay on this rig. The page only ever shows the last four characters.
       Without an ElevenLabs key every voice uses OpenAI; ATIS always does.</p>
@@ -369,6 +387,26 @@ async function saveField(icao) {
   show(document.getElementById('freqMsg'), res);
 }
 
+// ── Squadron (branding.js does the saving) ──
+const byId = id => document.getElementById(id);
+document.addEventListener('branding', e => {
+  if (document.activeElement !== byId('sqName')) byId('sqName').value = e.detail.nameSet ? e.detail.name : '';
+});
+async function saveSquadronName() {
+  const name = byId('sqName').value.trim();
+  try { await squadronSave({ op: 'name', name }); show(byId('sqNameMsg'), { ok: true, msg: name ? 'Saved.' : 'Cleared: the default name is back.' }); }
+  catch (e) { show(byId('sqNameMsg'), { ok: false, msg: e.message }); }
+}
+async function uploadSquadronLogo() {
+  try { await squadronUploadLogo(byId('sqFile').files[0]); show(byId('sqLogoMsg'), { ok: true, msg: 'Logo saved.' }); }
+  catch (e) { show(byId('sqLogoMsg'), { ok: false, msg: e.message }); }
+  byId('sqFile').value = '';
+}
+async function resetSquadronLogo() {
+  try { await squadronSave({ op: 'reset-logo' }); show(byId('sqLogoMsg'), { ok: true, msg: 'Back to the default logo.' }); }
+  catch (e) { show(byId('sqLogoMsg'), { ok: false, msg: e.message }); }
+}
+
 async function load() {
   const r = await fetch('/api/settings');
   if (!r.ok) { document.querySelector('main').textContent = 'Could not load settings: HTTP ' + r.status; return; }
@@ -383,5 +421,6 @@ async function load() {
 }
 load().then(loadVoices);
 </script>
+<script src="/branding.js"></script>
 </body>
 </html>

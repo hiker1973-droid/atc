@@ -43,4 +43,7 @@ update_last.json
 frequencies.json
 roles.json
 setup.json
+# Squadron name and uploaded logo (Setup / Settings), per install
+branding.json
+branding/
 sides.json
