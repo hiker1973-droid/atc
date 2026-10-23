@@ -97,6 +97,17 @@
     </div>
   </section>
 
+  <section id="updates">
+    <h2>Updates</h2>
+    <p class="sub" id="updStatus">Checking…</p>
+    <pre id="updNotes" style="display:none;white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:0.6rem;font-size:0.82rem;margin:0 0 0.6rem"></pre>
+    <div style="display:flex;gap:0.5rem;align-items:center" id="updButtons">
+      <button onclick="checkUpdate()">Check now</button>
+      <button class="primary" id="updInstall" onclick="installUpdate()" style="display:none">Update now</button>
+      <span class="msg" id="updMsg"></span>
+    </div>
+  </section>
+
   <section id="licence">
     <h2>Licence</h2>
     <p class="sub" id="licStatus">Checking…</p>
@@ -442,6 +453,50 @@ async function activateLicence() {
   show(msg, { ok: true, msg: 'Activated. Thank you!' });
 }
 loadLicence();
+
+// ── Updates (appupdate.go) ──
+let lastUpdate = null;
+function renderUpdate(u) {
+  lastUpdate = u;
+  const st = document.getElementById('updStatus'), notes = document.getElementById('updNotes');
+  document.getElementById('updButtons').style.display = u.source ? 'none' : 'flex';
+  document.getElementById('updInstall').style.display = u.available && !u.installing ? '' : 'none';
+  notes.style.display = 'none';
+  if (u.source) { st.className = 'sub muted'; st.textContent = 'This copy updates from git, with the dashboard\'s Update button.'; return; }
+  if (u.installing) { st.className = 'sub warn'; st.textContent = 'Updating: ' + (u.step || 'starting') + '…'; return; }
+  if (u.available) {
+    st.className = 'sub warn';
+    st.textContent = `SkyEye ${u.latest.version} is available - you have ${u.current}.`;
+    if (u.latest.notes) { notes.textContent = u.latest.notes; notes.style.display = ''; }
+    return;
+  }
+  st.className = 'sub ' + (u.error ? 'bad' : 'ok');
+  st.textContent = u.error ? `You have ${u.current}. Could not check for updates: ${u.error}`
+    : `You have ${u.current}, the latest` + (u.checkedAt && !u.checkedAt.startsWith('0001') ? ` (checked ${new Date(u.checkedAt).toLocaleString()}).` : '.');
+}
+async function checkUpdate(force = true) {
+  try { renderUpdate(await fetch('/api/app-update' + (force ? '?check=1' : '')).then(r => r.json())); } catch (e) { /* leave it */ }
+}
+async function installUpdate() {
+  if (!confirm('Install the update now? The roles that are running restart with it (about a minute).')) return;
+  const target = lastUpdate && lastUpdate.latest && lastUpdate.latest.version;
+  const r = await fetch('/api/app-update', { method: 'POST' });
+  if (!r.ok) { show(document.getElementById('updMsg'), { ok: false, msg: (await r.text()).trim() }); return; }
+  // Follow it: the launcher goes away while the installer runs, then comes back.
+  const poll = async () => {
+    try {
+      const u = await fetch('/api/app-update').then(r => r.json());
+      renderUpdate(u);
+      if (u.current === target) { location.reload(); return; } // the new launcher is up
+      if (!u.installing && u.error) return;
+    } catch (e) {
+      document.getElementById('updStatus').textContent = 'Installing - the launcher is restarting…';
+    }
+    setTimeout(poll, 2000);
+  };
+  poll();
+}
+checkUpdate();
 
 // ── Squadron (branding.js does the saving) ──
 const byId = id => document.getElementById(id);

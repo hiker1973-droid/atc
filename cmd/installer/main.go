@@ -28,8 +28,12 @@ import (
 //go:embed payload
 var payload embed.FS
 
-// version is set by build_installer.bat (-ldflags -X main.version=...).
-var version = "dev"
+// version (git describe) and productVersion (product_version.txt) are set by
+// build_installer.bat with -ldflags -X.
+var (
+	version        = "dev"
+	productVersion = ""
+)
 
 const (
 	appName    = "SkyEye ATC"
@@ -44,11 +48,15 @@ var (
 	flagQuiet     = flag.Bool("quiet", false, "Ask nothing: no start-with-Windows shortcut, no pause at the end")
 	flagNoStart   = flag.Bool("no-start", false, "Install only; do not start the launcher")
 	flagNoLinks   = flag.Bool("no-shortcuts", false, "Add no shortcuts (for testing)")
+	flagUpdate    = flag.Bool("update", false, "Run by the launcher's Update: ask nothing, keep the shortcuts, restart the launcher, open no page")
 )
 
 func main() {
 	flag.Parse()
-	fmt.Printf("%s setup %s\n\n", appName, version)
+	if *flagUpdate {
+		*flagQuiet = true
+	}
+	fmt.Printf("%s setup %s (%s)\n\n", appName, productVersion, version)
 	var err error
 	if *flagUninstall {
 		err = uninstall(*flagDir)
@@ -97,15 +105,18 @@ func install(dir string) error {
 		}
 		fmt.Printf("  %s\n", p)
 	}
-	os.WriteFile(filepath.Join(dir, "version.txt"), []byte(version+"\r\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "version.txt"), []byte(productVersion+" ("+version+")\r\n"), 0o644)
 	self, _ := os.Executable()
 	copyFile(self, filepath.Join(dir, "SkyEye-Setup.exe")) // kept for --uninstall
 
 	launcher := filepath.Join(dir, "launcher.exe")
 	args := launcherArgs()
-	if *flagNoLinks {
+	switch {
+	case *flagNoLinks:
 		fmt.Println("\nNo shortcuts (--no-shortcuts)")
-	} else {
+	case *flagUpdate:
+		// An update keeps whatever shortcuts the install has.
+	default:
 		addShortcuts(dir, launcher, args)
 	}
 
@@ -127,6 +138,11 @@ func install(dir string) error {
 		for i := 0; i < 30 && !portInUse(listenPort); i++ {
 			time.Sleep(500 * time.Millisecond)
 		}
+	}
+	if *flagUpdate {
+		// The dashboard that started the update reconnects by itself.
+		fmt.Printf("Updated to %s.\n", productVersion)
+		return nil
 	}
 	url := fmt.Sprintf("http://localhost:%d/setup", listenPort)
 	openURL(url)

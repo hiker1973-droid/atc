@@ -119,6 +119,8 @@ func main() {
 	fleetRigs = parseFleet(*flagFleet)
 	cachedVersion = computeVersion()
 	go healthLoop()
+	go appUpdateLoop()          // SkyEye-Setup installs: daily release check (appupdate.go)
+	go restoreRolesAfterUpdate() // roles running before an update come back
 	go alertLoop()
 	startAirborneSources()
 
@@ -170,6 +172,8 @@ func main() {
 	mux.HandleFunc("/api/setup", handleSetup)
 	// GET = trial / licence status (viewer); POST = enter a key (control, checked inside).
 	mux.HandleFunc("/api/licence", handleLicence)
+	// GET = installed-copy update state (viewer); POST = install the latest release (control, checked inside).
+	mux.HandleFunc("/api/app-update", handleAppUpdate)
 	// GET = progress (viewer); POST = run (control, checked inside).
 	mux.HandleFunc("/api/update", handleUpdate)
 

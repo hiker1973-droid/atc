@@ -587,6 +587,11 @@ async function checkSetup() {
     else if (l.state === 'trial') banner('/settings#licence', '⏳ ' + l.message + ' →', l.daysLeft <= 3);
   } catch (e) { /* no banner */ }
   try {
+    // A newer SkyEye-Setup release (appupdate.go); a git checkout never has one.
+    const u = await fetch('/api/app-update').then(r => r.json());
+    if (u.available && u.latest) banner('/settings#updates', `⬆ SkyEye ${u.latest.version} is available (you have ${u.current}): see what's new and update →`);
+  } catch (e) { /* no banner */ }
+  try {
     const s = await fetch('/api/setup').then(r => r.json());
     if (s.needsSetup) banner('/setup', '⚙ SkyEye is not set up on this PC yet: run Setup (keys, SRS server, theatre, test call) →');
   } catch (e) { /* no banner */ }

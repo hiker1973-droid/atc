@@ -1,0 +1,25 @@
+@echo off
+:: Publishes a SkyEye ATC release: builds SkyEye-Setup.exe and puts it on the
+:: public releases repo, where every installed copy's daily check finds it.
+::   1. Raise the number in product_version.txt (e.g. 0.1.0 -> 0.2.0).
+::   2. Write what changed in docs\releases\<version>.md (shown in the update offer).
+::   3. Commit, then run this.
+cd /d %~dp0
+set REPO=hiker1973-droid/skyeye-atc-releases
+set /p PV=<product_version.txt
+if not exist docs\releases\%PV%.md (
+    echo Write docs\releases\%PV%.md first: it is the "what's new" customers see.
+    exit /b 1
+)
+git diff --quiet HEAD -- || (
+    echo Commit your changes first, so the release is exactly a commit.
+    exit /b 1
+)
+call "%~dp0build_installer.bat" || exit /b 1
+gh release create v%PV% dist\SkyEye-Setup.exe --repo %REPO% --title "SkyEye ATC %PV%" --notes-file docs\releases\%PV%.md || goto :fail
+git tag -a skyeye-v%PV% -m "SkyEye ATC %PV%" && git push origin skyeye-v%PV%
+echo Published SkyEye ATC %PV%.
+exit /b 0
+:fail
+echo PUBLISH FAILED
+exit /b 1
