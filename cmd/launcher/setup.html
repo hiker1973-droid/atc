@@ -178,9 +178,11 @@ function renderVars() {
     if (v && v.set) state(f.querySelector('.state'), true, '✓ set' + (v.value ? ' (' + v.value + ')' : ''));
     else state(f.querySelector('.state'), null, 'not set');
   }
-  const ea = setup.checks.externalAudio;
-  $('eaCheck').innerHTML = ea ? '<span class="ok">✓</span> DCS-SRS ExternalAudio found on this PC.'
-    : '<span class="warn">⚠</span> DCS-SRS ExternalAudio not found. Install DCS-SRS on this PC: SkyEye transmits through it.';
+  const ea = setup.checks.externalAudio, ff = setup.checks.ffmpeg;
+  $('eaCheck').innerHTML = (ea ? '<span class="ok">✓</span> DCS-SRS ExternalAudio found on this PC.'
+    : '<span class="warn">⚠</span> DCS-SRS ExternalAudio not found. Install DCS-SRS on this PC with its installer (it also adds .NET 10, which ExternalAudio needs): SkyEye transmits through it.') +
+    '<br>' + (ff ? '<span class="ok">✓</span> ffmpeg found: calls get the radio effect.'
+    : '<span class="warn">⚠</span> ffmpeg not found at C:\ffmpeg-master-latest-win64-gpl\bin: calls will go out clean, without the radio effect.');
 }
 async function saveVar(btn) {
   const f = btn.closest('.field'), name = f.dataset.var, input = f.querySelector('input'), st = f.querySelector('.state');
@@ -256,7 +258,8 @@ function renderSummary() {
   $('summary').innerHTML =
     row(c.openai, 'OpenAI key') + row(c.elevenlabs, c.elevenlabs ? 'ElevenLabs key' : 'No ElevenLabs key: every voice uses OpenAI', true) +
     row(c.srs && c.eam, 'SRS server and password') + row(c.tacview, c.tacview ? 'Tacview telemetry' : 'No Tacview: Command and the GCI cannot see aircraft', true) +
-    row(c.externalAudio, 'DCS-SRS ExternalAudio on this PC') + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
+    row(c.externalAudio, 'DCS-SRS ExternalAudio on this PC') +
+    row(c.ffmpeg, c.ffmpeg ? 'ffmpeg (radio effect)' : 'No ffmpeg: calls go out without the radio effect', true) + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
     row(tested, tested ? 'Test call sent' : 'Test call not sent yet', true);
   $('startBtn').disabled = !t || !setup.canEdit;
   $('startBtn').textContent = t ? '▶ Start ' + t.label + ' and finish' : '▶ Start and finish';

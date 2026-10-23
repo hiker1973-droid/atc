@@ -74,6 +74,13 @@ func sayOnce(apiKey string) error {
 	}
 	out, err := runExternalAudio(ctx, flagExternalAudio, args)
 	if err != nil {
+		// SRS 2.4's ExternalAudio is a .NET 10 program; on a PC without the
+		// runtime it exits 0x80008096 with only a download link (dev box,
+		// 2026-10-23). The SRS installer puts the runtime on; a copied
+		// folder does not.
+		if strings.Contains(string(out), "dotnet-core-applaunch") {
+			return fmt.Errorf("SRS ExternalAudio needs Microsoft .NET 10 (Desktop Runtime, x64) on this PC - run the DCS-SRS installer, or install .NET 10 from dotnet.microsoft.com")
+		}
 		return fmt.Errorf("SRS did not take the transmission (%v): %s", err, lastLine(string(out)))
 	}
 	log.Info().Float64("freqMHz", flagFreqMHz).Str("tts", src.Service).Str("voice", src.Voice).Msg("setup test call sent")

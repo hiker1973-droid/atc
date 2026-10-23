@@ -58,6 +58,10 @@ func writeSetup(s setupState) error {
 // (atc.exe's --external-audio default).
 const externalAudioPath = `C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`
 
+// ffmpegPath is atc.exe's --ffmpeg default: the radio effect (static, band
+// limit, levelling). Without it every call goes out clean.
+const ffmpegPath = `C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`
+
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
@@ -99,6 +103,7 @@ func setupSnapshot() map[string]any {
 		"eam":           userEnv("SRS_EAM") != "",
 		"tacview":       userEnv("SKYEYE_TACVIEW") != "",
 		"externalAudio": fileExists(externalAudioPath),
+		"ffmpeg":        fileExists(ffmpegPath),
 		"atcExe":        fileExists(filepath.Join(rootDir, "atc.exe")),
 	}
 	return map[string]any{

@@ -406,6 +406,7 @@ func rotateLogIfNeeded(logPath string) {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	cmd.SilenceUsage = true      // the flags parsed: an error from here on is not a usage mistake
 	applyRoleConfig(cmd.Flags()) // the launcher Settings page's roles.json, before any flag is read
 	resolveStylePresets()
 	level, _ := zerolog.ParseLevel(flagLogLevel)
