@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vSFG-7 Stats</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --panel-2:#1c2330; --border:#30363d; --text:#c9d1d9; --muted:#8b949e;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel); }
+  .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
+    box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
+  header .logo { font-weight: 800; color: var(--blue); }
+  header .title { font-weight: 600; margin-right: 0.5rem; }
+  .spacer { flex: 1; }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; border: 1px solid var(--border);
+    padding: 0.28rem 0.6rem; border-radius: 5px; }
+  header a:hover { color: var(--text); }
+  button, input, select { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 0.35rem 0.6rem; font-size: 0.85rem; font-family: inherit; }
+  button { cursor: pointer; white-space: nowrap; }
+  button:hover:not(:disabled) { border-color: var(--blue); }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.on { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  main { padding: 1rem 1.2rem 3rem; max-width: 1250px; margin: 0 auto; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem 1rem; margin-bottom: 1rem; }
+  section h2 { margin: 0 0 0.2rem; font-size: 1rem; }
+  .sub { color: var(--muted); font-size: 0.82rem; margin: 0 0 0.8rem; }
+  .bar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--muted); } .ok { color: var(--green); } .bad { color: var(--red); }
+  .b { color: #6ea8ff; } .r { color: #ff7b72; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 0.35rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; user-select: none; }
+  th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  th.sorted::after { content: " ▾"; }
+  .sq { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; font-size: 0.72rem; font-weight: 700;
+    margin: 1px; border-radius: 3px; vertical-align: middle; }
+  .key { font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; }
+  .key .sq { width: 13px; height: 13px; margin: 0 4px 0 10px; }
+  .cards { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.9rem; min-width: 9rem; }
+  .card b { display: block; font-size: 1.35rem; } .card span { color: var(--muted); font-size: 0.78rem; }
+  .msg { font-size: 0.82rem; }
+</style>
+</head>
+<body>
+<header>
+  <img class="patch" src="/logo.png" alt="">
+  <span class="logo">vSFG-7</span><span class="title">Stats</span>
+  <span class="spacer"></span>
+  <a href="/">Dashboard</a><a href="/reports">Reports</a><a href="/pilots">Pilots</a><a href="/settings">Settings</a><a href="/help/">Help</a>
+</header>
+<main>
+  <section>
+    <div class="bar">
+      <span class="muted">Period</span>
+      <button data-p="month" onclick="setPeriod('month')">This month</button>
+      <button data-p="lastmonth" onclick="setPeriod('lastmonth')">Last month</button>
+      <button data-p="30d" onclick="setPeriod('30d')">Last 30 days</button>
+      <button data-p="year" onclick="setPeriod('year')">This year</button>
+      <button data-p="all" onclick="setPeriod('all')">All time</button>
+      <span class="muted" style="margin-left:0.6rem">or</span>
+      <input type="date" id="from"> <span class="muted">to</span> <input type="date" id="to">
+      <button data-p="custom" onclick="setPeriod('custom')">Show</button>
+      <span class="spacer"></span>
+      <button class="primary" onclick="exportFile('pdf')">Export PDF</button>
+      <button onclick="exportFile('pilots')">Pilots CSV</button>
+      <button onclick="exportFile('passes')">Greenie board CSV</button>
+    </div>
+  </section>
+
+  <div class="cards" id="cards"></div>
+
+  <section>
+    <h2>Flight stats</h2>
+    <p class="sub" id="flightSub">Every player who flew in the period, from the DCS server's own logs. Click a heading to sort.
+      Hours run from takeoff to landing, crash or ejection; a jet left in the air (re-slotting) counts until the pilot's next takeoff.</p>
+    <div class="tablewrap"><table id="pilots"></table></div>
+  </section>
+
+  <section>
+    <h2>Greenie board</h2>
+    <p class="sub">Every carrier pass the DCS LSO graded, oldest first; the number is the wire. Ranked by average grade points
+      (_OK_ 5, OK 4, (OK) 3, B 2.5, --- 2, WO 1, C 0; a foul-deck wave-off is not scored).</p>
+    <div class="tablewrap"><table id="board"></table></div>
+    <div class="key" id="key"></div>
+  </section>
+
+  <section>
+    <h2>Where the numbers come from</h2>
+    <p class="sub">The DCS server's dcs.log files on this PC (the live log, dcs.log.old and the dated .zip copies DCS keeps), and
+      any server logs uploaded here. A game client's dcs.log has no events to count.</p>
+    <div class="tablewrap"><table id="sources"></table></div>
+    <div class="bar" id="uploadBar" style="margin-top:0.7rem;display:none">
+      <span class="muted">Add a server dcs.log (or a rotated .zip of one)</span>
+      <input type="file" id="logFile" accept=".log,.txt,.old,.zip">
+      <button onclick="upload()">Upload</button>
+      <span class="msg" id="upMsg"></span>
+    </div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let period = 'month', data = null, sortKey = 'flightMin', sortDesc = true;
+try { period = localStorage.getItem('statsPeriod') || 'month'; } catch (e) {}
+
+const COLS = [
+  ['name', 'Pilot', false], ['aircraft', 'Aircraft', false], ['sorties', 'Sorties', true], ['flightMin', 'Hours', true],
+  ['landings', 'Landings', true], ['traps', 'Traps', true], ['kills', 'Air kills', true], ['ground', 'Ground', true],
+  ['shotDown', 'Shot down', true], ['crashes', 'Crashes', true], ['ejections', 'Ejections', true], ['shots', 'Shots', true], ['hitPct', 'Hit %', true],
+];
+
+function query() {
+  let q = 'period=' + period;
+  if (period === 'custom') q += '&from=' + $('from').value + '&to=' + $('to').value;
+  return q;
+}
+
+function setPeriod(p) {
+  if (p === 'custom' && (!$('from').value || !$('to').value)) return;
+  period = p;
+  try { localStorage.setItem('statsPeriod', p); } catch (e) {}
+  load();
+}
+
+async function load() {
+  document.querySelectorAll('[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === period));
+  const r = await fetch('/api/stats?' + query());
+  data = await r.json();
+  (data.pilots || []).forEach(p => p.hitPct = p.shots ? Math.round(100 * p.hits / p.shots) : -1);
+  render();
+}
+
+function render() {
+  const ps = data.pilots || [];
+  const sum = k => ps.reduce((n, p) => n + p[k], 0);
+  const hours = (sum('flightMin') / 60).toFixed(1);
+  const passes = (data.board || []).reduce((n, b) => n + b.passes.length, 0);
+  $('cards').innerHTML = [
+    [data.period, 'period'], [data.sessions, 'mission runs'], [ps.length, 'pilots'], [sum('sorties'), 'sorties'],
+    [hours, 'flight hours'], [sum('kills') + sum('ground'), 'kills'], [passes, 'carrier passes'],
+  ].map(([v, l]) => `<div class="card"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+
+  const sorted = [...ps].sort((a, b) => {
+    let x = a[sortKey], y = b[sortKey];
+    if (Array.isArray(x)) { x = x.join(); y = y.join(); }
+    const c = typeof x === 'string' ? x.localeCompare(y) : x - y;
+    return sortDesc ? -c : c;
+  });
+  $('pilots').innerHTML = '<tr>' + COLS.map(([k, l, n]) => `<th class="${n ? 'n' : ''} ${k === sortKey ? 'sorted' : ''}" onclick="sortBy('${k}')">${l}</th>`).join('') + '</tr>' +
+    (sorted.length ? sorted.map(p => `<tr><td class="${p.side === 'red' ? 'r' : 'b'}"><b>${esc(p.name)}</b></td><td>${esc((p.aircraft || []).join(', '))}</td>` +
+      `<td class="n">${p.sorties}</td><td class="n">${(p.flightMin / 60).toFixed(1)}</td><td class="n">${p.landings}</td><td class="n">${p.traps}</td>` +
+      `<td class="n">${p.kills}</td><td class="n">${p.ground}</td><td class="n">${p.shotDown}</td><td class="n">${p.crashes}</td><td class="n">${p.ejections}</td>` +
+      `<td class="n">${p.shots}</td><td class="n">${p.hitPct < 0 ? '-' : p.hitPct + '%'}</td></tr>`).join('')
+      : `<tr><td colspan="${COLS.length}" class="muted">No flying recorded in ${esc(data.period)}.</td></tr>`);
+
+  const board = data.board || [];
+  $('board').innerHTML = '<tr><th>Pilot</th><th class="n">Avg</th><th class="n">Passes</th><th class="n">Traps</th><th>Passes, oldest first</th></tr>' +
+    (board.length ? board.map(b => `<tr><td><b>${esc(b.pilot)}</b></td><td class="n">${b.avg < 0 ? '-' : b.avg.toFixed(2)}</td><td class="n">${b.passes.length}</td><td class="n">${b.traps}</td><td style="white-space:normal">` +
+      b.passes.map(p => `<span class="sq" style="background:${p.fill};color:${p.ink}" title="${esc(new Date(p.at).toLocaleString())} · ${esc(p.place)} · ${esc(p.raw)}">${p.wire || ''}</span>`).join('') + '</td></tr>').join('')
+      : '<tr><td colspan="5" class="muted">No graded carrier passes in this period.</td></tr>');
+  const KEY = [['_OK_', '#00843d', 'perfect'], ['OK', '#2fb34a', 'pass'], ['(OK)', '#f2c80f', 'fair'], ['---', '#8b5a2b', 'no grade'],
+    ['B', '#2f6db5', 'bolter'], ['WO', '#222222', 'wave-off'], ['C', '#c62828', 'cut'], ['WOFD', '#c8d0db', 'foul-deck wave-off (not scored)']];
+  $('key').innerHTML = KEY.map(([g, c, l]) => `<span class="sq" style="background:${c}"></span>${esc(g === 'WOFD' ? 'WO' : g)} ${esc(l)}`).join('');
+
+  const all = data.sources || [], src = all.filter(s => s.runs > 0), empty = all.length - src.length;
+  $('sources').innerHTML = '<tr><th>Log</th><th class="n">Mission runs</th><th>Modified</th><th class="n">Size</th></tr>' +
+    (src.length ? src.map(s => `<tr><td>${esc(s.label)}</td><td class="n">${s.runs}</td><td>${esc(new Date(s.modified).toLocaleString())}</td><td class="n">${(s.size / 1048576).toFixed(1)} MB</td></tr>`).join('')
+      : '<tr><td colspan="4" class="muted">No DCS server logs found on this PC. Upload the server\'s dcs.log below.</td></tr>') +
+    (empty ? `<tr><td colspan="4" class="muted">and ${empty} game-client log${empty > 1 ? 's' : ''} with no server events</td></tr>` : '');
+  $('uploadBar').style.display = data.canUpload ? 'flex' : 'none';
+}
+
+function sortBy(k) {
+  if (sortKey === k) sortDesc = !sortDesc; else { sortKey = k; sortDesc = !['name', 'aircraft'].includes(k); }
+  render();
+}
+
+function exportFile(kind) {
+  location.href = (kind === 'pdf' ? '/api/stats/pdf?' : '/api/stats/csv?kind=' + kind + '&') + query();
+}
+
+async function upload() {
+  const f = $('logFile').files[0];
+  if (!f) { $('upMsg').innerHTML = '<span class="bad">Choose a dcs.log first.</span>'; return; }
+  const fd = new FormData();
+  fd.append('log', f);
+  $('upMsg').textContent = 'Uploading…';
+  const r = await fetch('/api/stats/upload', { method: 'POST', body: fd });
+  const t = await r.text();
+  if (!r.ok) { $('upMsg').innerHTML = `<span class="bad">${esc(t.trim())}</span>`; return; }
+  const res = JSON.parse(t);
+  $('upMsg').innerHTML = `<span class="ok">Added: ${res.runs} mission runs, ${res.events} events.</span>`;
+  $('logFile').value = '';
+  load();
+}
+
+load();
+</script>
+<script src="/branding.js"></script>
+</body>
+</html>

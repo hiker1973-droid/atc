@@ -269,3 +269,23 @@ func TestHTML(t *testing.T) {
 		}
 	}
 }
+
+func TestAddUp(t *testing.T) {
+	srv, _ := ParseDCSLog(strings.NewReader(sampleLog))
+	// The same run twice (a log and its rotated copy) counts once.
+	runs := append(append([]EventSession{}, srv.Sessions...), srv.Sessions...)
+	tot := AddUp(runs, time.Time{}, time.Time{}, time.UTC)
+	if tot.Sessions != 1 || len(tot.Pilots) != 3 || len(tot.Passes) != 1 {
+		t.Fatalf("sessions %d pilots %d passes %d", tot.Sessions, len(tot.Pilots), len(tot.Passes))
+	}
+	if p := tot.Pilots[0]; p.Name != "Dabs" || p.Sorties != 1 || p.Kills != 1 || p.Traps != 1 || p.Flight != 19*time.Minute {
+		t.Fatalf("Dabs %+v", p)
+	}
+	b := tot.GreenieBoard()
+	if len(b) != 1 || b[0].Pilot != "Dabs" || b[0].Avg != 4 || b[0].Traps != 1 {
+		t.Fatalf("board %+v", b)
+	}
+	if none := AddUp(srv.Sessions, time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC), time.Time{}, time.UTC); none.Sessions != 0 {
+		t.Fatalf("period filter: %d sessions", none.Sessions)
+	}
+}

@@ -48,6 +48,8 @@ branding.json
 branding/
 # Debriefs written on the Reports page, per install
 reports/
+# Server logs uploaded on the Stats page, per install
+stats/
 # build_installer.bat output
 dist/
 # build_installer.bat copies the guides into the installer payload
