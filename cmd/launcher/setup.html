@@ -162,7 +162,8 @@ function state(el, ok, msg) { el.className = 'state ' + (ok === null ? 'muted' :
 
 function stepDone(i) {
   const c = setup.checks;
-  return [c.openai, c.srs && c.eam, !!setup.theatre, tested, setup.done][i];
+  const t = (setup.theatres || []).find(t => t.key === setup.theatre);
+  return [c.openai, c.srs && c.eam, !!t && t.files !== 'none', tested, setup.done][i];
 }
 function renderSteps() {
   $('steps').innerHTML = STEPS.map((s, i) =>
@@ -200,20 +201,47 @@ async function saveVar(btn) {
 }
 
 // Step 3: theatre and what runs in it.
+const FILES = { own: 'your own start files', generated: 'standard start files', none: 'not set up yet' };
 function renderTheatres() {
   const ts = setup.theatres || [];
-  $('theatres').innerHTML = ts.length ? ts.map(t => `<div class="card ${t.key === setup.theatre ? 'sel' : ''}" onclick="pickTheatre('${t.key}')">
-      <b>${esc(t.label)}</b><span>${t.roles} roles in the start scripts</span></div>`).join('')
-    : '<span class="bad">No start scripts found next to the launcher.</span>';
-  const roles = setup.theatre && settings.roles[setup.theatre];
-  if (!roles) { $('theatreRoles').innerHTML = ''; return; }
+  $('theatres').innerHTML = ts.map(t => `<div class="card ${t.key === setup.theatre ? 'sel' : ''}" onclick="pickTheatre('${t.key}')">
+      <b>${esc(t.label)}</b><span>${t.fields} fields · ${FILES[t.files]}</span></div>`).join('');
   const dis = setup.canEdit ? '' : 'disabled';
+  const cur = ts.find(t => t.key === setup.theatre);
+  let gen = '';
+  if (cur && cur.files !== 'own') {
+    // Standard start files: write them now, or rebuild with other choices.
+    const o = setup.genDefault;
+    gen = `<h3>${cur.files === 'none' ? 'Create start files' : 'Rebuild start files'}</h3>
+      <p class="sub" style="margin:0.2rem 0 0.4rem">ATIS, a tower at each of the ${cur.fields} fields and Command come as standard.</p>
+      <div class="list">
+        <label><input type="checkbox" id="genGCI" ${o.gci ? 'checked' : ''} ${dis}> AWACS (GCI) controller</label>
+        <label><input type="checkbox" id="genCarrier" ${o.carrier ? 'checked' : ''} ${dis}> Carrier ops: Marshal 306.3 and Deckboss 128.6</label>
+        <label>Callsign <input id="genCallsign" value="${esc(o.gciCallsign)}" style="width:8rem" ${dis}></label>
+        <label>AWACS frequency <input id="genFreq" value="${mhz(o.gciFreq)}" inputmode="decimal" style="width:6.5rem" ${dis}></label>
+      </div>
+      <button class="primary" style="margin-top:0.5rem" onclick="generate()" ${dis}>${cur.files === 'none' ? 'Create start files' : 'Rebuild start files'}</button>`;
+  } else if (cur) {
+    gen = `<p class="sub" style="margin:0.8rem 0 0">${esc(cur.label)} runs on your own start files; Setup leaves them as they are.</p>`;
+  }
+  const roles = setup.theatre && settings.roles[setup.theatre];
+  if (!roles || (!roles.stations.length && !roles.towers.length)) { $('theatreRoles').innerHTML = gen; return; }
   const box = (kind, id, label, ov, sub) => `<label><input type="checkbox" ${ov && ov.off ? '' : 'checked'} ${dis}
       onchange="toggleRole('${kind}', '${esc(id)}', this)"> ${esc(label)} <small>${sub}</small></label>`;
-  $('theatreRoles').innerHTML =
+  $('theatreRoles').innerHTML = gen +
     `<h3>Stations</h3><div class="list">${roles.stations.map(s => box('station', s.key, s.label, s.override,
         s.bat.freq ? mhz(s.override.freq || s.bat.freq) : '')).join('')}</div>
      <h3>Towers</h3><div class="list">${roles.towers.map(t => box('tower', t.icao, t.name + ' Tower', t.override, t.icao)).join('')}</div>`;
+}
+async function generate() {
+  const options = {
+    gci: $('genGCI').checked, carrier: $('genCarrier').checked,
+    gciCallsign: $('genCallsign').value.trim(), gciFreq: parseFloat($('genFreq').value),
+  };
+  state($('theatreMsg'), null, 'Writing start files…');
+  const r = await post('/api/setup', { op: 'generate', theatre: setup.theatre, options });
+  await load(); renderTheatres();
+  state($('theatreMsg'), r.ok, r.msg);
 }
 async function pickTheatre(k) {
   const r = await post('/api/setup', { op: 'theatre', theatre: k });

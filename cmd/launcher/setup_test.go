@@ -27,7 +27,8 @@ func TestSetupNeeded(t *testing.T) {
 		t.Fatal("set-up rig offered Setup")
 	}
 	ts := setupSnapshot()["theatres"].([]map[string]any)
-	if len(ts) != 1 || ts[0]["key"] != "caucasus" || ts[0]["testFreq"] != 260.0 {
+	// Every theatre is offered; the one with a hand-made bat is "own".
+	if len(ts) != 6 || ts[0]["key"] != "caucasus" || ts[0]["testFreq"] != 260.0 || ts[0]["files"] != "own" || ts[1]["files"] != "none" {
 		t.Fatalf("theatres %v", ts)
 	}
 	delete(env, "SKYEYE_SRS")

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/vsfg7/atc/pkg/airfield"
+	"github.com/vsfg7/atc/pkg/startgen"
 )
 
 // Setup wizard (operator 2026-10-23: "start on the setup wizard"): the first
@@ -67,7 +68,8 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-// setupTheatres are the theatres this rig has start scripts for.
+// setupTheatres lists every theatre with its start files: "own" (hand-made,
+// e.g. the vSFG-7 pack), "generated" (by Setup, rebuildable) or "none".
 func setupTheatres() []map[string]any {
 	off := commentedRoles()
 	rolesMu.Lock()
@@ -80,14 +82,20 @@ func setupTheatres() []map[string]any {
 	rolesMu.Unlock()
 	var out []map[string]any
 	for _, t := range settingsTheatres {
-		if have[t.Key] == 0 {
-			continue
-		}
 		var freq float64
-		if fs := airfield.FieldsForMap(t.Key); len(fs) > 0 {
+		fs := airfield.FieldsForMap(t.Key)
+		if len(fs) > 0 {
 			freq = fs[0].TowerFreqMHz
 		}
-		out = append(out, map[string]any{"key": t.Key, "label": t.Label, "roles": have[t.Key], "testFreq": freq})
+		files := "none"
+		switch {
+		case theatreHasHandMadeFiles(t.Key):
+			files = "own"
+		case theatreGenerated(t.Key):
+			files = "generated"
+		}
+		out = append(out, map[string]any{"key": t.Key, "label": t.Label, "roles": have[t.Key], "fields": len(fs),
+			"testFreq": freq, "files": files})
 	}
 	return out
 }
@@ -112,6 +120,7 @@ func setupSnapshot() map[string]any {
 		"needsSetup": !s.Done && (!checks["openai"] || !checks["srs"]),
 		"checks":     checks,
 		"theatres":   setupTheatres(),
+		"genDefault": startgen.Defaults(),
 	}
 }
 
@@ -162,7 +171,7 @@ func testCall(freq float64, text string) (string, error) {
 }
 
 // handleSetup: GET the wizard's state (viewer); POST (control) with JSON
-// {"op": "theatre"|"testcall"|"done", ...}.
+// {"op": "theatre"|"generate"|"testcall"|"done", ...}.
 func handleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		snap := setupSnapshot()
@@ -175,10 +184,11 @@ func handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Op      string  `json:"op"`
-		Theatre string  `json:"theatre"`
-		Freq    float64 `json:"freq"`
-		Text    string  `json:"text"`
+		Op      string           `json:"op"`
+		Theatre string           `json:"theatre"`
+		Freq    float64          `json:"freq"`
+		Text    string           `json:"text"`
+		Options startgen.Options `json:"options"` // op generate
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&req); err != nil {
 		http.Error(w, "bad JSON", http.StatusBadRequest)
@@ -221,8 +231,16 @@ func handleSetup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true, "msg": msg})
+	case "generate":
+		req.Options.GCICallsign = strings.TrimSpace(req.Options.GCICallsign)
+		written, err := generateStartFiles(req.Theatre, req.Options)
+		if err != nil {
+			writeJSON(w, map[string]any{"ok": false, "msg": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "msg": "Start files written: " + strings.Join(written, ", ")})
 	default:
-		http.Error(w, "op must be theatre, testcall or done", http.StatusBadRequest)
+		http.Error(w, "op must be theatre, generate, testcall or done", http.StatusBadRequest)
 	}
 }
 

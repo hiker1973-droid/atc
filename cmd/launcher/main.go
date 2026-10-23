@@ -43,7 +43,7 @@ var (
 	flagTacviewAddr = flag.String("tacview-addr", "192.168.1.221:42676", "Tacview address for health probe")
 	flagMizDir      = flag.String("miz-dir", "", "Dir scanned for newest .miz when --miz-path is empty (default: this user's DCS Saved Games)")
 	flagMizPath     = flag.String("miz-path", "", "Path to a specific .miz for /api/miz-weather (overrides --miz-dir; keep in sync with the roles' SKYEYE_MIZ)")
-	flagMizWatch    = flag.String("miz-watch-file", `C:\SkyeyeATC\current_mission.txt`, "File the DCS server hook writes the loaded mission's path to; when it names an existing .miz, /api/miz-weather reports that mission (matches atc.exe --miz-watch-file)")
+	flagMizWatch    = flag.String("miz-watch-file", "", "File the DCS server hook writes the loaded mission's path to; when it names an existing .miz, /api/miz-weather reports that mission (matches atc.exe --miz-watch-file; default current_mission.txt in the root dir)")
 	flagTacviewPort = flag.Int("tacview-port", 42676,
 		"Tacview real-time telemetry port used when reading a remote rig's air picture")
 	flagSkyEyeImage = flag.String("skyeye-image", "skyeye.exe", "SkyEye GCI process image name the health probe looks for")
@@ -1503,7 +1503,11 @@ func handleMizWeather(w http.ResponseWriter, r *http.Request) {
 	// happens to be newest on disk. Ahead of both: the mission the DCS server
 	// actually has loaded, as written by the server hook -- the roles follow it
 	// live (cmd/atc/mizwatch.go), so the widget must too.
-	if path := currentMissionFromHook(*flagMizWatch); path != "" {
+	watch := *flagMizWatch
+	if watch == "" {
+		watch = filepath.Join(rootDir, "current_mission.txt")
+	}
+	if path := currentMissionFromHook(watch); path != "" {
 		if wx, err := miz.ReadMizWeather(path); err == nil {
 			writeMizWeather(w, path, wx)
 			return

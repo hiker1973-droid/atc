@@ -57,6 +57,9 @@ var caucasusRangeAreas = []rangeArea{
 }
 
 func rangeAreasForMap(mapName string) []rangeArea {
+	if !flagSquadronRange {
+		return nil
+	}
 	switch strings.ToLower(strings.TrimSpace(mapName)) {
 	case "ca", "caucasus", "blacksea", "black-sea", "black sea":
 		return caucasusRangeAreas

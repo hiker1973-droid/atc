@@ -238,7 +238,7 @@ func writeGCIStatus(st gciStatus) {
 	if err != nil {
 		return
 	}
-	path := filepath.Join(`C:\SkyeyeATC\logs`, "gci-status-"+strings.ToLower(st.Callsign)+".json")
+	path := filepath.Join(installDir(), "logs", "gci-status-"+strings.ToLower(st.Callsign)+".json")
 	tmp := path + ".tmp"
 	if os.WriteFile(tmp, data, 0o644) == nil {
 		_ = os.Rename(tmp, path)

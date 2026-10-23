@@ -62,6 +62,9 @@ var caucasusTaskingTargets = []taskingTarget{
 // taskingTargetsForMap returns the tasking set for a theatre, nil where the
 // mission has no 9-line targets.
 func taskingTargetsForMap(mapName string) []taskingTarget {
+	if !flagSquadronRange {
+		return nil
+	}
 	switch strings.ToLower(strings.TrimSpace(mapName)) {
 	case "ca", "caucasus", "blacksea", "black-sea", "black sea":
 		return caucasusTaskingTargets

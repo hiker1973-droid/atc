@@ -201,12 +201,14 @@ func newRootCommand() *cobra.Command {
 	f.Float64Var(&flagStaticAltInHg, "static-alt-inhg", 29.92, "Static altimeter inHg (Training VM)")
 	f.Float64Var(&flagStaticTempC,   "static-temp-c",   15, "Static temperature Celsius (Training VM)")
 	f.BoolVar(&flagStaticNight,      "static-night",    false, "Treat mission as night (sets IsNight + 'VFR Night' mode). Real-world server clock is unrelated to DCS mission time, so this must be set explicitly.")
+	f.BoolVar(&flagSquadronRange, "squadron-range", true,
+		"Command knows the vSFG-7 Caucasus training range: its 9-line targets and range areas, from the squadron kneeboard. A generated (non-vSFG-7) start file turns it off")
 	f.BoolVar(&flagFootholdTasking, "foothold-tasking", true,
 		"Command on --map syria tasks flights against enemy zones read from the Foothold campaign save file")
 	f.StringVar(&flagFootholdSave, "foothold-save", "",
 		"Foothold save file (default: the path in Missions/Saves/foothold.status, else the newest Saves/foothold*.lua, under the mission folders SkyEye knows)")
 	f.StringVar(&flagMizPath, "miz-path", "", "Path to a specific .miz to read weather from at boot (overrides --miz-dir)")
-	f.StringVar(&flagMizWatchFile, "miz-watch-file", `C:\SkyeyeATC\current_mission.txt`,
+	f.StringVar(&flagMizWatchFile, "miz-watch-file", filepath.Join(installDir(), "current_mission.txt"),
 		"File the DCS server hook (tools/dcs-hooks/vsfg7-current-mission.lua) writes the loaded mission's path to; polled every 30s and the new mission's weather applied live. Empty disables. Missing file = keep boot weather.")
 	f.StringVar(&flagMizDir,  "miz-dir",  `C:\Users\Administrator\Saved Games\DCS.dcs_serverrelease\Missions`, "Dir scanned for the newest .miz when --miz-path is empty. Empty disables .miz auto-load.")
 	f.BoolVar(&flagCommandOnly, "command-only", false,
@@ -411,7 +413,7 @@ func run(cmd *cobra.Command, args []string) error {
 	resolveStylePresets()
 	level, _ := zerolog.ParseLevel(flagLogLevel)
 	// Write logs to both stderr (console) and a rotating log file
-	logDir := "C:\\SkyeyeATC\\logs"
+	logDir := filepath.Join(installDir(), "logs")
 	os.MkdirAll(logDir, 0755)
 	// Pick a sane log filename. --airfield defaults to "OMDM" even for
 	// ATIS-only / Command-only modes, so we have to let the mode flag win or

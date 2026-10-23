@@ -796,9 +796,22 @@ async function refreshRoles() {
     const r = await fetch(api('/api/roles'));
     const list = await r.json();
     roleStatus = {};
-    for (const x of (list||[])) roleStatus[x.name] = x.status;
+    roleAlias = {};
+    for (const x of (list||[])) {
+      roleStatus[x.name] = x.status;
+      // Setup's generated start files name roles "SkyEye ..." where the
+      // vSFG-7 bats say "vSFG-7 ...": the cards below are written with the
+      // vSFG-7 names, so answer for both.
+      if (x.name.startsWith('SkyEye ')) {
+        const card = 'vSFG-7 ' + x.name.slice(7);
+        if (!(card in roleStatus)) { roleStatus[card] = x.status; roleAlias[card] = x.name; }
+      }
+    }
   } catch (e) { /* leave previous state */ }
 }
+// realRole is the launcher's name for a card's role (see refreshRoles).
+let roleAlias = {};
+const realRole = n => roleAlias[n] || n;
 
 // Field sides from sides.json: ICAO -> 'red' (absent = blue). The tower
 // card's Side switch sets them (operator 2026-10-23).
@@ -1248,9 +1261,9 @@ function renderPattern() {
 // ──────────────────────────────────────────────────────────────────────────
 // A role that is already running is refused with 409 and a message to show
 // (operator 2026-10-23: Day had every tower running 2-3 times).
-async function startRole(name)   { const r = await fetch(api('/api/start?name=') + encodeURIComponent(name), { method: 'POST' }); if (r.status === 409) alert(await r.text()); setTimeout(refreshAll, 800); }
-async function stopRole(name)    { await fetch(api('/api/stop?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
-async function restartRole(name) { await fetch(api('/api/restart?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
+async function startRole(name)   { const r = await fetch(api('/api/start?name=') + encodeURIComponent(realRole(name)), { method: 'POST' }); if (r.status === 409) alert(await r.text()); setTimeout(refreshAll, 800); }
+async function stopRole(name)    { await fetch(api('/api/stop?name=') + encodeURIComponent(realRole(name)), { method: 'POST' }); setTimeout(refreshAll, 800); }
+async function restartRole(name) { await fetch(api('/api/restart?name=') + encodeURIComponent(realRole(name)), { method: 'POST' }); setTimeout(refreshAll, 1500); }
 // Flip the dashboard between theatres. Backend role start/stop is unaffected
 // (it auto-discovers all bats); this only re-points the tower-status, weather,
 // departures and pattern panels at the selected theatre's towers.
@@ -1288,7 +1301,7 @@ async function startAtis() {
   const btn = $('startAtisBtn');
   btn.disabled = true;
   try {
-    const r = await fetch(api('/api/start?name=') + encodeURIComponent(cfg.atisRole), { method: 'POST' });
+    const r = await fetch(api('/api/start?name=') + encodeURIComponent(realRole(cfg.atisRole)), { method: 'POST' });
     if (r.status === 409) alert(await r.text());
     else if (!r.ok) alert(`Start ${cfg.label} ATIS failed: ${await r.text()}`);
   } catch (e) { alert('Start ATIS failed: ' + e.message); }
@@ -1403,8 +1416,8 @@ async function applyWeather() {
     $('wxStatus').textContent = `Failed on ports: ${failed.map(f => f.port + ' (' + f.msg.trim() + ')').join(', ')}`;
   }
 }
-async function startGroup(names) { if (names.every(n => roleStatus[n] === 'running')) { alert(`${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} already running.`); return; } for (const n of names) { if (roleStatus[n] !== 'running') { await fetch(api('/api/start?name=') + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
-async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch(api('/api/stop?name=') + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
+async function startGroup(names) { if (names.every(n => roleStatus[n] === 'running')) { alert(`${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} already running.`); return; } for (const n of names) { if (roleStatus[n] !== 'running') { await fetch(api('/api/start?name=') + encodeURIComponent(realRole(n)), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
+async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch(api('/api/stop?name=') + encodeURIComponent(realRole(n)), { method: 'POST' }))); setTimeout(refreshAll, 800); }
 
 // ──────────────────────────────────────────────────────────────────────────
 // Live log — open one SSE per tower, merge into one feed
