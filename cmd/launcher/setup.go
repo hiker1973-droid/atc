@@ -63,6 +63,13 @@ const externalAudioPath = `C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS
 // limit, levelling). Without it every call goes out clean.
 const ffmpegPath = `C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`
 
+// dotnet10: the .NET 10 runtime DCS-SRS 2.4's ExternalAudio and installer run
+// on (a PC with only .NET 8 cannot start either).
+func dotnet10() bool {
+	m, _ := filepath.Glob(`C:\Program Files\dotnet\shared\Microsoft.NETCore.App\10.*`)
+	return len(m) > 0
+}
+
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
@@ -112,6 +119,7 @@ func setupSnapshot() map[string]any {
 		"tacview":       userEnv("SKYEYE_TACVIEW") != "",
 		"externalAudio": fileExists(externalAudioPath),
 		"ffmpeg":        fileExists(ffmpegPath),
+		"dotnet":        dotnet10(),
 		"atcExe":        fileExists(filepath.Join(rootDir, "atc.exe")),
 	}
 	return map[string]any{

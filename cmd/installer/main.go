@@ -129,7 +129,7 @@ func install(dir string) error {
 		}
 	}
 	url := fmt.Sprintf("http://localhost:%d/setup", listenPort)
-	exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	openURL(url)
 	fmt.Printf("Done. Setup is open in your browser: %s\n", url)
 	return nil
 }
@@ -148,7 +148,7 @@ func addShortcuts(dir, launcher, args string) {
 	}
 	shortcut(filepath.Join(startMenuDir(), "Uninstall "+appName+".lnk"),
 		filepath.Join(dir, "SkyEye-Setup.exe"), "--uninstall", dir, "Remove SkyEye ATC")
-	if !*flagQuiet && ask("Start SkyEye when Windows starts? [y/N] ") {
+	if !*flagQuiet && ask("Start SkyEye when Windows starts? [y/N] ", false) {
 		if err := shortcut(filepath.Join(startupDir(), appName+".lnk"), launcher, args, dir, appName); err == nil {
 			fmt.Println("  added to Startup")
 		}
@@ -222,16 +222,31 @@ func startupDir() string { return filepath.Join(startMenuDir(), "Startup") }
 func desktopDir() string { return filepath.Join(os.Getenv("USERPROFILE"), "Desktop") }
 
 // checkPrerequisites says what else the PC needs; the Setup page repeats it.
+const (
+	dotnetURL = "https://dotnet.microsoft.com/download/dotnet/10.0"
+	srsURL    = "https://github.com/ciribob/DCS-SimpleRadioStandalone/releases"
+)
+
 func checkPrerequisites() {
 	fmt.Println("\nChecking this PC")
 	dotnet, _ := filepath.Glob(`C:\Program Files\dotnet\shared\Microsoft.NETCore.App\10.*`)
 	report(len(dotnet) > 0, "Microsoft .NET 10",
-		"needed by DCS-SRS 2.4: install the .NET 10 Desktop Runtime (x64) from https://dotnet.microsoft.com/download/dotnet/10.0")
-	report(exists(`C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`), "DCS-SRS (ExternalAudio)",
-		"SkyEye talks on SRS through it: install DCS-SRS from https://github.com/ciribob/DCS-SimpleRadioStandalone/releases")
+		"needed by DCS-SRS 2.4 and its installer: install the .NET 10 Desktop Runtime (Windows x64) from "+dotnetURL)
+	srs := exists(`C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`)
+	report(srs, "DCS-SRS (ExternalAudio)",
+		"SkyEye talks on SRS through it: install DCS-SRS (after .NET 10) from "+srsURL)
 	report(exists(`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`), "ffmpeg (radio effect)",
 		"optional: without it calls go out clean. Unzip an ffmpeg build to C:\\ffmpeg-master-latest-win64-gpl")
+	// The console's links cannot be clicked: offer to open the pages.
+	if len(dotnet) == 0 && !*flagQuiet && ask("\nOpen the .NET 10 download page now? [Y/n] ", true) {
+		openURL(dotnetURL)
+	}
+	if !srs && !*flagQuiet && ask("Open the DCS-SRS download page now? [Y/n] ", true) {
+		openURL(srsURL)
+	}
 }
+
+func openURL(u string) { exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start() }
 
 func report(ok bool, what, fix string) {
 	if ok {
@@ -263,8 +278,14 @@ func portInUse(port int) bool {
 	return true
 }
 
-func ask(q string) bool {
+// ask is a yes/no question; Enter alone gives def.
+func ask(q string, def bool) bool {
 	fmt.Print(q)
 	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "y")
+	switch a := strings.ToLower(strings.TrimSpace(line)); {
+	case a == "":
+		return def
+	default:
+		return strings.HasPrefix(a, "y")
+	}
 }
