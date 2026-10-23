@@ -502,47 +502,6 @@ ol { padding-left: 18px; margin: 3px 0; } li { margin-bottom: 2px; }
 }
 `
 
-// Discord is the post that goes with the AAR on the squadron's Discord:
-// Claude's, or one made from the numbers. Kept under Discord's 2,000.
-func (r *Report) Discord() string {
-	if r.AI != nil && strings.TrimSpace(r.AI.Discord) != "" {
-		return clipRunes(strings.TrimSpace(r.AI.Discord), 1900)
-	}
-	s := r.Session
-	var b strings.Builder
-	fmt.Fprintf(&b, "**%s · %s · %s**\n", r.ReportNo, r.Mission, s.Start.In(s.Loc).Format("2 Jan 2006"))
-	if s.PvP && len(s.Engagements) > 0 {
-		bw, rw := 0, 0
-		for _, en := range s.Engagements {
-			switch en.Winner {
-			case "Blue":
-				bw++
-			case "Red":
-				rw++
-			}
-		}
-		fmt.Fprintf(&b, "Blue %s %d · Red %s %d\n", s.BlueName, bw, s.RedName, rw)
-	}
-	sorties := 0
-	for _, p := range s.Pilots {
-		sorties += p.Sorties
-	}
-	fmt.Fprintf(&b, "- %d pilots, %d sorties, %d engagements\n", len(s.Pilots), sorties, len(s.Engagements))
-	n := 0
-	for _, p := range s.Pilots {
-		if p.Kills+p.Ground == 0 || n == 3 {
-			continue
-		}
-		fmt.Fprintf(&b, "- %s: %d kills\n", p.Name, p.Kills+p.Ground)
-		n++
-	}
-	if len(s.Safety) > 0 {
-		fmt.Fprintf(&b, "- Safety: %d items to review\n", len(s.Safety))
-	}
-	b.WriteString("Full AAR attached.")
-	return b.String()
-}
-
 func clipRunes(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {

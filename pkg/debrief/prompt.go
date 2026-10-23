@@ -35,7 +35,9 @@ type AIText struct {
 	Comms           string   `json:"comms"`
 	Safety          string   `json:"safety"`
 	Server          string   `json:"server"`
-	Discord         string   `json:"discord"`
+	DiscordFights   []string `json:"discord_fights"`
+	DiscordOutcome  string   `json:"discord_outcome"`
+	DiscordTake     []string `json:"discord_takeaways"`
 }
 
 // Point2 is a bold lead and its sentence: "Launch high and fast." ...
@@ -71,7 +73,9 @@ Answer with ONLY a JSON object, no other text, with these fields:
  "comms": "Air traffic control and radio: calls not understood, procedure, readbacks, the comms report; whether faults were the pilots' phrasing or Readback's recognition (2-4 sentences). Empty if no radio records.",
  "safety": "One or two sentences on the safety items, with the corrective action. Empty if none.",
  "server": "Only server problems that affected the flying; empty otherwise.",
- "discord": "A Discord post announcing the AAR: under 900 characters, Discord Markdown (**bold**, bullet lines with -), a bold title line with the mission and date, the result, 2-4 key points with names, and a line saying the full AAR PDF is attached. No @everyone, no links."
+ "discord_fights": ["For the squadron's Discord post: one short paragraph per engagement, in order, 2-4 sentences, the story of the fight with names and the moment that decided it. The bold lead with the fight's length and score is added for you, so start straight with the story. You may add one line starting with '> ' quoting the most remarkable moment."],  // exactly one per engagement; empty if none
+ "discord_outcome": "For Discord: the result in bold (e.g. '**Venom wins both fights, 5-1 overall.**') and one or two sentences on what decided it.",
+ "discord_takeaways": ["For Discord: 3-5 short, specific takeaways with numbers from the records."]
 }`
 
 // Build turns the inputs into the message sent to Claude.

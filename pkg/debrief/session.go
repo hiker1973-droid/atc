@@ -26,6 +26,10 @@ type Session struct {
 	PvP         bool    // players on both sides
 	BlueName    string  // "Venom": the blue players' squadron word, for the headline
 	RedName     string
+	// MissionStart is when the mission run began (the Discord post's T+
+	// times); ejected holds each player's ejections by short name.
+	MissionStart time.Time
+	ejected      map[string][]time.Time
 }
 
 // PilotStat is one player's session.
@@ -256,6 +260,8 @@ func (s *Session) fromEvents(es *EventSession) {
 		}
 		return p.Pilot
 	}
+	s.MissionStart = es.Start
+	s.ejected = map[string][]time.Time{}
 	takeoff := map[string]time.Time{}
 	land := func(key string, at time.Time) {
 		if t0, ok := takeoff[key]; ok {
@@ -301,6 +307,7 @@ func (s *Session) fromEvents(es *EventSession) {
 					p.Crashes++
 				case "eject":
 					p.Ejections++
+					s.ejected[p.Name] = append(s.ejected[p.Name], e.At)
 				}
 				land(key, e.At)
 			}

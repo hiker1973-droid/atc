@@ -68,7 +68,8 @@
   #report iframe, iframe.pv { width: 100%; height: 80vh; border: 1px solid var(--border); border-radius: 5px; background: #e9ebee; }
   iframe.pv { height: 70vh; margin-bottom: 0.4rem; }
   .cap { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); margin: 0.4rem 0 0.25rem; }
-  #discordText { font-family: Consolas, monospace; font-size: 0.8rem; }
+  #discordParts textarea { width: 100%; font-family: Consolas, monospace; font-size: 0.8rem; }
+  #discordParts .part { margin-bottom: 0.7rem; }
 </style>
 </head>
 <body>
@@ -163,10 +164,9 @@
     </div>
     <iframe id="aarFrame" title="After Action Report"></iframe>
     <div id="discordBox" style="display:none;margin-top:0.9rem">
-      <div class="cap">DISCORD POST · paste it in your channel and attach the PDF or the picture</div>
-      <textarea id="discordText" rows="8" spellcheck="false"></textarea>
+      <div class="cap" id="discordCap">DISCORD POST · paste each part in order, then attach the PDF or the picture</div>
+      <div id="discordParts"></div>
       <div class="actions">
-        <button class="primary" onclick="copyDiscord()">Copy post</button>
         <button onclick="location.href='/api/reports/png?name=' + encodeURIComponent(current)">Download picture (page 1)</button>
         <button onclick="pdf(true)">Download PDF</button>
         <span class="msg" id="discordMsg"></span>
@@ -280,19 +280,25 @@ function openReport(name) {
   $('report').scrollIntoView({ behavior: 'smooth' });
   $('discordBox').style.display = 'none';
   fetch('/api/reports/file?name=' + encodeURIComponent(name)).then(r => r.ok ? r.json() : null).then(res => {
-    if (!res || !res.meta || !res.meta.discord) return;
-    $('discordText').value = res.meta.discord;
-    $('discordMsg').textContent = `${res.meta.discord.length} characters (Discord allows 2,000)`;
+    const posts = res && res.meta ? (res.meta.discordPosts || (res.meta.discord ? [res.meta.discord] : [])) : [];
+    if (!posts.length) return;
+    $('discordCap').textContent = posts.length > 1
+      ? `DISCORD POST · ${posts.length} parts (Discord takes 2,000 characters a message): paste them in order, then attach the PDF or the picture`
+      : 'DISCORD POST · paste it in your channel, then attach the PDF or the picture';
+    $('discordParts').innerHTML = posts.map((p, i) => `<div class="part">
+        <textarea rows="${Math.min(18, p.split('\n').length + 1)}" spellcheck="false">${esc(p)}</textarea>
+        <div class="actions" style="margin-top:0.3rem"><button class="primary" onclick="copyPart(${i}, this)">Copy ${posts.length > 1 ? 'part ' + (i + 1) : 'post'}</button>
+        <span class="msg muted">${p.length} characters</span></div></div>`).join('');
     $('discordBox').style.display = '';
   });
   load();
 }
 
-async function copyDiscord() {
-  const t = $('discordText');
+async function copyPart(i, btn) {
+  const t = $('discordParts').querySelectorAll('textarea')[i];
   try { await navigator.clipboard.writeText(t.value); }
   catch (e) { t.select(); document.execCommand('copy'); }
-  $('discordMsg').innerHTML = '<span class="ok">Copied</span> - paste it in Discord, then attach the PDF or the picture.';
+  btn.nextElementSibling.innerHTML = '<span class="ok">Copied</span> - paste it in Discord';
 }
 
 async function pdf(save) {

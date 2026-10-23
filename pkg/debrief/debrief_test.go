@@ -185,12 +185,28 @@ func TestReportHTML(t *testing.T) {
 	if !strings.Contains(page, "<b>Shoot first.</b> &lt;b&gt;it worked&lt;/b&gt;") || !strings.Contains(page, "[Flight leads]") || strings.Contains(page, "written by Claude") {
 		t.Fatal("Claude's words not placed, or not escaped")
 	}
-	if d := r.Discord(); !strings.Contains(d, "AAR-20261022-1800") || len(d) > 1900 {
-		t.Fatalf("discord fallback %q", d)
+	r.AI.DiscordFights = []string{"Dabs took Bacon from 15 nm."}
+	r.AI.DiscordOutcome = "**Venom wins, 1-0.**"
+	r.AI.DiscordTake = []string{"Shoot first."}
+	post := strings.Join(r.DiscordPosts(), "\n")
+	for _, want := range []string{"# :airplane: TEST — AAR", "**1 v 2 · Senaki-Kolkhi vs Mozdok · Oct 22**",
+		"## :red_circle: KILLS — 1 confirmed (Venom 1, Raider 0)", "T+05:12  Dabs    > Bacon   AIM-120C",
+		"## :skull: LOSSES — 1", "## :bar_chart: SHOT STATS — 1 AMRAAMs fired", "Venom: 1 kill per 1 shots.",
+		"**Fight 1 (", "Venom 1–0).** Dabs took Bacon", "## :dart: OUTCOME", "- Shoot first."} {
+		if !strings.Contains(post, want) {
+			t.Errorf("Discord post lacks %q:\n%s", want, post)
+		}
 	}
-	r.AI.Discord = "**AAR** Venom won"
-	if r.Discord() != "**AAR** Venom won" {
-		t.Fatal("Claude's Discord post not used")
+	for _, p := range r.DiscordPosts() {
+		if len(p) > 2000 {
+			t.Fatalf("a post of %d characters", len(p))
+		}
+	}
+	long := []string{strings.Repeat("x", 1500), "```\n" + strings.Repeat("line\n", 600) + "```"}
+	for _, p := range pack(long, 1900) {
+		if len(p) > 1900 || strings.Count(p, "```")%2 != 0 {
+			t.Fatalf("a split post is too long or leaves a code block open: %d chars", len(p))
+		}
 	}
 }
 

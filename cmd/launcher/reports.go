@@ -68,7 +68,8 @@ type reportMeta struct {
 	ReportNo string         `json:"reportNo,omitempty"`
 	Mission  string         `json:"mission,omitempty"`
 	Facts    []debrief.Fact `json:"facts,omitempty"`
-	Discord  string         `json:"discord,omitempty"`
+	Discord  string         `json:"discord,omitempty"`      // one post (reports before the squadron's format)
+	Posts    []string       `json:"discordPosts,omitempty"` // the Discord post, as messages under 2,000 characters
 	HTML     bool           `json:"html,omitempty"` // the full report is <name>.html (the AAR in the debrief style)
 }
 
@@ -461,7 +462,7 @@ func handleReportGenerate(w http.ResponseWriter, r *http.Request) {
 	preparedMu.Lock()
 	p.Report.AI, p.Report.Written, p.Report.Model = &ai, meta.Created, body.Model
 	page := p.Report.HTML()
-	meta.Discord = p.Report.Discord()
+	meta.Posts = p.Report.DiscordPosts()
 	preparedMu.Unlock()
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".html"), []byte(page), 0o644)
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(aiMarkdown(ai)), 0o644)

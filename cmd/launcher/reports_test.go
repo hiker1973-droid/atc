@@ -90,7 +90,8 @@ func TestReportFlow(t *testing.T) {
 	}
 	var out struct{ Meta reportMeta }
 	json.Unmarshal(rec.Body.Bytes(), &out)
-	if out.Meta.Usage.InputTokens != 900 || out.Meta.ReportNo != "AAR-20261023-0015" || out.Meta.Mission != "Test Mission" || len(out.Meta.Facts) == 0 {
+	if out.Meta.Usage.InputTokens != 900 || out.Meta.ReportNo != "AAR-20261023-0015" || out.Meta.Mission != "Test Mission" || len(out.Meta.Facts) == 0 ||
+		len(out.Meta.Posts) == 0 || !strings.Contains(out.Meta.Posts[0], "# :airplane: TEST MISSION — AAR") {
 		t.Fatalf("report meta %+v", out.Meta)
 	}
 
