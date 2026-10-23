@@ -65,7 +65,10 @@
   table.saved td.t { cursor: pointer; color: var(--blue); }
   table.saved .no { font-family: Consolas, monospace; font-size: 0.78rem; color: var(--muted); display: block; }
   #report { display: none; }
-  #report iframe { width: 100%; height: 80vh; border: 1px solid var(--border); border-radius: 5px; background: #e9ebee; }
+  #report iframe, iframe.pv { width: 100%; height: 80vh; border: 1px solid var(--border); border-radius: 5px; background: #e9ebee; }
+  iframe.pv { height: 70vh; margin-bottom: 0.4rem; }
+  .cap { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); margin: 0.4rem 0 0.25rem; }
+  #discordText { font-family: Consolas, monospace; font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -132,8 +135,10 @@
 
     <div id="preview" style="display:none;margin-top:0.9rem;border-top:1px solid var(--border);padding-top:0.8rem">
       <b id="pvTitle"></b>
-      <table class="facts" id="pvFacts"></table>
       <div class="stats" id="pvStats"></div>
+      <div class="cap">THE REPORT AS IT STANDS · maps, tables and safety are worked out on this PC; Claude adds the words</div>
+      <iframe id="pvFrame" class="pv" title="Report preview"></iframe>
+      <details><summary>Show the data block</summary><table class="facts" id="pvFacts"></table></details>
       <details><summary>Show exactly what will be sent to Claude</summary><pre class="records" id="pvRecords"></pre></details>
       <div class="actions">
         <select id="model"></select>
@@ -157,6 +162,16 @@
       <button id="delBtn" onclick="del()">Delete</button>
     </div>
     <iframe id="aarFrame" title="After Action Report"></iframe>
+    <div id="discordBox" style="display:none;margin-top:0.9rem">
+      <div class="cap">DISCORD POST · paste it in your channel and attach the PDF or the picture</div>
+      <textarea id="discordText" rows="8" spellcheck="false"></textarea>
+      <div class="actions">
+        <button class="primary" onclick="copyDiscord()">Copy post</button>
+        <button onclick="location.href='/api/reports/png?name=' + encodeURIComponent(current)">Download picture (page 1)</button>
+        <button onclick="pdf(true)">Download PDF</button>
+        <span class="msg" id="discordMsg"></span>
+      </div>
+    </div>
   </section>
 
   <section id="savedSec">
@@ -222,10 +237,15 @@ async function prepare() {
     const s = prep.stats;
     $('pvFacts').innerHTML = (s.facts || []).map(x => `<tr><th>${esc(x.label)}</th><td>${esc(x.value)}</td></tr>`).join('');
     const chips = [];
+    (s.sources || []).forEach(x => chips.push(x));
+    if (s.events === false) chips.push('no server events: kills are not scored without the DCS server\'s own dcs.log');
+    if (s.players != null) chips.push(`${s.players} players`);
+    if (s.engagements) chips.push(`${s.engagements} engagements`);
     if (s.serverProblems != null) chips.push(`${s.serverProblems} kinds of server error`);
     chips.push(`about ${Math.round(s.approxTokens / 100) / 10}k tokens to send`);
     $('pvStats').innerHTML = chips.map(c => `<span class="chip">${esc(c)}</span>`).join('');
     $('pvRecords').textContent = prep.records;
+    $('pvFrame').src = '/reports/preview?id=' + encodeURIComponent(prep.id);
     if (prep.from && !prep.from.startsWith('0001')) { $('from').value = localInput(new Date(prep.from)); $('to').value = localInput(new Date(prep.to)); }
     $('preview').style.display = '';
     $('genBtn').disabled = !state.keySet;
@@ -258,7 +278,21 @@ function openReport(name) {
   $('pdfMsg').textContent = '';
   $('report').style.display = 'block';
   $('report').scrollIntoView({ behavior: 'smooth' });
+  $('discordBox').style.display = 'none';
+  fetch('/api/reports/file?name=' + encodeURIComponent(name)).then(r => r.ok ? r.json() : null).then(res => {
+    if (!res || !res.meta || !res.meta.discord) return;
+    $('discordText').value = res.meta.discord;
+    $('discordMsg').textContent = `${res.meta.discord.length} characters (Discord allows 2,000)`;
+    $('discordBox').style.display = '';
+  });
   load();
+}
+
+async function copyDiscord() {
+  const t = $('discordText');
+  try { await navigator.clipboard.writeText(t.value); }
+  catch (e) { t.select(); document.execCommand('copy'); }
+  $('discordMsg').innerHTML = '<span class="ok">Copied</span> - paste it in Discord, then attach the PDF or the picture.';
 }
 
 async function pdf(save) {

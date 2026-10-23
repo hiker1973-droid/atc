@@ -44,6 +44,8 @@ type preparedReport struct {
 	ReportNo string
 	Mission  string
 	Facts    []debrief.Fact
+	Report   *debrief.Report // the pages; Generate adds Claude's words
+	Preview  []byte          // the pages before Claude, for the Preview frame
 }
 
 var (
@@ -66,6 +68,8 @@ type reportMeta struct {
 	ReportNo string         `json:"reportNo,omitempty"`
 	Mission  string         `json:"mission,omitempty"`
 	Facts    []debrief.Fact `json:"facts,omitempty"`
+	Discord  string         `json:"discord,omitempty"`
+	HTML     bool           `json:"html,omitempty"` // the full report is <name>.html (the AAR in the debrief style)
 }
 
 // localSource is a dcs.log or Tacview recording found on this PC.
@@ -301,7 +305,7 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 	to, _ := time.Parse(time.RFC3339, r.FormValue("to"))
 	switch {
 	case r.FormValue("matchTacview") == "1" && in.Tacview != nil && !in.Tacview.Start.IsZero():
-		from, to = in.Tacview.Start.Add(-15*time.Minute), in.Tacview.End.Add(15*time.Minute)
+		from, to = in.Tacview.Start.Add(-15*time.Minute), in.Tacview.End().Add(15*time.Minute)
 	case !from.IsZero() && to.After(from):
 	case in.Server != nil && !in.Server.Start.IsZero():
 		from, to = in.Server.Start, in.Server.End
@@ -318,6 +322,14 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nothing to report from: choose a Tacview recording or a dcs.log, or a time window with Readback radio traffic", http.StatusBadRequest)
 		return
 	}
+	var rec *debrief.Recording
+	if in.Tacview != nil {
+		rec = in.Tacview
+	}
+	in.Session = debrief.Analyze(rec, in.Server, from, to, time.Local)
+	if !in.Session.HasEvents && in.Server != nil && len(in.Server.Sessions) == 0 {
+		sources = append(sources, "(that dcs.log has no server events: use the DCS server's own log)")
+	}
 	title = debrief.MissionName(in)
 	switch {
 	case in.Tacview != nil && !in.Tacview.Start.IsZero():
@@ -328,25 +340,21 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 	records := debrief.Build(in)
 	id := newReportID()
 	preparedMu.Lock()
-	for k, p := range prepared { // keep a few, for an hour
-		if time.Since(p.At) > time.Hour || len(prepared) > 8 {
+	facts := debrief.Facts(in, sources)
+	rpt := &debrief.Report{Session: in.Session, Facts: facts, ReportNo: debrief.ReportNumber(in), Squadron: name,
+		LogoURI: string(squadronLogoDataURI()), Mission: debrief.MissionName(in), Sources: sources, Radio: in.Radio}
+	for k, p := range prepared { // tracks are large: keep the newest few
+		if len(prepared) >= 3 || time.Since(p.At) > time.Hour {
 			delete(prepared, k)
 		}
 	}
-	facts := debrief.Facts(in, sources)
 	prepared[id] = &preparedReport{Records: records, Title: title, From: from, To: to, Sources: sources, At: time.Now(),
-		ReportNo: debrief.ReportNumber(in), Mission: debrief.MissionName(in), Facts: facts}
+		ReportNo: rpt.ReportNo, Mission: rpt.Mission, Facts: facts, Report: rpt, Preview: []byte(rpt.HTML())}
 	preparedMu.Unlock()
 
 	stats := map[string]any{"sources": sources, "chars": len(records), "approxTokens": len(records) / 4, "facts": facts}
 	if in.Tacview != nil {
-		humans := 0
-		for _, f := range in.Tacview.Flights {
-			if f.Human {
-				humans++
-			}
-		}
-		stats["aircraft"], stats["players"], stats["losses"] = len(in.Tacview.Flights), humans, len(in.Tacview.Losses)
+		stats["aircraft"] = len(in.Tacview.Aircraft)
 	}
 	if in.Radio != nil {
 		stats["radioLines"] = len(in.Radio.Lines)
@@ -354,6 +362,7 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 	if in.Server != nil {
 		stats["serverProblems"] = len(in.Server.Problems)
 	}
+	stats["engagements"], stats["players"], stats["events"] = len(in.Session.Engagements), len(in.Session.Pilots), in.Session.HasEvents
 	writeJSON(w, map[string]any{"id": id, "title": title, "records": records, "stats": stats,
 		"from": from, "to": to})
 }
@@ -442,13 +451,20 @@ func handleReportGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	meta := reportMeta{Title: p.Title, Created: time.Now(), From: p.From, To: p.To, Model: body.Model, Usage: usage,
-		Sources: p.Sources, ReportNo: p.ReportNo, Mission: p.Mission, Facts: p.Facts}
+		Sources: p.Sources, ReportNo: p.ReportNo, Mission: p.Mission, Facts: p.Facts, HTML: true}
 	meta.Name = meta.Created.Format("2006-01-02_150405")
 	if err := os.MkdirAll(reportsDir(), 0o755); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(strings.TrimSpace(text)+"\n"), 0o644)
+	ai := debrief.ParseAI(text)
+	preparedMu.Lock()
+	p.Report.AI, p.Report.Written, p.Report.Model = &ai, meta.Created, body.Model
+	page := p.Report.HTML()
+	meta.Discord = p.Report.Discord()
+	preparedMu.Unlock()
+	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".html"), []byte(page), 0o644)
+	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(aiMarkdown(ai)), 0o644)
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".records.txt"), []byte(p.Records), 0o644)
 	mb, _ := json.MarshalIndent(meta, "", "  ")
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".json"), mb, 0o644)
@@ -503,7 +519,7 @@ func handleReportFile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		for _, ext := range []string{".md", ".json", ".records.txt", ".pdf"} {
+		for _, ext := range []string{".md", ".json", ".records.txt", ".pdf", ".html", ".png"} {
 			os.Remove(filepath.Join(reportsDir(), body.Name+ext))
 		}
 		writeJSON(w, map[string]any{"ok": true})
@@ -534,4 +550,63 @@ func reportFileName(meta reportMeta) string {
 		n = n[:60]
 	}
 	return strings.TrimSpace(meta.ReportNo + " " + n)
+}
+
+// handleReportPreview: GET /reports/preview?id= the pages of a prepared
+// report before Claude writes (the Preview frame).
+func handleReportPreview(w http.ResponseWriter, r *http.Request) {
+	preparedMu.Lock()
+	p := prepared[r.URL.Query().Get("id")]
+	preparedMu.Unlock()
+	if p == nil {
+		http.Error(w, "that preview has expired: press Preview again", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(p.Preview)
+}
+
+// aiMarkdown keeps Claude's words as Markdown beside the report (the .md
+// download and a record of what was written).
+func aiMarkdown(a debrief.AIText) string {
+	var b strings.Builder
+	w := func(format string, x ...any) { fmt.Fprintf(&b, format+"\n", x...) }
+	if a.BLUF != "" {
+		w("**BLUF:** %s\n", a.BLUF)
+	}
+	if len(a.WhatWon) > 0 {
+		w("## Key points")
+		for i, p := range a.WhatWon {
+			w("%d. **%s** %s", i+1, p.Title, p.Text)
+		}
+		w("")
+	}
+	for i, n := range a.EngagementNotes {
+		w("## Engagement %d\n%s\n", i+1, n)
+	}
+	for _, sec := range []struct{ h, t string }{{"1. Mission overview", a.Overview}, {"2. What was planned", a.Planned},
+		{"6. Air traffic control and comms", a.Comms}, {"Safety", a.Safety}, {"Server", a.Server}} {
+		if sec.t != "" {
+			w("## %s\n%s\n", sec.h, sec.t)
+		}
+	}
+	if len(a.Sustain)+len(a.Improve) > 0 {
+		w("## 7. Sustain / Improve\n**Sustain**")
+		for _, x := range a.Sustain {
+			w("- %s", x)
+		}
+		w("\n**Improve**")
+		for _, x := range a.Improve {
+			w("- %s", x)
+		}
+		w("")
+	}
+	if len(a.Recommendations) > 0 {
+		w("## 8. Recommendations and follow-up actions")
+		for i, x := range a.Recommendations {
+			w("%d. %s [%s]", i+1, x.Text, x.Owner)
+		}
+	}
+	return b.String()
 }

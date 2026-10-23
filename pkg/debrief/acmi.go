@@ -1,15 +1,19 @@
-// Package debrief turns a session's records - a Tacview recording, the DCS
-// server's dcs.log and Readback's own radio logs - into a compact text the
-// launcher's Reports page sends to Claude for a written debrief (operator
-// 2026-10-23: "lets add reporting functions", "load dcs log and tacview").
-// Everything is summarised here, on the PC: a recording of hundreds of MB
-// becomes a few KB of flights, shots and losses.
+// Package debrief turns a session's records - the DCS server's dcs.log, a
+// Tacview recording, the mission file and Readback's own radio logs - into
+// an After Action Report (operator 2026-10-23: "lets add reporting
+// functions", "load dcs log and tacview", "we want it to be a after action
+// report", then "like this example": the BFM Venom vs Raider debrief).
+// The server's event lines give what DCS scored (shots, hits, kills,
+// takeoffs, landings, grades); Tacview gives the geometry and the tracks for
+// the maps. Everything is computed on the PC; Claude only writes the words.
 package debrief
 
 import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"compress/flate"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
@@ -20,55 +24,100 @@ import (
 	"time"
 )
 
-// Flight is one aircraft in a Tacview recording.
-type Flight struct {
-	ID        string
-	Pilot     string // the callsign or player name Tacview shows
-	Aircraft  string
-	Group     string
-	Coalition string
-	Human     bool // DCS marks client aircraft with a player name unlike the unit name
-	FirstSeen time.Time
-	LastSeen  time.Time
-	MaxAltFt  float64
-	Takeoffs  []string // "18:31:05Z Senaki-Kolkhi"
-	Landings  []string
-	Fired     map[string]int // weapon type -> count
-	Kills     []string       // "18:40:12Z MiG-29A (Enemies)" - likely, from the weapon's impact point
-	Fate      string         // landed | destroyed | ... at the end of the recording
-	KilledBy  string
+// Point is one sample of an object's track.
+type Point struct {
+	T        float64 // seconds since the recording started
+	Lat, Lon float64
+	AltM     float64 // above sea level
+	AGL      float64 // above the ground, when Tacview gives it (-1 when not)
+	U, V     float64 // DCS flat coordinates, metres (0,0 when not given)
 }
 
-// Loss is a destroyed object that was not a tracked aircraft (ground units,
-// ships) or any aircraft, for the totals.
-type Loss struct {
-	At        time.Time
-	Name      string
-	Type      string
-	Coalition string
-	By        string // likely shooter's pilot, if a weapon hit near it
+// Object is one thing in a recording: an aircraft, a missile, a parachute.
+type Object struct {
+	ID, Type, Name, Pilot, Group, Color string
+	Start, End                          float64 // seconds; End is when it was removed (or the recording's end)
+	Removed                             bool
+	Track                               []Point
 }
 
-// Recording is the summary of a Tacview .acmi.
+// Side is "blue", "red", or "" from Tacview's colour (the Coalition field is
+// relative to whoever recorded it).
+func (o *Object) Side() string {
+	switch strings.ToLower(o.Color) {
+	case "blue":
+		return "blue"
+	case "red":
+		return "red"
+	}
+	return ""
+}
+
+// IsAircraft: fixed wing or helicopter.
+func (o *Object) IsAircraft() bool {
+	return strings.HasPrefix(o.Type, "Air+") && (strings.Contains(o.Type, "FixedWing") || strings.Contains(o.Type, "Rotorcraft"))
+}
+
+// IsWeapon: a missile, bomb or rocket (shells and bullets are left out).
+func (o *Object) IsWeapon() bool {
+	return strings.HasPrefix(o.Type, "Weapon") &&
+		(strings.Contains(o.Type, "Missile") || strings.Contains(o.Type, "Bomb") || strings.Contains(o.Type, "Rocket"))
+}
+
+// At is the track sample nearest t.
+func (o *Object) At(t float64) Point {
+	tr := o.Track
+	if len(tr) == 0 {
+		return Point{T: t, AGL: -1}
+	}
+	k := sort.Search(len(tr), func(i int) bool { return tr[i].T >= t })
+	switch {
+	case k == 0:
+		return tr[0]
+	case k == len(tr):
+		return tr[len(tr)-1]
+	case t-tr[k-1].T < tr[k].T-t:
+		return tr[k-1]
+	}
+	return tr[k]
+}
+
+// SpeedKt is the ground speed around t, from the track.
+func (o *Object) SpeedKt(t float64) float64 {
+	a, b := o.At(t-1.5), o.At(t+0.5)
+	dt := b.T - a.T
+	if dt < 0.1 {
+		return 0
+	}
+	return dist3(a, b) / dt * 1.94384
+}
+
+// Alive reports whether the object existed at t.
+func (o *Object) Alive(t float64) bool { return t >= o.Start && t <= o.End }
+
+// Recording is a parsed Tacview recording.
 type Recording struct {
-	Title        string
-	Start, End   time.Time // real-world UTC (RecordingTime + frame offsets)
-	MissionTime  string    // ReferenceTime: the in-mission date and time
-	Flights      []*Flight
-	Losses       []Loss
-	WeaponsTotal int
+	Title       string
+	MissionTime string    // ReferenceTime: the in-mission date and time
+	Start       time.Time // RecordingTime: real UTC at t = 0
+	Duration    float64   // seconds
+	Comments    string
+	Objects     map[string]*Object
+	Aircraft    []*Object // in order of appearance
+	Weapons     []*Object
+	Chutes      []*Object
 }
 
-type acmiObject struct {
-	id, typ, name, pilot, group, coalition, color string
-	lon, lat, altM                                float64
-	hasPos                                        bool
-	first, last                                   time.Time
-	flight                                        *Flight
-	shooter                                       *Flight // weapons: the aircraft that fired it
-	weapon                                        string
-	gone                                          bool
+// Time is the real time of recording second t.
+func (r *Recording) Time(t float64) time.Time {
+	return r.Start.Add(time.Duration(t * float64(time.Second)))
 }
+
+// Sec is the recording second of real time at.
+func (r *Recording) Sec(at time.Time) float64 { return at.Sub(r.Start).Seconds() }
+
+// End is the real time the recording stops.
+func (r *Recording) End() time.Time { return r.Time(r.Duration) }
 
 // ParseACMIFile reads a Tacview recording: text .acmi or the zipped
 // .zip.acmi Tacview saves by default.
@@ -83,7 +132,11 @@ func ParseACMIFile(path string) (*Recording, error) {
 	if bytes.Equal(magic, []byte("PK")) {
 		zr, err := zip.OpenReader(path)
 		if err != nil {
-			return nil, fmt.Errorf("the Tacview file looks zipped but cannot be opened: %w", err)
+			// A recording Tacview is still writing (the newest one on a live
+			// server) has no central directory yet: read the first entry's
+			// stream straight from its local header, as far as it goes.
+			f.Seek(0, io.SeekStart)
+			return parseStreamedZip(f)
 		}
 		defer zr.Close()
 		for _, zf := range zr.File {
@@ -102,26 +155,67 @@ func ParseACMIFile(path string) (*Recording, error) {
 	return ParseACMI(f)
 }
 
+// parseStreamedZip reads a zip's first entry from its local header, without
+// the central directory; a stream that stops early (still being written)
+// gives what was recorded so far.
+func parseStreamedZip(f io.Reader) (*Recording, error) {
+	hdr := make([]byte, 30)
+	if _, err := io.ReadFull(f, hdr); err != nil || !bytes.Equal(hdr[:4], []byte("PK\x03\x04")) {
+		return nil, fmt.Errorf("the Tacview file looks zipped but cannot be opened")
+	}
+	method := binary.LittleEndian.Uint16(hdr[8:])
+	skip := int64(binary.LittleEndian.Uint16(hdr[26:])) + int64(binary.LittleEndian.Uint16(hdr[28:]))
+	if _, err := io.CopyN(io.Discard, f, skip); err != nil {
+		return nil, err
+	}
+	var body io.Reader = f
+	if method == 8 {
+		body = flate.NewReader(f)
+	} else if method != 0 {
+		return nil, fmt.Errorf("the Tacview zip uses compression method %d", method)
+	}
+	return ParseACMI(tolerantReader{body})
+}
+
+// tolerantReader ends cleanly where a cut-off deflate stream stops.
+type tolerantReader struct{ r io.Reader }
+
+func (t tolerantReader) Read(p []byte) (int, error) {
+	n, err := t.r.Read(p)
+	if err != nil && err != io.EOF {
+		return n, io.EOF
+	}
+	return n, err
+}
+
+type acmiState struct {
+	v       [9]float64
+	has     [9]bool
+	agl     float64
+	lastT   float64
+	sampled bool
+}
+
 // ParseACMI reads a text ACMI 2.x stream.
 func ParseACMI(r io.Reader) (*Recording, error) {
-	rec := &Recording{}
-	objs := map[string]*acmiObject{}
-	var base time.Time
-	var offset float64
-	now := func() time.Time { return base.Add(time.Duration(offset * float64(time.Second))) }
-	var recentWeapons []*acmiObject // removed weapons, for hit attribution
+	rec := &Recording{Objects: map[string]*Object{}}
+	state := map[string]*acmiState{}
+	var refLat, refLon, t float64
 
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 1024*1024), 16*1024*1024)
 	header := 0
-	var pending string
+	var pending strings.Builder
 	for sc.Scan() {
 		line := sc.Text()
 		if strings.HasSuffix(line, `\`) && !strings.HasSuffix(line, `\\`) { // continued on the next line
-			pending += strings.TrimSuffix(line, `\`) + "\n"
+			pending.WriteString(strings.TrimSuffix(line, `\`) + "\n")
 			continue
 		}
-		line, pending = pending+line, ""
+		if pending.Len() > 0 {
+			line = pending.String() + line
+			pending.Reset()
+		}
 		line = strings.TrimPrefix(line, "\ufeff")
 		if header < 2 && (strings.HasPrefix(line, "FileType=") || strings.HasPrefix(line, "FileVersion=")) {
 			if strings.HasPrefix(line, "FileType=") && !strings.Contains(line, "acmi") {
@@ -136,21 +230,12 @@ func ParseACMI(r io.Reader) (*Recording, error) {
 		switch line[0] {
 		case '#':
 			if v, err := strconv.ParseFloat(line[1:], 64); err == nil {
-				offset = v
+				t = v
 			}
 			continue
 		case '-':
-			if o := objs[line[1:]]; o != nil && !o.gone {
-				o.gone, o.last = true, now()
-				if o.shooter != nil {
-					recentWeapons = append(recentWeapons, o)
-					if len(recentWeapons) > 200 {
-						recentWeapons = recentWeapons[100:]
-					}
-				}
-				if o.flight != nil {
-					o.flight.LastSeen = o.last
-				}
+			if o := rec.Objects[line[1:]]; o != nil && !o.Removed {
+				o.Removed, o.End = true, t
 			}
 			continue
 		}
@@ -163,222 +248,115 @@ func ParseACMI(r io.Reader) (*Recording, error) {
 				k, v, _ := strings.Cut(p, "=")
 				switch k {
 				case "RecordingTime":
-					if t, err := time.Parse(time.RFC3339, v); err == nil {
-						base = t
+					if tt, err := time.Parse(time.RFC3339, v); err == nil {
+						rec.Start = tt
 					}
 				case "ReferenceTime":
 					rec.MissionTime = v
-					if base.IsZero() {
-						if t, err := time.Parse(time.RFC3339, v); err == nil {
-							base = t
+					if rec.Start.IsZero() {
+						if tt, err := time.Parse(time.RFC3339, v); err == nil {
+							rec.Start = tt
 						}
 					}
+				case "ReferenceLongitude":
+					refLon, _ = strconv.ParseFloat(v, 64)
+				case "ReferenceLatitude":
+					refLat, _ = strconv.ParseFloat(v, 64)
 				case "Title":
 					rec.Title = v
-				case "Event":
-					handleEvent(rec, objs, v, now(), &recentWeapons)
+				case "Comments":
+					rec.Comments = v
 				}
 			}
 			continue
 		}
-		o := objs[id]
+		o := rec.Objects[id]
+		st := state[id]
 		if o == nil {
-			o = &acmiObject{id: id, first: now()}
-			objs[id] = o
+			o = &Object{ID: id, Start: t}
+			rec.Objects[id] = o
+			st = &acmiState{agl: -1, lastT: -1e9}
+			state[id] = st
 		}
-		o.last = now()
+		o.End = t
+		moved := false
 		for _, p := range splitProps(props) {
 			k, v, _ := strings.Cut(p, "=")
 			switch k {
 			case "T":
 				parts := strings.Split(v, "|")
-				set := func(i int, dst *float64) {
-					if i < len(parts) && parts[i] != "" {
-						if f, err := strconv.ParseFloat(parts[i], 64); err == nil {
-							*dst = f
+				var idx []int
+				switch len(parts) {
+				case 3:
+					idx = []int{0, 1, 2}
+				case 5:
+					idx = []int{0, 1, 2, 6, 7}
+				case 6:
+					idx = []int{0, 1, 2, 3, 4, 5}
+				default:
+					idx = []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
+				}
+				for i, x := range parts {
+					if i < len(idx) && x != "" {
+						if f, err := strconv.ParseFloat(x, 64); err == nil {
+							st.v[idx[i]], st.has[idx[i]] = f, true
 						}
 					}
 				}
-				set(0, &o.lon)
-				set(1, &o.lat)
-				set(2, &o.altM)
-				o.hasPos = true
+				moved = true
+			case "AGL":
+				st.agl, _ = strconv.ParseFloat(v, 64)
 			case "Type":
-				o.typ = v
+				o.Type = v
 			case "Name":
-				o.name = v
+				o.Name = v
 			case "Pilot":
-				o.pilot = v
+				o.Pilot = v
 			case "Group":
-				o.group = v
-			case "Coalition":
-				o.coalition = v
+				o.Group = v
 			case "Color":
-				o.color = v
+				o.Color = v
 			}
 		}
-		track(rec, objs, o)
+		if !moved || !st.has[0] || !st.has[1] {
+			continue
+		}
+		// Tracks for aircraft (1 s), weapons (0.25 s) and parachutes; the rest
+		// keep only where they first appeared.
+		every := -1.0
+		switch {
+		case o.IsWeapon():
+			every = 0.25
+		case o.IsAircraft() || strings.Contains(o.Type, "Parachutist"):
+			every = 1
+		}
+		if (every < 0 && st.sampled) || (every >= 0 && t-st.lastT < every) {
+			continue
+		}
+		st.lastT, st.sampled = t, true
+		o.Track = append(o.Track, Point{T: t, Lat: st.v[1] + refLat, Lon: st.v[0] + refLon, AltM: st.v[2], AGL: st.agl, U: st.v[6], V: st.v[7]})
 	}
 	if err := sc.Err(); err != nil {
 		return nil, err
 	}
-	rec.Start, rec.End = base, now()
-	for _, f := range rec.Flights {
-		if f.Fate == "" {
-			if o := objs[f.ID]; o != nil && o.gone {
-				f.Fate = "left the recording"
-			} else {
-				f.Fate = "still in the air or on the ground at the end"
-			}
+	rec.Duration = t
+	for _, o := range rec.Objects {
+		if !o.Removed {
+			o.End = t
+		}
+		switch {
+		case o.IsAircraft() && len(o.Track) > 0:
+			rec.Aircraft = append(rec.Aircraft, o)
+		case o.IsWeapon() && len(o.Track) > 0:
+			rec.Weapons = append(rec.Weapons, o)
+		case strings.Contains(o.Type, "Parachutist") && len(o.Track) > 0:
+			rec.Chutes = append(rec.Chutes, o)
 		}
 	}
-	sort.Slice(rec.Flights, func(i, j int) bool { return rec.Flights[i].FirstSeen.Before(rec.Flights[j].FirstSeen) })
+	for _, l := range [][]*Object{rec.Aircraft, rec.Weapons, rec.Chutes} {
+		sort.Slice(l, func(i, j int) bool { return l[i].Start < l[j].Start || (l[i].Start == l[j].Start && l[i].ID < l[j].ID) })
+	}
 	return rec, nil
-}
-
-// track keeps an aircraft's flight record and notes weapons with the
-// aircraft nearest their launch point as the shooter.
-func track(rec *Recording, objs map[string]*acmiObject, o *acmiObject) {
-	switch {
-	case strings.Contains(o.typ, "Air") && (strings.Contains(o.typ, "FixedWing") || strings.Contains(o.typ, "Rotorcraft")):
-		if o.flight == nil {
-			o.flight = &Flight{ID: o.id, FirstSeen: o.first, Fired: map[string]int{}}
-			rec.Flights = append(rec.Flights, o.flight)
-		}
-		f := o.flight
-		f.Pilot, f.Aircraft, f.Group, f.Coalition = o.pilot, o.name, o.group, side(o)
-		f.Human = o.pilot != "" && o.group != "" && !strings.HasPrefix(o.pilot, o.group)
-		f.LastSeen = o.last
-		if alt := o.altM * 3.28084; alt > f.MaxAltFt {
-			f.MaxAltFt = alt
-		}
-	case o.shooter == nil && o.weapon == "" && strings.Contains(o.typ, "Weapon") &&
-		(strings.Contains(o.typ, "Missile") || strings.Contains(o.typ, "Bomb") || strings.Contains(o.typ, "Rocket")):
-		if !o.hasPos {
-			return
-		}
-		o.weapon = o.name
-		if o.weapon == "" {
-			o.weapon = o.typ
-		}
-		rec.WeaponsTotal++
-		var best *acmiObject
-		bestD := 3000.0 // metres: a launch further than this from any aircraft is a ground launcher's
-		for _, a := range objs {
-			if a.flight == nil || a.gone || !a.hasPos {
-				continue
-			}
-			if d := distM(a, o); d < bestD {
-				best, bestD = a, d
-			}
-		}
-		if best != nil {
-			o.shooter = best.flight
-			best.flight.Fired[o.weapon]++
-		} else {
-			o.shooter = &Flight{Pilot: "a ground launcher"}
-		}
-	}
-}
-
-// handleEvent: Tacview's global events, "Kind|objectID|...|text".
-func handleEvent(rec *Recording, objs map[string]*acmiObject, v string, at time.Time, recent *[]*acmiObject) {
-	parts := strings.Split(v, "|")
-	if len(parts) < 2 {
-		return
-	}
-	o := objs[parts[1]]
-	text := ""
-	if len(parts) > 2 {
-		text = parts[len(parts)-1]
-	}
-	if o == nil {
-		return
-	}
-	stamp := at.UTC().Format("15:04:05Z")
-	if o.flight != nil && at.After(o.flight.LastSeen) {
-		o.flight.LastSeen = at
-	}
-	switch parts[0] {
-	case "TakenOff":
-		if o.flight != nil {
-			o.flight.Takeoffs = append(o.flight.Takeoffs, strings.TrimSpace(stamp+" "+airportOf(text)))
-		}
-	case "Landed":
-		if o.flight != nil {
-			o.flight.Landings = append(o.flight.Landings, strings.TrimSpace(stamp+" "+airportOf(text)))
-			o.flight.Fate = "landed"
-		}
-	case "Destroyed":
-		if o.weapon != "" { // a weapon "destroyed" is its impact
-			return
-		}
-		by := shooterOf(o, at, *recent, objs)
-		what := o.name
-		if o.flight != nil {
-			o.flight.Fate, o.flight.KilledBy = "destroyed at "+stamp, by
-			if o.flight.Pilot != "" {
-				what = o.flight.Pilot + " (" + o.name + ")"
-			}
-		}
-		rec.Losses = append(rec.Losses, Loss{At: at, Name: what, Type: o.typ, Coalition: side(o), By: by})
-		if by != "" {
-			for _, a := range objs {
-				if a.flight != nil && a.flight.Pilot == by {
-					a.flight.Kills = append(a.flight.Kills, fmt.Sprintf("%s %s (%s)", stamp, what, side(o)))
-					break
-				}
-			}
-		}
-	}
-}
-
-// shooterOf: the shooter of the weapon that ended nearest the target in the
-// last few seconds, if one ended close enough to count.
-func shooterOf(target *acmiObject, at time.Time, recent []*acmiObject, objs map[string]*acmiObject) string {
-	var best *acmiObject
-	bestD := 600.0
-	consider := func(w *acmiObject) {
-		if w.shooter == nil || !w.hasPos || !target.hasPos || at.Sub(w.last) > 8*time.Second || w.last.Sub(at) > 2*time.Second {
-			return
-		}
-		if d := distM(w, target); d < bestD {
-			best, bestD = w, d
-		}
-	}
-	for _, w := range recent {
-		consider(w)
-	}
-	for _, w := range objs {
-		if w.weapon != "" && !w.gone {
-			consider(w)
-		}
-	}
-	if best == nil {
-		return ""
-	}
-	who := best.shooter.Pilot
-	if who == "" {
-		who = best.shooter.Aircraft
-	}
-	return who
-}
-
-func side(o *acmiObject) string {
-	if o.coalition != "" {
-		return o.coalition
-	}
-	return o.color
-}
-
-func airportOf(text string) string {
-	// DCS export: "Venom 1-1 has taken off from Senaki-Kolkhi."
-	for _, k := range []string{" from ", " at "} {
-		if _, after, ok := strings.Cut(text, k); ok {
-			return strings.TrimSuffix(strings.TrimSpace(after), ".")
-		}
-	}
-	return ""
 }
 
 // splitProps splits on commas that are not escaped ("\,").
@@ -400,11 +378,19 @@ func splitProps(s string) []string {
 	return append(out, b.String())
 }
 
-func distM(a, b *acmiObject) float64 {
+// dist3 is the 3-D distance in metres: DCS's flat metres when both points
+// have them, else from latitude and longitude.
+func dist3(a, b Point) float64 {
+	if (a.U != 0 || a.V != 0) && (b.U != 0 || b.V != 0) {
+		return math.Sqrt((a.U-b.U)*(a.U-b.U) + (a.V-b.V)*(a.V-b.V) + (a.AltM-b.AltM)*(a.AltM-b.AltM))
+	}
+	return math.Hypot(groundM(a, b), a.AltM-b.AltM)
+}
+
+func groundM(a, b Point) float64 {
 	const R = 6371000.0
-	lat1, lat2 := a.lat*math.Pi/180, b.lat*math.Pi/180
-	dLat, dLon := lat2-lat1, (b.lon-a.lon)*math.Pi/180
-	x := dLon * math.Cos((lat1+lat2)/2)
-	h := math.Hypot(x*R, dLat*R)
-	return math.Hypot(h, a.altM-b.altM)
+	lat := (a.Lat + b.Lat) / 2 * math.Pi / 180
+	x := (b.Lon - a.Lon) * math.Pi / 180 * math.Cos(lat) * R
+	y := (b.Lat - a.Lat) * math.Pi / 180 * R
+	return math.Hypot(x, y)
 }

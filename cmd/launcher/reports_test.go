@@ -16,7 +16,7 @@ import (
 
 const testACMI = "FileType=text/acmi/tacview\nFileVersion=2.2\n" +
 	"0,ReferenceTime=2016-06-21T10:00:00Z,RecordingTime=2026-10-23T00:15:00Z,Title=Test Mission\n#0\n" +
-	"101,T=42.0|42.2|50,Type=Air+FixedWing,Name=F-16C_50,Pilot=Dabs,Group=Venom 1,Coalition=Allies\n" +
+	"101,T=42.0|42.2|50,Type=Air+FixedWing,Name=F-16C_50,Pilot=Dabs,Group=Venom 1,Color=Blue,Coalition=Allies\n" +
 	"#600\n0,Event=TakenOff|101|Dabs has taken off from Senaki-Kolkhi.\n" +
 	"#3000\n0,Event=Landed|101|Dabs has landed at Senaki-Kolkhi.\n"
 
@@ -44,7 +44,7 @@ func TestReportFlow(t *testing.T) {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		sent = body.Messages[0].Content
-		w.Write([]byte(`{"content":[{"type":"text","text":"## Summary\nDabs flew a clean sortie."}],"stop_reason":"end_turn","usage":{"input_tokens":900,"output_tokens":120}}`))
+		w.Write([]byte(`{"content":[{"type":"text","text":"{\"bluf\": \"Dabs flew a clean sortie.\", \"discord\": \"**AAR** Dabs flew a clean sortie.\"}"}],"stop_reason":"end_turn","usage":{"input_tokens":900,"output_tokens":120}}`))
 	}))
 	defer claude.Close()
 	defer func(a string) { debrief.API = a }(debrief.API)
@@ -69,7 +69,7 @@ func TestReportFlow(t *testing.T) {
 		ID, Title, Records string
 	}
 	json.Unmarshal(rec.Body.Bytes(), &prep)
-	if !strings.Contains(prep.Records, "Dabs - F-16C_50") || !strings.Contains(prep.Records, "request taxi") ||
+	if !strings.Contains(prep.Records, "Dabs | blue | F-16C") || !strings.Contains(prep.Records, "request taxi") ||
 		!strings.HasPrefix(prep.Title, "Test Mission - 23 Oct 2026 00:15Z") {
 		t.Fatalf("title %q records:\n%s", prep.Title, prep.Records)
 	}
@@ -98,7 +98,7 @@ func TestReportFlow(t *testing.T) {
 	rec = httptest.NewRecorder()
 	handleAARPage(rec, httptest.NewRequest(http.MethodGet, "/reports/aar?name="+out.Meta.Name, nil))
 	page := rec.Body.String()
-	for _, want := range []string{"AFTER ACTION REPORT", "AAR-20261023-0015", "<th>Sorties</th><td>1 takeoffs</td>", "<h2>Summary</h2>", "clean sortie", "Reviewed and approved"} {
+	for _, want := range []string{"AFTER ACTION REPORT", "AAR-20261023-0015", "<b>BLUF:</b> Dabs flew a clean sortie.", "Pilots and carrier", "Reviewed and approved"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("AAR page lacks %q", want)
 		}

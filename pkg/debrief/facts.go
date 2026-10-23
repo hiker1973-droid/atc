@@ -28,6 +28,9 @@ func ReportNumber(in Inputs) string {
 }
 
 func sessionStart(in Inputs) time.Time {
+	if in.Session != nil && !in.Session.Start.IsZero() {
+		return in.Session.Start
+	}
 	if in.Tacview != nil && !in.Tacview.Start.IsZero() {
 		return in.Tacview.Start
 	}
@@ -90,69 +93,52 @@ func Facts(in Inputs, sources []string) []Fact {
 		theatre = in.Mission.Theatre
 	}
 	add("Theatre", theatre)
-	start, end := sessionStart(in), in.To
-	if in.Tacview != nil && !in.Tacview.End.IsZero() {
-		end = in.Tacview.End
-	}
-	if !start.IsZero() {
-		add("Date", start.UTC().Format("2 January 2006"))
-		add("Time", fmt.Sprintf("%s - %s (%s)", start.UTC().Format("1504Z"), end.UTC().Format("1504Z"), dur(end.Sub(start))))
+	if s := in.Session; s != nil && !s.Start.IsZero() {
+		add("Date", s.Start.In(s.Loc).Format("Monday 2 January 2006"))
+		add("Time", fmt.Sprintf("%s - %s %s (%s)", s.Clock(s.Start), s.Clock(s.End), strings.TrimPrefix(s.ZoneNote(), "times "), dur(s.End.Sub(s.Start))))
 	}
 	if m := in.Mission; m != nil && m.Date != "" {
-		add("Mission time", m.Date+", "+m.StartTime+" local")
+		add("Mission time", m.Date+", "+m.StartTime+" in the mission")
 	}
 	add("Weather", WeatherLine(in.Mission))
 
-	if r := in.Tacview; r != nil {
-		var pilots, types []string
-		seenP, seenT := map[string]bool{}, map[string]bool{}
-		sorties, losses := 0, 0
+	if s := in.Session; s != nil && len(s.Pilots) > 0 {
+		var types []string
+		sorties, air, ground := 0, 0, 0
+		down := map[string]int{}
+		var flight time.Duration
 		weapons := map[string]int{}
-		airKills, groundKills := 0, 0
-		side := ""
-		for _, f := range r.Flights {
-			if !f.Human {
-				continue
+		for _, p := range s.Pilots {
+			for _, a := range p.Aircraft {
+				types = addUnique(types, a)
 			}
-			side = f.Coalition
-			if !seenP[f.Pilot] {
-				seenP[f.Pilot] = true
-				pilots = append(pilots, f.Pilot)
-			}
-			if !seenT[f.Aircraft] {
-				seenT[f.Aircraft] = true
-				types = append(types, f.Aircraft)
-			}
-			sorties += len(f.Takeoffs)
-			if strings.HasPrefix(f.Fate, "destroyed") {
-				losses++
-			}
-			for k, n := range f.Fired {
-				weapons[k] += n
-			}
+			sorties += p.Sorties
+			air += p.Kills
+			ground += p.Ground
+			down[p.Side] += p.ShotDown
+			flight += p.Flight
 		}
-		for _, l := range r.Losses {
-			if l.By == "" || !seenP[l.By] {
-				continue
-			}
-			if strings.Contains(l.Type, "Air") {
-				airKills++
-			} else {
-				groundKills++
-			}
+		for _, m := range s.Missiles {
+			weapons[m.Weapon] += m.Fired
 		}
 		sort.Strings(types)
-		add("Players", fmt.Sprintf("%d (%s)", len(pilots), strings.Join(types, ", ")))
-		add("Sorties", fmt.Sprintf("%d takeoffs", sorties))
+		add("Players", fmt.Sprintf("%d (%s)", len(s.Pilots), strings.Join(types, ", ")))
+		add("Sorties", fmt.Sprintf("%d, %s flying", sorties, hm(flight)))
 		add("Weapons expended", weaponLine(weapons))
-		add("Kills (likely)", fmt.Sprintf("%d air, %d ground/sea", airKills, groundKills))
-		friendlyLost := 0
-		for _, l := range r.Losses {
-			if side != "" && l.Coalition == side && strings.Contains(l.Type, "Air") {
-				friendlyLost++
+		if s.HasEvents {
+			add("Kills", fmt.Sprintf("%d air, %d ground/sea", air, ground))
+			if s.PvP {
+				add("Losses", fmt.Sprintf("Blue %d, Red %d players shot down", down["blue"], down["red"]))
+			} else {
+				add("Losses", fmt.Sprintf("%d players shot down", down["blue"]+down["red"]+down[""]))
 			}
 		}
-		add("Losses", fmt.Sprintf("%d player aircraft, %d friendly aircraft in all", losses, friendlyLost))
+		if len(s.Engagements) > 0 {
+			add("Engagements", fmt.Sprintf("%d", len(s.Engagements)))
+		}
+		if len(s.Traps) > 0 {
+			add("Carrier", fmt.Sprintf("%d graded passes", len(s.Traps)))
+		}
 	}
 	if rad := in.Radio; rad != nil {
 		calls, tx := 0, 0

@@ -140,20 +140,28 @@
   306.300</b> and <b>Deckboss on 128.600</b>. Give your pilots these on their kneeboard or preset card, and update them
   whenever you change one in Settings.</p>
 
-<h2>6. Reports: written debriefs</h2>
-<p>The <b>Reports</b> page writes a squadron-style debrief of a session with Claude, using your own Claude API key
-  (Settings &gt; Reports; create one at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>,
-  billed by Anthropic per report).</p>
+<h2>6. Reports: After Action Reports</h2>
+<p>The <b>Reports</b> page makes an After Action Report of a session: a summary page with the result, a relief map of every
+  kill and the pilot, engagement and missile tables; a page per engagement with the fight's tracks and missiles and every
+  shot (range, launch altitude and speed, kill or miss); the pilots' sorties, flight time and carrier grades; the Safety
+  items (blue-on-blue, ground impacts, ejections); and the AAR itself - BLUF, plan, sustain / improve and
+  recommendations with owners. Every number and map is worked out on this PC; Claude writes the words, with your own
+  Claude API key (Settings &gt; Reports; create one at
+  <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>, billed by Anthropic per report -
+  usually a few cents).</p>
 <ol>
-  <li>Pick the session's <b>Tacview recording</b> (.acmi or .zip.acmi) and/or the DCS server's <b>dcs.log</b>: choose
-    one found on this PC, or upload a file.</li>
-  <li>Leave <b>Include the radio logs</b> ticked to add what was said on Readback's frequencies over the same hours.</li>
+  <li>Pick the session's records, each found on this PC or uploaded: the <b>mission file</b> (.miz: what was planned),
+    the <b>Tacview recording</b> (.acmi or .zip.acmi: the tracks) and the <b>DCS server's dcs.log</b> (the shots, kills,
+    takeoffs, landings and grades DCS scored). It must be the <i>server's</i> log
+    (<code>Saved Games\DCS.dcs_serverrelease\Logs</code> on the server); a game client's dcs.log has none of them.</li>
+  <li>Leave <b>Include the radio logs</b> ticked to add what was said on Readback's frequencies.</li>
   <li>Optionally say what to focus on, e.g. "Venom flight's carrier recovery".</li>
-  <li>Press <b>Preview</b>. The records are boiled down on this PC, and you can read exactly what will be sent.</li>
-  <li>Press <b>Write the debrief</b>. It takes under a minute; print it, save it as PDF or download it.</li>
+  <li>Press <b>Preview</b>: the report's pages appear with everything but Claude's words, and you can read exactly what
+    will be sent.</li>
+  <li>Press <b>Write the AAR</b>. Then <b>Download PDF</b>, <b>Print</b>, or post it: the <b>Discord post</b> box has
+    the announcement ready to copy, with the PDF or a picture of the summary page to attach.</li>
 </ol>
-<p>Debriefs are kept in the <code>reports</code> folder. Kills are matched to shooters from weapon impact points, so
-  the debrief calls them "likely".</p>
+<p>Reports are kept in the <code>reports</code> folder.</p>
 
 <h2>7. When something is wrong</h2>
 <ul>

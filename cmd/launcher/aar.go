@@ -152,7 +152,7 @@ func handleAARPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	page, err := renderAAR(meta, md)
+	page, err := reportPage(meta, md)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -160,6 +160,42 @@ func handleAARPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(page)
+}
+
+// reportPage is a report's page: the saved debrief-style AAR (.html), or an
+// earlier report drawn from its Markdown.
+func reportPage(meta reportMeta, md string) ([]byte, error) {
+	if meta.HTML {
+		return os.ReadFile(filepath.Join(reportsDir(), meta.Name+".html"))
+	}
+	return renderAAR(meta, md)
+}
+
+// handleAARPNG: GET /api/reports/png?name= the report's first page as a
+// picture, for the Discord post. Made by Edge on first request and kept.
+func handleAARPNG(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	meta, md, err := loadReport(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	pngPath := filepath.Join(reportsDir(), name+".png")
+	img, err := os.ReadFile(pngPath)
+	if err != nil {
+		page, err := reportPage(meta, md)
+		if err == nil {
+			img, err = screenshotPNG(r.Context(), page)
+		}
+		if err != nil {
+			http.Error(w, "could not make the picture: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		os.WriteFile(pngPath, img, 0o644)
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.png"`, reportFileName(meta)))
+	w.Write(img)
 }
 
 // handleAARPDF: GET /api/reports/pdf?name= the report as a PDF, printed by
@@ -174,7 +210,7 @@ func handleAARPDF(w http.ResponseWriter, r *http.Request) {
 	pdfPath := filepath.Join(reportsDir(), name+".pdf")
 	pdf, err := os.ReadFile(pdfPath)
 	if err != nil || r.URL.Query().Get("fresh") == "1" {
-		page, err := renderAAR(meta, md)
+		page, err := reportPage(meta, md)
 		if err == nil {
 			pdf, err = printPDF(r.Context(), page)
 		}
@@ -233,6 +269,33 @@ func printPDF(ctx context.Context, page []byte) ([]byte, error) {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+	return os.ReadFile(out)
+}
+
+// screenshotPNG takes the first page of a report (1056 x 816, landscape
+// Letter at 96 dpi with the page's margin) with headless Edge.
+func screenshotPNG(ctx context.Context, page []byte) ([]byte, error) {
+	edge := findEdge()
+	if edge == "" {
+		return nil, fmt.Errorf("Microsoft Edge was not found")
+	}
+	dir, err := os.MkdirTemp("", "readback-aar-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	src, out := filepath.Join(dir, "aar.html"), filepath.Join(dir, "aar.png")
+	if err := os.WriteFile(src, page, 0o644); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, edge, "--headless", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
+		"--user-data-dir="+filepath.Join(dir, "profile"), "--window-size=1010,790", "--screenshot="+out,
+		"file:///"+filepath.ToSlash(src))
+	if b, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("%v: %s", err, strings.TrimSpace(string(b)))
 	}
 	return os.ReadFile(out)
 }

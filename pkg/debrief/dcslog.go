@@ -19,6 +19,7 @@ type ServerLog struct {
 	Events     []string  // "21:44:10Z NET: ..." in order, capped
 	Problems   []Problem // ERROR and ALERT lines grouped, most frequent first
 	Levels     map[string]int
+	Sessions   []EventSession // the server's event: lines, one run per mission start (events.go)
 }
 
 // Problem is one kind of error with how often it came up.
@@ -34,12 +35,15 @@ const (
 )
 
 var (
-	dcsLine = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+ (\w+)\s+([^:]+): (.*)$`)
+	dcsLine = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+) (\w+)\s+([^:]+): (.*)$`)
 	numbers = regexp.MustCompile(`\d+(\.\d+)?`)
 	// interesting picks the lines about the session rather than the engine.
 	interesting = regexp.MustCompile(`(?i)\b(mission|loadMission|player|client|connect|disconnect|kick|ban|slot|crash|eject|shot down|killed|pilot dead|server started|server stopped|pause|unpause|simulation|start_mission|stop_mission)\b`)
 	// noise is engine chatter that matches the words above anyway.
 	noise = regexp.MustCompile(`(?i)degenerate triangle|Loaded C:|Added sound path|_crash'|lua-.*\.dll|terrain|texture|shader|font`)
+	// harmless is DCS's own start-up complaining that every server logs
+	// (missing raster charts, mod payload warnings): not worth a report.
+	harmless = regexp.MustCompile(`(?i)No suitable driver found to mount|negative drag of payload|unit replace .* not allowed|already declared in table|can't (open|load) proto file|Cell ".*" (references|is linked|link to)`)
 )
 
 // ParseDCSLogFile reads a dcs.log.
@@ -63,7 +67,7 @@ func ParseDCSLog(r io.Reader) (*ServerLog, error) {
 		if m == nil {
 			continue
 		}
-		t, err := time.Parse("2006-01-02 15:04:05", m[1])
+		t, err := time.Parse("2006-01-02 15:04:05.999", m[1])
 		if err != nil {
 			continue
 		}
@@ -73,8 +77,21 @@ func ParseDCSLog(r io.Reader) (*ServerLog, error) {
 		s.End = t
 		level, source, text := m[2], strings.TrimSpace(m[3]), strings.TrimSpace(m[4])
 		s.Levels[level]++
+		if strings.HasPrefix(text, "event:") {
+			e := parseEventLine(text[len("event:"):])
+			if e.Type == "mission start" || len(s.Sessions) == 0 {
+				s.Sessions = append(s.Sessions, EventSession{Start: t.Add(-time.Duration(e.T * float64(time.Second)))})
+			}
+			cur := &s.Sessions[len(s.Sessions)-1]
+			e.At = cur.Start.Add(time.Duration(e.T * float64(time.Second)))
+			cur.Events = append(cur.Events, e)
+			continue
+		}
 		switch level {
 		case "ERROR", "ALERT", "ERROR_ONCE":
+			if harmless.MatchString(text) {
+				break
+			}
 			key := level + "|" + source + "|" + numbers.ReplaceAllString(text, "#")
 			if p := problems[key]; p != nil {
 				p.Count++
