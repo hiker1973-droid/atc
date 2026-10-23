@@ -238,8 +238,8 @@ function prereqHTML(c) {
       `Microsoft .NET 10 is missing: DCS-SRS 2.4 and its installer need it. ${link(LINKS.dotnet, 'Download the .NET 10 Desktop Runtime')} (Windows x64), install it, then install DCS-SRS.`) +
     line(c.externalAudio, 'DCS-SRS ExternalAudio found on this PC.',
       `DCS-SRS ExternalAudio not found: Readback transmits through it. ${link(LINKS.srs, 'Download DCS-SRS')} and run its installer (after .NET 10).`) +
-    line(c.ffmpeg, 'ffmpeg found: calls get the radio effect.',
-      `ffmpeg not found (optional): calls go out clean, without the radio effect. ${link(LINKS.ffmpeg, 'Get ffmpeg')} (ffmpeg-master-latest-win64-gpl.zip) and unzip it to C:\\ffmpeg-master-latest-win64-gpl.`);
+    line(c.ffmpeg, 'ffmpeg found.',
+      `ffmpeg not found (required): Readback needs it to hear your pilots. Easiest: open Command Prompt and run <code>winget install --id Gyan.FFmpeg -e</code>, then reload this page. Or ${link(LINKS.ffmpeg, 'download ffmpeg')} (ffmpeg-master-latest-win64-gpl.zip) and unzip it to C:\\ffmpeg-master-latest-win64-gpl.`);
 }
 async function saveVar(btn) {
   const f = btn.closest('.field'), name = f.dataset.var, input = f.querySelector('input'), st = f.querySelector('.state');
@@ -344,7 +344,7 @@ function renderSummary() {
     row(c.srs && c.eam, 'SRS server and password') + row(c.tacview, c.tacview ? 'Tacview telemetry' : 'No Tacview: Command and the GCI cannot see aircraft', true) +
     row(c.dotnet, c.dotnet ? 'Microsoft .NET 10' : 'Microsoft .NET 10 missing: ' + link(LINKS.dotnet, 'download the .NET 10 Desktop Runtime')) +
     row(c.externalAudio, c.externalAudio ? 'DCS-SRS ExternalAudio on this PC' : 'DCS-SRS missing: ' + link(LINKS.srs, 'download DCS-SRS')) +
-    row(c.ffmpeg, c.ffmpeg ? 'ffmpeg (radio effect)' : 'No ffmpeg: calls go out without the radio effect', true) + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
+    row(c.ffmpeg, c.ffmpeg ? 'ffmpeg' : 'ffmpeg missing: pilots cannot be heard. Run <code>winget install --id Gyan.FFmpeg -e</code>') + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
     row(tested, tested ? 'Test call sent' : 'Test call not sent yet', true) +
     (licence && licence.state !== 'source'
       ? row(licence.state === 'licensed', esc(licence.message), licence.state === 'trial') : '');

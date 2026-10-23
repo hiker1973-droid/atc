@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/vsfg7/atc/pkg/airfield"
+	"github.com/vsfg7/atc/pkg/ffmpegpath"
 	"github.com/vsfg7/atc/pkg/startgen"
 )
 
@@ -59,9 +60,6 @@ func writeSetup(s setupState) error {
 // (atc.exe's --external-audio default).
 const externalAudioPath = `C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`
 
-// ffmpegPath is atc.exe's --ffmpeg default: the radio effect (static, band
-// limit, levelling). Without it every call goes out clean.
-const ffmpegPath = `C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`
 
 // dotnet10: the .NET 10 runtime DCS-SRS 2.4's ExternalAudio and installer run
 // on (a PC with only .NET 8 cannot start either).
@@ -118,7 +116,7 @@ func setupSnapshot() map[string]any {
 		"eam":           userEnv("SRS_EAM") != "",
 		"tacview":       userEnv("SKYEYE_TACVIEW") != "",
 		"externalAudio": fileExists(externalAudioPath),
-		"ffmpeg":        fileExists(ffmpegPath),
+		"ffmpeg":        ffmpegpath.Find(rootDir) != "", // required: atc.exe hears pilots through it
 		"dotnet":        dotnet10(),
 		"atcExe":        fileExists(filepath.Join(rootDir, "atc.exe")),
 	}

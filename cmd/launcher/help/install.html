@@ -28,8 +28,10 @@
   <tr><td>An ElevenLabs API key</td><td>Optional: more natural voices for the controllers that have one.</td></tr>
   <tr><td>Tacview real-time telemetry</td><td>Optional but recommended: Command, AWACS, traffic calls and position checks
     use it to see the aircraft. Turn on real-time telemetry in Tacview on the DCS server.</td></tr>
-  <tr><td>ffmpeg</td><td>Optional: gives transmissions their radio sound. Without it, calls go out clean. Unzip
-    <i>ffmpeg-master-latest-win64-gpl</i> from <a href="https://github.com/BtbN/FFmpeg-Builds/releases">github.com/BtbN/FFmpeg-Builds/releases</a>
+  <tr><td><b>ffmpeg</b></td><td>Required: Readback uses it to hear your pilots' radio calls (and for the radio sound).
+    Readback-Setup offers to install it for you. To do it yourself, open Command Prompt and run
+    <code>winget install --id Gyan.FFmpeg -e</code>, or unzip <i>ffmpeg-master-latest-win64-gpl</i> from
+    <a href="https://github.com/BtbN/FFmpeg-Builds/releases">github.com/BtbN/FFmpeg-Builds/releases</a>
     to <code>C:\ffmpeg-master-latest-win64-gpl</code>.</td></tr>
 </table>
 
@@ -39,7 +41,8 @@
   <li>If Windows shows <b>"Windows protected your PC"</b>, click <b>More info</b>, then <b>Run anyway</b>.</li>
   <li>Readback installs to <code>%LOCALAPPDATA%\Readback ATC</code> and adds <b>Readback ATC</b> to the Start menu
     and the desktop. It asks whether to start Readback when Windows starts.</li>
-  <li>It checks this PC for .NET 10, DCS-SRS and ffmpeg, and offers to open the download page for anything missing.</li>
+  <li>It checks this PC for .NET 10, DCS-SRS and ffmpeg. It offers to install ffmpeg (through Windows' winget) and to
+    open the download page for anything else missing.</li>
   <li>It starts Readback and opens <b>Setup</b> in your browser.</li>
 </ol>
 <div class="note">The dashboard is always at <b>http://localhost:7000</b> on this PC. Other PCs on your network can open

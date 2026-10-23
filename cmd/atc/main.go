@@ -471,6 +471,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	applyFreqOverrides() // the launcher Settings page's frequencies.json
 	commandHandoffFollows()
+	resolveFFmpeg(cmd.Flags())
 
 	af := airfield.ByICAO(flagAirfield)
 	if af == nil {

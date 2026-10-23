@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/vsfg7/atc/pkg/ffmpegpath"
 )
 
 //go:embed payload
@@ -311,6 +313,7 @@ func desktopDir() string { return filepath.Join(os.Getenv("USERPROFILE"), "Deskt
 const (
 	dotnetURL = "https://dotnet.microsoft.com/download/dotnet/10.0"
 	srsURL    = "https://github.com/ciribob/DCS-SimpleRadioStandalone/releases"
+	ffmpegURL = "https://github.com/BtbN/FFmpeg-Builds/releases"
 )
 
 func checkPrerequisites() {
@@ -321,14 +324,44 @@ func checkPrerequisites() {
 	srs := exists(`C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`)
 	report(srs, "DCS-SRS (ExternalAudio)",
 		"Readback talks on SRS through it: install DCS-SRS (after .NET 10) from "+srsURL)
-	report(exists(`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`), "ffmpeg (radio effect)",
-		"optional: without it calls go out clean. Unzip an ffmpeg build to C:\\ffmpeg-master-latest-win64-gpl")
+	ffmpeg := ffmpegpath.Find(*flagDir) != ""
+	report(ffmpeg, "ffmpeg", "required: Readback hears your pilots through it")
 	// The console's links cannot be clicked: offer to open the pages.
 	if len(dotnet) == 0 && !*flagQuiet && ask("\nOpen the .NET 10 download page now? [Y/n] ", true) {
 		openURL(dotnetURL)
 	}
 	if !srs && !*flagQuiet && ask("Open the DCS-SRS download page now? [Y/n] ", true) {
 		openURL(srsURL)
+	}
+	if !ffmpeg && !*flagQuiet {
+		installFFmpeg()
+	}
+}
+
+// installFFmpeg offers Windows' own package manager (winget, on Windows 10
+// and 11): one command, shown and confirmed, run in this window so its own
+// prompts are answered by the user. Without winget, the download page.
+func installFFmpeg() {
+	if _, err := exec.LookPath("winget"); err != nil {
+		if ask("Open the ffmpeg download page now? [Y/n] ", true) {
+			openURL(ffmpegURL)
+		}
+		return
+	}
+	if !ask("Install ffmpeg now with winget (winget install --id "+ffmpegpath.WingetID+" -e)? [Y/n] ", true) {
+		fmt.Println("  Later: open Command Prompt and run  winget install --id " + ffmpegpath.WingetID + " -e")
+		return
+	}
+	cmd := exec.Command("winget", "install", "--id", ffmpegpath.WingetID, "-e")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err := cmd.Run()
+	switch {
+	case ffmpegpath.Find(*flagDir) != "":
+		fmt.Println("  ok    ffmpeg installed")
+	case err != nil:
+		fmt.Printf("  winget did not finish (%v). Run  winget install --id %s -e  yourself, or get it from %s\n", err, ffmpegpath.WingetID, ffmpegURL)
+	default:
+		fmt.Println("  winget finished but ffmpeg was not found yet: restart the PC, then check Setup")
 	}
 }
 
