@@ -14,7 +14,8 @@ import "github.com/paulmach/orb"
 // mozdok_stands.json), converted from DCS x/y to lat/lon here (the same
 // conversion puts Senaki's centre within 40 m of its TACAN). The runway runs
 // 090.8 true. MagVar is the map-wide 7.5: Mozdok sits between DimOn's 2025
-// +7 and +8 lines. Tower 266.000 UHF is DCS's (Radio.lua); no ATIS, no ILS.
+// +7 and +8 lines. Tower 266.000 UHF is DCS's (Radio.lua); no ILS. The ATIS on
+// 237.000 is SkyEye's own, moved from Tbilisi (operator 2026-10-23).
 // The ME edges may not be the pavement ends (Tbilisi's were not).
 var XRMF = &Airfield{
 	ICAO:            "XRMF",
@@ -26,7 +27,7 @@ var XRMF = &Airfield{
 	PatternAltFt:    1500,
 	TowerFreqMHz:    266.000,
 	ApproachFreqMHz: 266.000,
-	ATISFreqMHz:     0, // none
+	ATISFreqMHz:     237.000, // SkyEye's, taken over from Tbilisi (2026-10-23); DCS has none
 	DepartureDistNm: 7,
 	DepartureAngels: 3,
 	// Blue: theatre-wide Command, as the other Caucasus fields. Set red, the

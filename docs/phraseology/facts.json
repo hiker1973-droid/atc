@@ -128,14 +128,14 @@
     "freq": 233
    },
    {
+    "name": "Mozdok ATIS",
+    "icao": "XRMF",
+    "freq": 237
+   },
+   {
     "name": "Senaki ATIS",
     "icao": "UGKS",
     "freq": 234
-   },
-   {
-    "name": "Tbilisi ATIS",
-    "icao": "UGTB",
-    "freq": 237
    }
   ]
  },

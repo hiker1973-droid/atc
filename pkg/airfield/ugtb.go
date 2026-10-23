@@ -18,7 +18,7 @@ var UGTB = &Airfield{
 	PatternAltFt:    1500, // AGL, as the other fields
 	TowerFreqMHz:    267.000,
 	ApproachFreqMHz: 267.000,
-	ATISFreqMHz:     237.000,
+	ATISFreqMHz:     0, // its SkyEye ATIS and 237.000 went to Mozdok (operator 2026-10-23)
 	DepartureDistNm: 7,
 	DepartureAngels: 5, // field is at 1,574 ft — angels 3 would be 1,400 ft AGL
 	HandoffCallsign: "command",
