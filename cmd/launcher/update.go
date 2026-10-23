@@ -79,6 +79,12 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 		return
 	}
+	// An Update is git pull + go build: a SkyEye-Setup install has neither,
+	// and is updated by running a newer SkyEye-Setup.exe.
+	if _, err := os.Stat(filepath.Join(rootDir, ".git")); err != nil {
+		http.Error(w, "this copy was installed by SkyEye-Setup.exe: run a newer SkyEye-Setup.exe to update it", http.StatusConflict)
+		return
+	}
 	updMu.Lock()
 	if upd.Running {
 		updMu.Unlock()

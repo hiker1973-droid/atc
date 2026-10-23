@@ -120,7 +120,7 @@ func startAirborneSources() {
 		airMu.Unlock()
 		go s.run()
 	}
-	add("", *flagTacviewAddr) // "" is this box, matching the UI rig value
+	add("", probeAddr("tacview-addr", "SKYEYE_TACVIEW")) // "" is this box, matching the UI rig value
 	for _, r := range fleetRigs {
 		if isSelf(r) {
 			continue

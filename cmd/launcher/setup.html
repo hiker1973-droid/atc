@@ -109,7 +109,8 @@
   <section data-step="2">
     <h2>DCS server</h2>
     <p class="sub">SkyEye joins your DCS-SRS server as radio stations and reads the air picture from Tacview's
-      real-time telemetry. Run it on the DCS server PC, or point it at one.</p>
+      real-time telemetry. <b>Install SkyEye on the PC that runs the SRS server</b>: SRS only takes SkyEye's
+      transmissions from the same PC, so the server is localhost and its port (5002 unless you changed it).</p>
     <div class="field" data-var="SKYEYE_SRS">
       <label>SRS server <small>host:port, e.g. localhost:5002</small></label>
       <div class="line"><input type="text" spellcheck="false" placeholder="localhost:5002"><button class="primary" onclick="saveVar(this)">Save</button></div>

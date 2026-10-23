@@ -385,11 +385,26 @@ func healthLoop() {
 	}
 }
 
+// probeAddr is where the health check looks for SRS or Tacview: the
+// --srs-addr / --tacview-addr the rig's start_launcher.bat passes, else the
+// address saved in Setup (a SkyEye-Setup install starts the launcher without
+// them), else the flag's default.
+func probeAddr(flagName, envName string) string {
+	given := false
+	flag.Visit(func(f *flag.Flag) { given = given || f.Name == flagName })
+	if !given {
+		if v := userEnv(envName); v != "" {
+			return v
+		}
+	}
+	return flag.Lookup(flagName).Value.String()
+}
+
 func updateHealth() {
 	h := Health{
 		At:        time.Now(),
-		SRS:       tcpProbe(*flagSRSAddr, 2*time.Second),
-		Tacview:   tcpProbe(*flagTacviewAddr, 2*time.Second),
+		SRS:       tcpProbe(probeAddr("srs-addr", "SKYEYE_SRS"), 2*time.Second),
+		Tacview:   tcpProbe(probeAddr("tacview-addr", "SKYEYE_TACVIEW"), 2*time.Second),
 		Tacview64: tacview64Probe(),
 		OpenAI:    openaiProbe(3 * time.Second),
 	}

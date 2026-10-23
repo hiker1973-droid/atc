@@ -1,0 +1,270 @@
+// SkyEye-Setup.exe: installs SkyEye ATC on a PC that has none of the vSFG-7
+// setup (operator 2026-10-23: "are we building a .exe", "i can install on my
+// laptop"). It carries atc.exe and launcher.exe (build_installer.bat puts
+// them in payload/), copies them to %LOCALAPPDATA%\SkyEye (no admin needed),
+// adds Start-menu and desktop shortcuts, checks the prerequisites, starts the
+// launcher and opens its Setup page, which does the rest: keys, SRS server,
+// squadron, theatre (generated start files) and a test call.
+//
+//	SkyEye-Setup.exe               install or update, then start
+//	SkyEye-Setup.exe --uninstall   remove the programs and shortcuts (settings and logs stay)
+package main
+
+import (
+	"bufio"
+	"embed"
+	"errors"
+	"flag"
+	"fmt"
+	"io/fs"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+//go:embed payload
+var payload embed.FS
+
+// version is set by build_installer.bat (-ldflags -X main.version=...).
+var version = "dev"
+
+const (
+	appName    = "SkyEye ATC"
+	listenPort = 7000
+)
+
+var programs = []string{"atc.exe", "launcher.exe"}
+
+var (
+	flagDir       = flag.String("dir", filepath.Join(os.Getenv("LOCALAPPDATA"), "SkyEye"), "Install folder")
+	flagUninstall = flag.Bool("uninstall", false, "Remove the programs and shortcuts; settings and logs stay")
+	flagQuiet     = flag.Bool("quiet", false, "Ask nothing: no start-with-Windows shortcut, no pause at the end")
+	flagNoStart   = flag.Bool("no-start", false, "Install only; do not start the launcher")
+	flagNoLinks   = flag.Bool("no-shortcuts", false, "Add no shortcuts (for testing)")
+)
+
+func main() {
+	flag.Parse()
+	fmt.Printf("%s setup %s\n\n", appName, version)
+	var err error
+	if *flagUninstall {
+		err = uninstall(*flagDir)
+	} else {
+		err = install(*flagDir)
+	}
+	if err != nil {
+		fmt.Printf("\nSetup failed: %v\n", err)
+	}
+	if !*flagQuiet {
+		fmt.Print("\nPress Enter to close.")
+		bufio.NewReader(os.Stdin).ReadString('\n')
+	}
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func install(dir string) error {
+	for _, p := range programs {
+		if _, err := fs.Stat(payload, "payload/"+p); err != nil {
+			return fmt.Errorf("this SkyEye-Setup.exe was built without %s - rebuild it with build_installer.bat", p)
+		}
+	}
+	fmt.Printf("Installing to %s\n", dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if n := stopRunning(dir); n > 0 {
+		fmt.Printf("  closed %d running SkyEye program(s) from this folder\n", n)
+		time.Sleep(time.Second) // let Windows release the files
+	}
+	for _, p := range programs {
+		data, err := payload.ReadFile("payload/" + p)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(dir, p)
+		tmp := dst + ".new"
+		if err := os.WriteFile(tmp, data, 0o755); err != nil {
+			return err
+		}
+		if err := os.Rename(tmp, dst); err != nil {
+			os.Remove(tmp)
+			return fmt.Errorf("could not replace %s (is it still running?): %w", p, err)
+		}
+		fmt.Printf("  %s\n", p)
+	}
+	os.WriteFile(filepath.Join(dir, "version.txt"), []byte(version+"\r\n"), 0o644)
+	self, _ := os.Executable()
+	copyFile(self, filepath.Join(dir, "SkyEye-Setup.exe")) // kept for --uninstall
+
+	launcher := filepath.Join(dir, "launcher.exe")
+	args := launcherArgs()
+	if *flagNoLinks {
+		fmt.Println("\nNo shortcuts (--no-shortcuts)")
+	} else {
+		addShortcuts(dir, launcher, args)
+	}
+
+	checkPrerequisites()
+
+	if *flagNoStart {
+		fmt.Printf("\nInstalled. Start it from the Start menu: %s\n", appName)
+		return nil
+	}
+	if portInUse(listenPort) {
+		fmt.Printf("\nSomething is already using port %d - another launcher? Opening it.\n", listenPort)
+	} else {
+		fmt.Println("\nStarting the launcher...")
+		cmd := exec.Command("cmd", append([]string{"/c", "start", appName + " launcher", "/min", launcher}, strings.Fields(args)...)...)
+		cmd.Dir = dir
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("could not start the launcher: %w", err)
+		}
+		for i := 0; i < 30 && !portInUse(listenPort); i++ {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+	url := fmt.Sprintf("http://localhost:%d/setup", listenPort)
+	exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	fmt.Printf("Done. Setup is open in your browser: %s\n", url)
+	return nil
+}
+
+// addShortcuts: Start menu and desktop, an uninstall entry, and on request
+// Startup so SkyEye runs when Windows starts.
+func addShortcuts(dir, launcher, args string) {
+	fmt.Println("\nShortcuts")
+	for _, where := range []string{startMenuDir(), desktopDir()} {
+		lnk := filepath.Join(where, appName+".lnk")
+		if err := shortcut(lnk, launcher, args, dir, "Start SkyEye ATC and open its dashboard"); err != nil {
+			fmt.Printf("  could not add %s: %v\n", lnk, err)
+		} else {
+			fmt.Printf("  %s\n", lnk)
+		}
+	}
+	shortcut(filepath.Join(startMenuDir(), "Uninstall "+appName+".lnk"),
+		filepath.Join(dir, "SkyEye-Setup.exe"), "--uninstall", dir, "Remove SkyEye ATC")
+	if !*flagQuiet && ask("Start SkyEye when Windows starts? [y/N] ") {
+		if err := shortcut(filepath.Join(startupDir(), appName+".lnk"), launcher, args, dir, appName); err == nil {
+			fmt.Println("  added to Startup")
+		}
+	}
+}
+
+// launcherArgs: a single-PC install. The fleet list is this PC only (the
+// launcher's own default names the vSFG-7 rigs); SRS and Tacview health
+// follow what Setup saves.
+func launcherArgs() string {
+	return fmt.Sprintf("--listen :%d --fleet this=This-PC@127.0.0.1:%d", listenPort, listenPort)
+}
+
+func uninstall(dir string) error {
+	fmt.Printf("Removing %s from %s\n", appName, dir)
+	if n := stopRunning(dir); n > 0 {
+		fmt.Printf("  closed %d running SkyEye program(s)\n", n)
+		time.Sleep(time.Second)
+	}
+	for _, p := range []string{
+		filepath.Join(startMenuDir(), appName+".lnk"),
+		filepath.Join(startMenuDir(), "Uninstall "+appName+".lnk"),
+		filepath.Join(desktopDir(), appName+".lnk"),
+		filepath.Join(startupDir(), appName+".lnk"),
+	} {
+		if err := os.Remove(p); err == nil {
+			fmt.Printf("  removed %s\n", p)
+		}
+	}
+	for _, p := range append(programs, "version.txt") {
+		if err := os.Remove(filepath.Join(dir, p)); err == nil {
+			fmt.Printf("  removed %s\n", p)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			fmt.Printf("  could not remove %s: %v\n", p, err)
+		}
+	}
+	fmt.Printf("\nYour settings, start files and logs are still in %s.\nDelete that folder to remove them too.\n", dir)
+	return nil
+}
+
+// stopRunning closes SkyEye programs started from dir, and only those: a
+// vSFG-7 rig or another install on the same PC is left alone.
+func stopRunning(dir string) int {
+	script := fmt.Sprintf(`$d = '%s\*'; $p = Get-Process launcher,atc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like $d }; $p | Stop-Process -Force; ($p | Measure-Object).Count`,
+		strings.ReplaceAll(dir, "'", "''"))
+	out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script).Output()
+	if err != nil {
+		return 0
+	}
+	var n int
+	fmt.Sscanf(strings.TrimSpace(string(out)), "%d", &n)
+	return n
+}
+
+// shortcut writes a .lnk through Windows' own shell object.
+func shortcut(lnk, target, args, workDir, desc string) error {
+	os.MkdirAll(filepath.Dir(lnk), 0o755)
+	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+	script := fmt.Sprintf(`$s = (New-Object -ComObject WScript.Shell).CreateShortcut(%s); $s.TargetPath = %s; $s.Arguments = %s; $s.WorkingDirectory = %s; $s.Description = %s; $s.IconLocation = %s; $s.Save()`,
+		q(lnk), q(target), q(args), q(workDir), q(desc), q(target+",0"))
+	if out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput(); err != nil {
+		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func startMenuDir() string {
+	return filepath.Join(os.Getenv("APPDATA"), `Microsoft\Windows\Start Menu\Programs`)
+}
+func startupDir() string { return filepath.Join(startMenuDir(), "Startup") }
+func desktopDir() string { return filepath.Join(os.Getenv("USERPROFILE"), "Desktop") }
+
+// checkPrerequisites says what else the PC needs; the Setup page repeats it.
+func checkPrerequisites() {
+	fmt.Println("\nChecking this PC")
+	dotnet, _ := filepath.Glob(`C:\Program Files\dotnet\shared\Microsoft.NETCore.App\10.*`)
+	report(len(dotnet) > 0, "Microsoft .NET 10",
+		"needed by DCS-SRS 2.4: install the .NET 10 Desktop Runtime (x64) from https://dotnet.microsoft.com/download/dotnet/10.0")
+	report(exists(`C:\Program Files\Eagle Dynamics\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe`), "DCS-SRS (ExternalAudio)",
+		"SkyEye talks on SRS through it: install DCS-SRS from https://github.com/ciribob/DCS-SimpleRadioStandalone/releases")
+	report(exists(`C:\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe`), "ffmpeg (radio effect)",
+		"optional: without it calls go out clean. Unzip an ffmpeg build to C:\\ffmpeg-master-latest-win64-gpl")
+}
+
+func report(ok bool, what, fix string) {
+	if ok {
+		fmt.Printf("  ok    %s\n", what)
+	} else {
+		fmt.Printf("  MISSING  %s - %s\n", what, fix)
+	}
+}
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+func copyFile(src, dst string) error {
+	if strings.EqualFold(filepath.Clean(src), filepath.Clean(dst)) {
+		return nil
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o755)
+}
+
+func portInUse(port int) bool {
+	c, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 300*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	c.Close()
+	return true
+}
+
+func ask(q string) bool {
+	fmt.Print(q)
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "y")
+}

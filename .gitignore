@@ -46,4 +46,6 @@ setup.json
 # Squadron name and uploaded logo (Setup / Settings), per install
 branding.json
 branding/
+# build_installer.bat output
+dist/
 sides.json
