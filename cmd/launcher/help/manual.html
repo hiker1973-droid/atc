@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Readback ATC - User Manual</title>
+<link rel="stylesheet" href="help.css">
+</head>
+<body>
+<div class="cover">
+  <img src="readback-banner.png" alt="Readback ATC" class="banner">
+  <h1>User Manual</h1>
+  <p class="lead">How to run Readback ATC on your DCS World server, set it up the way your squadron flies, and talk to
+    its controllers.</p>
+</div>
+
+<h2>1. The controllers</h2>
+<p>Each controller is a station on SRS that listens on its frequency and answers your pilots by voice.</p>
+<table>
+  <tr><th>Station</th><th>What it does</th></tr>
+  <tr><td><b>Towers</b></td><td>One per airfield: radio checks, startup, taxi, takeoff, departure handoff, the overhead
+    break and landing, go-arounds, emergencies, traffic alerts.</td></tr>
+  <tr><td><b>ATIS</b></td><td>A recorded weather and runway broadcast for each field, kept in step with its tower.</td></tr>
+  <tr><td><b>Command</b></td><td>The strike net: check-in, fence in/out, tasking, tankers, recoveries and diverts.</td></tr>
+  <tr><td><b>AWACS (GCI)</b></td><td>Picture, bogey dope, declare, snaplock, threat calls and vectors, from the air picture
+    Tacview sees.</td></tr>
+  <tr><td><b>Marshal, Deckboss, Paddles</b></td><td>Carrier operations: the marshal stack and approach, the deck and
+    catapults, and the LSO on the ball.</td></tr>
+  <tr><td><b>Tankers, JTAC</b></td><td>Air-to-air refuelling check-in and join-up, and close air support 9-lines, where your
+    start files include them.</td></tr>
+</table>
+
+<h2>2. The dashboard</h2>
+<p>Open <b>Readback ATC</b> from the Start menu, or <b>http://localhost:7000</b>.</p>
+<ul>
+  <li><b>Theatre buttons</b> pick the map. <b>Start</b> runs every controller in it; <b>Stop</b> stops them all.</li>
+  <li><b>Cards</b> show each controller, its frequency, and whether it is running, with Start/Stop for each.</li>
+  <li><b>Tower status</b> shows each field's runway, weather and traffic.</li>
+  <li><b>Logs</b> shows what the controllers heard and said, live.</li>
+  <li>Banners at the top show the trial days left, an available update, or that Setup is not finished.</li>
+</ul>
+
+<h2>3. Settings</h2>
+<table>
+  <tr><th>Section</th><th>What you set</th></tr>
+  <tr><td>Squadron</td><td>Name and logo on every page.</td></tr>
+  <tr><td>Updates</td><td>Your version, what's new in the latest, and <b>Update now</b>.</td></tr>
+  <tr><td>Licence</td><td>Trial or licence status; paste a licence key here.</td></tr>
+  <tr><td>Voice services</td><td><b>Windows voices</b> (free) or <b>OpenAI voices</b> (natural), and the OpenAI and ElevenLabs
+    keys. Each key has a <b>Test</b> button.</td></tr>
+  <tr><td>Server connection</td><td>The SRS server, its External AWACS Mode password, and Tacview.</td></tr>
+  <tr><td>Frequencies</td><td>Each field's tower, ATIS and departure-handoff frequency. Changed values are marked; clear a box
+    to go back to the default.</td></tr>
+  <tr><td>Roles</td><td>For every station: frequency, name, ElevenLabs voice, OpenAI voice, speed, and on/off. ▶ plays a
+    sample of a voice. Moving Command or Marshal also moves the handoffs that point to it.</td></tr>
+</table>
+<div class="note">Changes reach a controller when it restarts: use <b>Restart this theatre's roles</b> under Roles, or Stop
+  and Start on the dashboard. Tell your pilots when you move a frequency.</div>
+<p>Each tower card on the dashboard has a <b>Blue/Red</b> switch: a red field's tower talks to the red coalition on SRS
+  and hands its departures to Red Command, for servers that run one.</p>
+
+<h2>4. Talking to Readback</h2>
+<ul>
+  <li>Tune the station's frequency (AM on UHF and VHF, FM below 88 MHz).</li>
+  <li>Say <b>the station first, then your callsign</b>, then the request: <i>"Batumi Tower, Viper 1-1, request taxi."</i></li>
+  <li>Use a two-part callsign such as <i>Viper 1-1</i> or a modex such as <i>Raider 302</i>, and keep it the same all flight.</li>
+  <li>Release the transmit key and wait for the answer. If it didn't hear you, ask <i>"say again"</i> or call again.</li>
+</ul>
+<p>The calls below are the ones Readback is tested against. Similar wordings work too.</p>
+
+<h3>Tower</h3>
+<table>
+  <tr><th>When</th><th>Say</th></tr>
+  <tr><td>Radio check</td><td>Batumi Tower, Viper 1-1, radio check.</td></tr>
+  <tr><td>Before engines</td><td>Batumi Tower, Viper 1-1, request startup.</td></tr>
+  <tr><td>Taxi</td><td>Batumi Tower, Viper 1-1, request taxi.</td></tr>
+  <tr><td>At the hold</td><td>Batumi Tower, Viper 1-1, holding short.</td></tr>
+  <tr><td>Takeoff</td><td>Batumi Tower, Viper 1-1, ready for takeoff.</td></tr>
+  <tr><td>After takeoff</td><td>Batumi Tower, Viper 1-1, airborne.</td></tr>
+  <tr><td>Leaving the area</td><td>Batumi Tower, Viper 1-1, seven DME.</td></tr>
+  <tr><td>Coming back</td><td>Batumi Tower, Viper 1-1, 10 mile initial.</td></tr>
+  <tr><td>Overhead break</td><td>Batumi Tower, Viper 1-1, break.</td></tr>
+  <tr><td>Straight in</td><td>Batumi Tower, Viper 1-1, request straight in.</td></tr>
+  <tr><td>Base / final</td><td>Batumi Tower, Viper 1-1, base, gear down. / ... on final.</td></tr>
+  <tr><td>Go-around</td><td>Batumi Tower, Viper 1-1, going around.</td></tr>
+  <tr><td>Off the runway</td><td>Batumi Tower, Viper 1-1, runway vacated.</td></tr>
+  <tr><td>Wind</td><td>Batumi Tower, Viper 1-1, wind check.</td></tr>
+  <tr><td>Emergency</td><td>Batumi Tower, Viper 1-1, mayday mayday mayday.</td></tr>
+</table>
+
+<h3>Command</h3>
+<table>
+  <tr><th>When</th><th>Say</th></tr>
+  <tr><td>Check in</td><td>Command, Viper 1-1, checking in.</td></tr>
+  <tr><td>Fence in, with fuel</td><td>Command, Viper 1-1, fence in, state 6.2.</td></tr>
+  <tr><td>Ask for work</td><td>Command, Viper 1-1, request tasking.</td></tr>
+  <tr><td>Tanker</td><td>Command, Viper 1-1, request tanker.</td></tr>
+  <tr><td>Bullseye</td><td>Command, Viper 1-1, say bullseye.</td></tr>
+  <tr><td>Weapons / shots</td><td>Command, Viper 1-1, in hot. / ... pickle. / ... Fox 3.</td></tr>
+  <tr><td>Fuel</td><td>Command, Viper 1-1, Joker. / ... Bingo, RTB.</td></tr>
+  <tr><td>Going home</td><td>Command, Viper 1-1, fence out. / ... RTB.</td></tr>
+</table>
+
+<h3>AWACS (callsign as set, e.g. Darkstar)</h3>
+<table>
+  <tr><th>When</th><th>Say</th></tr>
+  <tr><td>Check in</td><td>Darkstar, Viper 1-1, checking in.</td></tr>
+  <tr><td>The air picture</td><td>Darkstar, Viper 1-1, picture.</td></tr>
+  <tr><td>Nearest threat to you</td><td>Darkstar, Viper 1-1, bogey dope.</td></tr>
+  <tr><td>Identify a contact</td><td>Darkstar, Viper 1-1, declare bullseye 010 for 48 at 25000.</td></tr>
+  <tr><td>Contact on your nose</td><td>Darkstar, Viper 1-1, snaplock 125 for 10 at 8000.</td></tr>
+  <tr><td>RWR spike</td><td>Darkstar, Viper 1-1, spiked 080.</td></tr>
+  <tr><td>Steer</td><td>Darkstar, Viper 1-1, vector to tanker.</td></tr>
+  <tr><td>Kill</td><td>Darkstar, Viper 1-1, splash one.</td></tr>
+  <tr><td>Leaving</td><td>Darkstar, Viper 1-1, checking out.</td></tr>
+</table>
+
+<h3>Carrier</h3>
+<table>
+  <tr><th>Station</th><th>Say</th></tr>
+  <tr><td>Deckboss</td><td>Deckboss, Viper 1-1, request taxi. / ... ready cat 2. / ... airborne. / ... pushing Marshal.</td></tr>
+  <tr><td>Marshal</td><td>Marshal, Viper 1-1, checking in. / ... marking moms, angels 12, state 6.5. / ... commencing. /
+    ... platform. / ... clear seven miles.</td></tr>
+  <tr><td>Paddles</td><td>Paddles, Raider 302, Hornet ball, 5.5. / ... Clara, 5.0.</td></tr>
+</table>
+
+<h3>Tanker and JTAC (where your start files include them)</h3>
+<table>
+  <tr><th>Station</th><th>Say</th></tr>
+  <tr><td>Tanker</td><td>Texaco 1-1, Viper 1-1, 15 mile initial for port observation, intent to refuel. /
+    ... established port observation. / ... checking out.</td></tr>
+  <tr><td>JTAC</td><td>Hitman, Viper 1-1, checking in. / ... IP inbound. / ... in from the south. / ... off. /
+    ... request BDA.</td></tr>
+</table>
+
+<h2>5. Frequencies</h2>
+<p>Towers use each field's DCS tower frequency; Settings &gt; Frequencies lists them for your theatre. The standard
+  start files put <b>Command on 282.000</b>, the <b>AWACS on 264.000</b> (or what you chose in Setup), <b>Marshal on
+  306.300</b> and <b>Deckboss on 128.600</b>. Give your pilots these on their kneeboard or preset card, and update them
+  whenever you change one in Settings.</p>
+
+<h2>6. When something is wrong</h2>
+<ul>
+  <li><b>No answer</b>: the controller must be running (dashboard), the pilot on its frequency, and the call must start with
+    the station's name. The Logs page shows what it heard.</li>
+  <li><b>It heard something else</b>: speak after the transmit key is down, a little slower, station first. Check SRS isn't
+    clipping your microphone.</li>
+  <li><b>No voice at all</b>: send the test call in Setup (step 5); it reports exactly what is missing.</li>
+  <li><b>Command or AWACS can't see aircraft</b>: check Tacview's real-time telemetry is on and its address is right in
+    Settings.</li>
+</ul>
+<p>See the Installation Guide for install problems, the trial, licences and updates.</p>
+<p class="foot">Readback ATC is not affiliated with or endorsed by Eagle Dynamics. DCS World is a trademark of Eagle Dynamics SA.</p>
+</body>
+</html>

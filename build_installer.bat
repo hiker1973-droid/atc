@@ -10,6 +10,7 @@ echo Building Readback-Setup %PV% (%VER%)
 set LDF=-X main.productVersion=%PV%
 go build -o cmd\installer\payload\atc.exe .\cmd\atc || goto :fail
 go build -ldflags "%LDF%" -o cmd\installer\payload\launcher.exe .\cmd\launcher || goto :fail
+copy /y "cmd\launcher\help\Readback ATC *.pdf" cmd\installer\payload\ >nul || goto :fail
 if not exist dist mkdir dist
 go build -ldflags "%LDF% -X main.version=%VER%" -o dist\Readback-Setup.exe .\cmd\installer || goto :fail
 echo Built dist\Readback-Setup.exe

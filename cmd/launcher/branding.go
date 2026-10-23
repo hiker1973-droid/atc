@@ -9,6 +9,7 @@ import (
 	_ "image/jpeg" // DecodeConfig for uploaded logos
 	_ "image/png"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -327,4 +328,15 @@ func serveBrandingJS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	io.WriteString(w, brandingJS)
+}
+
+// helpHandler serves the guides embedded from help/: the Installation Guide
+// and User Manual as pages, and the PDFs built from them
+// (docs/manual/build_manuals.py).
+func helpHandler() http.Handler {
+	sub, err := fs.Sub(uiFS, "help")
+	if err != nil {
+		panic(err)
+	}
+	return http.StripPrefix("/help/", http.FileServer(http.FS(sub)))
 }

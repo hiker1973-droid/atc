@@ -1,0 +1,32 @@
+/* Readback ATC help pages: the launcher's /help, and the PDFs built from the
+   same files (docs/manual/build_manuals.py). Kept to plain CSS the PDF
+   renderer (PyMuPDF Story) understands. */
+body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.45; color: #1d2128;
+  background: #ffffff; max-width: 880px; margin: 0 auto; padding: 16px 20px 40px; }
+.cover { background-color: #1d1f23; color: #f2f2f2; padding: 18px 22px 16px; margin-bottom: 18px; }
+.cover .banner { width: 360px; }
+.cover h1 { color: #ff6a2b; font-size: 22pt; margin: 6px 0 4px; }
+.cover .lead { color: #d9d9d9; margin: 0; }
+h1 { font-size: 20pt; }
+h2 { font-size: 15pt; color: #1d1f23; border-bottom: 2px solid #ff6a2b; padding-bottom: 2px; margin: 22px 0 8px; }
+h3 { font-size: 12pt; color: #c44d14; margin: 14px 0 4px; }
+p, li { margin: 4px 0; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; }
+th { color: #1d1f23; text-align: left; padding: 4px 7px; font-size: 10pt; border-bottom: 2px solid #1d1f23; }
+td { border-bottom: 1px solid #d6d9de; padding: 4px 7px; vertical-align: top; font-size: 10pt; }
+code { font-family: Consolas, "Courier New", monospace; background-color: #f1f2f4; padding: 0 3px; }
+a { color: #c44d14; }
+.note { background-color: #fff4ec; border-left: 4px solid #ff6a2b; padding: 7px 10px; margin: 10px 0; }
+.foot { color: #7a808a; font-size: 8.5pt; margin-top: 26px; }
+.guides a.card { display: block; border: 1px solid #d6d9de; padding: 12px 14px; margin: 10px 0; text-decoration: none; color: #1d2128; }
+.guides a.card b { color: #c44d14; font-size: 13pt; }
+
+/* Printing (the PDFs are Edge's print of these pages): Letter pages, rows and
+   notes kept whole, headings kept with what follows, the dark cover printed. */
+@page { size: Letter; margin: 0.55in 0.6in 0.7in; }
+@media print {
+  body { max-width: none; padding: 0; margin: 0; }
+  tr, .note, .cover { break-inside: avoid; }
+  h2, h3 { break-after: avoid; }
+  .cover, th, td, .note, code { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

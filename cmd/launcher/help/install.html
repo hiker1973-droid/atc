@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Readback ATC - Installation Guide</title>
+<link rel="stylesheet" href="help.css">
+</head>
+<body>
+<div class="cover">
+  <img src="readback-banner.png" alt="Readback ATC" class="banner">
+  <h1>Installation Guide</h1>
+  <p class="lead">Readback ATC gives your DCS World server AI air traffic controllers that talk to your pilots over
+    DCS-SRS: towers with ATIS, Command, AWACS, carrier Marshal, Deckboss and Paddles, tankers and JTAC.</p>
+</div>
+
+<h2>1. What you need</h2>
+<table>
+  <tr><th>Item</th><th>Notes</th></tr>
+  <tr><td><b>The PC that runs your DCS-SRS server</b></td><td>Windows 10 or 11, 64-bit. Readback must run on the same PC as the
+    SRS server: SRS only accepts Readback's radio transmissions from that PC.</td></tr>
+  <tr><td><b>DCS-SRS 2.4 or newer</b></td><td>With <b>External AWACS Mode</b> (EAM) switched on in the SRS server and a
+    password set. Readback joins SRS through it.</td></tr>
+  <tr><td><b>Microsoft .NET 10 Desktop Runtime (x64)</b></td><td>DCS-SRS 2.4 and its installer need it. Install it
+    before DCS-SRS: <a href="https://dotnet.microsoft.com/download/dotnet/10.0">dotnet.microsoft.com/download/dotnet/10.0</a></td></tr>
+  <tr><td><b>An OpenAI API key</b></td><td>Required: it is how Readback understands what your pilots say. Billed by
+    OpenAI per use. Create one at <a href="https://platform.openai.com/api-keys">platform.openai.com/api-keys</a>.</td></tr>
+  <tr><td>An ElevenLabs API key</td><td>Optional: more natural voices for the controllers that have one.</td></tr>
+  <tr><td>Tacview real-time telemetry</td><td>Optional but recommended: Command, AWACS, traffic calls and position checks
+    use it to see the aircraft. Turn on real-time telemetry in Tacview on the DCS server.</td></tr>
+  <tr><td>ffmpeg</td><td>Optional: gives transmissions their radio sound. Without it, calls go out clean. Unzip
+    <i>ffmpeg-master-latest-win64-gpl</i> from <a href="https://github.com/BtbN/FFmpeg-Builds/releases">github.com/BtbN/FFmpeg-Builds/releases</a>
+    to <code>C:\ffmpeg-master-latest-win64-gpl</code>.</td></tr>
+</table>
+
+<h2>2. Install</h2>
+<ol>
+  <li><b>Run Readback-Setup.exe</b> on the SRS server PC. No administrator rights are needed.</li>
+  <li>If Windows shows <b>"Windows protected your PC"</b>, click <b>More info</b>, then <b>Run anyway</b>.</li>
+  <li>Readback installs to <code>%LOCALAPPDATA%\Readback ATC</code> and adds <b>Readback ATC</b> to the Start menu
+    and the desktop. It asks whether to start Readback when Windows starts.</li>
+  <li>It checks this PC for .NET 10, DCS-SRS and ffmpeg, and offers to open the download page for anything missing.</li>
+  <li>It starts Readback and opens <b>Setup</b> in your browser.</li>
+</ol>
+<div class="note">The dashboard is always at <b>http://localhost:7000</b> on this PC. Other PCs on your network can open
+  it at <b>http://&lt;this PC's address&gt;:7000</b>. If Windows asks whether to let Readback through the firewall,
+  allow private networks.</div>
+
+<h2>3. Setup</h2>
+<p>Setup walks you through six steps. You can go back to any step, and change everything later in <b>Settings</b>.</p>
+<ol>
+  <li><b>Squadron</b>: your squadron's name and logo (.png or .jpg). They appear on every page.</li>
+  <li><b>Voice</b>: paste your OpenAI key, and your ElevenLabs key if you have one. Each key is tested before it is
+    saved. Keys stay on this PC.</li>
+  <li><b>Server</b>: the SRS server (usually <code>localhost:5002</code>), its External AWACS Mode password, and
+    Tacview's real-time telemetry address (usually <code>localhost:42674</code>). Each is tested when you save it.</li>
+  <li><b>Theatre</b>: pick the map your server flies and click <b>Create start files</b>. Choose whether you want the
+    AWACS controller (callsign and frequency) and carrier operations (Marshal and Deckboss). Untick any station or
+    field you don't want.</li>
+  <li><b>Test call</b>: tune an SRS radio to the frequency shown, click <b>Send test call</b>, and listen for
+    <i>"Radio check. This is Readback..."</i>. If you hear it, everything works.</li>
+  <li><b>Ready</b>: check the list, then <b>Start</b> the theatre.</li>
+</ol>
+
+<h2>4. Voices</h2>
+<p>Readback starts with the free <b>Windows voices</b>. For natural voices with regional accents, turn on
+  <b>OpenAI voices</b> in Settings &gt; Voice services (a fraction of a cent per transmission). With an ElevenLabs key,
+  the controllers that have an ElevenLabs voice use it.</p>
+
+<h2>5. Trial and licence</h2>
+<p>Readback runs as a <b>14-day trial</b> from the first start. The dashboard shows the days left. To keep it running,
+  buy a licence key and paste it into <b>Settings &gt; Licence</b>. Keys start with <code>READBACK1-</code>.</p>
+
+<h2>6. Updates</h2>
+<p>Readback checks for new versions once a day. When one is out, the dashboard shows <b>Update available</b>: open
+  <b>Settings &gt; Updates</b>, read what's new and click <b>Update now</b>. Readback downloads it, checks it,
+  installs it and restarts, and the controllers that were running start again. Your settings stay.</p>
+
+<h2>7. Uninstall</h2>
+<p>Start menu &gt; <b>Uninstall Readback ATC</b>. It removes the programs and shortcuts and leaves your settings, start
+  files and logs in <code>%LOCALAPPDATA%\Readback ATC</code>; delete that folder to remove them too.</p>
+
+<h2>8. Troubleshooting</h2>
+<table>
+  <tr><th>You see</th><th>Do this</th></tr>
+  <tr><td>Test call: <i>"SRS ExternalAudio needs Microsoft .NET 10"</i></td><td>Install the .NET 10 Desktop Runtime (x64),
+    then send the test call again.</td></tr>
+  <tr><td>Test call: <i>"SRS ExternalAudio not found"</i></td><td>Install DCS-SRS on this PC with its installer.</td></tr>
+  <tr><td>Test call: <i>"SRS did not take the transmission"</i></td><td>Check the SRS server is running on this PC, the port
+    in Settings matches it, and External AWACS Mode is on.</td></tr>
+  <tr><td>The test call is sent but you hear nothing</td><td>Check your SRS radio is on the same frequency and in AM for UHF/VHF,
+    and that your SRS client is connected to this server.</td></tr>
+  <tr><td>Pilots get no answer</td><td>Make sure the controller is running on the dashboard, the pilot calls the right
+    station first (<i>"Batumi Tower, Viper 1-1, radio check"</i>), and the OpenAI key works (Settings &gt; Test).</td></tr>
+  <tr><td><i>"The 14-day trial has ended"</i></td><td>Enter a licence key in Settings &gt; Licence.</td></tr>
+  <tr><td>The dashboard does not open</td><td>Another program may be using port 7000. Close it, then start Readback ATC from
+    the Start menu.</td></tr>
+</table>
+<p class="foot">Readback ATC is not affiliated with or endorsed by Eagle Dynamics. DCS World is a trademark of Eagle Dynamics SA.</p>
+</body>
+</html>

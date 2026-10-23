@@ -16,7 +16,7 @@ git diff --quiet HEAD -- || (
     exit /b 1
 )
 call "%~dp0build_installer.bat" || exit /b 1
-gh release create v%PV% dist\Readback-Setup.exe --repo %REPO% --title "Readback ATC %PV%" --notes-file docs\releases\%PV%.md || goto :fail
+gh release create v%PV% dist\Readback-Setup.exe "cmd\launcher\help\Readback ATC Installation Guide.pdf" "cmd\launcher\help\Readback ATC User Manual.pdf" --repo %REPO% --title "Readback ATC %PV%" --notes-file docs\releases\%PV%.md || goto :fail
 git tag -a readback-v%PV% -m "Readback ATC %PV%" && git push origin readback-v%PV%
 echo Published Readback ATC %PV%.
 exit /b 0

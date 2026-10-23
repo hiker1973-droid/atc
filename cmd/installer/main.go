@@ -42,6 +42,10 @@ const (
 
 var programs = []string{"atc.exe", "launcher.exe"}
 
+// guides are the PDFs from docs/manual/build_manuals.py, beside the programs
+// and in the Start menu.
+var guides = []string{"Readback ATC Installation Guide.pdf", "Readback ATC User Manual.pdf"}
+
 var (
 	flagDir       = flag.String("dir", filepath.Join(os.Getenv("LOCALAPPDATA"), "Readback ATC"), "Install folder")
 	flagUninstall = flag.Bool("uninstall", false, "Remove the programs and shortcuts; settings and logs stay")
@@ -105,6 +109,11 @@ func install(dir string) error {
 		}
 		fmt.Printf("  %s\n", p)
 	}
+	for _, g := range guides {
+		if data, err := payload.ReadFile("payload/" + g); err == nil {
+			os.WriteFile(filepath.Join(dir, g), data, 0o644)
+		}
+	}
 	os.WriteFile(filepath.Join(dir, "version.txt"), []byte(productVersion+" ("+version+")\r\n"), 0o644)
 	self, _ := os.Executable()
 	copyFile(self, filepath.Join(dir, "Readback-Setup.exe")) // kept for --uninstall
@@ -162,6 +171,11 @@ func addShortcuts(dir, launcher, args string) {
 			fmt.Printf("  %s\n", lnk)
 		}
 	}
+	for _, g := range guides {
+		if exists(filepath.Join(dir, g)) {
+			shortcut(filepath.Join(startMenuDir(), strings.TrimSuffix(g, ".pdf")+".lnk"), filepath.Join(dir, g), "", dir, g)
+		}
+	}
 	shortcut(filepath.Join(startMenuDir(), "Uninstall "+appName+".lnk"),
 		filepath.Join(dir, "Readback-Setup.exe"), "--uninstall", dir, "Remove Readback ATC")
 	if !*flagQuiet && ask("Start Readback ATC when Windows starts? [y/N] ", false) {
@@ -189,12 +203,14 @@ func uninstall(dir string) error {
 		filepath.Join(startMenuDir(), "Uninstall "+appName+".lnk"),
 		filepath.Join(desktopDir(), appName+".lnk"),
 		filepath.Join(startupDir(), appName+".lnk"),
+		filepath.Join(startMenuDir(), "Readback ATC Installation Guide.lnk"),
+		filepath.Join(startMenuDir(), "Readback ATC User Manual.lnk"),
 	} {
 		if err := os.Remove(p); err == nil {
 			fmt.Printf("  removed %s\n", p)
 		}
 	}
-	for _, p := range append(programs, "version.txt") {
+	for _, p := range append(append(programs, guides...), "version.txt") {
 		if err := os.Remove(filepath.Join(dir, p)); err == nil {
 			fmt.Printf("  removed %s\n", p)
 		} else if !errors.Is(err, fs.ErrNotExist) {
