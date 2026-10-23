@@ -15,7 +15,10 @@ import "strings"
 //   - Senaki (UGKS): "Snarky Tower" (twice) and "Select Ski traffic" were
 //     dropped on DCS3 2026-10-17; "The Naki Raider 306, holding short" on
 //     2026-10-20 (Whisper split off the "Se").
+//   - Mozdok (XRMF, red side): "Monstar Tower" and "Mazda Ground" were dropped
+//     on Day 2026-10-22; "Mazdoc traffic" was heard on blue Command.
 var fieldSpokenAliases = map[string][]string{
+	"mozdok tower":          {"monstar", "mazda", "mazdoc", "mazdok", "mozdoc", "mozdock", "mosdok", "mozdog"},
 	"senaki tower":          {"snarky", "select ski", "senacky", "senaky", "the naki", "naki"},
 	"tbilisi tower":         {"tbilissi", "tiblisi", "tibilisi", "t bilisi", "lochini", "double ace", "double-ace", "to velocity"},
 	"mafraq tower":          {"king hussein", "hussein"},

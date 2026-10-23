@@ -46,6 +46,12 @@ func TestParseIntentAddressing(t *testing.T) {
 		{"senaki as naki tower", "Senaki Tower", "Naki Tower, Raider 306, request taxi.", true},
 		{"the naki is not kutaisi", "Kutaisi Tower", "The Naki Raider 306, holding short runway 09.", false},
 
+		// Mozdok misses on Day 2026-10-22 (BFM red side).
+		{"mozdok as monstar", "Mozdok Tower", "Monstar Tower, Raider 031 requesting taxi, runway 26.", true},
+		{"mozdok as mazda ground", "Mozdok Tower", "Mazda Ground, Raider 302, request startup.", true},
+		{"mozdok as mazdoc", "Mozdok Tower", "Mazdoc traffic, Raider 302 requests startup.", true},
+		{"mazda is not senaki", "Senaki Tower", "Mazda Ground, Raider 302, request startup.", false},
+
 		// Other shapes of the field-name address.
 		{"misspelt without tower", "Incirlik Tower", "Injirlik, Raider 11, request taxi", true},
 		{"pg short name", "Al Minhad Tower", "Minhad, Raider 11, request taxi", true},
