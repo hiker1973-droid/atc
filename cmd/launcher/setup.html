@@ -180,7 +180,7 @@ function renderVars() {
   }
   const ea = setup.checks.externalAudio, ff = setup.checks.ffmpeg;
   $('eaCheck').innerHTML = (ea ? '<span class="ok">✓</span> DCS-SRS ExternalAudio found on this PC.'
-    : '<span class="warn">⚠</span> DCS-SRS ExternalAudio not found. Install DCS-SRS on this PC with its installer (it also adds .NET 10, which ExternalAudio needs): SkyEye transmits through it.') +
+    : '<span class="warn">⚠</span> DCS-SRS ExternalAudio not found. SkyEye transmits through it: install the .NET 10 Desktop Runtime (x64) from dotnet.microsoft.com first (SRS 2.4 and its installer need it), then DCS-SRS.') +
     '<br>' + (ff ? '<span class="ok">✓</span> ffmpeg found: calls get the radio effect.'
     : '<span class="warn">⚠</span> ffmpeg not found at C:\ffmpeg-master-latest-win64-gpl\bin: calls will go out clean, without the radio effect.');
 }
