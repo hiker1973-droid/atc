@@ -164,6 +164,14 @@ func main() {
 	// debug.SetMemoryLimit caps total Go memory usage
 	debug.SetGCPercent(50)
 	debug.SetMemoryLimit(512 * 1024 * 1024) // 512MB hard cap per instance
+	if err := newRootCommand().Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+// newRootCommand builds the command and registers every flag; the Settings
+// catalog test (roles_test.go) reads the flag defaults from it.
+func newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "atc",
 		Short: "vSFG-7 AI Tower ATC for DCS World",
@@ -373,9 +381,7 @@ func main() {
 		"Tower calls a departure itself at the field's departure distance (7 nm): \"<callsign>, Senaki Departure, seven miles, angels five, leaving my airspace, contact Command ...\". A pilot \"seven DME\" report after that gets \"copy\". --departure-handoff-call=false = the pilot's report only.")
 	f.BoolVar(&flagTrafficAlerts, "traffic-alerts", true,
 		"Tower warns two airborne aircraft within 10 nm of the field that are converging to a close pass (inside 0.25 nm and 500 ft within 30 s, 80+ kt closure, headings 45+ degrees apart): \"traffic alert, two o'clock, one mile, same altitude\". Formations and rejoins stay quiet. Each alert also goes to the comms report. --traffic-alerts=false turns them off.")
-	if err := root.Execute(); err != nil {
-		os.Exit(1)
-	}
+	return root
 }
 
 // rotateLogIfNeeded inspects logPath at startup and, if it exceeds 50 MB,
@@ -399,6 +405,7 @@ func rotateLogIfNeeded(logPath string) {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	applyRoleConfig(cmd.Flags()) // the launcher Settings page's roles.json, before any flag is read
 	resolveStylePresets()
 	level, _ := zerolog.ParseLevel(flagLogLevel)
 	// Write logs to both stderr (console) and a rotating log file
@@ -450,7 +457,11 @@ func run(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
+	if err := logRoleConfig(); err != nil {
+		return err
+	}
 	applyFreqOverrides() // the launcher Settings page's frequencies.json
+	commandHandoffFollows()
 
 	af := airfield.ByICAO(flagAirfield)
 	if af == nil {

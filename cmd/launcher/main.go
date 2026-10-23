@@ -161,6 +161,7 @@ func main() {
 	mux.HandleFunc("/api/sides", handleSides)
 	// GET = keys (masked), connection and frequencies (viewer); POST = change one (control, checked inside).
 	mux.HandleFunc("/api/settings", handleSettings)
+	mux.HandleFunc("/api/settings/voices", handleSettingsVoices)
 	// GET = progress (viewer); POST = run (control, checked inside).
 	mux.HandleFunc("/api/update", handleUpdate)
 

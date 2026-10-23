@@ -33,8 +33,9 @@ type sidesFile struct {
 }
 
 // redCommandFreqMHz and redCommandName are what a red tower hands departures
-// to: Red Command in start_red_caucasus.bat.
-const (
+// to: Red Command in start_red_caucasus.bat, or where the Settings page moved
+// it (roles.go).
+var (
 	redCommandFreqMHz = 280.0
 	redCommandName    = "Red Command"
 )

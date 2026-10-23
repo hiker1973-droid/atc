@@ -41,4 +41,5 @@ tts_cache/
 update_last.json
 # Settings page and tower Side switch, per rig
 frequencies.json
+roles.json
 sides.json

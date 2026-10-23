@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"github.com/vsfg7/atc/pkg/airfield"
+	"github.com/vsfg7/atc/pkg/rolecfg"
 )
 
 // Settings page (operator 2026-10-23: "backend gui for product. where to
@@ -197,6 +198,9 @@ type fieldFreqView struct {
 	Handoff     float64               `json:"handoff"`
 	HandoffName string                `json:"handoffName"`
 	Override    airfield.FreqOverride `json:"override"`
+	// HandoffFollows: the handoff is Command's frequency from the Roles
+	// section, not the field's own.
+	HandoffFollows bool `json:"handoffFollows,omitempty"`
 }
 
 type theatreView struct {
@@ -225,21 +229,35 @@ func settingsSnapshot() map[string]any {
 	freqsMu.Lock()
 	o, ferr := airfield.ReadFreqOverrides(freqsPath())
 	freqsMu.Unlock()
+	rolesCfgMu.Lock()
+	rc, rerr := rolecfg.Read(rolesCfgPath())
+	rolesCfgMu.Unlock()
 	theatres := []theatreView{}
+	roleViews := map[string]theatreRolesView{}
 	for _, t := range settingsTheatres {
 		tv := theatreView{Key: t.Key, Label: t.Label}
+		cmdOv, _ := rc.Station(t.Key, "command")
 		for _, af := range airfield.FieldsForMap(t.Key) {
-			tv.Fields = append(tv.Fields, fieldFreqView{
+			fv := fieldFreqView{
 				ICAO: af.ICAO, Name: af.Name,
 				Tower: af.TowerFreqMHz, ATIS: af.ATISFreqMHz, Handoff: af.HandoffFreqMHz,
 				HandoffName: af.HandoffCallsign, Override: o.Fields[af.ICAO],
-			})
+			}
+			// Mirrors cmd/atc commandHandoffFollows.
+			if cmdOv.Freq > 0 && !cmdOv.Off && strings.EqualFold(af.HandoffCallsign, "command") && fv.Override.Handoff == 0 {
+				fv.Handoff, fv.HandoffFollows = cmdOv.Freq, true
+			}
+			tv.Fields = append(tv.Fields, fv)
 		}
 		theatres = append(theatres, tv)
+		roleViews[t.Key] = theatreRoles(t.Key, rc)
 	}
-	out := map[string]any{"vars": vars, "theatres": theatres}
+	out := map[string]any{"vars": vars, "theatres": theatres, "roles": roleViews}
 	if ferr != nil {
 		out["freqError"] = ferr.Error()
+	}
+	if rerr != nil {
+		out["rolesError"] = rerr.Error()
 	}
 	return out
 }
@@ -330,6 +348,12 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		Tower   float64 `json:"tower"`
 		ATIS    float64 `json:"atis"`
 		Handoff float64 `json:"handoff"`
+		// op role / restart / sample
+		Theatre  string           `json:"theatre"`
+		Key      string           `json:"key"`
+		Override rolecfg.Override `json:"override"`
+		Provider string           `json:"provider"`
+		Voice    string           `json:"voice"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&req); err != nil {
 		http.Error(w, "bad JSON", http.StatusBadRequest)
@@ -370,8 +394,32 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true, "msg": icao + " saved. Restart its tower, ATIS and Command to use it."})
+	case "role":
+		o := req.Override
+		o.Name, o.Voice, o.Eleven = strings.TrimSpace(o.Name), strings.TrimSpace(o.Voice), strings.TrimSpace(o.Eleven)
+		icao := strings.ToUpper(strings.TrimSpace(req.ICAO))
+		if err := setRoleOverride(req.Theatre, req.Key, icao, o); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "msg": "Saved. Restart the theatre's roles to use it."})
+	case "restart":
+		running := restartTheatre(req.Theatre)
+		msg := "Nothing running in that theatre - the changes apply when it starts."
+		if len(running) > 0 {
+			msg = fmt.Sprintf("Restarting %d roles: %s. Allow a minute for the towers.", len(running), strings.Join(running, ", "))
+		}
+		writeJSON(w, map[string]any{"ok": true, "msg": msg})
+	case "sample":
+		b, err := voiceSample(req.Provider, req.Voice)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Write(b)
 	default:
-		http.Error(w, "op must be set, test or freq", http.StatusBadRequest)
+		http.Error(w, "op must be set, test, freq, role, restart or sample", http.StatusBadRequest)
 	}
 }
 
