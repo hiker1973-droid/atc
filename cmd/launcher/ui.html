@@ -1202,7 +1202,9 @@ function renderPattern() {
 // ──────────────────────────────────────────────────────────────────────────
 // Role control actions
 // ──────────────────────────────────────────────────────────────────────────
-async function startRole(name)   { await fetch(api('/api/start?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
+// A role that is already running is refused with 409 and a message to show
+// (operator 2026-10-23: Day had every tower running 2-3 times).
+async function startRole(name)   { const r = await fetch(api('/api/start?name=') + encodeURIComponent(name), { method: 'POST' }); if (r.status === 409) alert(await r.text()); setTimeout(refreshAll, 800); }
 async function stopRole(name)    { await fetch(api('/api/stop?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 800); }
 async function restartRole(name) { await fetch(api('/api/restart?name=') + encodeURIComponent(name), { method: 'POST' }); setTimeout(refreshAll, 1500); }
 // Flip the dashboard between theatres. Backend role start/stop is unaffected
@@ -1243,7 +1245,8 @@ async function startAtis() {
   btn.disabled = true;
   try {
     const r = await fetch(api('/api/start?name=') + encodeURIComponent(cfg.atisRole), { method: 'POST' });
-    if (!r.ok) alert(`Start ${cfg.label} ATIS failed: ${await r.text()}`);
+    if (r.status === 409) alert(await r.text());
+    else if (!r.ok) alert(`Start ${cfg.label} ATIS failed: ${await r.text()}`);
   } catch (e) { alert('Start ATIS failed: ' + e.message); }
   setTimeout(() => { btn.disabled = false; refreshAll(); }, 1200);
 }
@@ -1253,7 +1256,13 @@ async function startRegion() {
   btn.disabled = true;
   try {
     const r = await fetch(api('/api/start-region?region=') + encodeURIComponent(currentTheatre), { method: 'POST' });
-    if (!r.ok) alert(`Start ${cfg.label} failed: ${await r.text()}`);
+    if (r.status === 409) alert(`${cfg.label}: ${await r.text()}.`);
+    else if (!r.ok) alert(`Start ${cfg.label} failed: ${await r.text()}`);
+    else {
+      const j = await r.json().catch(() => ({}));
+      if (j.alreadyRunning && j.alreadyRunning.length)
+        alert(`Already running: ${j.alreadyRunning.join(', ')}.\nStarting the rest of ${cfg.label}.`);
+    }
   } catch (e) { alert('Start region failed: ' + e.message); }
   setTimeout(() => { btn.disabled = false; refreshAll(); }, 1500);
 }
@@ -1350,7 +1359,7 @@ async function applyWeather() {
     $('wxStatus').textContent = `Failed on ports: ${failed.map(f => f.port + ' (' + f.msg.trim() + ')').join(', ')}`;
   }
 }
-async function startGroup(names) { for (const n of names) { if (roleStatus[n] !== 'running') { await fetch(api('/api/start?name=') + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
+async function startGroup(names) { if (names.every(n => roleStatus[n] === 'running')) { alert(`${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} already running.`); return; } for (const n of names) { if (roleStatus[n] !== 'running') { await fetch(api('/api/start?name=') + encodeURIComponent(n), { method: 'POST' }); await new Promise(r=>setTimeout(r,800)); } } refreshAll(); }
 async function stopGroup(names)  { await Promise.all(names.filter(n => roleStatus[n]==='running').map(n => fetch(api('/api/stop?name=') + encodeURIComponent(n), { method: 'POST' }))); setTimeout(refreshAll, 800); }
 
 // ──────────────────────────────────────────────────────────────────────────

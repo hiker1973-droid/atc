@@ -725,7 +725,7 @@ func scanLogAlerts() []Alert {
 				}
 			}
 			// Only warn lines can match a signature: every transmission logs
-			// "TX via OpenAI TTS + ExternalAudio" at info, and each one raised
+			// "TX via OpenAI TTS + ExternalAudio" (now "Tower TX") at info, and each one raised
 			// an alert (Day, 2026-10-15 09:49, Raider 302's first calls).
 			if !fault && !recovered && l.Level == "warn" {
 				for _, sig := range faultSignatures {
@@ -1354,8 +1354,55 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, h)
 }
 
+// runningRoles names the roles running now, of those listed.
+func runningRoles(names []string) []string {
+	rolesMu.Lock()
+	rs := append([]Role(nil), roles...)
+	rolesMu.Unlock()
+	want := map[string]bool{}
+	for _, n := range names {
+		want[n] = true
+	}
+	var out []string
+	for i, pid := range detectRunning(rs) {
+		if pid != 0 && want[rs[i].Name] {
+			out = append(out, rs[i].Name)
+		}
+	}
+	return out
+}
+
+// regionStartRoles are the roles a region's bat starts: the region's roles
+// whose own bat it calls (the on-demand RED card is in the region but not in
+// its bat).
+func regionStartRoles(region string) []string {
+	body, err := os.ReadFile(filepath.Join(rootDir, regionBats[region]))
+	if err != nil {
+		return nil
+	}
+	text := strings.ToLower(string(body))
+	rolesMu.Lock()
+	defer rolesMu.Unlock()
+	var out []string
+	for _, r := range roles {
+		if r.Region == region && r.Bat != "" && strings.Contains(text, strings.ToLower(r.Bat)) {
+			out = append(out, r.Name)
+		}
+	}
+	return out
+}
+
+// Starting a role that is already running is refused with a message the
+// dashboard shows (operator 2026-10-23: Day had every tower running 2-3
+// times). atc.exe refuses a second copy anyway (ec006bd); this says so up
+// front instead of leaving a refused copy in the log.
 func handleStart(w http.ResponseWriter, r *http.Request) {
-	if err := startRole(r.URL.Query().Get("name")); err != nil {
+	name := r.URL.Query().Get("name")
+	if len(runningRoles([]string{name})) > 0 {
+		http.Error(w, name+" is already running", http.StatusConflict)
+		return
+	}
+	if err := startRole(name); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -1371,11 +1418,19 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleStartRegion(w http.ResponseWriter, r *http.Request) {
-	if err := startRegion(r.URL.Query().Get("region")); err != nil {
+	region := r.URL.Query().Get("region")
+	want := regionStartRoles(region)
+	up := runningRoles(want)
+	if len(want) > 0 && len(up) == len(want) {
+		http.Error(w, fmt.Sprintf("all %d roles are already running", len(want)), http.StatusConflict)
+		return
+	}
+	if err := startRegion(region); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "started"})
+	// The bat starts every role; the ones already up refuse their second copy.
+	writeJSON(w, map[string]any{"status": "started", "alreadyRunning": up})
 }
 
 func handleStopRegion(w http.ResponseWriter, r *http.Request) {

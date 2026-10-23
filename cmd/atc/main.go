@@ -863,19 +863,20 @@ func run(cmd *cobra.Command, args []string) error {
 				if tx.ground {
 					profile = groundProfile(voice)
 				}
-				log.Info().Str("text", text).Str("voice", voice).Bool("departure", tx.departure).Int("queued", len(txChan)).Msg("TX via OpenAI TTS + ExternalAudio")
 				// 10s ceiling on TTS: OpenAI is either fast (~2s) or hung. No
 				// SAPI fallback — operator preference is one consistent voice;
 				// pilot will repeat if TX drops.
 				ttsCtx, ttsCancel := context.WithTimeout(ctx, 10*time.Second)
 				ttsStart := time.Now()
-				mp3, err := synthesizeSpeech(ttsCtx, apiKey, text, profile)
+				mp3, src, err := synthesizeSpeechFrom(ttsCtx, apiKey, text, profile)
 				ttsCancel()
 				ttsMs := time.Since(ttsStart).Milliseconds()
 				if err != nil {
 					log.Warn().Err(err).Int64("ttsMs", ttsMs).Str("text", text).Msg("TTS synthesis failed — dropping TX")
 					continue
 				}
+				log.Info().Str("text", text).Str("tts", src.Service).Str("voice", src.Voice).Bool("cached", src.Cached).
+					Bool("departure", tx.departure).Int("queued", len(txChan)).Msg("Tower TX")
 				// Set cooldown HERE, not at dequeue: covers the actual playback
 				// window starting now. Setting at dequeue lets a slow TTS expire
 				// the cooldown before audio plays, which is how self-loopback got
@@ -2159,30 +2160,54 @@ func atisVoiceFor(st *atisStation) voiceProfile {
 
 // synthesizeSpeech checks cache first, falls back to API on miss.
 func synthesizeSpeech(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
+	mp3, _, err := synthesizeSpeechFrom(ctx, apiKey, text, v)
+	return mp3, err
+}
+
+// ttsSource says who spoke a line: which service, which voice, and whether it
+// came from the cache. Every tower TX used to log "TX via OpenAI TTS" whatever
+// spoke it, which read as ElevenLabs being down on Day 2026-10-22 when it was
+// not.
+type ttsSource struct {
+	Service string // "elevenlabs" or "openai"
+	Voice   string // the ElevenLabs voice name, or the OpenAI voice
+	Cached  bool
+}
+
+// synthesizeSpeechFrom is synthesizeSpeech, also saying where the audio came
+// from.
+func synthesizeSpeechFrom(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, ttsSource, error) {
 	if elevenCapped() {
 		v.eleven = elevenVoice{} // past the credit cap: OpenAI only, cached ElevenLabs clips too (eleven_cap.go)
 	}
+	src := ttsSource{Service: "openai", Voice: v.voice}
+	if v.eleven.ID != "" {
+		src = ttsSource{Service: "elevenlabs", Voice: v.eleven.Name}
+	}
 	if mp3, ok := globalTTSCache.get(v, text); ok {
 		log.Debug().Str("text", text).Msg("TTS cache hit")
-		return mp3, nil
+		src.Cached = true
+		return mp3, src, nil
 	}
 	if mp3, ok := speakElevenLabs(ctx, text, v); ok {
 		globalTTSCache.set(v, text, mp3)
-		return mp3, nil
+		return mp3, src, nil
 	}
 	// OpenAI: no ElevenLabs voice for this role, or it failed. Cached under
 	// the profile without the ElevenLabs voice, so a recovered ElevenLabs is
 	// not shadowed by the fallback clip.
 	v.eleven = elevenVoice{}
+	src = ttsSource{Service: "openai", Voice: v.voice}
 	if mp3, ok := globalTTSCache.get(v, text); ok {
-		return mp3, nil
+		src.Cached = true
+		return mp3, src, nil
 	}
 	mp3, err := synthesizeSpeechAPI(ctx, apiKey, text, v)
 	if err != nil {
-		return nil, err
+		return nil, src, err
 	}
 	globalTTSCache.set(v, text, mp3)
-	return mp3, nil
+	return mp3, src, nil
 }
 
 // synthesizeSpeechAPI calls OpenAI TTS API directly — bypasses cache.

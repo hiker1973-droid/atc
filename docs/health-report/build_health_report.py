@@ -42,7 +42,8 @@ big = ParagraphStyle("b", parent=ss["Normal"], fontSize=15, leading=17, textColo
 small = ParagraphStyle("sm", parent=cell, alignment=1, textColor=GREY)
 
 HEARD = {"recognized", "Command heard", "Marshal heard", "Deckboss heard"}
-REPLIED = {"TX via OpenAI TTS + ExternalAudio", "Command TX", "Marshal TX", "Deckboss TX", "Paddles TX", "GCI TX"}
+# "Tower TX" replaced "TX via OpenAI TTS + ExternalAudio" on 2026-10-23; older logs keep the old name.
+REPLIED = {"Tower TX", "TX via OpenAI TTS + ExternalAudio", "Command TX", "Marshal TX", "Deckboss TX", "Paddles TX", "GCI TX"}
 # GCI (Darkstar / Overlord, cmd/atc/gci.go): a heard call SkyEye's parser could
 # not place is a miss; it also catches pilots talking to each other on 264.
 GCI_MISS = "GCI: not addressed to us or not understood - silent"
