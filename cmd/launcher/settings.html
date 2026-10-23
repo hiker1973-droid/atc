@@ -74,7 +74,7 @@
   <img class="patch" src="/logo.png" alt="">
   <span class="logo">vSFG-7</span><span class="title">Settings</span>
   <span class="spacer"></span>
-  <a href="/">Dashboard</a><a href="/setup">Setup</a><a href="/fleet">Fleet</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a><a href="/help/">Help</a>
+  <a href="/">Dashboard</a><a href="/setup">Setup</a><a href="/fleet">Fleet</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a><a href="/reports">Reports</a><a href="/help/">Help</a>
 </header>
 <main>
   <div class="banner" id="viewer">You can look but not change anything here: settings need operator rights.</div>
@@ -136,6 +136,14 @@
   </section>
 
   <section>
+    <h2>Reports</h2>
+    <p class="sub">Your own Claude API key lets the <a href="/reports">Reports</a> page write debriefs from Tacview,
+      dcs.log and the radio logs. Optional. Billed to your Anthropic account per report; create a key at
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+    <div id="aiKey"></div>
+  </section>
+
+  <section>
     <h2>Server connection</h2>
     <p class="sub">Where this rig finds DCS-SRS and Tacview real-time telemetry.</p>
     <div id="conn"></div>
@@ -173,8 +181,10 @@
   </section>
 </main>
 <script>
-const KEYS = ['OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
-const TESTABLE = new Set(['OPENAI_API_KEY', 'ELEVENLABS_API_KEY', 'SKYEYE_SRS', 'SKYEYE_TACVIEW']);
+const KEYS = ['OPENAI_API_KEY', 'ELEVENLABS_API_KEY'], AI_KEYS = ['ANTHROPIC_API_KEY'];
+const OPTIONAL = { ELEVENLABS_API_KEY: 'Remove the ElevenLabs key? Every voice will use OpenAI.',
+  ANTHROPIC_API_KEY: 'Remove the Claude key? Reports will not be able to write debriefs.' };
+const TESTABLE = new Set(['OPENAI_API_KEY', 'ELEVENLABS_API_KEY', 'ANTHROPIC_API_KEY', 'SKYEYE_SRS', 'SKYEYE_TACVIEW']);
 let data = null, theatre = localGet('settingsTheatre') || 'caucasus';
 
 function localGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -214,8 +224,8 @@ async function saveVar(name) {
   const input = row.querySelector('input'), msg = row.querySelector('.msg');
   const value = input.value.trim();
   if (!value) {
-    if (name !== 'ELEVENLABS_API_KEY') { show(msg, { ok: false, msg: 'Type a value first.' }); return; }
-    if (!confirm('Remove the ElevenLabs key? Every voice will use OpenAI.')) return;
+    if (!OPTIONAL[name]) { show(msg, { ok: false, msg: 'Type a value first.' }); return; }
+    if (!confirm(OPTIONAL[name])) return;
   }
   // Test a new key before keeping it, so a typo never reaches the roles.
   if (value && TESTABLE.has(name)) {
@@ -524,7 +534,8 @@ async function load() {
   data = await r.json();
   document.getElementById('viewer').style.display = data.canEdit ? 'none' : 'block';
   document.getElementById('keys').innerHTML = data.vars.filter(v => KEYS.includes(v.name)).map(varRow).join('');
-  document.getElementById('conn').innerHTML = data.vars.filter(v => !KEYS.includes(v.name)).map(varRow).join('');
+  document.getElementById('aiKey').innerHTML = data.vars.filter(v => AI_KEYS.includes(v.name)).map(varRow).join('');
+  document.getElementById('conn').innerHTML = data.vars.filter(v => !KEYS.includes(v.name) && !AI_KEYS.includes(v.name)).map(varRow).join('');
   if (data.freqError) show(document.getElementById('freqMsg'), { ok: false, msg: 'frequencies.json: ' + data.freqError });
   if (data.rolesError) show(document.getElementById('roleMsg'), { ok: false, msg: 'roles.json: ' + data.rolesError });
   document.getElementById('restartBtn').disabled = !data.canEdit;

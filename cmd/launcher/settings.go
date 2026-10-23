@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"github.com/vsfg7/atc/pkg/airfield"
+	"github.com/vsfg7/atc/pkg/debrief"
 	"github.com/vsfg7/atc/pkg/license"
 	"github.com/vsfg7/atc/pkg/rolecfg"
 )
@@ -42,6 +44,7 @@ var settingVars = []struct {
 	{"SKYEYE_SRS", "SRS server (host:port)", false},
 	{"SRS_EAM", "SRS external-audio password", true},
 	{"SKYEYE_TACVIEW", "Tacview real-time (host:port)", false},
+	{"ANTHROPIC_API_KEY", "Claude API key", true}, // Reports page debriefs (reports.go); roles never read it
 }
 
 func settingVar(name string) (label string, secret, ok bool) {
@@ -102,8 +105,8 @@ func maskSecret(v string) string {
 // checkSetting validates a value before it is stored.
 func checkSetting(name, value string) error {
 	if value == "" {
-		if name == "ELEVENLABS_API_KEY" {
-			return nil // optional: every voice falls back to OpenAI
+		if name == "ELEVENLABS_API_KEY" || name == "ANTHROPIC_API_KEY" {
+			return nil // optional: every voice falls back to OpenAI; reports need it only to write debriefs
 		}
 		return fmt.Errorf("%s cannot be empty", name)
 	}
@@ -116,7 +119,7 @@ func checkSetting(name, value string) error {
 		if err != nil || host == "" || port == "" {
 			return fmt.Errorf("want host:port, e.g. 192.168.1.220:5008")
 		}
-	case "OPENAI_API_KEY", "ELEVENLABS_API_KEY":
+	case "OPENAI_API_KEY", "ELEVENLABS_API_KEY", "ANTHROPIC_API_KEY":
 		if len(value) < 20 {
 			return fmt.Errorf("that is too short to be an API key")
 		}
@@ -302,6 +305,11 @@ func testSetting(name, value string) (string, error) {
 		req, _ := http.NewRequest(http.MethodGet, elevenAPI+"/v1/user/subscription", nil)
 		req.Header.Set("xi-api-key", value)
 		return providerCheck(req, "ElevenLabs")
+	case "ANTHROPIC_API_KEY":
+		if err := debrief.CheckKey(context.Background(), value); err != nil {
+			return "", err
+		}
+		return "key accepted", nil
 	case "SKYEYE_SRS", "SKYEYE_TACVIEW":
 		c, err := net.DialTimeout("tcp", value, 3*time.Second)
 		if err != nil {

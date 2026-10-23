@@ -48,6 +48,7 @@
   <tr><td>Licence</td><td>Trial or licence status; paste a licence key here.</td></tr>
   <tr><td>Voice services</td><td><b>Windows voices</b> (free) or <b>OpenAI voices</b> (natural), and the OpenAI and ElevenLabs
     keys. Each key has a <b>Test</b> button.</td></tr>
+  <tr><td>Reports</td><td>Your own Claude API key, for written debriefs on the Reports page (optional).</td></tr>
   <tr><td>Server connection</td><td>The SRS server, its External AWACS Mode password, and Tacview.</td></tr>
   <tr><td>Frequencies</td><td>Each field's tower, ATIS and departure-handoff frequency. Changed values are marked; clear a box
     to go back to the default.</td></tr>
@@ -139,7 +140,22 @@
   306.300</b> and <b>Deckboss on 128.600</b>. Give your pilots these on their kneeboard or preset card, and update them
   whenever you change one in Settings.</p>
 
-<h2>6. When something is wrong</h2>
+<h2>6. Reports: written debriefs</h2>
+<p>The <b>Reports</b> page writes a squadron-style debrief of a session with Claude, using your own Claude API key
+  (Settings &gt; Reports; create one at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>,
+  billed by Anthropic per report).</p>
+<ol>
+  <li>Pick the session's <b>Tacview recording</b> (.acmi or .zip.acmi) and/or the DCS server's <b>dcs.log</b>: choose
+    one found on this PC, or upload a file.</li>
+  <li>Leave <b>Include the radio logs</b> ticked to add what was said on Readback's frequencies over the same hours.</li>
+  <li>Optionally say what to focus on, e.g. "Venom flight's carrier recovery".</li>
+  <li>Press <b>Preview</b>. The records are boiled down on this PC, and you can read exactly what will be sent.</li>
+  <li>Press <b>Write the debrief</b>. It takes under a minute; print it, save it as PDF or download it.</li>
+</ol>
+<p>Debriefs are kept in the <code>reports</code> folder. Kills are matched to shooters from weapon impact points, so
+  the debrief calls them "likely".</p>
+
+<h2>7. When something is wrong</h2>
 <ul>
   <li><b>No answer</b>: the controller must be running (dashboard), the pilot on its frequency, and the call must start with
     the station's name. The Logs page shows what it heard.</li>

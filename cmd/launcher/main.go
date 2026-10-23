@@ -33,7 +33,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html logs.html pilots.html settings.html setup.html logo.png readback.png help
+//go:embed ui.html fleet.html logs.html pilots.html settings.html setup.html reports.html logo.png readback.png help
 var uiFS embed.FS
 
 var (
@@ -132,6 +132,7 @@ func main() {
 	mux.HandleFunc("/pilots", servePilotsUI)
 	mux.HandleFunc("/settings", serveSettingsUI)
 	mux.HandleFunc("/setup", serveSetupUI)
+	mux.HandleFunc("/reports", serveReportsUI)
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/branding.js", serveBrandingJS)
 	mux.HandleFunc("/icon.png", serveIcon)
@@ -159,6 +160,9 @@ func main() {
 	mux.HandleFunc("/api/day-log", handleDayLog)
 	mux.HandleFunc("/api/pilots-raw", handlePilotsRaw)
 	mux.HandleFunc("/api/pilots", handlePilots)
+	mux.HandleFunc("/api/reports", handleReports)
+	// GET = one saved debrief (viewer); POST = delete it (control, checked inside).
+	mux.HandleFunc("/api/reports/file", handleReportFile)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
 	mux.HandleFunc("/api/start", requireControl(requireLicence(handleStart)))
@@ -167,6 +171,8 @@ func main() {
 	mux.HandleFunc("/api/stop-region", requireControl(handleStopRegion))
 	mux.HandleFunc("/api/restart", requireControl(requireLicence(handleRestart)))
 	mux.HandleFunc("/api/rescan", requireControl(handleRescan))
+	mux.HandleFunc("/api/reports/prepare", requireControl(handleReportPrepare))   // summarise, show what would be sent
+	mux.HandleFunc("/api/reports/generate", requireControl(handleReportGenerate)) // send to Claude with the customer's key
 	// GET = the field sides (viewer); POST = set one (control, checked inside).
 	mux.HandleFunc("/api/sides", handleSides)
 	// GET = keys (masked), connection and frequencies (viewer); POST = change one (control, checked inside).
