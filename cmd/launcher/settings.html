@@ -443,7 +443,9 @@ function renderTTS() {
 // ── Licence (pkg/license) ──
 function renderLicence(st) {
   const el = document.getElementById('licStatus');
-  const cls = { licensed: 'ok', source: 'muted', trial: st.daysLeft <= 3 ? 'bad' : 'warn', expired: 'bad' }[st.state] || 'muted';
+  const ending = st.licence && st.licence.exp && st.daysLeft <= 14;
+  const cls = { licensed: ending ? (st.daysLeft <= 3 ? 'bad' : 'warn') : 'ok', source: 'muted', trial: st.daysLeft <= 3 ? 'bad' : 'warn',
+    grace: 'bad', expired: 'bad' }[st.state] || 'muted';
   el.className = 'sub ' + cls;
   el.textContent = st.message;
   // A source install (the vSFG-7 rigs) is never checked, but can show a key.

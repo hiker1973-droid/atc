@@ -594,8 +594,10 @@ async function checkSetup() {
   try {
     // Trial or licence (pkg/license); the vSFG-7 rigs are "source" and show nothing.
     const l = await fetch('/api/licence').then(r => r.json());
-    if (l.state === 'expired') banner('/settings#licence', '⛔ ' + l.message + ' →', true);
+    if (l.state === 'expired' || l.state === 'grace') banner('/settings#licence', '⛔ ' + l.message + ' →', true);
     else if (l.state === 'trial') banner('/settings#licence', '⏳ ' + l.message + ' →', l.daysLeft <= 3);
+    // A key that ends: warned two weeks ahead, red in the last three days.
+    else if (l.state === 'licensed' && l.licence && l.licence.exp && l.daysLeft <= 14) banner('/settings#licence', '⏳ ' + l.message + ' →', l.daysLeft <= 3);
     // The badge in the header strip: licensed (and days left on a key that
     // ends), the trial's days, or ended. Nothing on a rig without a key.
     const lb = $('licBadge'), days = n => `${n} DAY${n === 1 ? '' : 'S'} LEFT`;
@@ -603,7 +605,10 @@ async function checkSetup() {
     if (l.state === 'licensed') {
       const exp = l.licence && l.licence.exp;
       text = exp ? `LICENSED · ${days(l.daysLeft)}` : `LICENSED · ${(l.licence && l.licence.sq) || ''}`;
-      cls = exp && l.daysLeft <= 14 ? 'warn' : 'ok';
+      cls = exp && l.daysLeft <= 3 ? 'bad' : exp && l.daysLeft <= 14 ? 'warn' : 'ok';
+    } else if (l.state === 'grace') {
+      text = `LICENCE ENDED · ${l.daysLeft} DAY${l.daysLeft === 1 ? '' : 'S'} GRACE`;
+      cls = 'bad';
     } else if (l.state === 'trial') {
       text = `TRIAL · ${days(l.daysLeft)}`;
       cls = l.daysLeft <= 3 ? 'bad' : 'warn';

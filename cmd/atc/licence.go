@@ -20,6 +20,8 @@ func checkLicence() error {
 		return fmt.Errorf("%s", st.Message)
 	case license.Trial:
 		log.Info().Int("daysLeft", st.DaysLeft).Msg("trial")
+	case license.Grace:
+		log.Warn().Int("graceDaysLeft", st.DaysLeft).Msg(st.Message)
 	case license.Licensed:
 		log.Info().Str("squadron", st.Licence.Squadron).Str("id", st.Licence.ID).Msg("licensed")
 	}

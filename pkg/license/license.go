@@ -106,8 +106,15 @@ const (
 	Source   State = "source"   // git checkout: not checked
 	Licensed State = "licensed" // a valid key
 	Trial    State = "trial"
-	Expired  State = "expired" // trial over, or the key's expiry passed
+	Grace    State = "grace"   // a key's end date passed, within GraceDays: still runs
+	Expired  State = "expired" // trial over, or the key's end date and grace passed
 )
+
+// GraceDays: how long a key keeps working after its end date (not the trial).
+const GraceDays = 7
+
+// RenewWarnDays: how long before a key's end date the dashboard warns.
+const RenewWarnDays = 14
 
 // Status is what the launcher shows and both programs enforce.
 type Status struct {
@@ -210,12 +217,31 @@ func (c *Checker) Check() Status {
 			if exp.IsZero() {
 				return Status{State: Licensed, Licence: &l, Message: "Licensed to " + l.Squadron + "."}
 			}
-			if now.Before(exp) {
-				return Status{State: Licensed, Licence: &l, DaysLeft: daysLeft(exp, now),
-					Message: fmt.Sprintf("Licensed to %s until %s.", l.Squadron, l.Expires)}
+			// A key with an end date: the clock may not go back on it either.
+			rs, rl := c.Store.Load()
+			if last := latest(f.LastSeen, rl); now.Before(last) {
+				now = last
+			}
+			f.LastSeen = now
+			c.Store.Save(earliest(f.TrialStart, rs), now)
+			c.writeFile(f)
+			switch {
+			case now.Before(exp):
+				left := daysLeft(exp, now)
+				msg := fmt.Sprintf("Licensed to %s until %s.", l.Squadron, l.Expires)
+				if left <= RenewWarnDays {
+					msg = fmt.Sprintf("The licence for %s ends on %s: %d day%s left. Enter the renewed key in Settings.", l.Squadron, l.Expires, left, plural(left))
+				}
+				return Status{State: Licensed, Licence: &l, DaysLeft: left, Message: msg}
+			case now.Before(exp.Add(GraceDays * 24 * time.Hour)):
+				// Grace (operator 2026-10-23): a late renewal never stops a
+				// paying squadron's flying night.
+				left := daysLeft(exp.Add(GraceDays*24*time.Hour), now)
+				return Status{State: Grace, Licence: &l, DaysLeft: left,
+					Message: fmt.Sprintf("The licence for %s ended on %s. Readback keeps running for %d more day%s: enter the renewed key in Settings.", l.Squadron, l.Expires, left, plural(left))}
 			}
 			return Status{State: Expired, Licence: &l,
-				Message: fmt.Sprintf("The licence for %s ended on %s. Enter a new key in Settings.", l.Squadron, l.Expires)}
+				Message: fmt.Sprintf("The licence for %s ended on %s. Enter a new key in Settings to start Readback ATC again.", l.Squadron, l.Expires)}
 		}
 	}
 	// Trial: the earliest start either place knows, the latest time seen.

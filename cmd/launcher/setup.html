@@ -347,7 +347,7 @@ function renderSummary() {
     row(c.ffmpeg, c.ffmpeg ? 'ffmpeg' : 'ffmpeg missing: pilots cannot be heard. Run <code>winget install --id Gyan.FFmpeg -e</code>') + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
     row(tested, tested ? 'Test call sent' : 'Test call not sent yet', true) +
     (licence && licence.state !== 'source'
-      ? row(licence.state === 'licensed', esc(licence.message), licence.state === 'trial') : '');
+      ? row(licence.state === 'licensed', esc(licence.message), licence.state === 'trial' || licence.state === 'grace') : '');
   $('startBtn').disabled = !t || !setup.canEdit;
   $('startBtn').textContent = t ? '▶ Start ' + t.label + ' and finish' : '▶ Start and finish';
 }

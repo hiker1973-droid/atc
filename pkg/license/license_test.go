@@ -99,8 +99,12 @@ func TestActivate(t *testing.T) {
 		t.Fatalf("%+v %v", s, err)
 	}
 	*now = time.Date(2027, 11, 2, 1, 0, 0, 0, time.UTC)
-	if s := c.Check(); s.State != Expired {
-		t.Fatalf("after the key's end: %+v", s)
+	if s := c.Check(); s.State != Grace || !s.Allowed() || s.DaysLeft != 7 {
+		t.Fatalf("the day after the key's end: %+v", s)
+	}
+	*now = time.Date(2027, 11, 9, 1, 0, 0, 0, time.UTC)
+	if s := c.Check(); s.State != Expired || s.Allowed() {
+		t.Fatalf("after the grace week: %+v", s)
 	}
 	perpetual, _ := Sign(Licence{Squadron: "vSFG-7", ID: "p", Issued: "2026-10-23"}, priv)
 	if s, err := c.Activate(perpetual); err != nil || s.State != Licensed || s.DaysLeft != 0 {
@@ -136,5 +140,28 @@ func TestSourceInstallShowsKey(t *testing.T) {
 func TestBuiltInPublicKey(t *testing.T) {
 	if len(PublicKey) != ed25519.PublicKeySize || PublicKey.Equal(make(ed25519.PublicKey, ed25519.PublicKeySize)) {
 		t.Fatal("no public key built in: every licence key would be rejected")
+	}
+}
+
+// Two weeks before a key ends the message warns; setting the clock back
+// after the end does not buy days.
+func TestKeyEndWarningAndClock(t *testing.T) {
+	c, priv, now := testChecker(t)
+	key, _ := Sign(Licence{Squadron: "VFA-103", ID: "a", Issued: "2026-10-01", Expires: "2026-11-30"}, priv)
+	c.Activate(key)
+	if s := c.Check(); s.State != Licensed || strings.Contains(s.Message, "days left") {
+		t.Fatalf("five weeks out: %+v", s)
+	}
+	*now = time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	if s := c.Check(); s.State != Licensed || s.DaysLeft != 6 || !strings.Contains(s.Message, "6 days left") {
+		t.Fatalf("five days out: %+v", s)
+	}
+	*now = time.Date(2026, 12, 20, 12, 0, 0, 0, time.UTC)
+	if s := c.Check(); s.State != Expired {
+		t.Fatalf("three weeks after: %+v", s)
+	}
+	*now = time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC) // the clock set back
+	if s := c.Check(); s.State != Expired {
+		t.Fatalf("clock set back: %+v", s)
 	}
 }
