@@ -60,6 +60,7 @@ func main() {
 	if *flagUpdate {
 		*flagQuiet = true
 	}
+	setTitle(appName + " Setup " + productVersion)
 	fmt.Printf("%s setup %s (%s)\n\n", appName, productVersion, version)
 	var err error
 	if *flagUninstall {
@@ -93,6 +94,7 @@ func install(dir string) error {
 		fmt.Printf("  closed %d running Readback program(s) from this folder\n", n)
 		time.Sleep(time.Second) // let Windows release the files
 	}
+	retireSkyEye(dir)
 	for _, p := range programs {
 		data, err := payload.ReadFile("payload/" + p)
 		if err != nil {
@@ -219,6 +221,58 @@ func uninstall(dir string) error {
 	}
 	fmt.Printf("\nYour settings, start files and logs are still in %s.\nDelete that folder to remove them too.\n", dir)
 	return nil
+}
+
+// retireSkyEye moves a PC off the test builds from before the rename
+// (SkyEye-Setup.exe: %LOCALAPPDATA%\SkyEye, "SkyEye ATC" shortcuts). Left in
+// place, its Startup shortcut kept starting the old launcher on port 7000, so
+// the new install opened the old dashboard (operator 2026-10-23: the name
+// "just shows SKYEYE"). It stops the old programs, removes the old shortcuts
+// and copies the settings across where the new folder has none; the old
+// folder itself stays.
+func retireSkyEye(dir string) {
+	old := filepath.Join(os.Getenv("LOCALAPPDATA"), "SkyEye")
+	if strings.EqualFold(filepath.Clean(old), filepath.Clean(dir)) || !exists(filepath.Join(old, "launcher.exe")) {
+		return
+	}
+	fmt.Printf("\nFound the old SkyEye ATC test copy in %s\n", old)
+	if n := stopRunning(old); n > 0 {
+		fmt.Printf("  closed %d running SkyEye program(s)\n", n)
+		time.Sleep(time.Second)
+	}
+	for _, p := range []string{
+		filepath.Join(startMenuDir(), "SkyEye ATC.lnk"),
+		filepath.Join(startMenuDir(), "Uninstall SkyEye ATC.lnk"),
+		filepath.Join(desktopDir(), "SkyEye ATC.lnk"),
+		filepath.Join(startupDir(), "SkyEye ATC.lnk"),
+	} {
+		if err := os.Remove(p); err == nil {
+			fmt.Printf("  removed %s\n", p)
+		}
+	}
+	// Settings and generated start files; the trial and licence carry over
+	// through licence.json and the registry.
+	var keep []string
+	for _, pat := range []string{"*.json", "start_*.bat"} {
+		m, _ := filepath.Glob(filepath.Join(old, pat))
+		keep = append(keep, m...)
+	}
+	if m, _ := filepath.Glob(filepath.Join(old, "branding", "*")); len(m) > 0 {
+		os.MkdirAll(filepath.Join(dir, "branding"), 0o755)
+		keep = append(keep, m...)
+	}
+	n := 0
+	for _, src := range keep {
+		rel, _ := filepath.Rel(old, src)
+		dst := filepath.Join(dir, rel)
+		if !exists(dst) && copyFile(src, dst) == nil {
+			n++
+		}
+	}
+	if n > 0 {
+		fmt.Printf("  copied %d settings file(s) to the new folder\n", n)
+	}
+	fmt.Printf("  the old folder can be deleted once Readback ATC is working\n\n")
 }
 
 // stopRunning closes SkyEye programs started from dir, and only those: a
