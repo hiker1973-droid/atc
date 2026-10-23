@@ -48,4 +48,6 @@ branding.json
 branding/
 # build_installer.bat output
 dist/
+# build_installer.bat copies the guides into the installer payload
+cmd/installer/payload/*.pdf
 sides.json
