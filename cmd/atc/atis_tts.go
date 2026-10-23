@@ -110,6 +110,9 @@ func atisSynthesize(ctx context.Context, apiKey, text string, v voiceProfile, st
 				Dur("took", time.Since(start)).Msg("ATIS TTS attempt failed")
 			continue
 		}
+		if isWinClip(mp3) { // Windows voice: text, not audio to measure
+			return mp3, nil
+		}
 		sec, derr := mp3DurationSec(flagFFmpeg, mp3)
 		if derr != nil {
 			log.Warn().Err(derr).Str("station", station).Str("part", part).

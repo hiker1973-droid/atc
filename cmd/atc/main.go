@@ -2233,6 +2233,9 @@ func synthesizeSpeechFrom(ctx context.Context, apiKey, text string, v voiceProfi
 	// the profile without the ElevenLabs voice, so a recovered ElevenLabs is
 	// not shadowed by the fallback clip.
 	v.eleven = elevenVoice{}
+	if ttsEngine() == "windows" { // tts_windows.go
+		return makeWinClip(text, v), ttsSource{Service: "windows", Voice: v.voice}, nil
+	}
 	src = ttsSource{Service: "openai", Voice: v.voice}
 	if mp3, ok := globalTTSCache.get(v, text); ok {
 		src.Cached = true
@@ -2307,6 +2310,9 @@ func translateATIS(ctx context.Context, apiKey, text, language string) (string, 
 var openAIClient = &http.Client{Timeout: 60 * time.Second}
 
 func synthesizeSpeechAPI(ctx context.Context, apiKey, text string, v voiceProfile) ([]byte, error) {
+	if ttsEngine() == "windows" { // ATIS comes straight here (tts_windows.go)
+		return makeWinClip(text, v), nil
+	}
 	speed := v.speed
 	if speed <= 0 {
 		speed = speedDeckboss
@@ -2892,6 +2898,10 @@ func transmitExternalAudioFile(ctx context.Context, mp3 []byte, freqMHz float64,
 	// Our receivers on this frequency ignore what they hear until playback
 	// has ended (tx_guard.go).
 	defer beginTX(freqMHz)()
+	if c, ok := readWinClip(mp3); ok {
+		transmitWinClip(ctx, c, freqMHz, callsign, srsPort, exePath)
+		return
+	}
 	// Write MP3 to temp file
 	tmp, err := os.CreateTemp("", "atc-tts-*.mp3")
 	if err != nil {

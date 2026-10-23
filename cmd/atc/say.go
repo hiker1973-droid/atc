@@ -51,27 +51,33 @@ func sayOnce(apiKey string) error {
 	if err != nil {
 		return fmt.Errorf("text-to-speech failed (%s): %w", src.Service, err)
 	}
-	tmp, err := os.CreateTemp("", "atc-say-*.mp3")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(mp3); err != nil {
+	// The audio, or with the Windows voices the line itself (tts_windows.go).
+	var speak []string
+	if c, ok := readWinClip(mp3); ok {
+		speak = winClipArgs(c)
+	} else {
+		tmp, err := os.CreateTemp("", "atc-say-*.mp3")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(tmp.Name())
+		if _, err := tmp.Write(mp3); err != nil {
+			tmp.Close()
+			return err
+		}
 		tmp.Close()
-		return err
+		txPath, cleanup := prepareTX(tmp.Name(), flagSayName)
+		defer cleanup()
+		speak = []string{"--file", txPath}
 	}
-	tmp.Close()
-	txPath, cleanup := prepareTX(tmp.Name(), flagSayName)
-	defer cleanup()
-	args := []string{
-		"--file", txPath,
+	args := append(speak,
 		"--freqs", fmt.Sprintf("%.3f", flagFreqMHz),
 		"--modulations", srsModulationName(flagFreqMHz),
 		"-c", srsCoalitionArg(),
 		"-n", strings.ReplaceAll(flagSayName, " ", "-"),
 		"-p", port,
 		"-v", "1",
-	}
+	)
 	out, err := runExternalAudio(ctx, flagExternalAudio, args)
 	if err != nil {
 		// SRS 2.4's ExternalAudio is a .NET 10 program; on a PC without the

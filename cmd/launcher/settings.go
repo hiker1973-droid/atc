@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"github.com/vsfg7/atc/pkg/airfield"
+	"github.com/vsfg7/atc/pkg/license"
 	"github.com/vsfg7/atc/pkg/rolecfg"
 )
 
@@ -121,6 +122,22 @@ func checkSetting(name, value string) error {
 		}
 	}
 	return nil
+}
+
+// ttsEngine is the voice engine roles use: SKYEYE_TTS, else OpenAI on a
+// source install (the vSFG-7 rigs) and Windows on a SkyEye-Setup install.
+// Mirrors cmd/atc ttsEngine.
+func ttsEngine() string {
+	switch strings.ToLower(strings.TrimSpace(userEnv("SKYEYE_TTS"))) {
+	case "windows":
+		return "windows"
+	case "openai":
+		return "openai"
+	}
+	if license.IsSource(rootDir) {
+		return "openai"
+	}
+	return "windows"
 }
 
 // --- frequencies.json ---
@@ -253,7 +270,7 @@ func settingsSnapshot() map[string]any {
 		theatres = append(theatres, tv)
 		roleViews[t.Key] = theatreRoles(t.Key, rc)
 	}
-	out := map[string]any{"vars": vars, "theatres": theatres, "roles": roleViews}
+	out := map[string]any{"vars": vars, "theatres": theatres, "roles": roleViews, "tts": ttsEngine()}
 	if ferr != nil {
 		out["freqError"] = ferr.Error()
 	}
@@ -404,6 +421,22 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true, "msg": "Saved. Restart the theatre's roles to use it."})
+	case "tts":
+		// The voice engine (cmd/atc/tts_windows.go): free Windows voices, or
+		// OpenAI's. ElevenLabs speaks wherever its key and a role's voice are set.
+		if req.Value != "windows" && req.Value != "openai" {
+			http.Error(w, "want windows or openai", http.StatusBadRequest)
+			return
+		}
+		if err := setUserEnv("SKYEYE_TTS", req.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		msg := "OpenAI voices on. Restart the roles to hear them."
+		if req.Value == "windows" {
+			msg = "Windows voices on (free). Restart the roles to hear them."
+		}
+		writeJSON(w, map[string]any{"ok": true, "msg": msg})
 	case "restart":
 		if licenceBlocks(w) {
 			return

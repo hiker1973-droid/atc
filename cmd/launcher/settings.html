@@ -111,7 +111,16 @@
   <section>
     <h2>Voice services</h2>
     <p class="sub">Keys stay on this rig. The page only ever shows the last four characters.
-      Without an ElevenLabs key every voice uses OpenAI; ATIS always does.</p>
+      The OpenAI key is needed in any case: it is how SkyEye understands the pilots.</p>
+    <div class="row" style="grid-template-columns: 15rem 1fr">
+      <div class="lab">Voices</div>
+      <div>
+        <label style="display:block;margin:0.15rem 0"><input type="radio" name="tts" value="windows" onchange="setTTS(this.value)"> <b>Windows voices</b> <span class="muted">- free, built into Windows; plainer, no radio accents</span></label>
+        <label style="display:block;margin:0.15rem 0"><input type="radio" name="tts" value="openai" onchange="setTTS(this.value)"> <b>OpenAI voices</b> <span class="muted">- natural, with each field's accent; a fraction of a cent per call</span></label>
+        <span class="muted" style="font-size:0.8rem">An ElevenLabs key below upgrades the roles that have an ElevenLabs voice, whichever is chosen here. ATIS uses this choice.</span>
+      </div>
+      <div class="msg" id="ttsMsg"></div>
+    </div>
     <div id="keys"></div>
   </section>
 
@@ -398,6 +407,18 @@ async function saveField(icao) {
   show(document.getElementById('freqMsg'), res);
 }
 
+// ── Voice engine (cmd/atc/tts_windows.go) ──
+async function setTTS(value) {
+  const res = await post({ op: 'tts', value });
+  show(document.getElementById('ttsMsg'), res);
+}
+function renderTTS() {
+  for (const r of document.querySelectorAll('input[name="tts"]')) {
+    r.checked = r.value === data.tts;
+    r.disabled = !data.canEdit;
+  }
+}
+
 // ── Licence (pkg/license) ──
 function renderLicence(st) {
   const el = document.getElementById('licStatus');
@@ -452,7 +473,7 @@ async function load() {
   if (data.freqError) show(document.getElementById('freqMsg'), { ok: false, msg: 'frequencies.json: ' + data.freqError });
   if (data.rolesError) show(document.getElementById('roleMsg'), { ok: false, msg: 'roles.json: ' + data.rolesError });
   document.getElementById('restartBtn').disabled = !data.canEdit;
-  renderTabs(); renderFields(); renderRoles();
+  renderTabs(); renderFields(); renderRoles(); renderTTS();
 }
 load().then(loadVoices);
 </script>

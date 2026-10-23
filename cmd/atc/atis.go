@@ -326,7 +326,7 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 			// serial playback. On ffmpeg failure fall back to EN-only rather
 			// than risk the overlap bug.
 			combined := enMP3
-			if l2MP3 != nil {
+			if l2MP3 != nil && !isWinClip(enMP3) { // the Windows English voices cannot read the local language
 				if merged, mErr := concatMP3WithSilence(enMP3, l2MP3, flagFFmpeg, 1.2); mErr == nil {
 					combined = merged
 				} else {
