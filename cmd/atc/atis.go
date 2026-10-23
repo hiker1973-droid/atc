@@ -629,10 +629,11 @@ func atisStationsForMap(m string) []*atisStation {
 			{Name: "Senaki ATIS", FreqMHz: 234.000, Voice: "echo", ICAO: "UGKS",
 				TACAN: "TACAN 31X.", ILS: "ILS 108.90 runway 09.", Advisory: advisory},
 			// Mozdok took Tbilisi's ATIS and its 237.000 (operator 2026-10-23: "change
-			// Tbilisi ATIS for Mozdok"). No ILS at Mozdok; its TACAN 38X MZD is a
-			// mission unit in the BFM mission only, so not broadcast.
+			// Tbilisi ATIS for Mozdok"). No ILS at Mozdok. TACAN 38X MZD is a mission
+			// unit, in both the BFM mission and Training V1.36 (mission session,
+			// 2026-10-23).
 			{Name: "Mozdok ATIS", FreqMHz: 237.000, Voice: "onyx", ICAO: "XRMF",
-				TACAN: "", ILS: "", Advisory: advisory},
+				TACAN: "TACAN 38X.", ILS: "", Advisory: advisory},
 		}
 	case "germany", "de", "coldwargermany", "cold-war-germany", "cwg":
 		return []*atisStation{
