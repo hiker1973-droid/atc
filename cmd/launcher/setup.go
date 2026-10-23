@@ -220,6 +220,9 @@ func handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, map[string]any{"ok": true})
 	case "testcall":
+		if licenceBlocks(w) {
+			return
+		}
 		text := strings.TrimSpace(req.Text)
 		if len(text) > 200 || strings.ContainsAny(text, "\"%") {
 			http.Error(w, "keep the test line short, without quotes or %", http.StatusBadRequest)

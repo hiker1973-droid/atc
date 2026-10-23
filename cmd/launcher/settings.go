@@ -405,6 +405,9 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, map[string]any{"ok": true, "msg": "Saved. Restart the theatre's roles to use it."})
 	case "restart":
+		if licenceBlocks(w) {
+			return
+		}
 		running := restartTheatre(req.Theatre)
 		msg := "Nothing running in that theatre - the changes apply when it starts."
 		if len(running) > 0 {

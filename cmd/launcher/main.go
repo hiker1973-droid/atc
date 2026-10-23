@@ -155,11 +155,11 @@ func main() {
 	mux.HandleFunc("/api/pilots", handlePilots)
 
 	// State-changing — operators only, POST + same-origin (see controlAllowed).
-	mux.HandleFunc("/api/start", requireControl(handleStart))
+	mux.HandleFunc("/api/start", requireControl(requireLicence(handleStart)))
 	mux.HandleFunc("/api/stop", requireControl(handleStop))
-	mux.HandleFunc("/api/start-region", requireControl(handleStartRegion))
+	mux.HandleFunc("/api/start-region", requireControl(requireLicence(handleStartRegion)))
 	mux.HandleFunc("/api/stop-region", requireControl(handleStopRegion))
-	mux.HandleFunc("/api/restart", requireControl(handleRestart))
+	mux.HandleFunc("/api/restart", requireControl(requireLicence(handleRestart)))
 	mux.HandleFunc("/api/rescan", requireControl(handleRescan))
 	// GET = the field sides (viewer); POST = set one (control, checked inside).
 	mux.HandleFunc("/api/sides", handleSides)
@@ -168,6 +168,8 @@ func main() {
 	mux.HandleFunc("/api/settings/voices", handleSettingsVoices)
 	// GET = setup state (viewer); POST = theatre / test call / done (control, checked inside).
 	mux.HandleFunc("/api/setup", handleSetup)
+	// GET = trial / licence status (viewer); POST = enter a key (control, checked inside).
+	mux.HandleFunc("/api/licence", handleLicence)
 	// GET = progress (viewer); POST = run (control, checked inside).
 	mux.HandleFunc("/api/update", handleUpdate)
 

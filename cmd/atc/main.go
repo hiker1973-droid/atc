@@ -463,6 +463,9 @@ func run(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
+	if err := checkLicence(); err != nil { // trial over and no key (licence.go)
+		return err
+	}
 	if err := logRoleConfig(); err != nil {
 		return err
 	}

@@ -330,7 +330,9 @@ function renderSummary() {
     row(c.srs && c.eam, 'SRS server and password') + row(c.tacview, c.tacview ? 'Tacview telemetry' : 'No Tacview: Command and the GCI cannot see aircraft', true) +
     row(c.externalAudio, 'DCS-SRS ExternalAudio on this PC') +
     row(c.ffmpeg, c.ffmpeg ? 'ffmpeg (radio effect)' : 'No ffmpeg: calls go out without the radio effect', true) + row(!!t, t ? 'Theatre: ' + esc(t.label) : 'No theatre picked') +
-    row(tested, tested ? 'Test call sent' : 'Test call not sent yet', true);
+    row(tested, tested ? 'Test call sent' : 'Test call not sent yet', true) +
+    (licence && licence.state !== 'source'
+      ? row(licence.state === 'licensed', esc(licence.message), licence.state === 'trial') : '');
   $('startBtn').disabled = !t || !setup.canEdit;
   $('startBtn').textContent = t ? '▶ Start ' + t.label + ' and finish' : '▶ Start and finish';
 }
@@ -344,8 +346,10 @@ async function finish(start) {
   location.href = '/';
 }
 
+let licence = null; // trial / licence status (pkg/license), for the Ready checklist
 async function load() {
-  [setup, settings] = await Promise.all([fetch('/api/setup').then(r => r.json()), fetch('/api/settings').then(r => r.json())]);
+  [setup, settings, licence] = await Promise.all([fetch('/api/setup').then(r => r.json()), fetch('/api/settings').then(r => r.json()),
+    fetch('/api/licence').then(r => r.json()).catch(() => null)]);
   $('viewer').style.display = setup.canEdit ? 'none' : 'block';
   document.querySelectorAll('section input, section button').forEach(el => {
     if (!el.closest('.nav') && !setup.canEdit) el.disabled = true;

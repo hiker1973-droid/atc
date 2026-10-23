@@ -97,6 +97,17 @@
     </div>
   </section>
 
+  <section id="licence">
+    <h2>Licence</h2>
+    <p class="sub" id="licStatus">Checking…</p>
+    <div class="row" style="grid-template-columns: 15rem 1fr auto" id="licEntry">
+      <div class="lab">Licence key<small>starts SKYEYE1-</small></div>
+      <input id="licKey" spellcheck="false" autocomplete="off" placeholder="paste the key you were sent">
+      <button class="primary" onclick="activateLicence()">Activate</button>
+      <div class="msg" id="licMsg"></div>
+    </div>
+  </section>
+
   <section>
     <h2>Voice services</h2>
     <p class="sub">Keys stay on this rig. The page only ever shows the last four characters.
@@ -386,6 +397,30 @@ async function saveField(icao) {
   await load();
   show(document.getElementById('freqMsg'), res);
 }
+
+// ── Licence (pkg/license) ──
+function renderLicence(st) {
+  const el = document.getElementById('licStatus');
+  const cls = { licensed: 'ok', source: 'muted', trial: st.daysLeft <= 3 ? 'bad' : 'warn', expired: 'bad' }[st.state] || 'muted';
+  el.className = 'sub ' + cls;
+  el.textContent = st.message;
+  // A source install (the vSFG-7 rigs) has nothing to enter.
+  document.getElementById('licEntry').style.display = st.state === 'source' ? 'none' : '';
+}
+async function loadLicence() {
+  try { renderLicence(await fetch('/api/licence').then(r => r.json())); } catch (e) { /* leave "Checking…" */ }
+}
+async function activateLicence() {
+  const key = document.getElementById('licKey').value.trim(), msg = document.getElementById('licMsg');
+  if (!key) { show(msg, { ok: false, msg: 'Paste your licence key first.' }); return; }
+  const r = await fetch('/api/licence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+  const t = await r.text();
+  if (!r.ok) { show(msg, { ok: false, msg: t.trim() }); return; }
+  document.getElementById('licKey').value = '';
+  renderLicence(JSON.parse(t));
+  show(msg, { ok: true, msg: 'Activated. Thank you!' });
+}
+loadLicence();
 
 // ── Squadron (branding.js does the saving) ──
 const byId = id => document.getElementById(id);

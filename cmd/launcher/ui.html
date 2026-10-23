@@ -571,14 +571,24 @@ async function switchRig(name) {
 // A fresh install (no OpenAI key or SRS address yet, setup not finished) gets
 // a banner pointing at the Setup wizard. Working rigs never see it.
 async function checkSetup() {
+  const banner = (href, text, red) => {
+    const b = document.createElement('a');
+    b.href = href;
+    b.textContent = text;
+    b.style.cssText = red
+      ? 'display:block;background:#3d0f0f;color:#ff7b72;border-bottom:1px solid #f85149;padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;'
+      : 'display:block;background:#3d2e00;color:#e3b341;border-bottom:1px solid #d29922;padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;';
+    document.body.prepend(b);
+  };
+  try {
+    // Trial or licence (pkg/license); the vSFG-7 rigs are "source" and show nothing.
+    const l = await fetch('/api/licence').then(r => r.json());
+    if (l.state === 'expired') banner('/settings#licence', '⛔ ' + l.message + ' →', true);
+    else if (l.state === 'trial') banner('/settings#licence', '⏳ ' + l.message + ' →', l.daysLeft <= 3);
+  } catch (e) { /* no banner */ }
   try {
     const s = await fetch('/api/setup').then(r => r.json());
-    if (!s.needsSetup) return;
-    const b = document.createElement('a');
-    b.href = '/setup';
-    b.textContent = '⚙ SkyEye is not set up on this PC yet: run Setup (keys, SRS server, theatre, test call) →';
-    b.style.cssText = 'display:block;background:#3d2e00;color:#e3b341;border-bottom:1px solid #d29922;padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;';
-    document.body.prepend(b);
+    if (s.needsSetup) banner('/setup', '⚙ SkyEye is not set up on this PC yet: run Setup (keys, SRS server, theatre, test call) →');
   } catch (e) { /* no banner */ }
 }
 
