@@ -156,6 +156,8 @@ func main() {
 	mux.HandleFunc("/api/stop-region", requireControl(handleStopRegion))
 	mux.HandleFunc("/api/restart", requireControl(handleRestart))
 	mux.HandleFunc("/api/rescan", requireControl(handleRescan))
+	// GET = the field sides (viewer); POST = set one (control, checked inside).
+	mux.HandleFunc("/api/sides", handleSides)
 	// GET = progress (viewer); POST = run (control, checked inside).
 	mux.HandleFunc("/api/update", handleUpdate)
 

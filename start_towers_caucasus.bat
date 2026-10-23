@@ -49,4 +49,10 @@ start "Kutaisi Tower" cmd /c "%~dp0atc.exe --airfield UGKO --srs-addr %SRS% --ea
 start "Tbilisi Tower" cmd /c "%~dp0atc.exe --airfield UGTB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice onyx --dashboard-port 6015 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
+:: Mozdok Tower — XRMF, 266.0, dashboard 6016, Adam; no ATIS. Blue for the
+:: Training mission (operator 2026-10-23); the dashboard's Side switch makes it
+:: red for a BFM night (sides.json), handing departures to Red Command 280.
+start "Mozdok Tower" cmd /c "%~dp0atc.exe --airfield XRMF --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice onyx --elevenlabs-tower-voice pNInz6obpgDQGcFmaJgB --dashboard-port 6016 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+%SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
+
 echo [vSFG-7] Caucasus towers launched.

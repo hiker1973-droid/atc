@@ -96,6 +96,11 @@
     "freq": 263
    },
    {
+    "name": "Mozdok Tower",
+    "icao": "XRMF",
+    "freq": 266
+   },
+   {
     "name": "Senaki Tower",
     "icao": "UGKS",
     "freq": 261

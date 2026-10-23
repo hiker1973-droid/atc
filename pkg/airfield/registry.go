@@ -25,7 +25,7 @@ func ByICAO(icao string) *Airfield { return registry[strings.ToUpper(strings.Tri
 // the Command proactive-handoff scan, and the start scripts.
 var (
 	PersianGulf = []*Airfield{OMDM, OMAM, OMAL}
-	Caucasus    = []*Airfield{UGSB, UG5X, UGKS, UGKO, UGTB}
+	Caucasus    = []*Airfield{UGSB, UG5X, UGKS, UGKO, UGTB, XRMF} // Mozdok blue for Training (2026-10-23); its Side switch makes it red
 	// Germany is the 8 F/A-18 recovery bases from the Cold War Germany COMM1
 	// preset card (tower on VHF, ATIS on UHF), in launch order.
 	Germany = []*Airfield{ETAR, ETAD, EDFH, EDDF, EDDK, EDDL, EDDV, EDDH}

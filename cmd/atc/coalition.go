@@ -49,10 +49,10 @@ func srsCoalitionArg() string {
 
 // commandFields are the fields Command hands recovering jets to, takes its
 // magnetic variation from and offers for a divert: --command-fields when set,
-// else the --map's tower fields.
+// else the --map's tower fields on Command's own side (sides.go).
 func commandFields() []*airfield.Airfield {
 	if strings.TrimSpace(flagCommandFields) == "" {
-		return airfield.FieldsForMap(flagMap)
+		return sideFields(airfield.FieldsForMap(flagMap), redSide())
 	}
 	var out []*airfield.Airfield
 	for _, icao := range strings.Split(flagCommandFields, ",") {

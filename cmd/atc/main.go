@@ -485,7 +485,18 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagGCIOnly       { mode = "gci-only" }
 	if flagDeckbossFreq != "0" && flagDeckbossFreq != "" { mode = "deckboss" }
 	log.Info().Str("mode", mode).Str("srs", flagSRSAddr).Msg("vsfg7-atc starting")
-	key := instanceKey(mode, af.ICAO, flagMap, flagCoalition, flagSRSAddr)
+	if mode == "tower" {
+		applyTowerSide(af, cmd.Flags().Changed("coalition"))
+		if redSide() {
+			log.Info().Str("airfield", af.ICAO).Str("handoff", af.HandoffCallsign).Msg("red tower - SRS coalition red, departures to Red Command")
+		}
+	}
+	// One tower per field whatever its side; blue and red Command are two roles.
+	side := ""
+	if flagCommandOnly {
+		side = flagCoalition
+	}
+	key := instanceKey(mode, af.ICAO, flagMap, side, flagSRSAddr)
 	if ok, err := claimInstance(key); err != nil {
 		log.Warn().Err(err).Str("key", key).Msg("single-instance check failed - starting anyway")
 	} else if !ok {

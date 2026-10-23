@@ -103,6 +103,9 @@
   .card-head .status-dot.up { background: var(--green); box-shadow: 0 0 6px rgba(63,185,80,0.6); }
   .card-head .status-dot.down { background: var(--red); }
   .card .freq { color: var(--blue); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+  .card .btn.side { margin-left: 0.35rem; padding: 0.1rem 0.5rem; font-size: 0.68rem; font-weight: 600; }
+  .card .btn.side.blue { background: rgba(56,139,253,0.15); color: #58a6ff; border: 1px solid #1f6feb; }
+  .card .btn.side.red  { background: rgba(248,81,73,0.15); color: #ff7b72; border: 1px solid #da3633; }
   .card .pill { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.7rem; color: var(--label); margin-top: 0.45rem; }
   .card .extra { color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
   .card select.rwy-sel { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.3rem; font-size: 0.72rem; font-family: inherit; margin-top: 0.3rem; }
@@ -624,9 +627,10 @@ const THEATRES = {
       { icao: 'UGKS', label: 'Senaki',   freq: '261.000', port: 6013, role: 'Senaki Tower' },
       { icao: 'UGKO', label: 'Kutaisi',  freq: '263.000', port: 6014, role: 'Kutaisi Tower' },
       { icao: 'UGTB', label: 'Tbilisi',  freq: '267.000', port: 6015, role: 'Tbilisi Tower' },
+      { icao: 'XRMF', label: 'Mozdok',   freq: '266.000', port: 6016, role: 'Mozdok Tower' },
     ],
     // Five towers + Marshal (6004) + Deckboss (6005) on the shared carrier ports.
-    wxPorts: [6011, 6012, 6013, 6014, 6015, 6004, 6005],
+    wxPorts: [6011, 6012, 6013, 6014, 6015, 6016, 6004, 6005],
     // Black Sea CVN-72: live Marshal 306.200 = Hornet COMM1 CH2 (operator 2026-09-19; CH3 306.3 is DCS AI),
     // Deckboss 128.600 as in every other theatre (2026-09-15). These still
     // target the _caucasus bats — they set --airfield UGSB for BRC variation.
@@ -636,11 +640,11 @@ const THEATRES = {
       { id: 'deckboss', label: 'Deckboss', freq: '128.600', extras: 'Black Sea carrier UHF',    roles: ['Deckboss (Caucasus)'],       stopLabel: 'Stop Deckboss' },
       // GCI (cmd/atc/gci.go, 2026-10-21): in start_region_caucasus.bat since skyeye.exe left the servers.
       { id: 'gci',      label: 'AWACS Darkstar', freq: '264.000', extras: 'AWACS 264.000', roles: ['vSFG-7 GCI Darkstar (Caucasus)'], stopLabel: 'Stop AWACS' },
-      // RED side on demand (start_red_caucasus.bat, operator 2026-10-22 BFM night): one bat
-      // starts both, so Start fires it once (start); Stop stops both. Not in the region bat -
-      // an Update stops it and does not bring it back.
-      { id: 'red',      label: 'RED Command + Mozdok', freq: '280.000', extras: 'Red Command 280.000 · Mozdok Tower 266.000 · on demand',
-        roles: ['vSFG-7 Red Command (Caucasus)', 'Mozdok Tower'], start: ['vSFG-7 Red Command (Caucasus)'], stopLabel: 'Stop RED' },
+      // RED Command on demand (start_red_caucasus.bat, operator 2026-10-22 BFM night). Not in
+      // the region bat - an Update stops it and does not bring it back. Its fields are the
+      // towers switched to RED on their cards (Mozdok for BFM; 2026-10-23).
+      { id: 'red',      label: 'RED Command', freq: '280.000', extras: 'Red Command 280.000 · on demand · recovers to RED towers',
+        roles: ['vSFG-7 Red Command (Caucasus)'], stopLabel: 'Stop RED' },
     ],
   },
   germany: {
@@ -775,6 +779,22 @@ async function refreshRoles() {
   } catch (e) { /* leave previous state */ }
 }
 
+// Field sides from sides.json: ICAO -> 'red' (absent = blue). The tower
+// card's Side switch sets them (operator 2026-10-23).
+let fieldSides = {};
+async function refreshSides() {
+  try {
+    const r = await fetch(api('/api/sides'), { cache: 'no-store' });
+    fieldSides = ((await r.json()) || {}).fields || {};
+  } catch { /* leave previous state */ }
+}
+async function setSide(icao, label, side) {
+  if (!confirm(`Make ${label} ${side.toUpperCase()}? A running ${label} tower restarts on the new side (about 10 s off air).`)) return;
+  const r = await fetch(api(`/api/sides?icao=${encodeURIComponent(icao)}&side=${side}`), { method: 'POST' });
+  if (!r.ok) alert(`Set ${label} ${side} failed: ${await r.text()}`);
+  setTimeout(refreshAll, 2000);
+}
+
 async function refreshTowers() {
   await Promise.all(TOWERS.map(async t => {
     try {
@@ -816,13 +836,16 @@ function renderCards() {
            ${available.map(r => `<option value="${esc(r)}"${r===current?' selected':''}>RWY ${esc(r)}</option>`).join('')}
          </select>`
       : `<span>RWY ${esc(current || '—')}</span>`;
+    const red = fieldSides[t.icao] === 'red';
+    const sideBtn = `<button class="btn side ${red ? 'red' : 'blue'}" title="Switch ${esc(t.label)} to ${red ? 'blue' : 'red'}"
+      onclick="setSide('${esc(t.icao)}', '${esc(t.label)}', '${red ? 'blue' : 'red'}')">${red ? 'RED' : 'BLUE'}</button>`;
     parts.push(`
       <div class="card">
         <div class="card-head">
           <span class="name">${t.label}</span>
           <span class="status-dot ${running ? 'up' : 'down'}"></span>
         </div>
-        <span class="pill">${esc(mode)}</span>
+        <span class="pill">${esc(mode)}</span> ${sideBtn}
         <div class="extra">${rwySelect}</div>
         <div class="actions">
           ${running
@@ -1484,7 +1507,7 @@ async function loadModalLog() {
 // Refresh loop
 // ──────────────────────────────────────────────────────────────────────────
 async function refreshAll() {
-  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth(), refreshAirborne()]);
+  await Promise.all([refreshRoles(), refreshTowers(), refreshCarrier(), refreshHealth(), refreshAirborne(), refreshSides()]);
   renderCards();
   renderMissionClock();
   renderWeather();

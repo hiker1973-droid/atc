@@ -2,11 +2,12 @@ package airfield
 
 import "github.com/paulmach/orb"
 
-// XRMF is Mozdok, Russia — Caucasus theatre, the RED field (operator
-// 2026-10-22: "a red Command 280.00 ... Red will be using mozdok airfield",
-// "Mozdok tower is 266"; the BFM Venom vs Raider mission, V1.16+). Run on
-// demand by start_red_caucasus.bat with --coalition red; it is NOT in the
-// Caucasus list below, so blue Command never sends a jet here.
+// XRMF is Mozdok, Russia — Caucasus theatre. Red's field in the BFM Venom vs
+// Raider mission (operator 2026-10-22: "Red will be using mozdok airfield",
+// "Mozdok tower is 266"), blue in the Training mission (2026-10-23: "for the
+// training miz I want to make Mozdok a blue airfield"). It runs with the
+// Caucasus towers as blue; the dashboard's Side switch makes it red for a BFM
+// night (cmd/atc/sides.go), which hands departures to Red Command 280 instead.
 //
 // Centre, elevation and runway edges are the live Mission Editor's
 // (`dcs-sms me airbase get --name Mozdok`, kept in the BFM build's
@@ -28,11 +29,11 @@ var XRMF = &Airfield{
 	ATISFreqMHz:     0, // none
 	DepartureDistNm: 7,
 	DepartureAngels: 3,
-	// Red's own Command (start_red_caucasus.bat): Hornet COMM2 CH4, Viper
-	// COMM1 CH3 in the BFM mission - two different buttons, so no preset.
-	HandoffCallsign: "Red Command",
-	HandoffFreqMHz:  280.000,
-	HandoffPreset:   "",
+	// Blue: theatre-wide Command, as the other Caucasus fields. Set red, the
+	// tower hands off to Red Command 280 instead (sides.go).
+	HandoffCallsign: "command",
+	HandoffFreqMHz:  282.000,
+	HandoffPreset:   "channel one",
 	BreakDirections: map[string]string{
 		"08": "left", // TODO verify pattern side against the ramp (south of the runway)
 		"26": "left",

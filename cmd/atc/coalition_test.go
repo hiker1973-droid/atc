@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/paulmach/orb"
 
@@ -43,9 +46,28 @@ func TestSRSCoalition(t *testing.T) {
 	}
 }
 
+// withSides points sides.json at a temp file holding the given red fields.
+func withSides(t *testing.T, red ...string) {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "sides.json")
+	f := sidesFile{Fields: map[string]string{}}
+	for _, icao := range red {
+		f.Fields[icao] = "red"
+	}
+	b, _ := json.Marshal(f)
+	if err := os.WriteFile(p, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := sidesPath
+	sidesPath = func() string { return p }
+	t.Cleanup(func() { sidesPath = old; sidesMod = time.Time{} })
+	sidesMod = time.Time{}
+}
+
 // Red Command recovers to Mozdok only, never to a blue field.
 func TestRedCommandRecoversToMozdok(t *testing.T) {
-	withCoalition(t, "red", "XRMF")
+	withSides(t, "XRMF")
+	withCoalition(t, "red", "")
 	fields := commandFields()
 	if len(fields) != 1 || fields[0].ICAO != "XRMF" {
 		t.Fatalf("red fields %v", fields)
@@ -61,16 +83,48 @@ func TestRedCommandRecoversToMozdok(t *testing.T) {
 	}
 }
 
-// Blue Command is unchanged: the five Caucasus fields, Mozdok not among them.
-func TestBlueCommandNeverSendsToMozdok(t *testing.T) {
+// Training (2026-10-23): Mozdok is a blue field, so blue Command has all six.
+// Switched red for a BFM night, blue Command drops it.
+func TestBlueCommandMozdokFollowsItsSide(t *testing.T) {
+	withSides(t)
 	withCoalition(t, "blue", "")
+	if n := len(commandFields()); n != len(airfield.Caucasus) || n != 6 {
+		t.Fatalf("blue fields %d", n)
+	}
+	withSides(t, "XRMF")
 	for _, f := range commandFields() {
 		if f.ICAO == "XRMF" {
-			t.Fatal("Mozdok is in blue's field list")
+			t.Fatal("red Mozdok is in blue's field list")
 		}
 	}
-	if len(commandFields()) != len(airfield.Caucasus) {
-		t.Fatalf("blue fields %d", len(commandFields()))
+	withCoalition(t, "red", "")
+	if n := len(commandFields()); n != 1 {
+		t.Fatalf("red fields %d", n)
+	}
+}
+
+// A tower switched red registers as red and hands off to Red Command 280;
+// blue, Mozdok hands off to Command 282 like the other Caucasus fields.
+func TestTowerSide(t *testing.T) {
+	withCoalition(t, "blue", "")
+	withSides(t)
+	blue := *airfield.XRMF
+	applyTowerSide(&blue, false)
+	if redSide() || blue.HandoffFreqMHz != 282.0 || blue.HandoffCallsign != "command" {
+		t.Fatalf("blue Mozdok %v %+v", redSide(), blue)
+	}
+	withSides(t, "XRMF")
+	red := *airfield.XRMF
+	applyTowerSide(&red, false)
+	if !redSide() || srsCoalition() != 1 || red.HandoffFreqMHz != 280.0 || red.HandoffCallsign != "Red Command" || red.HandoffPreset != "" {
+		t.Fatalf("red Mozdok %v %+v", redSide(), red)
+	}
+	// --coalition given on the command line wins over the file.
+	flagCoalition = "blue"
+	pinned := *airfield.XRMF
+	applyTowerSide(&pinned, true)
+	if redSide() {
+		t.Fatal("--coalition blue overridden by sides.json")
 	}
 }
 
@@ -88,11 +142,15 @@ func TestRedCommandAddress(t *testing.T) {
 	}
 }
 
-// Mozdok's departure call names Red Command and its frequency, with no
+// Red Mozdok's departure call names Red Command and its frequency, with no
 // dangling preset.
 func TestMozdokHandoffToRedCommand(t *testing.T) {
-	af := airfield.ByICAO("XRMF")
-	if af == nil || af.TowerFreqMHz != 266.0 || af.HandoffFreqMHz != 280.0 {
+	withCoalition(t, "red", "")
+	withSides(t, "XRMF")
+	cp := *airfield.ByICAO("XRMF")
+	af := &cp
+	applyTowerSide(af, true)
+	if af.TowerFreqMHz != 266.0 || af.HandoffFreqMHz != 280.0 {
 		t.Fatalf("XRMF %+v", af)
 	}
 	c := composer.NewATCComposer("Mozdok Tower")
