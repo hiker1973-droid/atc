@@ -33,7 +33,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html logs.html pilots.html logo.png
+//go:embed ui.html fleet.html logs.html pilots.html settings.html logo.png
 var uiFS embed.FS
 
 var (
@@ -128,6 +128,7 @@ func main() {
 	mux.HandleFunc("/fleet", serveFleetUI)
 	mux.HandleFunc("/logs", serveLogsUI)
 	mux.HandleFunc("/pilots", servePilotsUI)
+	mux.HandleFunc("/settings", serveSettingsUI)
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/api/me", handleMe)
 	mux.HandleFunc("/api/fleet", handleFleet)
@@ -158,6 +159,8 @@ func main() {
 	mux.HandleFunc("/api/rescan", requireControl(handleRescan))
 	// GET = the field sides (viewer); POST = set one (control, checked inside).
 	mux.HandleFunc("/api/sides", handleSides)
+	// GET = keys (masked), connection and frequencies (viewer); POST = change one (control, checked inside).
+	mux.HandleFunc("/api/settings", handleSettings)
 	// GET = progress (viewer); POST = run (control, checked inside).
 	mux.HandleFunc("/api/update", handleUpdate)
 

@@ -361,7 +361,7 @@ func restartLauncher() error {
 // launcher starts roles: the API keys and SkyEye settings an operator changes
 // with setx. A process only sees setx values set before it started, and the
 // roles inherit the launcher's environment - the 2026-10-15 revoked-key 401s.
-var keyEnvPrefixes = []string{"ELEVENLABS_", "OPENAI_", "SKYEYE_"}
+var keyEnvPrefixes = []string{"ELEVENLABS_", "OPENAI_", "SKYEYE_", "SRS_EAM"} // SRS_EAM: the Settings page sets it too
 
 // refreshKeyEnv copies those variables from the registry (machine, then user,
 // which wins - the same precedence Windows uses) into this process, and drops

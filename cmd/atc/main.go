@@ -450,6 +450,8 @@ func run(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
+	applyFreqOverrides() // the launcher Settings page's frequencies.json
+
 	af := airfield.ByICAO(flagAirfield)
 	if af == nil {
 		return fmt.Errorf("unknown airfield %q", flagAirfield)

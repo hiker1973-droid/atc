@@ -39,3 +39,6 @@ elevenlabs_usage/
 tts_cache/
 # one-click update: outcome and build scratch, per rig
 update_last.json
+# Settings page and tower Side switch, per rig
+frequencies.json
+sides.json

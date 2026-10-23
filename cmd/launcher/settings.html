@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vSFG-7 Settings</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --panel-2:#1c2330; --border:#30363d; --text:#c9d1d9; --muted:#8b949e;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel); }
+  .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
+    box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
+  header .logo { font-weight: 800; color: var(--blue); }
+  header .title { font-weight: 600; margin-right: 0.5rem; }
+  .spacer { flex: 1; }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; border: 1px solid var(--border);
+    padding: 0.28rem 0.6rem; border-radius: 5px; }
+  header a:hover { color: var(--text); }
+  button, input { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 0.35rem 0.6rem; font-size: 0.85rem; font-family: inherit; }
+  button { cursor: pointer; white-space: nowrap; }
+  button:hover:not(:disabled) { border-color: var(--blue); }
+  button:disabled, input:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.on { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  main { padding: 1rem 1.2rem 3rem; max-width: 1100px; margin: 0 auto; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.9rem 1rem 1rem; margin-bottom: 1rem; }
+  section h2 { margin: 0 0 0.2rem; font-size: 1rem; }
+  section .sub { color: var(--muted); font-size: 0.82rem; margin: 0 0 0.8rem; }
+  .row { display: grid; grid-template-columns: 15rem 9rem 1fr auto auto; gap: 0.5rem; align-items: center;
+    padding: 0.45rem 0; border-top: 1px solid var(--border); }
+  .row:first-of-type { border-top: none; }
+  .row .lab { font-weight: 600; }
+  .row .lab small { display: block; color: var(--muted); font-weight: 400; font-family: Consolas, monospace; font-size: 0.72rem; }
+  .row .cur { font-family: Consolas, monospace; font-size: 0.82rem; }
+  .row input { width: 100%; }
+  .ok { color: var(--green); } .bad { color: var(--red); } .warn { color: var(--amber); } .muted { color: var(--muted); }
+  .msg { grid-column: 1 / -1; font-size: 0.8rem; min-height: 0; }
+  .msg:empty { display: none; }
+  @media (max-width: 760px) {
+    .row { grid-template-columns: 1fr auto auto; }
+    .row .lab { grid-column: 1 / -1; } .row .cur { grid-column: 1 / -1; }
+  }
+  .tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td input { width: 6.5rem; font-family: Consolas, monospace; }
+  td input.changed { border-color: var(--amber); }
+  td .def { display: block; color: var(--muted); font-size: 0.7rem; margin-top: 0.15rem; }
+  td.icao { font-family: Consolas, monospace; color: var(--muted); }
+  .note { color: var(--muted); font-size: 0.8rem; margin-top: 0.7rem; }
+  .banner { border: 1px solid var(--amber); color: var(--amber); border-radius: 6px; padding: 0.6rem 0.8rem;
+    margin-bottom: 1rem; font-size: 0.85rem; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <img class="patch" src="/logo.png" alt="">
+  <span class="logo">vSFG-7</span><span class="title">Settings</span>
+  <span class="spacer"></span>
+  <a href="/">Dashboard</a><a href="/fleet">Fleet</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a>
+</header>
+<main>
+  <div class="banner" id="viewer">You can look but not change anything here: settings need operator rights.</div>
+
+  <section>
+    <h2>Voice services</h2>
+    <p class="sub">Keys stay on this rig. The page only ever shows the last four characters.
+      Without an ElevenLabs key every voice uses OpenAI; ATIS always does.</p>
+    <div id="keys"></div>
+  </section>
+
+  <section>
+    <h2>Server connection</h2>
+    <p class="sub">Where this rig finds DCS-SRS and Tacview real-time telemetry.</p>
+    <div id="conn"></div>
+  </section>
+
+  <section>
+    <h2>Frequencies</h2>
+    <p class="sub">Tower, ATIS and the departure handoff for each field, in MHz. Changed values are
+      marked; clear a box or put the default back to undo. A red field always hands off to Red Command 280.</p>
+    <div class="tabs" id="tabs"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Field</th><th></th><th>Tower</th><th>ATIS</th><th>Handoff to</th><th>Handoff</th><th></th></tr></thead>
+      <tbody id="fields"></tbody>
+    </table></div>
+    <div class="msg" id="freqMsg" style="margin-top:0.6rem"></div>
+    <p class="note">Changes reach a role when it restarts: Stop and Start the theatre on the dashboard.
+      Remember the pilots' kneeboards and preset cards if you move a frequency.</p>
+  </section>
+</main>
+<script>
+const KEYS = ['OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+const TESTABLE = new Set(['OPENAI_API_KEY', 'ELEVENLABS_API_KEY', 'SKYEYE_SRS', 'SKYEYE_TACVIEW']);
+let data = null, theatre = localGet('settingsTheatre') || 'caucasus';
+
+function localGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function localSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const mhz = f => f ? Number(f).toFixed(3) : '';
+
+async function post(body) {
+  const r = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+  const text = await r.text();
+  if (!r.ok) return { ok: false, msg: text.trim() || ('HTTP ' + r.status) };
+  try { return JSON.parse(text); } catch (e) { return { ok: true, msg: text }; }
+}
+
+function show(el, res) {
+  el.className = 'msg ' + (res.ok ? 'ok' : 'bad');
+  el.textContent = res.msg;
+}
+
+function varRow(v) {
+  const id = v.name;
+  const cur = v.set ? `<span class="ok">● </span>${esc(v.value)}` : '<span class="warn">not set</span>';
+  const ph = v.secret ? (v.set ? 'paste a new key to replace' : 'paste key') : (v.value || 'host:port');
+  const dis = data.canEdit ? '' : 'disabled';
+  return `<div class="row" data-name="${id}">
+    <div class="lab">${esc(v.label)}<small>${id}</small></div>
+    <div class="cur">${cur}</div>
+    <input type="${v.secret ? 'password' : 'text'}" autocomplete="off" spellcheck="false" placeholder="${esc(ph)}" ${dis}>
+    <button class="primary" onclick="saveVar('${id}')" ${dis}>Save</button>
+    ${TESTABLE.has(id) ? `<button onclick="testVar('${id}')" ${dis}>Test</button>` : '<span></span>'}
+    <div class="msg"></div>
+  </div>`;
+}
+
+async function saveVar(name) {
+  const row = document.querySelector(`.row[data-name="${name}"]`);
+  const input = row.querySelector('input'), msg = row.querySelector('.msg');
+  const value = input.value.trim();
+  if (!value) {
+    if (name !== 'ELEVENLABS_API_KEY') { show(msg, { ok: false, msg: 'Type a value first.' }); return; }
+    if (!confirm('Remove the ElevenLabs key? Every voice will use OpenAI.')) return;
+  }
+  // Test a new key before keeping it, so a typo never reaches the roles.
+  if (value && TESTABLE.has(name)) {
+    msg.className = 'msg muted'; msg.textContent = 'Checking…';
+    const t = await post({ op: 'test', name, value });
+    if (!t.ok && !confirm(`${t.msg}\n\nSave it anyway?`)) { show(msg, t); return; }
+  }
+  const res = await post({ op: 'set', name, value });
+  input.value = '';
+  await load();
+  show(document.querySelector(`.row[data-name="${name}"] .msg`), res);
+}
+
+async function testVar(name) {
+  const row = document.querySelector(`.row[data-name="${name}"]`);
+  const msg = row.querySelector('.msg');
+  msg.className = 'msg muted'; msg.textContent = 'Checking…';
+  show(msg, await post({ op: 'test', name, value: row.querySelector('input').value.trim() }));
+}
+
+function renderTabs() {
+  document.getElementById('tabs').innerHTML = data.theatres.map(t =>
+    `<button class="${t.key === theatre ? 'on' : ''}" onclick="pickTheatre('${t.key}')">${esc(t.label)}</button>`).join('');
+}
+function pickTheatre(k) { theatre = k; localSet('settingsTheatre', k); renderTabs(); renderFields(); }
+
+function freqCell(f, kind, def, ov) {
+  if (kind === 'atis' && !def) return '<td class="muted">none</td>';
+  const val = ov || def, dis = data.canEdit ? '' : 'disabled';
+  return `<td><input inputmode="decimal" data-kind="${kind}" data-def="${mhz(def)}" value="${mhz(val)}"
+      class="${ov ? 'changed' : ''}" oninput="markChanged(this)" ${dis}>
+    <span class="def">${ov ? 'default ' + mhz(def) : '&nbsp;'}</span></td>`;
+}
+function markChanged(inp) {
+  const v = parseFloat(inp.value);
+  inp.classList.toggle('changed', inp.value.trim() !== '' && mhz(v) !== inp.dataset.def);
+}
+
+function renderFields() {
+  const t = data.theatres.find(t => t.key === theatre) || data.theatres[0];
+  document.getElementById('fields').innerHTML = (t.fields || []).map(f => `<tr data-icao="${f.icao}">
+    <td><b>${esc(f.name)}</b></td><td class="icao">${f.icao}</td>
+    ${freqCell(f, 'tower', f.tower, f.override.tower)}
+    ${freqCell(f, 'atis', f.atis, f.override.atis)}
+    <td class="muted">${esc(f.handoffName)}</td>
+    ${freqCell(f, 'handoff', f.handoff, f.override.handoff)}
+    <td><button onclick="saveField('${f.icao}')" ${data.canEdit ? '' : 'disabled'}>Save</button></td>
+  </tr>`).join('');
+}
+
+async function saveField(icao) {
+  const row = document.querySelector(`tr[data-icao="${icao}"]`);
+  const body = { op: 'freq', icao };
+  for (const inp of row.querySelectorAll('input')) {
+    const s = inp.value.trim(), v = s === '' ? 0 : parseFloat(s);
+    if (s !== '' && !(v >= 30 && v <= 400)) {
+      show(document.getElementById('freqMsg'), { ok: false, msg: `${icao}: "${s}" is not a frequency in MHz (30-400).` });
+      return;
+    }
+    body[inp.dataset.kind] = v;
+  }
+  const res = await post(body);
+  await load();
+  show(document.getElementById('freqMsg'), res);
+}
+
+async function load() {
+  const r = await fetch('/api/settings');
+  if (!r.ok) { document.querySelector('main').textContent = 'Could not load settings: HTTP ' + r.status; return; }
+  data = await r.json();
+  document.getElementById('viewer').style.display = data.canEdit ? 'none' : 'block';
+  document.getElementById('keys').innerHTML = data.vars.filter(v => KEYS.includes(v.name)).map(varRow).join('');
+  document.getElementById('conn').innerHTML = data.vars.filter(v => !KEYS.includes(v.name)).map(varRow).join('');
+  if (data.freqError) show(document.getElementById('freqMsg'), { ok: false, msg: 'frequencies.json: ' + data.freqError });
+  renderTabs(); renderFields();
+}
+load();
+</script>
+</body>
+</html>

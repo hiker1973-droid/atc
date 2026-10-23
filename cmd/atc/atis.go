@@ -834,6 +834,7 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 	if altInHg <= 0 { altInHg = 29.88 }
 
 	stations := filterATISStations(atisStationsForMap(flagMap), flagATISStations)
+	applyATISFreqOverrides(stations)
 
 	var atcCtrl *controller.ATCController
 	if windDir >= 0 {
