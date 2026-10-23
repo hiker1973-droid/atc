@@ -485,6 +485,13 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagGCIOnly       { mode = "gci-only" }
 	if flagDeckbossFreq != "0" && flagDeckbossFreq != "" { mode = "deckboss" }
 	log.Info().Str("mode", mode).Str("srs", flagSRSAddr).Msg("vsfg7-atc starting")
+	key := instanceKey(mode, af.ICAO, flagMap, flagCoalition, flagSRSAddr)
+	if ok, err := claimInstance(key); err != nil {
+		log.Warn().Err(err).Str("key", key).Msg("single-instance check failed - starting anyway")
+	} else if !ok {
+		log.Error().Str("key", key).Msg("this role is already running - second copy exiting")
+		return fmt.Errorf("already running: %s", key)
+	}
 	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly && !flagLSOOnly && !flagGCIOnly {
 		log.Info().
 			Str("airfield", af.ICAO).

@@ -286,11 +286,28 @@ func regionForBat(bat string) string {
 // every cmd.exe instance currently showing a window. One tasklist call per
 // /api/roles request — much cheaper than one per role.
 func enumerateCmdWindows() map[string]int {
+	m := make(map[string]int)
+	for _, w := range listCmdWindows() {
+		m[w.title] = w.pid
+	}
+	return m
+}
+
+type cmdWindow struct {
+	title string // lowercased
+	pid   int
+}
+
+// listCmdWindows is every cmd.exe window, duplicates included: the title map
+// above keeps one PID per title, so a role running twice was stopped once and
+// the second copy survived every Stop and Update (Day 2026-10-23 06:39: each
+// Caucasus tower running 2-3 times).
+func listCmdWindows() []cmdWindow {
 	out, err := exec.Command("tasklist", "/v", "/fi", "IMAGENAME eq cmd.exe", "/fo", "csv", "/nh").Output()
 	if err != nil {
 		return nil
 	}
-	m := make(map[string]int)
+	var m []cmdWindow
 	r := csv.NewReader(strings.NewReader(string(out)))
 	r.FieldsPerRecord = -1
 	for {
@@ -304,9 +321,23 @@ func enumerateCmdWindows() map[string]int {
 		title := strings.TrimSpace(rec[len(rec)-1])
 		var pid int
 		fmt.Sscanf(rec[1], "%d", &pid)
-		m[strings.ToLower(title)] = pid
+		m = append(m, cmdWindow{title: strings.ToLower(title), pid: pid})
 	}
 	return m
+}
+
+// roleWindowPIDs is the PID of every window titled for the role, in the same
+// exact or "<name> - <cmdline>" forms findWindowPID accepts.
+func roleWindowPIDs(wins []cmdWindow, name string) []int {
+	key := strings.ToLower(name)
+	prefix := key + " - "
+	var pids []int
+	for _, w := range wins {
+		if w.title == key || strings.HasPrefix(w.title, prefix) {
+			pids = append(pids, w.pid)
+		}
+	}
+	return pids
 }
 
 // findWindowPID matches `name` against window titles, accepting either an
@@ -1127,9 +1158,14 @@ func startRole(name string) error {
 }
 
 func stopRole(name string) error {
-	wins := enumerateCmdWindows()
-	if pid, ok := findWindowPID(wins, name); ok {
-		return killTree(pid)
+	if pids := roleWindowPIDs(listCmdWindows(), name); len(pids) > 0 {
+		var firstErr error
+		for _, pid := range pids { // every copy, not just the first
+			if err := killTree(pid); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return firstErr
 	}
 	// No window to close — the role may still be running without one.
 	if r := findRole(name); r != nil && r.cmd != "" {
@@ -1195,6 +1231,19 @@ func stopRegion(region string) (int, error) {
 			continue
 		}
 		killed++
+	}
+	// Then any second copy of a region role: detectRunning names one PID per
+	// role, and the copies it didn't name were what came back after an Update.
+	wins := listCmdWindows()
+	for i := range rs {
+		if rs[i].Region != region {
+			continue
+		}
+		for _, pid := range roleWindowPIDs(wins, rs[i].Name) {
+			if pid != pids[i] {
+				_ = killTree(pid)
+			}
+		}
 	}
 	return killed, firstErr
 }
