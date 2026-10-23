@@ -117,6 +117,22 @@ func TestSourceInstallNotChecked(t *testing.T) {
 	}
 }
 
+// A rig can show the squadron's key; an expired one never blocks it.
+func TestSourceInstallShowsKey(t *testing.T) {
+	c, priv, now := testChecker(t)
+	os.Mkdir(filepath.Join(c.Dir, ".git"), 0o755)
+	key, _ := Sign(Licence{Squadron: "vSFG-7", ID: "p", Issued: "2026-10-23"}, priv)
+	if s, err := c.Activate(key); err != nil || s.State != Licensed || s.Message != "Licensed to vSFG-7." {
+		t.Fatalf("permanent key on a rig: %+v %v", s, err)
+	}
+	short, _ := Sign(Licence{Squadron: "vSFG-7", ID: "s", Issued: "2026-10-23", Expires: "2026-11-01"}, priv)
+	c.Activate(short)
+	*now = time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
+	if s := c.Check(); s.State != Source || !s.Allowed() {
+		t.Fatalf("an expired key blocked a rig: %+v", s)
+	}
+}
+
 func TestBuiltInPublicKey(t *testing.T) {
 	if len(PublicKey) != ed25519.PublicKeySize || PublicKey.Equal(make(ed25519.PublicKey, ed25519.PublicKeySize)) {
 		t.Fatal("no public key built in: every licence key would be rejected")

@@ -188,11 +188,22 @@ func daysLeft(until, now time.Time) int {
 // Check works out the Status, starting the trial on first use. It records
 // when it last ran, so setting the clock back does not buy days.
 func (c *Checker) Check() Status {
-	if IsSource(c.Dir) {
-		return Status{State: Source, Message: "Source install: licence not checked."}
-	}
 	now := c.Now()
 	f := c.readFile()
+	if IsSource(c.Dir) {
+		// The vSFG-7 rigs: never blocked, but a key entered there shows
+		// (operator 2026-10-23: "I want to enter our key for this rig").
+		if l, err := Parse(f.Key, c.Pub); f.Key != "" && err == nil {
+			if exp := l.ExpiresAt(); exp.IsZero() || now.Before(exp) {
+				st := Status{State: Licensed, Licence: &l, Message: "Licensed to " + l.Squadron + "."}
+				if !exp.IsZero() {
+					st.DaysLeft, st.Message = daysLeft(exp, now), fmt.Sprintf("Licensed to %s until %s.", l.Squadron, l.Expires)
+				}
+				return st
+			}
+		}
+		return Status{State: Source, Message: "Source install: licence not checked."}
+	}
 	if f.Key != "" {
 		if l, err := Parse(f.Key, c.Pub); err == nil {
 			exp := l.ExpiresAt()

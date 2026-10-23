@@ -446,8 +446,7 @@ function renderLicence(st) {
   const cls = { licensed: 'ok', source: 'muted', trial: st.daysLeft <= 3 ? 'bad' : 'warn', expired: 'bad' }[st.state] || 'muted';
   el.className = 'sub ' + cls;
   el.textContent = st.message;
-  // A source install (the vSFG-7 rigs) has nothing to enter.
-  document.getElementById('licEntry').style.display = st.state === 'source' ? 'none' : '';
+  // A source install (the vSFG-7 rigs) is never checked, but can show a key.
 }
 async function loadLicence() {
   try { renderLicence(await fetch('/api/licence').then(r => r.json())); } catch (e) { /* leave "Checking…" */ }
