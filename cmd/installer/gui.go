@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -69,44 +70,51 @@ func runGUI(uninstallMode bool) error {
 	url := fmt.Sprintf("http://127.0.0.1:%d/?t=%s", ln.Addr().(*net.TCPAddr).Port, g.token)
 
 	say("Setup window: %s", url)
-	closed := make(chan struct{})
 	var win *exec.Cmd
 	var profile string
 	if !*flagNoWindow {
 		win, profile = openWindow(url)
 	}
-	switch {
-	case win != nil:
-		go func() { win.Wait(); close(closed) }()
-	case !*flagNoWindow:
+	if win == nil && !*flagNoWindow {
 		openURL(url)
 	}
-	// Without the app window (or if it dies), stop once the page stops
-	// asking for the state.
-	watchdog := time.NewTicker(2 * time.Second)
+	if win != nil {
+		go win.Wait()
+	}
+	// The window is gone when the page stops asking for the state (it asks
+	// every 0.7 s). Not when the Edge process we started exits: on its first
+	// run with a new profile Edge can restart itself, handing the window to
+	// a new process - setup used to stop there and leave the window on a
+	// dead 127.0.0.1 page (operator 2026-10-23: "first time you start exe
+	// it comes up with 127.xxxx error").
+	opened := time.Now()
+	watchdog := time.NewTicker(time.Second)
 	defer watchdog.Stop()
 wait:
 	for {
 		select {
 		case <-g.quit:
 			break wait
-		case <-closed:
-			break wait
 		case <-watchdog.C:
 			g.mu.Lock()
-			stale := !g.lastPoll.IsZero() && time.Since(g.lastPoll) > 20*time.Second
+			last := g.lastPoll
 			g.mu.Unlock()
-			if stale && win == nil {
-				break wait
+			switch {
+			case !last.IsZero() && time.Since(last) > 6*time.Second:
+				break wait // closed
+			case last.IsZero() && time.Since(opened) > 3*time.Minute:
+				break wait // never opened
 			}
 		}
 	}
 	for g.working() { // closed mid-install: let it finish
 		time.Sleep(300 * time.Millisecond)
 	}
+	if profile != "" {
+		closeWindow(profile)
+	}
 	if win != nil && win.ProcessState == nil {
 		win.Process.Kill()
-		time.Sleep(500 * time.Millisecond)
 	}
 	if profile != "" {
 		for i := 0; i < 10 && os.RemoveAll(profile) != nil; i++ {
@@ -116,8 +124,19 @@ wait:
 	return nil
 }
 
-// openWindow starts Edge in app mode with a throwaway profile (so the window
-// is its own process: when it closes, setup ends), centred on the screen.
+// closeWindow ends every Edge process using setup's own profile (the window
+// may belong to a process Edge started itself, not the one we did).
+func closeWindow(profile string) {
+	script := fmt.Sprintf(`Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like '*%s*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+		strings.ReplaceAll(filepath.Base(profile), "'", "''"))
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	hideWindow(cmd)
+	cmd.Run()
+	time.Sleep(500 * time.Millisecond)
+}
+
+// openWindow starts Edge in app mode with a throwaway profile (its own
+// window, never the person's browser), centred on the screen.
 func openWindow(url string) (*exec.Cmd, string) {
 	edge := ""
 	for _, p := range []string{

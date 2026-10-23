@@ -78,6 +78,7 @@ async function call(path, body) {
   });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   st = await r.json();
+  if (path === 'finish' || path === 'quit') { window.close(); return; } // setup is ending: the window goes too
   render();
 }
 
