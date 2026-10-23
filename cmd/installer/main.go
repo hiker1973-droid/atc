@@ -56,7 +56,7 @@ var programs = []string{"atc.exe", "launcher.exe"}
 var guides = []string{"Readback ATC Installation Guide.pdf", "Readback ATC User Manual.pdf"}
 
 var (
-	flagDir       = flag.String("dir", filepath.Join(os.Getenv("LOCALAPPDATA"), "Readback ATC"), "Install folder")
+	flagDir       = flag.String("dir", "", `Install folder (default: where Readback is installed, else %LOCALAPPDATA%\Readback ATC)`)
 	flagUninstall = flag.Bool("uninstall", false, "Remove the programs and shortcuts; settings and logs stay")
 	flagQuiet     = flag.Bool("quiet", false, "No window and no questions: install (no start-with-Windows shortcut), start, open Setup")
 	flagNoStart   = flag.Bool("no-start", false, "Install only; do not start the launcher")
@@ -97,6 +97,9 @@ func main() {
 		defer f.Close()
 	}
 	say("%s setup %s (%s)", appName, productVersion, version)
+	if *flagDir == "" {
+		*flagDir = defaultDir(*flagUninstall)
+	}
 	var err error
 	switch {
 	case !*flagQuiet:
@@ -130,7 +133,7 @@ func install(dir string, o installOptions) error {
 		}
 	}
 	say("Installing to %s", dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := checkDir(dir); err != nil {
 		return err
 	}
 	if n := stopRunning(dir); n > 0 {
@@ -166,7 +169,59 @@ func install(dir string, o installOptions) error {
 	if o.Shortcuts {
 		addShortcuts(dir, o.Startup)
 	}
+	rememberDir(dir)
 	say("Installed %s %s", appName, productVersion)
+	return nil
+}
+
+// defaultDir is where to install: where Readback already is (remembered at
+// install), else %LOCALAPPDATA%\Readback ATC. Uninstalling from the Start
+// menu runs the Readback-Setup.exe kept in the install folder, so that
+// folder is the one to remove.
+func defaultDir(uninstalling bool) string {
+	if uninstalling {
+		if self, err := os.Executable(); err == nil && exists(filepath.Join(filepath.Dir(self), "launcher.exe")) {
+			return filepath.Dir(self)
+		}
+	}
+	if d := rememberedDir(); d != "" && exists(filepath.Join(d, "launcher.exe")) {
+		return d
+	}
+	return filepath.Join(os.Getenv("LOCALAPPDATA"), appName)
+}
+
+// chosenDir turns a folder picked in the setup window into the install
+// folder: a parent such as D:\Games gets its own "Readback ATC" folder; a
+// folder that already holds Readback, or is named for it, is used as it is.
+func chosenDir(picked string) string {
+	picked = filepath.Clean(strings.TrimSpace(picked))
+	if strings.EqualFold(filepath.Base(picked), appName) || exists(filepath.Join(picked, "launcher.exe")) {
+		return picked
+	}
+	return filepath.Join(picked, appName)
+}
+
+// checkDir makes sure Readback can be installed in dir: a full path that is
+// not a drive's root or Windows' own folders, and one this user can write
+// to (setup runs without administrator rights, so not Program Files).
+func checkDir(dir string) error {
+	if !filepath.IsAbs(dir) || filepath.VolumeName(dir) == "" {
+		return fmt.Errorf(`choose a full folder path, such as D:\Games\Readback ATC`)
+	}
+	if filepath.Dir(dir) == dir {
+		return fmt.Errorf("choose a folder, not the root of a drive")
+	}
+	if win := os.Getenv("SystemRoot"); win != "" && strings.HasPrefix(strings.ToLower(dir)+`\`, strings.ToLower(win)+`\`) {
+		return fmt.Errorf("Readback cannot go in the Windows folder")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("cannot create %s: %w. Setup runs without administrator rights, so choose a folder you can write to (not Program Files)", dir, err)
+	}
+	probe := filepath.Join(dir, ".readback-write-test")
+	if err := os.WriteFile(probe, []byte("ok"), 0o644); err != nil {
+		return fmt.Errorf("cannot write to %s. Setup runs without administrator rights, so choose a folder you can write to (not Program Files)", dir)
+	}
+	os.Remove(probe)
 	return nil
 }
 
@@ -261,6 +316,9 @@ func uninstall(dir string) error {
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			say("Could not remove %s: %v", p, err)
 		}
+	}
+	if strings.EqualFold(filepath.Clean(rememberedDir()), filepath.Clean(dir)) {
+		rememberDir("")
 	}
 	say("Your settings, start files and logs are still in %s. Delete that folder to remove them too.", dir)
 	return nil

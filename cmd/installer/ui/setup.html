@@ -24,6 +24,12 @@
   .folder { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 16px 0 12px;
             font-size: 12.5px; color: var(--muted); }
   .folder b { display: block; color: var(--text); font-weight: 500; font-size: 13.5px; word-break: break-all; }
+  .dirrow { display: flex; gap: 8px; margin: 5px 0 6px; }
+  .dirrow input { flex: 1; min-width: 0; font: inherit; font-size: 13.5px; color: var(--text); background: var(--bg);
+                  border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; user-select: text; }
+  .dirrow input:focus { outline: none; border-color: var(--orange); }
+  .dirrow button { padding: 5px 14px; font-weight: 500; }
+  .direrr { color: var(--red); }
   label.opt { display: flex; gap: 10px; align-items: center; padding: 6px 2px; cursor: pointer; }
   label.opt input { width: 17px; height: 17px; accent-color: var(--orange); }
   footer { display: flex; gap: 10px; justify-content: flex-end; align-items: center; padding: 14px 40px 18px;
@@ -88,7 +94,8 @@ function logHTML() {
 
 function render() {
   const key = st.mode + st.phase + (st.phase === 'done' || st.phase === 'working' || st.phase === 'removed'
-    ? JSON.stringify([st.log.length, st.busy, st.busyErr, (st.prereqs || []).map(p => p.ok)]) : '');
+    ? JSON.stringify([st.log.length, st.busy, st.busyErr, (st.prereqs || []).map(p => p.ok)])
+    : JSON.stringify([st.dir, st.dirErr, st.installed]));
   if (key === shown) return;
   shown = key;
   if (startup === null) startup = !!st.startup;
@@ -107,12 +114,15 @@ function render() {
     main.innerHTML = `<h1>${update ? `Update Readback ATC to <span class="ver">${v}</span>` : again ? `Reinstall Readback ATC <span class="ver">${v}</span>` : `Install Readback ATC <span class="ver">${v}</span>`}</h1>
       <p>${update ? `Version ${esc(st.installed)} is installed. Your settings, keys and squadron logo are kept.`
         : 'AI air traffic control for DCS World: towers, ATIS, Command, AWACS and the carrier, talking on your SRS server.'}</p>
-      <div class="folder">Install folder<b>${esc(st.dir)}</b>No administrator rights needed.</div>
+      <div class="folder">Install folder
+        <div class="dirrow"><input id="dir" value="${esc(st.dir)}" spellcheck="false" onchange="call('dir',{dir:this.value})">
+          <button onclick="call('browse',{})">Browse…</button></div>
+        ${st.dirErr ? `<span class="direrr">${esc(st.dirErr)}</span>` : 'No administrator rights needed: any folder you can write to, such as one on another drive.'}</div>
       <label class="opt"><input type="checkbox" id="startup" ${startup ? 'checked' : ''} onchange="startup=this.checked">
         Start Readback ATC when Windows starts</label>
       <p style="font-size:12.5px">Install Readback on the PC that runs your SRS server.</p>`;
     foot.innerHTML = `<span class="left">Readback ATC ${v}</span><button onclick="call('quit',{})">Cancel</button>
-      <button class="primary" onclick="call('install',{startup})">${update ? 'Update' : 'Install'}</button>`;
+      <button class="primary" onclick="call('install',{startup, dir: $('dir').value})">${update ? 'Update' : 'Install'}</button>`;
   } else if (st.phase === 'working') {
     main.innerHTML = `<h1>${st.mode === 'uninstall' ? 'Removing Readback ATC…' : 'Installing Readback ATC…'}</h1>
       <div class="bar"><i></i></div>${logHTML()}`;

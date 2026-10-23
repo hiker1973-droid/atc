@@ -39,6 +39,8 @@ type gui struct {
 	quitOnce  sync.Once
 	token     string
 	installed string // the version already in the folder, if any
+	dir       string // the install folder, which the person can change
+	dirErr    string // why the folder chosen will not do
 }
 
 func (g *gui) set(f func()) { g.mu.Lock(); f(); g.mu.Unlock() }
@@ -52,7 +54,7 @@ func (g *gui) working() bool {
 }
 
 func runGUI(uninstallMode bool) error {
-	g := &gui{mode: "install", phase: "welcome", quit: make(chan struct{}), installed: installedVersion(*flagDir)}
+	g := &gui{mode: "install", phase: "welcome", quit: make(chan struct{}), installed: installedVersion(*flagDir), dir: *flagDir}
 	if uninstallMode {
 		g.mode = "uninstall"
 	}
@@ -203,16 +205,45 @@ func (g *gui) api(w http.ResponseWriter, r *http.Request) {
 		Startup bool   `json:"startup"`
 		Launch  bool   `json:"launch"`
 		Key     string `json:"key"`
+		Dir     string `json:"dir"`
 	}
 	if r.Method == http.MethodPost {
 		json.NewDecoder(r.Body).Decode(&body)
 	}
-	dir := *flagDir
+	g.mu.Lock()
+	dir := g.dir
+	g.mu.Unlock()
+	setDir := func(d string) {
+		g.set(func() { g.dir, g.installed, g.dirErr = d, installedVersion(d), "" })
+		dir = d
+	}
 	switch r.URL.Path {
 	case "/api/state":
 		g.set(func() { g.lastPoll = time.Now() })
+	case "/api/browse": // Windows' folder picker; a parent folder gets "Readback ATC" added
+		if g.working() || g.mode != "install" {
+			break
+		}
+		start := dir
+		for start != "" && !exists(start) {
+			start = filepath.Dir(start)
+		}
+		if picked := pickFolder(start); picked != "" {
+			setDir(chosenDir(picked))
+		}
+	case "/api/dir": // typed in the folder box
+		if !g.working() && g.mode == "install" && strings.TrimSpace(body.Dir) != "" {
+			setDir(filepath.Clean(strings.TrimSpace(body.Dir)))
+		}
 	case "/api/install":
 		if g.working() {
+			break
+		}
+		if d := strings.TrimSpace(body.Dir); d != "" {
+			setDir(filepath.Clean(d))
+		}
+		if err := checkDir(dir); err != nil {
+			g.set(func() { g.dirErr = err.Error() })
 			break
 		}
 		g.set(func() { g.phase, g.err = "working", "" })
@@ -277,7 +308,7 @@ func (g *gui) api(w http.ResponseWriter, r *http.Request) {
 	g.mu.Lock()
 	state := map[string]any{
 		"mode": g.mode, "phase": g.phase, "err": g.err, "busy": g.busy, "busyErr": g.busyErr,
-		"version": productVersion, "dir": dir, "installed": g.installed,
+		"version": productVersion, "dir": g.dir, "dirErr": g.dirErr, "installed": g.installed,
 		"startup": exists(startupLink()), "log": logLines(),
 	}
 	g.mu.Unlock()
