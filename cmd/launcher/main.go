@@ -135,6 +135,7 @@ func main() {
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/branding.js", serveBrandingJS)
 	mux.HandleFunc("/icon.png", serveIcon)
+	mux.HandleFunc("/readback-mark.png", serveProductMark)
 	mux.Handle("/help/", helpHandler()) // the Installation Guide and User Manual (help/)
 	mux.Handle("/help", http.RedirectHandler("/help/", http.StatusFound))
 	// GET = squadron name and logo (viewer); POST = change them (control, checked inside).

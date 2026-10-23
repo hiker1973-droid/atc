@@ -139,7 +139,24 @@ func brandingSnapshot() map[string]any {
 			out["logoVersion"] = st.ModTime().Unix()
 		}
 	}
+	// The product mark in every header (operator 2026-10-23: the product logo
+	// on the dashboard), left off where the header already is Readback ATC.
+	out["productVersion"] = productVersion
+	out["productShown"] = out["customLogo"] == false && builtInLogo() == "readback.png" && out["name"] == "Readback ATC"
 	return out
+}
+
+// serveProductMark is the Readback ATC tower for the header's product mark,
+// whatever squadron logo the page shows.
+func serveProductMark(w http.ResponseWriter, _ *http.Request) {
+	data, err := uiFS.ReadFile("readback.png")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "max-age=86400")
+	w.Write(data)
 }
 
 // handleBranding: GET the name and logo state (viewer); POST (control) JSON
@@ -280,6 +297,26 @@ func serveIcon(w http.ResponseWriter, r *http.Request) {
 // save and upload helpers. Every page loads it.
 const brandingJS = `(() => {
   let shownName = 'vSFG-7'; // what the page's own title starts with
+  // productMark: "Readback ATC" with the tower, at the right of the header,
+  // linking to Help. Not shown where the header is already Readback ATC.
+  const productMark = b => {
+    const header = document.querySelector('header');
+    if (!header) return;
+    let m = document.getElementById('productMark');
+    if (b.productShown) { if (m) m.remove(); return; }
+    if (!m) {
+      m = document.createElement('a');
+      m.id = 'productMark'; m.href = '/help/'; m.title = 'Readback ATC - Help';
+      m.style.cssText = 'display:flex;align-items:center;gap:0.4rem;flex:none;margin-left:auto;text-decoration:none;' +
+        'color:#8b949e;font-size:0.72rem;line-height:1.15;';
+      m.innerHTML = '<img src="/readback-mark.png" alt="" style="width:30px;height:30px;border-radius:6px;">' +
+        '<span><span style="color:#ff6a2b;font-weight:700;font-size:0.86rem;letter-spacing:0.03em;">Readback ATC</span>' +
+        '<br><span class="pm-ver"></span></span>';
+      const server = header.querySelector('.server'); // the dashboard: after the server status
+      if (server) { m.style.marginLeft = '0.4rem'; server.after(m); } else header.appendChild(m);
+    }
+    m.querySelector('.pm-ver').textContent = b.productVersion ? 'v' + b.productVersion : 'AI ATC for DCS';
+  };
   window.applyBranding = b => {
     const v = '/logo.png?v=' + (b.logoVersion || 0);
     document.querySelectorAll('.logo').forEach(e => { e.textContent = b.name; e.style.display = b.wide ? 'none' : ''; });
@@ -296,6 +333,7 @@ const brandingJS = `(() => {
     let icon = document.querySelector('link[rel="icon"]');
     if (!icon) { icon = document.createElement('link'); icon.rel = 'icon'; document.head.appendChild(icon); }
     icon.href = '/icon.png?v=' + (b.logoVersion || 0);
+    productMark(b);
     window.squadron = b;
     document.dispatchEvent(new CustomEvent('branding', { detail: b }));
   };
