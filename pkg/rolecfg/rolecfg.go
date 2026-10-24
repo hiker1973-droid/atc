@@ -115,7 +115,7 @@ var Defaults = map[string]string{
 	"gci-freq": "264", "gci-callsign": "Darkstar", "gci-voice": "shimmer", "elevenlabs-gci-voice": "vChnJZ1Cu89g2XXumPfT",
 	"marshal-freq": "0", "marshal-voice": "ballad", "elevenlabs-marshal-voice": "6PBHdlpKVQ70t6tnDUYF",
 	"deckboss-freq": "0", "deckboss-voice": "shimmer", "elevenlabs-deckboss-voice": "ljX1ZrXuDIIRVcmiVSyR",
-	"lso-freq": "128.3", "lso-name": "Paddles", "lso-voice": "ash", "elevenlabs-paddles-voice": "XrExE9yKIg1WjnnlVkGX",
+	"lso-freq": "128.3", "lso-name": "Paddles", "lso-voice": "ash", "elevenlabs-paddles-voice": "KvaCHcJoMXfOzwtsULOZ",
 	"tts-voice": "nova", "elevenlabs-tower-voice": "", "tts-speed": "1.2",
 }
 

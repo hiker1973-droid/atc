@@ -67,7 +67,7 @@ const (
 	elSpartan = "S75jVZ0i3J6Xa5BbK8CE" // American man, calm, grounded baritone (Command, then Marshal, on 2026-10-15)
 	elRolando = "6PBHdlpKVQ70t6tnDUYF" // American man, crisp, military (Marshal; operator 2026-10-15: "change marshall to this command_2_Rolando-crisp-military")
 	// elMatilda is round 6's marshal_2 ("Matilda - Knowledgable, Professional",
-	// premade, American woman), picked for Paddles 2026-10-18.
+	// premade, American woman), Paddles 2026-10-18 to 2026-10-24 (now Hank).
 	elMatilda = "XrExE9yKIg1WjnnlVkGX"
 	// elCommand11 is voice 3 of round 11, the IDs the operator sent (pick 2026-10-15:
 	// "command_3_XlDdozLmuTofIxK4BjPD"). Its name is not readable with the
