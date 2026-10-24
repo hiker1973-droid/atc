@@ -18,6 +18,14 @@ code { font-family: Consolas, "Courier New", monospace; background-color: #f1f2f
 a { color: #c44d14; }
 .note { background-color: #fff4ec; border-left: 4px solid #ff6a2b; padding: 7px 10px; margin: 10px 0; }
 .foot { color: #7a808a; font-size: 8.5pt; margin-top: 26px; }
+/* The manual's contents and its example exchanges (pilot / controller). */
+.toc { border: 1px solid #d6d9de; padding: 8px 14px; margin: 0 0 14px; }
+.toc ol { columns: 2; column-gap: 28px; margin: 4px 0 0; padding-left: 22px; }
+.toc li { margin: 1px 0; }
+.ex { background-color: #1d1f23; color: #e8e8e8; font-family: Consolas, "Courier New", monospace; font-size: 9.5pt;
+  padding: 8px 12px; margin: 8px 0 12px; }
+.ex p { margin: 2px 0; }
+.ex b { color: #ff9a66; }
 .guides a.card { display: block; border: 1px solid #d6d9de; padding: 12px 14px; margin: 10px 0; text-decoration: none; color: #1d2128; }
 .guides a.card b { color: #c44d14; font-size: 13pt; }
 
@@ -26,7 +34,7 @@ a { color: #c44d14; }
 @page { size: Letter; margin: 0.55in 0.6in 0.7in; }
 @media print {
   body { max-width: none; padding: 0; margin: 0; }
-  tr, .note, .cover { break-inside: avoid; }
+  tr, .note, .cover, .ex, .toc { break-inside: avoid; }
   h2, h3 { break-after: avoid; }
-  .cover, th, td, .note, code { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cover, th, td, .note, code, .ex { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
