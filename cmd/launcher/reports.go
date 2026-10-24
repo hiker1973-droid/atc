@@ -46,6 +46,8 @@ type preparedReport struct {
 	Facts    []debrief.Fact
 	Report   *debrief.Report // the pages; Generate adds Claude's words
 	Preview  []byte          // the pages before Claude, for the Preview frame
+	Opts     debrief.Options
+	Comms    []debrief.CommsScore
 }
 
 var (
@@ -57,20 +59,22 @@ var (
 // An AAR (ReportNo set) keeps only Claude's sections in the .md; its header
 // and data block come from here. Earlier debriefs kept a whole page there.
 type reportMeta struct {
-	Name     string         `json:"name"`
-	Title    string         `json:"title"`
-	Created  time.Time      `json:"created"`
-	From     time.Time      `json:"from"`
-	To       time.Time      `json:"to"`
-	Model    string         `json:"model"`
-	Usage    debrief.Usage  `json:"usage"`
-	Sources  []string       `json:"sources"`
-	ReportNo string         `json:"reportNo,omitempty"`
-	Mission  string         `json:"mission,omitempty"`
-	Facts    []debrief.Fact `json:"facts,omitempty"`
-	Discord  string         `json:"discord,omitempty"`      // one post (reports before the squadron's format)
-	Posts    []string       `json:"discordPosts,omitempty"` // the Discord post, as messages under 2,000 characters
-	HTML     bool           `json:"html,omitempty"` // the full report is <name>.html (the AAR in the debrief style)
+	Name     string               `json:"name"`
+	Title    string               `json:"title"`
+	Created  time.Time            `json:"created"`
+	From     time.Time            `json:"from"`
+	To       time.Time            `json:"to"`
+	Model    string               `json:"model"`
+	Usage    debrief.Usage        `json:"usage"`
+	Sources  []string             `json:"sources"`
+	ReportNo string               `json:"reportNo,omitempty"`
+	Mission  string               `json:"mission,omitempty"`
+	Facts    []debrief.Fact       `json:"facts,omitempty"`
+	Discord  string               `json:"discord,omitempty"`      // one post (reports before the squadron's format)
+	Posts    []string             `json:"discordPosts,omitempty"` // the Discord post, as messages under 2,000 characters
+	HTML     bool                 `json:"html,omitempty"`         // the full report is <name>.html (the AAR in the debrief style)
+	Options  *debrief.Options     `json:"options,omitempty"`      // what was ticked (reports since 2026-10-24)
+	Comms    []debrief.CommsScore `json:"comms,omitempty"`        // each aircraft's comms score, for the next report's "last report"
 }
 
 // localSource is a dcs.log or Tacview recording found on this PC.
@@ -243,6 +247,14 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 	defer r.MultipartForm.RemoveAll()
 	name, _ := brandingSnapshot()["name"].(string)
 	in := debrief.Inputs{Squadron: name, Focus: r.FormValue("focus")}
+	opts := debrief.AllOptions() // what the page ticked; all of it when it says nothing
+	if v := r.FormValue("options"); v != "" {
+		opts = debrief.Options{}
+		if err := json.Unmarshal([]byte(v), &opts); err != nil {
+			http.Error(w, "bad options: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	var sources []string
 	title := ""
 
@@ -338,19 +350,31 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 	case !from.IsZero():
 		title = fmt.Sprintf("%s - %s", title, from.UTC().Format("2 Jan 2006 15:04Z"))
 	}
+	// The optional pages: currency counts from every server log on this PC
+	// (the Stats tab's) and this session's own.
+	var history []debrief.EventSession
+	if opts.Currency || opts.PilotPages {
+		history, _ = statsRuns()
+		if in.Server != nil {
+			history = append(append([]debrief.EventSession(nil), history...), in.Server.Sessions...)
+		}
+	}
+	in.Extras = debrief.ComputeExtras(in.Session, in.Radio, history, opts)
+	prevComms(in.Extras.Comms)
 	records := debrief.Build(in)
 	id := newReportID()
 	preparedMu.Lock()
 	facts := debrief.Facts(in, sources)
 	rpt := &debrief.Report{Session: in.Session, Facts: facts, ReportNo: debrief.ReportNumber(in), Squadron: name,
-		LogoURI: string(squadronLogoDataURI()), Mission: debrief.MissionName(in), Sources: sources, Radio: in.Radio}
+		LogoURI: string(squadronLogoDataURI()), Mission: debrief.MissionName(in), Sources: sources, Radio: in.Radio,
+		Opt: &opts, X: in.Extras}
 	for k, p := range prepared { // tracks are large: keep the newest few
 		if len(prepared) >= 3 || time.Since(p.At) > time.Hour {
 			delete(prepared, k)
 		}
 	}
 	prepared[id] = &preparedReport{Records: records, Title: title, From: from, To: to, Sources: sources, At: time.Now(),
-		ReportNo: rpt.ReportNo, Mission: rpt.Mission, Facts: facts, Report: rpt, Preview: []byte(rpt.HTML())}
+		ReportNo: rpt.ReportNo, Mission: rpt.Mission, Facts: facts, Report: rpt, Preview: []byte(rpt.HTML()), Opts: opts, Comms: in.Extras.Comms}
 	preparedMu.Unlock()
 
 	stats := map[string]any{"sources": sources, "chars": len(records), "approxTokens": len(records) / 4, "facts": facts}
@@ -429,14 +453,6 @@ func handleReportGenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	key := userEnv("ANTHROPIC_API_KEY")
-	if key == "" {
-		http.Error(w, "no Claude API key: add one in Settings, under Reports", http.StatusBadRequest)
-		return
-	}
-	if !debrief.ValidModel(body.Model) {
-		body.Model = debrief.Models[0].ID
-	}
 	preparedMu.Lock()
 	p := prepared[body.ID]
 	preparedMu.Unlock()
@@ -444,32 +460,78 @@ func handleReportGenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "that preview has expired: press Preview again", http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Minute)
-	defer cancel()
-	text, usage, err := debrief.Write(ctx, key, body.Model, p.Records)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
+	// Claude writes only when the write-up is ticked; without it the report
+	// is saved as worked out on this PC, with no key needed.
+	var ai *debrief.AIText
+	var usage debrief.Usage
+	if p.Opts.Written {
+		key := userEnv("ANTHROPIC_API_KEY")
+		if key == "" {
+			http.Error(w, "no Claude API key: add one in Settings, under Reports, or untick Claude's write-up", http.StatusBadRequest)
+			return
+		}
+		if !debrief.ValidModel(body.Model) {
+			body.Model = debrief.Models[0].ID
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 6*time.Minute)
+		defer cancel()
+		text, u, err := debrief.Write(ctx, key, body.Model, p.Records)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		a := debrief.ParseAI(text)
+		ai, usage = &a, u
+	} else {
+		body.Model = ""
 	}
+	opts := p.Opts
 	meta := reportMeta{Title: p.Title, Created: time.Now(), From: p.From, To: p.To, Model: body.Model, Usage: usage,
-		Sources: p.Sources, ReportNo: p.ReportNo, Mission: p.Mission, Facts: p.Facts, HTML: true}
+		Sources: p.Sources, ReportNo: p.ReportNo, Mission: p.Mission, Facts: p.Facts, HTML: true, Options: &opts, Comms: p.Comms}
 	meta.Name = meta.Created.Format("2006-01-02_150405")
 	if err := os.MkdirAll(reportsDir(), 0o755); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	ai := debrief.ParseAI(text)
 	preparedMu.Lock()
-	p.Report.AI, p.Report.Written, p.Report.Model = &ai, meta.Created, body.Model
+	p.Report.AI, p.Report.Written, p.Report.Model = ai, meta.Created, body.Model
 	page := p.Report.HTML()
-	meta.Posts = p.Report.DiscordPosts()
+	if opts.Discord {
+		meta.Posts = p.Report.DiscordPosts()
+	}
 	preparedMu.Unlock()
+	if ai == nil {
+		ai = &debrief.AIText{}
+	}
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".html"), []byte(page), 0o644)
-	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(aiMarkdown(ai)), 0o644)
+	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".md"), []byte(aiMarkdown(*ai)), 0o644)
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".records.txt"), []byte(p.Records), 0o644)
 	mb, _ := json.MarshalIndent(meta, "", "  ")
 	os.WriteFile(filepath.Join(reportsDir(), meta.Name+".json"), mb, 0o644)
 	writeJSON(w, map[string]any{"meta": meta})
+}
+
+// prevComms fills in each aircraft's score from the newest saved report
+// that scored it.
+func prevComms(scores []debrief.CommsScore) {
+	if len(scores) == 0 {
+		return
+	}
+	saved := savedReports() // newest first
+	for i := range scores {
+		for _, m := range saved {
+			found := false
+			for _, c := range m.Comms {
+				if c.Key == scores[i].Key {
+					scores[i].Prev, found = c.Score, true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
 }
 
 // loadReport reads a saved report's meta and Markdown.

@@ -21,6 +21,9 @@ type Report struct {
 	Written  time.Time
 	Model    string
 	Radio    *Radio
+	Opt      *Options // the contents ticked; nil for the pages every report had
+	X        *Extras  // the optional pages' numbers
+	skipped  []string // optional pages left out for want of data, said on the AAR page
 }
 
 // Greenie board squares: the squadron's colours (docs/paddles-report).
@@ -37,19 +40,38 @@ func esc(s string) string { return html.EscapeString(s) }
 // greenie board, then the AAR.
 func (r *Report) HTML() string {
 	s := r.Session
+	o := r.opts()
+	r.skipped = nil
 	var b strings.Builder
 	b.WriteString(`<!doctype html><html><head><meta charset="utf-8"><title>` + esc(r.ReportNo+" "+r.Mission) + `</title><style>` + reportCSS + `</style></head><body>`)
-	b.WriteString(r.summaryPage())
-	for _, en := range s.Engagements {
-		b.WriteString(r.engagementPage(en))
+	page := func(on bool, f func() string) {
+		if on {
+			b.WriteString(f())
+		}
 	}
-	b.WriteString(r.pilotsPage())
+	page(o.Summary, r.summaryPage)
+	if o.Engagements {
+		for _, en := range s.Engagements {
+			b.WriteString(r.engagementPage(en))
+		}
+	}
+	page(o.Losses, r.lossesPage)
+	page(o.Weapons, r.weaponsPage)
+	page(o.Pilots, r.pilotsPage)
+	page(o.Recovery, r.recoveryPage)
+	page(o.Tanker, r.tankerPage)
+	page(o.Comms, r.commsPage)
+	page(o.Currency, r.currencyPage)
+	page(o.PilotPages, r.pilotPages)
 	b.WriteString(r.aarPage())
 	b.WriteString(`</body></html>`)
 	return b.String()
 }
 
 func (r *Report) pending(what string) string {
+	if !r.opts().Written {
+		return ""
+	}
 	return `<p class="pending">` + esc(what) + ` - written by Claude when you press Write the AAR.</p>`
 }
 
@@ -140,7 +162,9 @@ func (r *Report) summaryPage() string {
 	if !s.PvP || len(s.Engagements) == 0 {
 		title = "Key points"
 	}
-	b.WriteString(`<h3>` + title + `</h3>`)
+	if r.AI != nil || r.opts().Written {
+		b.WriteString(`<h3>` + title + `</h3>`)
+	}
 	if r.AI == nil {
 		b.WriteString(r.pending("The points that decided the session"))
 	} else {
@@ -348,6 +372,12 @@ func (r *Report) aarPage() string {
 		b.WriteString(`<tr><th>` + esc(f.Label) + `</th><td>` + esc(f.Value) + `</td></tr>`)
 	}
 	b.WriteString(`</table>`)
+	if !r.opts().Written { // the data block, what is in the report and the signatures: no write-up
+		b.WriteString(`</div><div>` + r.contentsNote())
+		b.WriteString(`<div class="sign"><div>Prepared by (name, callsign) / date</div><div>Reviewed and approved (Commanding Officer) / date</div></div>`)
+		b.WriteString(`</div></div>` + r.sourcesPara() + `</section>`)
+		return b.String()
+	}
 	sec := func(title, text string) {
 		b.WriteString(`<h2>` + esc(title) + `</h2>`)
 		if r.AI == nil {
@@ -430,8 +460,31 @@ func (r *Report) aarPage() string {
 		}
 		b.WriteString(`</ol>`)
 	}
+	b.WriteString(r.contentsNote())
 	b.WriteString(`<div class="sign"><div>Prepared by (name, callsign) / date</div><div>Reviewed and approved (Commanding Officer) / date</div></div>`)
 	b.WriteString(`</div></div>`)
+	b.WriteString(r.sourcesPara())
+	b.WriteString(`</section>`)
+	return b.String()
+}
+
+// contentsNote lists the optional pages left out for want of data.
+func (r *Report) contentsNote() string {
+	if len(r.skipped) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(`<h2>Not in this report</h2><ul class="tight">`)
+	for _, x := range r.skipped {
+		b.WriteString(`<li>` + esc(x) + `</li>`)
+	}
+	b.WriteString(`</ul>`)
+	return b.String()
+}
+
+func (r *Report) sourcesPara() string {
+	s := r.Session
+	var b strings.Builder
 	written := ""
 	if !r.Written.IsZero() {
 		written = " on " + r.Written.In(s.Loc).Format("2 Jan 2006 15:04")
@@ -442,7 +495,6 @@ func (r *Report) aarPage() string {
 	}
 	b.WriteString(`<p class="sources">Prepared with Readback ATC` + esc(written) + model + ` from ` + esc(strings.Join(r.Sources, "; ")) +
 		`. Shots, kills, sorties and landings are as DCS logged them on the server; ranges, altitudes and tracks come from Tacview; pilot radio calls are as speech recognition heard them.</p>`)
-	b.WriteString(`</section>`)
 	return b.String()
 }
 
@@ -484,6 +536,15 @@ table.wide td { white-space: nowrap; }
 .sq { display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 8pt; font-weight: 700; margin: 1px; border-radius: 2px; vertical-align: middle; }
 .si { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .si ul { margin: 2px 0; padding-left: 16px; }
 ol { padding-left: 18px; margin: 3px 0; } li { margin-bottom: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
+.chip { border: 1px solid #c9d0d6; border-radius: 3px; padding: 1px 7px; font-size: 8.5pt; background: #f6f7f8; }
+.st { display: inline-block; padding: 0 6px; border-radius: 3px; font-size: 8pt; font-weight: 700; color: #fff; }
+.st.current { background: #2e8b3e; } .st.due { background: #c98a12; } .st.lapsed { background: #c0392b; }
+.bar { display: inline-block; width: 48px; height: 7px; background: #e1e5e9; vertical-align: middle; border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: #1f5fa8; }
+.up { color: #2e8b3e; font-weight: 700; } .down { color: #c0392b; font-weight: 700; }
+.gexcellent { color: #2e8b3e; font-weight: 700; } .ggood { color: #1f5fa8; font-weight: 700; } .gfair { color: #c98a12; font-weight: 700; } .gneeds { color: #c0392b; font-weight: 700; }
+ul.tight { margin: 2px 0 6px; padding-left: 16px; } ul.tight li { margin-bottom: 1px; font-size: 8.5pt; }
 .owner { color: #55606b; font-weight: 600; white-space: nowrap; }
 .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 22px; font-size: 8pt; color: #3a3f47; }
 .sign div { border-top: 1px solid #1c232b; padding-top: 3px; }
@@ -498,7 +559,7 @@ ol { padding-left: 18px; margin: 3px 0; } li { margin-bottom: 2px; }
   .page:last-child { page-break-after: auto; }
   .page.flow { min-height: 0; }
   tr, li { break-inside: avoid; }
-  .sq, table.data th, .pending { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sq, table.data th, .pending, .st, .bar, .bar i, .chip { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 `
 

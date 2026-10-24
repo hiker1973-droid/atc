@@ -426,7 +426,9 @@
   kill and the pilot, engagement and missile tables; a page per engagement with the fight's tracks and missiles and every
   shot (range, launch altitude and speed, kill or miss); the pilots' sorties, flight time and carrier grades; the Safety
   items (blue-on-blue, ground impacts, ejections); and the AAR itself - BLUF, plan, sustain / improve and
-  recommendations with owners. Every number and map is worked out on this PC; Claude writes the words, with your own
+  recommendations with owners; and, as you choose, a comms score for each pilot, a page per pilot, currency, weapon
+  effectiveness, losses, the carrier recovery and the tankers. Every number and map is worked out on this PC; Claude
+  writes the words, with your own
   Claude API key (Settings &gt; Reports; create one at
   <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>).</p>
 <ol>
@@ -436,12 +438,41 @@
     (<code>Saved Games\DCS.dcs_serverrelease\Logs</code> on the server); a game client's dcs.log has none of them.</li>
   <li>Leave <b>Include the radio logs</b> ticked to add what was said on Readback's frequencies.</li>
   <li>Optionally say what to focus on, e.g. "Venom flight's carrier recovery".</li>
+  <li>Under <b>Report contents</b>, tick the pages you want (the page remembers your choice). A page the session has
+    nothing for is left out and listed at the end under "Not in this report".</li>
   <li>Press <b>Preview</b>: the report's pages appear with everything but Claude's words, and you can read exactly what
     will be sent.</li>
-  <li>Press <b>Write the AAR</b>. Then <b>Download PDF</b>, <b>Print</b>, or post it: the <b>Discord post</b> boxes hold
-    the debrief in your squadron's format, split into messages that fit Discord, each with <b>Copy</b>; attach the PDF or
-    the picture of the summary page.</li>
+  <li>Press <b>Write the AAR</b> (or <b>Save the report</b> with Claude's write-up unticked: no key needed). Then
+    <b>Download PDF</b>, <b>Print</b>, or post it: the <b>Discord post</b> boxes hold the debrief in your squadron's
+    format, split into messages that fit Discord, each with <b>Copy</b>; attach the PDF or the picture of the summary
+    page.</li>
 </ol>
+<table>
+  <tr><th>Report contents</th><th>What it shows</th><th>Needs</th></tr>
+  <tr><td>Summary page</td><td>The result, the map of every kill, the engagement, pilot and weapons tables, Safety.</td><td>dcs.log; Tacview for the map</td></tr>
+  <tr><td>Engagement pages</td><td>A page per fight: the tracks, the missiles, every shot.</td><td>Tacview and dcs.log</td></tr>
+  <tr><td>Pilots and greenie board</td><td>Every player's sorties, flight time, landings, traps, kills and losses; this session's passes.</td><td>dcs.log</td></tr>
+  <tr><td>Claude's write-up</td><td>Key points, BLUF, the AAR sections, sustain / improve, recommendations with owners.</td><td>A Claude key</td></tr>
+  <tr><td>Discord post</td><td>The debrief to paste in your squadron's channel.</td><td>-</td></tr>
+  <tr><td>Comms score</td><td>Each aircraft out of 100: calls Readback answered (60%), handoffs followed and readbacks given when a
+    controller asked for one (40%), less 5 for each "say again" or comms-report flag; with the change since the last saved
+    report and what cost points. A modex heard two ways ("Raider 302", "reader 302") counts as one aircraft.</td><td>Readback's radio logs</td></tr>
+  <tr><td>A page per pilot</td><td>Each player's flight log, carrier passes, weapons, comms score, tanking, losses and
+    currency.</td><td>dcs.log</td></tr>
+  <tr><td>Currency</td><td>Each pilot's last sortie and last trap, sorties, landings, traps and tanker plugs in the last 30
+    (and 90) days: Current within 30 days, Due 31 to 60, Lapsed after that. Counted from every DCS server log on this PC
+    (the ones Stats reads).</td><td>The server's logs on this PC</td></tr>
+  <tr><td>Weapon effectiveness</td><td>Each weapon's shots, hits, hit rate and kills, the average launch range of hits and
+    misses, and the ground and sea targets destroyed.</td><td>dcs.log; Tacview for ranges</td></tr>
+  <tr><td>Losses</td><td>Every player aircraft lost: shot down (by whom, with what, from how far), crashed or ejected
+    without a kill, whether the pilot ejected or died, and whether Readback called a CSAR launch.</td><td>dcs.log</td></tr>
+  <tr><td>Carrier recovery</td><td>Each carrier's recovery: passes, traps, bolters, wave-offs, boarding rate, time between
+    passes, average grade; and each pilot's Marshal check-in, Charlie, commencing, initial, first pass and trap.</td><td>dcs.log; radio logs for the Marshal times</td></tr>
+  <tr><td>Tankers</td><td>Each aircraft's tanker, check-in, fuel asked for, first contact, plugs, re-plugs (disconnects) and
+    time in the basket. DCS does not log the fuel passed.</td><td>dcs.log; radio logs for the calls</td></tr>
+</table>
+<p>The Marshal and tanker times, and a pilot's comms score on their pilot page, need the radio callsign matched to the
+  DCS player: name your slot with the callsign (<code>RAIDER 302 | HIKER</code>) or its modex, and it is matched.</p>
 <p>Reports are kept in the <code>reports</code> folder and listed under <b>Saved reports</b>.</p>
 
 <h2 id="stats">16. Stats: flight stats and the greenie board</h2>

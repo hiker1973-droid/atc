@@ -71,6 +71,13 @@
   .cap { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); margin: 0.4rem 0 0.25rem; }
   #discordParts textarea { width: 100%; font-family: Consolas, monospace; font-size: 0.8rem; }
   #discordParts .part { margin-bottom: 0.7rem; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem 1.4rem; }
+  .opts .ogh { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin: 0.2rem 0 0.25rem; }
+  .opts label { display: block; padding: 0.18rem 0; cursor: pointer; }
+  .opts label small { display: block; color: var(--muted); font-size: 0.74rem; margin-left: 1.45rem; }
+  .opts .ogb { grid-column: 1 / -1; display: flex; gap: 0.4rem; margin-top: 0.3rem; }
+  .opts .ogb button { padding: 0.2rem 0.6rem; font-size: 0.78rem; }
+  @media (max-width: 720px) { .opts { grid-template-columns: 1fr; } .src { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -130,6 +137,30 @@
       <div class="lab">Focus<small>optional</small></div>
       <textarea id="focus" maxlength="600" placeholder="e.g. Venom flight's first carrier traps; how the new pilots handled tower calls"></textarea>
     </div>
+    <div class="src">
+      <div class="lab">Report contents<small>tick what goes in; a page with nothing to show is left out and listed at the end</small></div>
+      <div class="opts" id="opts" onchange="optsChanged()">
+        <div>
+          <div class="ogh">The report</div>
+          <label><input type="checkbox" data-o="summary"> Summary page<small>headline, map, results, weapons fired, safety</small></label>
+          <label><input type="checkbox" data-o="engagements"> Engagement pages<small>a page per fight: the tracks and every shot</small></label>
+          <label><input type="checkbox" data-o="pilots"> Pilots and greenie board<small>every player's numbers and this session's passes</small></label>
+          <label><input type="checkbox" data-o="written"> Claude's write-up<small>key points, the AAR sections, recommendations; needs your Claude key</small></label>
+          <label><input type="checkbox" data-o="discord"> Discord post<small>the squadron-format post to paste</small></label>
+        </div>
+        <div>
+          <div class="ogh">Extra pages</div>
+          <label><input type="checkbox" data-o="comms"> Comms score<small>each pilot's calls answered and handoffs followed, against the last report</small></label>
+          <label><input type="checkbox" data-o="pilotPages"> A page per pilot<small>flight log, carrier passes, weapons, comms, tanker, currency</small></label>
+          <label><input type="checkbox" data-o="currency"> Currency<small>flying and carrier currency from the server logs on this PC</small></label>
+          <label><input type="checkbox" data-o="weapons"> Weapon effectiveness<small>hit rates and launch ranges by weapon; ground kills</small></label>
+          <label><input type="checkbox" data-o="losses"> Losses<small>how each aircraft was lost; ejections and CSAR</small></label>
+          <label><input type="checkbox" data-o="recovery"> Carrier recovery<small>Marshal to the wire: timings, bolters, boarding rate</small></label>
+          <label><input type="checkbox" data-o="tanker"> Tankers<small>plugs, time to contact, time in the basket</small></label>
+        </div>
+        <div class="ogb"><button type="button" onclick="setAll(true)">Tick all</button><button type="button" onclick="setAll(false)">Untick all</button></div>
+      </div>
+    </div>
     <div class="actions">
       <button id="prepBtn" onclick="prepare()">Preview</button>
       <span class="msg" id="prepMsg"></span>
@@ -147,7 +178,7 @@
         <button class="primary" id="genBtn" onclick="generate()">Write the AAR</button>
         <span class="msg" id="genMsg"></span>
       </div>
-      <p class="sub" style="margin-top:0.5rem">Sent with your own Claude key and billed to your Anthropic account. A report
+      <p class="sub" id="sentNote" style="margin-top:0.5rem">Sent with your own Claude key and billed to your Anthropic account. A report
         usually takes under a minute. The data block above is worked out on this PC and printed as it is.</p>
     </div>
   </section>
@@ -207,10 +238,27 @@ async function load() {
   $('saved').innerHTML = saved.length ? saved.map(s => `<tr class="${current === s.name ? 'sel' : ''}">
       <td class="t" onclick="openReport('${s.name}')">${esc(s.mission || s.title)}<span class="no">${esc(s.reportNo || 'debrief')}</span></td>
       <td>${when(s.created)}</td>
-      <td class="muted" style="font-size:0.8rem">${esc((s.sources || []).join(', '))}</td><td class="muted" style="font-size:0.8rem">${esc(s.model)}</td></tr>`).join('')
+      <td class="muted" style="font-size:0.8rem">${esc((s.sources || []).join(', '))}</td><td class="muted" style="font-size:0.8rem">${esc(s.model || 'no write-up')}</td></tr>`).join('')
     : '<tr><td colspan="4" class="muted">None yet.</td></tr>';
   $('delBtn').style.display = state.canGenerate ? '' : 'none';
 }
+
+// The report's contents: remembered on this browser between visits.
+const optBoxes = () => document.querySelectorAll('#opts input[data-o]');
+function optsNow() { const o = {}; optBoxes().forEach(b => { o[b.dataset.o] = b.checked; }); return o; }
+function loadOpts() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('readback.reportOptions') || 'null'); } catch (e) {}
+  optBoxes().forEach(b => { b.checked = saved && b.dataset.o in saved ? !!saved[b.dataset.o] : true; });
+}
+function optsChanged() {
+  try { localStorage.setItem('readback.reportOptions', JSON.stringify(optsNow())); } catch (e) {}
+  if (prep && $('preview').style.display !== 'none') {
+    $('genBtn').disabled = true;
+    $('genMsg').innerHTML = '<span class="warn">The contents changed: press Preview again.</span>';
+  }
+}
+function setAll(v) { optBoxes().forEach(b => { b.checked = v; }); optsChanged(); }
 
 function syncWindow() { $('window').style.opacity = $('matchTacview').checked ? 0.45 : 1; }
 
@@ -225,6 +273,8 @@ async function prepare() {
   if ($('from').value) f.append('from', new Date($('from').value).toISOString());
   if ($('to').value) f.append('to', new Date($('to').value).toISOString());
   f.append('focus', $('focus').value);
+  const opts = optsNow();
+  f.append('options', JSON.stringify(opts));
   $('prepBtn').disabled = true; $('preview').style.display = 'none';
   const big = ['acmiFile', 'dcsFile', 'mizFile'].reduce((n, id) => n + ($(id).files[0]?.size || 0), 0) > 20 << 20;
   $('prepMsg').innerHTML = `<span class="spin"></span> ${big ? 'Uploading and reading the files…' : 'Reading the records…'}`;
@@ -233,6 +283,7 @@ async function prepare() {
     const t = await r.text();
     if (!r.ok) throw new Error(t.trim() || 'HTTP ' + r.status);
     prep = JSON.parse(t);
+    prep.opts = opts;
     $('prepMsg').textContent = '';
     $('pvTitle').textContent = prep.title;
     const s = prep.stats;
@@ -249,8 +300,13 @@ async function prepare() {
     $('pvFrame').src = '/reports/preview?id=' + encodeURIComponent(prep.id);
     if (prep.from && !prep.from.startsWith('0001')) { $('from').value = localInput(new Date(prep.from)); $('to').value = localInput(new Date(prep.to)); }
     $('preview').style.display = '';
-    $('genBtn').disabled = !state.keySet;
-    $('genMsg').innerHTML = state.keySet ? '' : '<span class="warn">Add a Claude key in Settings to write it.</span>';
+    const written = opts.written;
+    $('genBtn').textContent = written ? 'Write the AAR' : 'Save the report';
+    $('model').style.display = written ? '' : 'none';
+    $('sentNote').style.display = written ? '' : 'none';
+    $('genBtn').disabled = written && !state.keySet;
+    $('genMsg').innerHTML = !written ? '<span class="muted">Claude&#39;s write-up is unticked: the report is saved as worked out on this PC.</span>'
+      : state.keySet ? '' : '<span class="warn">Add a Claude key in Settings to write it, or untick Claude&#39;s write-up.</span>';
   } catch (e) {
     $('prepMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
   } finally { $('prepBtn').disabled = false; }
@@ -258,18 +314,20 @@ async function prepare() {
 
 async function generate() {
   $('genBtn').disabled = true;
-  $('genMsg').innerHTML = '<span class="spin"></span> Claude is writing the After Action Report…';
+  const written = prep.opts && prep.opts.written;
+  $('genMsg').innerHTML = written ? '<span class="spin"></span> Claude is writing the After Action Report…' : '<span class="spin"></span> Saving the report…';
   try {
     const r = await fetch('/api/reports/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: prep.id, model: $('model').value }) });
     const t = await r.text();
     if (!r.ok) throw new Error(t.trim() || 'HTTP ' + r.status);
     const res = JSON.parse(t);
-    $('genMsg').innerHTML = `<span class="ok">Done</span> <span class="muted">(${res.meta.usage.input_tokens} tokens in, ${res.meta.usage.output_tokens} out)</span>`;
+    $('genMsg').innerHTML = written ? `<span class="ok">Done</span> <span class="muted">(${res.meta.usage.input_tokens} tokens in, ${res.meta.usage.output_tokens} out)</span>`
+      : '<span class="ok">Saved</span>';
     openReport(res.meta.name);
   } catch (e) {
     $('genMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
-  } finally { $('genBtn').disabled = !state.keySet; }
+  } finally { $('genBtn').disabled = written && !state.keySet; }
 }
 
 function openReport(name) {
@@ -334,6 +392,7 @@ const now = new Date();
 $('to').value = localInput(now);
 $('from').value = localInput(new Date(now - 4 * 3600e3));
 syncWindow();
+loadOpts();
 load();
 const linked = new URLSearchParams(location.search).get('name'); // /reports?name=… opens that report
 if (linked) openReport(linked);

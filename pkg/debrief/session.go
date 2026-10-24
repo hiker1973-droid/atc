@@ -30,6 +30,7 @@ type Session struct {
 	// times); ejected holds each player's ejections by short name.
 	MissionStart time.Time
 	ejected      map[string][]time.Time
+	es           *EventSession // the server's events, for the losses and tanker pages
 }
 
 // PilotStat is one player's session.
@@ -49,6 +50,17 @@ type PilotStat struct {
 	Ejections int
 	Shots     int
 	Hits      int
+	Log       []LogEntry // the pilot page's flight log, from the server events
+}
+
+// LogEntry is one line of a pilot's flight log.
+type LogEntry struct {
+	At   time.Time
+	Text string
+}
+
+func (p *PilotStat) log(at time.Time, format string, a ...any) {
+	p.Log = append(p.Log, LogEntry{At: at, Text: fmt.Sprintf(format, a...)})
 }
 
 // Shot is one missile, bomb or rocket fired by or at a player.
@@ -182,7 +194,7 @@ func Analyze(rec *Recording, srv *ServerLog, from, to time.Time, loc *time.Locat
 	}
 	es := srv.SessionFor(recStart, from, to)
 	if es != nil && len(es.Events) > 0 {
-		s.HasEvents = true
+		s.HasEvents, s.es = true, es
 		if rec == nil {
 			s.Start, s.End = es.Start, es.End()
 		}
@@ -288,6 +300,7 @@ func (s *Session) fromEvents(es *EventSession) {
 				p := s.pilot(key, e.Init.Side())
 				p.Sorties++
 				p.Aircraft = addUnique(p.Aircraft, AircraftName(e.Init.Unit))
+				p.log(e.At, "Took off from %s in the %s", firstNonEmpty(e.Place, "the field"), AircraftName(e.Init.Unit))
 				land(key, e.At) // a sortie still open: it ended when that jet did
 				takeoff[key] = e.At
 				s.field(e.Place, key, e.At, e.Init.Side())
@@ -296,6 +309,7 @@ func (s *Session) fromEvents(es *EventSession) {
 			if human {
 				p := s.pilot(key, e.Init.Side())
 				p.Landings++
+				p.log(e.At, "Landed at %s", firstNonEmpty(e.Place, "a field"))
 				land(key, e.At)
 				s.field(e.Place, key, e.At, e.Init.Side())
 			}
@@ -305,9 +319,13 @@ func (s *Session) fromEvents(es *EventSession) {
 				switch e.Type {
 				case "crash":
 					p.Crashes++
+					p.log(e.At, "The jet crashed")
 				case "eject":
 					p.Ejections++
 					s.ejected[p.Name] = append(s.ejected[p.Name], e.At)
+					p.log(e.At, "Ejected")
+				default:
+					p.log(e.At, "Pilot killed")
 				}
 				land(key, e.At)
 			}
@@ -315,9 +333,16 @@ func (s *Session) fromEvents(es *EventSession) {
 			if human {
 				g := ParseGrade(e.Comment)
 				s.Traps = append(s.Traps, Trap{At: e.At, Pilot: ShortName(key), Place: e.Place, Grade: g})
+				p := s.pilot(key, e.Init.Side())
 				if g.Wire > 0 {
-					s.pilot(key, e.Init.Side()).Traps++
+					p.Traps++
 				}
+				p.log(e.At, "Carrier pass at %s: %s", firstNonEmpty(e.Place, "the carrier"), firstNonEmpty(g.Raw, g.Grade))
+			}
+		case "refuel", "refuel stop":
+			if human {
+				p := s.pilot(key, e.Init.Side())
+				p.log(e.At, "%s", map[string]string{"refuel": "Plugged in on the tanker", "refuel stop": "Off the tanker"}[e.Type])
 			}
 		case "shot":
 			if human || e.Target.Human() {
@@ -425,9 +450,12 @@ func (s *Session) fromEvents(es *EventSession) {
 			} else {
 				p.Ground++
 			}
+			p.log(e.At, "Killed %s (%s) with %s", k.Victim, firstNonEmpty(k.VictimType, "?"), firstNonEmpty(k.Weapon, "guns"))
 		}
 		if e.Target.Human() {
-			s.pilot(e.Target.Pilot, e.Target.Side()).ShotDown++
+			p := s.pilot(e.Target.Pilot, e.Target.Side())
+			p.ShotDown++
+			p.log(e.At, "Shot down by %s with %s", k.Killer, firstNonEmpty(k.Weapon, "guns"))
 		}
 		s.Kills = append(s.Kills, k)
 	}

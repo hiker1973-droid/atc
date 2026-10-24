@@ -19,6 +19,7 @@ type Inputs struct {
 	Radio    *Radio
 	Mission  *miz.Briefing // the .miz: what was planned
 	Session  *Session      // the analysis (Analyze)
+	Extras   *Extras       // the optional pages' numbers (ComputeExtras)
 }
 
 // AIText is what Claude writes; the layout, numbers, tables and maps are the
@@ -190,6 +191,50 @@ func Build(in Inputs) string {
 		}
 	}
 
+	if x := in.Extras; x != nil && s != nil {
+		if len(x.Comms) > 0 {
+			w("\n## Comms score (out of 100: calls answered 60%%, handoffs followed and readbacks asked for given 40%%, minus 'say again' and flags)")
+			w("callsign | pilot | score | calls | answered | handoffs and readbacks done/asked | say again | flags | previous report's score")
+			for _, c := range x.Comms {
+				prev := "-"
+				if c.Prev >= 0 {
+					prev = fmt.Sprint(c.Prev)
+				}
+				w("%s | %s | %d | %d | %d | %d/%d | %d | %s | %s", c.Callsign, firstNonEmpty(c.Pilot, "-"), c.Score, c.Calls, c.Answered,
+					c.Done, c.Asked, c.SayAgain, firstNonEmpty(strings.Join(c.Flags, ", "), "-"), prev)
+			}
+		}
+		if len(x.Losses) > 0 {
+			w("\n## Player losses")
+			for _, l := range x.Losses {
+				w("%s %s (%s, %s): %s, %s; ejected %v, CSAR %v", s.Clock(l.At), l.Pilot, l.Side, l.Aircraft, l.Cause, l.Detail, l.Ejected, l.CSAR)
+			}
+		}
+		for _, rc := range x.Recoveries {
+			w("\n## Carrier recovery at %s, %s to %s: %d passes, %d traps, %d bolters, %d wave-offs, %s between passes", rc.Place,
+				s.Clock(rc.Start), s.Clock(rc.End), rc.Passes, rc.Traps, rc.Bolters, rc.WaveOffs, mins(rc.Interval))
+			for _, ap := range rc.Approaches {
+				w("%s (%s): check-in %s, commencing %s, first pass %s, trapped %s, %d passes", ap.Pilot, firstNonEmpty(ap.Callsign, "-"),
+					clockOr(s, ap.CheckIn), clockOr(s, ap.Commencing), clockOr(s, ap.FirstPass), clockOr(s, ap.Trap), ap.Passes)
+			}
+		}
+		if len(x.Tanker) > 0 {
+			w("\n## Tanking")
+			for _, t := range x.Tanker {
+				w("%s (%s) on %s: checked in %s, asked for %s, first contact %s, %d plugs on %d visits, %s in the basket",
+					firstNonEmpty(t.Pilot, "-"), firstNonEmpty(t.Callsign, "-"), firstNonEmpty(t.Tanker, "-"), clockOr(s, t.CheckIn),
+					firstNonEmpty(t.Requested, "-"), clockOr(s, t.FirstPlug), t.Plugs, t.Visits, mins(t.Connected))
+			}
+		}
+		if len(x.Currency) > 0 && x.HistoryRuns > 0 {
+			w("\n## Currency (from %d mission runs in the server logs; current = within 30 days, due = 31-60, lapsed = over 60 or none)", x.HistoryRuns)
+			for _, c := range x.Currency {
+				w("%s: flying %s (%d sorties in 30 days), carrier %s (%d traps in 30 days)", c.Pilot, c.FlyStatus, c.Sorties30,
+					firstNonEmpty(c.TrapStatus, "n/a"), c.Traps30)
+			}
+		}
+	}
+
 	if rad := in.Radio; rad != nil && len(rad.Lines) > 0 {
 		w("\n## Readback radio log (%d lines; %d calls not understood)", len(rad.Lines), rad.Unheard)
 		if rad.Truncated > 0 {
@@ -216,6 +261,13 @@ func Build(in Inputs) string {
 		}
 	}
 	return b.String()
+}
+
+func clockOr(s *Session, t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return s.Clock(t)
 }
 
 func winLine(en *Engagement) string {
