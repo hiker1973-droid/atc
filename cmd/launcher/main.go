@@ -139,6 +139,8 @@ func main() {
 	mux.HandleFunc("/reports/preview", handleReportPreview) // a prepared report's pages before Claude writes
 	mux.HandleFunc("/logo.png", serveLogo)
 	mux.HandleFunc("/branding.js", serveBrandingJS)
+	mux.HandleFunc("/theme.js", serveThemeJS)   // colour modes (theme.go)
+	mux.HandleFunc("/theme.css", serveThemeCSS) // Light and Night for every page
 	mux.HandleFunc("/icon.png", serveIcon)
 	mux.HandleFunc("/readback-mark.png", serveProductMark)
 	mux.Handle("/help/", helpHandler()) // the Installation Guide and User Manual (help/)

@@ -308,9 +308,9 @@ const brandingJS = `(() => {
       m = document.createElement('a');
       m.id = 'productMark'; m.href = '/help/'; m.title = 'Readback ATC - Help';
       m.style.cssText = 'display:flex;align-items:center;gap:0.4rem;flex:none;margin-left:auto;text-decoration:none;' +
-        'color:#8b949e;font-size:0.72rem;line-height:1.15;';
+        'color:var(--hx-8b949e, #8b949e);font-size:0.72rem;line-height:1.15;';
       m.innerHTML = '<img src="/readback-mark.png" alt="" style="width:30px;height:30px;border-radius:6px;">' +
-        '<span><span style="color:#ff6a2b;font-weight:700;font-size:0.86rem;letter-spacing:0.03em;">Readback ATC</span>' +
+        '<span><span style="color:var(--hx-ff6a2b, #ff6a2b);font-weight:700;font-size:0.86rem;letter-spacing:0.03em;">Readback ATC</span>' +
         '<br><span class="pm-ver"></span></span>';
       const server = header.querySelector('.server'); // the dashboard: after the server status
       if (server) { m.style.marginLeft = '0.4rem'; server.after(m); } else header.appendChild(m);

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>vSFG-7 Fleet Monitor</title>
@@ -15,7 +16,7 @@
   header { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 1.4rem;
     border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
   .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
-           box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
+           box-shadow: 0 0 0 1px var(--hx-30363d, #30363d), 0 0 8px rgba(88,166,255,0.22); }
   header .logo { font-weight: 800; color: var(--blue); letter-spacing: 0.03em; }
   header .title { font-size: 1.05rem; font-weight: 600; }
   header .spacer { flex: 1; }
@@ -51,7 +52,7 @@
   .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
   .err { color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; word-break: break-word; }
   .foot { color: var(--muted); font-size: 0.72rem; margin-top: 0.6rem; }
-  .rig.hasalert { border-color: #da3633; box-shadow: 0 0 0 1px #da363355; }
+  .rig.hasalert { border-color: var(--hx-da3633, #da3633); box-shadow: 0 0 0 1px #da363355; }
   .alerts { margin-top: 0.7rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
   .alert { display: flex; gap: 0.4rem; align-items: baseline; font-size: 0.78rem; margin-bottom: 0.3rem; }
   .alert .lvl { font-weight: 700; text-transform: uppercase; font-size: 0.66rem; padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }

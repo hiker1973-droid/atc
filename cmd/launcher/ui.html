@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">
 <meta charset="utf-8">
 <title>vSFG-7 AI Tower ATC Control Portal</title>
 <style>
@@ -35,8 +36,16 @@
   /* One row that wraps instead of squashing. The header carries a lot now —
      brand, rig picker, five theatre buttons, region controls, nav, clock — and
      on a narrow window flex was shrinking the wordmark into odd sizes. */
-  header { padding: 1.35rem 1.2rem 0.8rem; position: relative; background: var(--panel); border-bottom: 2px solid var(--orange);
-           display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; row-gap: 0.6rem; }
+  header { padding: 0.7rem 1.2rem 0.6rem; position: relative; background: var(--panel); border-bottom: 2px solid var(--orange); }
+  /* Row 1: brand, rig, pages, status, colours. Row 2: the theatre and what
+     to run in it, licence and build on the right. */
+  .hrow { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; row-gap: 0.5rem; }
+  .hrow-2 { margin-top: 0.6rem; padding-top: 0.55rem; border-top: 1px solid var(--border); }
+  .topnav { display: flex; gap: 0.1rem; flex-wrap: wrap; }
+  .topnav a { color: var(--label); text-decoration: none; font-size: 0.82rem; padding: 0.3rem 0.65rem; border-radius: 5px; }
+  .topnav a:hover { background: var(--panel-2); color: var(--text); }
+  .badges { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }
+  .badges .build-badge, .badges .lic-badge { position: static; }
   .brand { display: flex; align-items: center; gap: 0.7rem; flex: none; }
   .patch { width: 38px; height: 38px; border-radius: 50%; flex: none;
            box-shadow: 0 0 0 1px var(--border), 0 0 10px rgba(88,166,255,0.25); }
@@ -67,7 +76,7 @@
   body.viewer .btn.warn { display: none !important; }
   body.viewer .rwy-sel { pointer-events: none; opacity: 0.6; }
   .title { color: var(--label); font-size: 0.9rem; }
-  .beta { background: var(--orange); color: #000; font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px; letter-spacing: 0.1em; }
+  .beta { background: var(--orange); color: var(--hx-000000, #000); font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px; letter-spacing: 0.1em; }
   .server { margin-left: auto; text-align: right; }
   .server-line { color: var(--green); font-weight: 500; font-size: 0.8rem; letter-spacing: 0.08em; }
   .server-line .dot { width: 8px; height: 8px; }
@@ -104,8 +113,8 @@
   .card-head .status-dot.down { background: var(--red); }
   .card .freq { color: var(--blue); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
   .card .btn.side { margin-left: 0.35rem; padding: 0.1rem 0.5rem; font-size: 0.68rem; font-weight: 600; }
-  .card .btn.side.blue { background: rgba(56,139,253,0.15); color: #58a6ff; border: 1px solid #1f6feb; }
-  .card .btn.side.red  { background: rgba(248,81,73,0.15); color: #ff7b72; border: 1px solid #da3633; }
+  .card .btn.side.blue { background: rgba(56,139,253,0.15); color: var(--hx-58a6ff, #58a6ff); border: 1px solid var(--hx-1f6feb, #1f6feb); }
+  .card .btn.side.red  { background: rgba(248,81,73,0.15); color: var(--hx-ff7b72, #ff7b72); border: 1px solid var(--hx-da3633, #da3633); }
   .card .pill { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.7rem; color: var(--label); margin-top: 0.45rem; }
   .card .extra { color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
   .card select.rwy-sel { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.3rem; font-size: 0.72rem; font-family: inherit; margin-top: 0.3rem; }
@@ -146,13 +155,13 @@
   table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
   table th, table td { text-align: left; padding: 0.32rem 0.4rem; }
   table th { color: var(--muted); font-weight: 500; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
-  table td { border-bottom: 1px solid #21262d; }
+  table td { border-bottom: 1px solid var(--hx-21262d, #21262d); }
   table tr:last-child td { border-bottom: none; }
   .num { font-variant-numeric: tabular-nums; }
   .pill-phase { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 500; }
   .pill-phase.charlie { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid var(--green-dim); }
-  .pill-phase.holding { background: rgba(240,136,62,0.15); color: var(--orange); border: 1px solid #7d4818; }
-  .pill-phase.inbound { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid #1f4070; }
+  .pill-phase.holding { background: rgba(240,136,62,0.15); color: var(--orange); border: 1px solid var(--hx-7d4818, #7d4818); }
+  .pill-phase.inbound { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid var(--hx-1f4070, #1f4070); }
   .pill-staged  { color: var(--orange); }
   .pill-free    { color: var(--green); }
   .pill-busy    { color: var(--red); }
@@ -207,17 +216,17 @@
   .pill-state { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 500; }
   .pill-state.cleared    { background: rgba(63,185,80,0.15);  color: var(--green);  border: 1px solid var(--green-dim); }
   .pill-state.luaw       { background: rgba(240,136,62,0.20); color: var(--orange); border: 1px solid var(--orange); }
-  .pill-state.hold-short { background: rgba(240,136,62,0.10); color: var(--orange); border: 1px solid #7d4818; }
+  .pill-state.hold-short { background: rgba(240,136,62,0.10); color: var(--orange); border: 1px solid var(--hx-7d4818, #7d4818); }
   .pill-state.queued     { background: var(--panel-2);        color: var(--muted);  border: 1px solid var(--border); }
   .airfield-cell { font-weight: 500; }
-  .airfield-cell.OMDM { color: #b794f4; }
-  .airfield-cell.OMAM { color: #f9a8d4; }
-  .airfield-cell.OMAL { color: #fcd34d; }
+  .airfield-cell.OMDM { color: var(--hx-b794f4, #b794f4); }
+  .airfield-cell.OMAM { color: var(--hx-f9a8d4, #f9a8d4); }
+  .airfield-cell.OMAL { color: var(--hx-fcd34d, #fcd34d); }
 
   /* Row 3: pattern / freqs / controls */
   .row-3 { display: grid; grid-template-columns: 1.9fr 1fr 1.7fr; gap: 0.7rem; }
   .freq-list { font-size: 0.78rem; }
-  .freq-list .row { display: flex; padding: 0.3rem 0.2rem; border-bottom: 1px solid #21262d; }
+  .freq-list .row { display: flex; padding: 0.3rem 0.2rem; border-bottom: 1px solid var(--hx-21262d, #21262d); }
   .freq-list .row:last-child { border-bottom: none; }
   .freq-list .name { flex: 1; color: var(--text); }
   .freq-list .num { color: var(--blue); font-variant-numeric: tabular-nums; }
@@ -225,14 +234,14 @@
   /* Controls grid */
   .ctrl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   button.btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0.55rem 0.6rem; cursor: pointer; font: inherit; font-size: 0.78rem; text-align: center; }
-  button.btn:hover { background: #2a313a; }
+  button.btn:hover { background: var(--hx-2a313a, #2a313a); }
   button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
   button.btn.start  { border-color: var(--green-dim); color: var(--green); }
   button.btn.start:hover  { background: rgba(63,185,80,0.15); }
-  button.btn.stop   { border-color: #5d1a1a; color: #ffb3b3; }
+  button.btn.stop   { border-color: var(--hx-5d1a1a, #5d1a1a); color: var(--hx-ffb3b3, #ffb3b3); }
   button.btn.stop:hover   { background: rgba(248,81,73,0.15); }
-  button.btn.warn   { border-color: #6e5a1c; color: var(--yellow); }
-  button.btn.info   { border-color: #1f4070; color: var(--blue); }
+  button.btn.warn   { border-color: var(--hx-6e5a1c, #6e5a1c); color: var(--yellow); }
+  button.btn.info   { border-color: var(--hx-1f4070, #1f4070); color: var(--blue); }
 
   /* Log */
   .log { height: 360px; overflow-y: auto; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.55; padding: 0.4rem 0.6rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; }
@@ -242,8 +251,8 @@
   .log .src { font-weight: 500; }
   .log .row.t-rx .msg { color: var(--gold); }
   .log .row.t-tx .msg { color: var(--blue); }
-  .log .row.t-sys .msg { color: #9fc1ee; }
-  .log .row.t-msh .msg { color: #6dabff; }
+  .log .row.t-sys .msg { color: var(--hx-9fc1ee, #9fc1ee); }
+  .log .row.t-msh .msg { color: var(--hx-6dabff, #6dabff); }
   .log .row.t-dkb .msg { color: var(--gold); }
   .log .row.t-err .msg { color: var(--red); }
   .log-legend { margin-left: auto; font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.7rem; }
@@ -263,7 +272,7 @@
   #wxInner h3 { margin: 0 0 0.8rem; }
   #wxInner .row { display: flex; justify-content: space-between; align-items: center; margin: 0.45rem 0; }
   #wxInner label { color: var(--muted); }
-  #wxInner input { width: 110px; background: #11151a; color: #d7e3f0; border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.4rem; font-family: inherit; text-align: right; }
+  #wxInner input { width: 110px; background: var(--hx-11151a, #11151a); color: var(--hx-d7e3f0, #d7e3f0); border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.4rem; font-family: inherit; text-align: right; }
   #wxInner .actions { margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
   #wxNote { color: var(--muted); font-size: 0.85em; margin-top: 0.6rem; }
   #wxStatus { color: var(--muted); font-size: 0.85em; margin-top: 0.4rem; min-height: 1.1em; }
@@ -271,23 +280,23 @@
   #logInner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; width: 85%; height: 85%; display: flex; flex-direction: column; }
   #logHead { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   #logTitle { font-weight: 500; }
-  #logBody { flex: 1; overflow: auto; padding: 0.8rem 1rem; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; color: #b1bac4; }
-  .theatre-switch { display: flex; align-items: center; gap: 0.4rem; margin: 0 1rem; }
+  #logBody { flex: 1; overflow: auto; padding: 0.8rem 1rem; font-family: Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; color: var(--hx-b1bac4, #b1bac4); }
+  .theatre-switch { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .theatre-label { color: var(--muted); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.2rem; }
   .theatre-btn { background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.7rem; font-size: 0.85em; cursor: pointer; }
-  .theatre-btn:hover { color: #e6edf3; }
-  .theatre-btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  .theatre-btn:hover { color: var(--hx-e6edf3, #e6edf3); }
+  .theatre-btn.active { background: var(--hx-1f6feb, #1f6feb); color: var(--hx-ffffff, #fff); border-color: var(--hx-1f6feb, #1f6feb); }
   .region-sep { width: 1px; height: 1.2rem; background: var(--border); margin: 0 0.5rem; }
   .region-btn { border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.7rem; font-size: 0.85em; cursor: pointer; font-weight: 600; }
-  .region-btn.start { background: #196c2e33; color: #7ee787; border-color: #2ea04366; }
-  .region-btn.start:hover { background: #2ea04366; color: #fff; }
-  .region-btn.atis { background: #1f3a5f33; color: #79c0ff; border-color: #1f6feb66; margin-left: 0.35rem; }
-  .region-btn.atis:hover { background: #1f6feb66; color: #fff; }
-  .region-btn.stop { background: #6e111133; color: #ff9492; border-color: #da363366; margin-left: 0.35rem; }
-  .region-btn.stop:hover { background: #da363366; color: #fff; }
+  .region-btn.start { background: #196c2e33; color: var(--hx-7ee787, #7ee787); border-color: #2ea04366; }
+  .region-btn.start:hover { background: #2ea04366; color: var(--hx-ffffff, #fff); }
+  .region-btn.atis { background: #1f3a5f33; color: var(--hx-79c0ff, #79c0ff); border-color: #1f6feb66; margin-left: 0.35rem; }
+  .region-btn.atis:hover { background: #1f6feb66; color: var(--hx-ffffff, #fff); }
+  .region-btn.stop { background: #6e111133; color: var(--hx-ff9492, #ff9492); border-color: #da363366; margin-left: 0.35rem; }
+  .region-btn.stop:hover { background: #da363366; color: var(--hx-ffffff, #fff); }
   .region-btn:disabled { opacity: 0.5; cursor: default; }
   .region-btn.update { background: #3d2f0a33; color: var(--gold); border-color: #7a5f1f99; margin-left: 0.35rem; }
-  .region-btn.update:hover { background: #7a5f1f66; color: #fff; }
+  .region-btn.update:hover { background: #7a5f1f66; color: var(--hx-ffffff, #fff); }
   .upd-chip { display: none; margin-left: 0.5rem; font-size: 0.75rem; color: var(--gold); max-width: 28rem;
               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   .upd-chip.ok { color: var(--green); } .upd-chip.fail { color: var(--red); white-space: normal; }
@@ -303,43 +312,55 @@
   .af-col td { padding: 0.12rem 0.3rem; border-top: 1px solid var(--border); }
   .af-col .hint { color: var(--muted); font-style: italic; }
   /* Caucasus airfield accent colours (mirror PG cells) */
-  .airfield-cell.UGSB { color: #7ee787; } .airfield-cell.UG5X { color: #79c0ff; }
-  .airfield-cell.UGKS { color: #ffa657; } .airfield-cell.UGKO { color: #d2a8ff; }
-  .airfield-cell.UGTB { color: #ff7b72; }
+  .airfield-cell.UGSB { color: var(--hx-7ee787, #7ee787); } .airfield-cell.UG5X { color: var(--hx-79c0ff, #79c0ff); }
+  .airfield-cell.UGKS { color: var(--hx-ffa657, #ffa657); } .airfield-cell.UGKO { color: var(--hx-d2a8ff, #d2a8ff); }
+  .airfield-cell.UGTB { color: var(--hx-ff7b72, #ff7b72); }
   /* Kola airfield accent colours */
-  .airfield-cell.ENBO { color: #7ee787; } .airfield-cell.ENDU { color: #79c0ff; } .airfield-cell.ENNA { color: #ffa657; } .airfield-cell.EFRO { color: #d2a8ff; }
+  .airfield-cell.ENBO { color: var(--hx-7ee787, #7ee787); } .airfield-cell.ENDU { color: var(--hx-79c0ff, #79c0ff); } .airfield-cell.ENNA { color: var(--hx-ffa657, #ffa657); } .airfield-cell.EFRO { color: var(--hx-d2a8ff, #d2a8ff); }
   /* Cold War Germany airfield accent colours (8 recovery bases) */
-  .airfield-cell.ETAR { color: #7ee787; } .airfield-cell.ETAD { color: #79c0ff; }
-  .airfield-cell.EDFH { color: #ffa657; } .airfield-cell.EDDF { color: #d2a8ff; }
-  .airfield-cell.EDDK { color: #f778ba; } .airfield-cell.EDDL { color: #ffdf5d; }
-  .airfield-cell.EDDV { color: #56d4dd; } .airfield-cell.EDDH { color: #ff9492; }
+  .airfield-cell.ETAR { color: var(--hx-7ee787, #7ee787); } .airfield-cell.ETAD { color: var(--hx-79c0ff, #79c0ff); }
+  .airfield-cell.EDFH { color: var(--hx-ffa657, #ffa657); } .airfield-cell.EDDF { color: var(--hx-d2a8ff, #d2a8ff); }
+  .airfield-cell.EDDK { color: var(--hx-f778ba, #f778ba); } .airfield-cell.EDDL { color: var(--hx-ffdf5d, #ffdf5d); }
+  .airfield-cell.EDDV { color: var(--hx-56d4dd, #56d4dd); } .airfield-cell.EDDH { color: var(--hx-ff9492, #ff9492); }
   /* Iraq airfield accent colours (9 recovery bases) */
-  .airfield-cell.ORAA { color: #7ee787; } .airfield-cell.ORSH { color: #79c0ff; }
-  .airfield-cell.ORBR { color: #ffa657; } .airfield-cell.ORBI { color: #d2a8ff; }
-  .airfield-cell.ORBD { color: #f778ba; } .airfield-cell.ORBB { color: #ffdf5d; }
-  .airfield-cell.ORER { color: #56d4dd; } .airfield-cell.ORKK { color: #ff9492; }
-  .airfield-cell.ORSU { color: #a5d6ff; }
+  .airfield-cell.ORAA { color: var(--hx-7ee787, #7ee787); } .airfield-cell.ORSH { color: var(--hx-79c0ff, #79c0ff); }
+  .airfield-cell.ORBR { color: var(--hx-ffa657, #ffa657); } .airfield-cell.ORBI { color: var(--hx-d2a8ff, #d2a8ff); }
+  .airfield-cell.ORBD { color: var(--hx-f778ba, #f778ba); } .airfield-cell.ORBB { color: var(--hx-ffdf5d, #ffdf5d); }
+  .airfield-cell.ORER { color: var(--hx-56d4dd, #56d4dd); } .airfield-cell.ORKK { color: var(--hx-ff9492, #ff9492); }
+  .airfield-cell.ORSU { color: var(--hx-a5d6ff, #a5d6ff); }
   /* Syria / Eastern Med airfield accent colours (8 recovery bases) */
-  .airfield-cell.LTAG { color: #7ee787; } .airfield-cell.LLRD { color: #79c0ff; }
-  .airfield-cell.OJMF { color: #ffa657; } .airfield-cell.LTDA { color: #d2a8ff; }
-  .airfield-cell.LTAJ { color: #f778ba; } .airfield-cell.LCRA { color: #ffdf5d; }
-  .airfield-cell.LCPH { color: #56d4dd; } .airfield-cell.OJHR { color: #ff9492; }
-  .airfield-cell.OSLK { color: #ffa657; } .airfield-cell.OLBA { color: #d2a8ff; }
+  .airfield-cell.LTAG { color: var(--hx-7ee787, #7ee787); } .airfield-cell.LLRD { color: var(--hx-79c0ff, #79c0ff); }
+  .airfield-cell.OJMF { color: var(--hx-ffa657, #ffa657); } .airfield-cell.LTDA { color: var(--hx-d2a8ff, #d2a8ff); }
+  .airfield-cell.LTAJ { color: var(--hx-f778ba, #f778ba); } .airfield-cell.LCRA { color: var(--hx-ffdf5d, #ffdf5d); }
+  .airfield-cell.LCPH { color: var(--hx-56d4dd, #56d4dd); } .airfield-cell.OJHR { color: var(--hx-ff9492, #ff9492); }
+  .airfield-cell.OSLK { color: var(--hx-ffa657, #ffa657); } .airfield-cell.OLBA { color: var(--hx-d2a8ff, #d2a8ff); }
 </style>
 </head>
 <body>
 <header>
+ <!-- Two rows (operator 2026-10-23, "clean up the top navigation bar"):
+      who and where - brand, rig, pages, status, colours - then what to run:
+      the theatre and its Start / ATIS / Stop / Update, licence and build. -->
+ <div class="hrow">
   <div class="brand">
     <img class="patch" src="/logo.png" alt="vSFG-7 squadron patch">
     <span class="logo">vSFG-7</span>
-    <span class="title">AI Tower ATC Control Portal</span>
-    <span class="beta">BETA</span>
     <span class="view-chip" id="viewChip" style="display:none;">VIEW ONLY</span>
   </div>
   <div class="rig-pick">
     <label for="rigSel">Rig</label>
     <select class="rig-sel" id="rigSel" onchange="switchRig(this.value)"></select>
   </div>
+  <nav class="topnav">
+    <a href="/fleet">Fleet</a><a href="/logs">Logs</a><a href="/pilots">Pilots</a><a href="/reports">Reports</a><a href="/stats">Stats</a><a href="/settings">Settings</a><a href="/help/">Help</a>
+  </nav>
+  <div class="server">
+    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv-chip" id="tvChip" title="Tacview real-time telemetry">TACVIEW …</span><span class="gci-chip" id="gciChip"></span><span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
+    <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
+  </div>
+  <span class="theme-slot"></span>
+ </div>
+ <div class="hrow hrow-2">
   <div class="theatre-switch" id="theatreSwitch">
     <span class="theatre-label">Theatre</span>
     <button class="theatre-btn active" data-theatre="pg" onclick="switchTheatre('pg')">Persian Gulf</button>
@@ -355,21 +376,11 @@
     <button class="region-btn update" id="updateRigBtn" onclick="updateThisRig()" title="Update this rig: git pull, build, restart the running theatre, then the launcher">⟳ Update</button>
     <span class="upd-chip" id="updChip"></span>
   </div>
-  <div class="topnav" style="display:flex;gap:0.4rem;margin:0 0.8rem;">
-    <a href="/fleet" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Fleet</a>
-    <a href="/logs" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Logs</a>
-    <a href="/pilots" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Pilots</a>
-    <a href="/reports" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Reports</a>
-    <a href="/stats" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Stats</a>
-    <a href="/settings" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Settings</a>
-    <a href="/help/" style="color:#8b949e;text-decoration:none;font-size:0.82rem;border:1px solid #30363d;padding:0.25rem 0.6rem;border-radius:5px;">Help</a>
+  <div class="badges">
+    <a class="lic-badge" id="licBadge" href="/settings#licence"></a>
+    <div class="build-badge" id="buildBadge" title="Build this rig is running">build …</div>
   </div>
-  <a class="lic-badge" id="licBadge" href="/settings#licence"></a>
-  <div class="build-badge" id="buildBadge" title="Build this rig is running">build …</div>
-  <div class="server">
-    <div class="server-line" id="serverLine"><span class="dot up"></span>SERVER ONLINE<span class="tv-chip" id="tvChip" title="Tacview real-time telemetry">TACVIEW …</span><span class="gci-chip" id="gciChip"></span><span class="tv64-badge" id="tv64Badge" title="Tacview64.exe viewer not running — launch it to see the air picture">⚠ TACVIEW64 OFF</span></div>
-    <div class="clock"><span id="missionClock">Mission —</span> · <span id="clock">--:--:-- UTC</span></div>
-  </div>
+ </div>
 </header>
 
 <main>
@@ -439,7 +450,7 @@
       <span class="log-legend">
         <span><span class="pip" style="background:var(--blue)"></span>ATC TX</span>
         <span><span class="pip" style="background:var(--gold)"></span>Pilot RX</span>
-        <span><span class="pip" style="background:#9fc1ee"></span>Sys</span>
+        <span><span class="pip" style="background:var(--hx-9fc1ee, #9fc1ee)"></span>Sys</span>
         <span><span class="pip" style="background:var(--red)"></span>Err</span>
         <button class="btn info mini" onclick="openLogModal()" title="Every role's log in full">Full Log</button>
       </span>
@@ -583,8 +594,8 @@ async function checkSetup() {
     b.href = href;
     b.textContent = text;
     b.style.cssText = red
-      ? 'display:block;background:#3d0f0f;color:#ff7b72;border-bottom:1px solid #f85149;padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;'
-      : 'display:block;background:#3d2e00;color:#e3b341;border-bottom:1px solid #d29922;padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;';
+      ? 'display:block;background:var(--hx-3d0f0f, #3d0f0f);color:var(--hx-ff7b72, #ff7b72);border-bottom:1px solid var(--hx-f85149, #f85149);padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;'
+      : 'display:block;background:var(--hx-3d2e00, #3d2e00);color:var(--hx-e3b341, #e3b341);border-bottom:1px solid var(--hx-d29922, #d29922);padding:0.6rem 1.2rem;text-decoration:none;font-weight:600;';
     document.body.prepend(b);
   };
   try {

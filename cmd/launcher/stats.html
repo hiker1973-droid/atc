@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>vSFG-7 Stats</title>
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --panel-2:#1c2330; --border:#30363d; --text:#c9d1d9; --muted:#8b949e;
+  :root { --bg:var(--hx-0d1117, #0d1117); --panel:var(--hx-161b22, #161b22); --panel-2:var(--hx-1c2330, #1c2330); --border:var(--hx-30363d, #30363d); --text:var(--hx-c9d1d9, #c9d1d9); --muted:var(--hx-8b949e, #8b949e);
     --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
@@ -13,7 +14,7 @@
   header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
     border-bottom: 1px solid var(--border); background: var(--panel); }
   .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
-    box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
+    box-shadow: 0 0 0 1px var(--hx-30363d, #30363d), 0 0 8px rgba(88,166,255,0.22); }
   header .logo { font-weight: 800; color: var(--blue); }
   header .title { font-weight: 600; margin-right: 0.5rem; }
   .spacer { flex: 1; }
@@ -24,15 +25,15 @@
     border-radius: 5px; padding: 0.35rem 0.6rem; font-size: 0.85rem; font-family: inherit; }
   button { cursor: pointer; white-space: nowrap; }
   button:hover:not(:disabled) { border-color: var(--blue); }
-  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
-  button.on { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.primary { background: var(--hx-1f6feb, #1f6feb); border-color: var(--hx-1f6feb, #1f6feb); color: var(--hx-ffffff, #fff); }
+  button.on { background: var(--hx-1f6feb, #1f6feb); border-color: var(--hx-1f6feb, #1f6feb); color: var(--hx-ffffff, #fff); }
   main { padding: 1rem 1.2rem 3rem; max-width: 1250px; margin: 0 auto; }
   section { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem 1rem; margin-bottom: 1rem; }
   section h2 { margin: 0 0 0.2rem; font-size: 1rem; }
   .sub { color: var(--muted); font-size: 0.82rem; margin: 0 0 0.8rem; }
   .bar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
   .muted { color: var(--muted); } .ok { color: var(--green); } .bad { color: var(--red); }
-  .b { color: #6ea8ff; } .r { color: #ff7b72; }
+  .b { color: var(--hx-6ea8ff, #6ea8ff); } .r { color: var(--hx-ff7b72, #ff7b72); }
   .tablewrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 0.35rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>vSFG-7 Live Logs</title>
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e;
+  :root { --bg:var(--hx-0d1117, #0d1117); --panel:var(--hx-161b22, #161b22); --border:var(--hx-30363d, #30363d); --text:var(--hx-c9d1d9, #c9d1d9); --muted:var(--hx-8b949e, #8b949e);
     --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -14,14 +15,14 @@
   header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
     border-bottom: 1px solid var(--border); background: var(--panel); }
   .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
-           box-shadow: 0 0 0 1px #30363d, 0 0 8px rgba(88,166,255,0.22); }
+           box-shadow: 0 0 0 1px var(--hx-30363d, #30363d), 0 0 8px rgba(88,166,255,0.22); }
   header .logo { font-weight: 800; color: var(--blue); }
   header .title { font-weight: 600; margin-right: 0.5rem; }
   header label { color: var(--muted); font-size: 0.8rem; }
   select, button { background: var(--bg); color: var(--text); border: 1px solid var(--border);
     border-radius: 5px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
   select:hover, button:hover { border-color: var(--blue); }
-  button.on { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  button.on { background: var(--hx-1f6feb, #1f6feb); color: var(--hx-ffffff, #fff); border-color: var(--hx-1f6feb, #1f6feb); }
   .spacer { flex: 1; }
   header .status { color: var(--muted); font-size: 0.78rem; }
   header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; border: 1px solid var(--border);
@@ -32,11 +33,11 @@
   .ln { display: flex; gap: 0.6rem; white-space: pre-wrap; word-break: break-word; padding: 0.02rem 0; }
   .ln .t { color: var(--muted); flex-shrink: 0; }
   .ln .lv { flex-shrink: 0; width: 3.2em; text-transform: uppercase; font-size: 0.72rem; font-weight: 700; }
-  .ln .lv.info { color: #6e7681; } .ln .lv.warn { color: var(--amber); } .ln .lv.error { color: var(--red); }
+  .ln .lv.info { color: var(--hx-6e7681, #6e7681); } .ln .lv.warn { color: var(--amber); } .ln .lv.error { color: var(--red); }
   .ln .site { flex-shrink: 0; color: var(--blue); min-width: 6em; }
   .ln .m { color: var(--text); }
-  .ln.error .m { color: #ffb4ad; }
-  .ln.warn .m { color: #f0c674; }
+  .ln.error .m { color: var(--hx-ffb4ad, #ffb4ad); }
+  .ln.warn .m { color: var(--hx-f0c674, #f0c674); }
   .empty { color: var(--muted); font-style: italic; padding: 1rem; }
 </style>
 </head>
