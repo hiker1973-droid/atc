@@ -13,6 +13,7 @@ user manual?"
 
 Run:  python -I docs/manual/build_manuals.py      (from the repo root)
 """
+import datetime as dt
 import os
 import shutil
 import subprocess
@@ -23,6 +24,10 @@ import time
 import pymupdf
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Every page's footer carries the version and the day it was built (operator
+# 2026-10-24: "Put a date on the PDF's").
+VERSION = open(os.path.join(REPO, "product_version.txt"), encoding="utf-8").read().strip()
+DATED = "Version %s  -  %s" % (VERSION, dt.date.today().strftime("%d %B %Y").lstrip("0"))
 HELP = os.path.join(REPO, "cmd", "launcher", "help")
 OUT = os.path.join(REPO, "docs", "manual")
 
@@ -62,6 +67,8 @@ def build(src, dst_name, title):
         y = r.height - 24
         grey = (0.48, 0.5, 0.54)
         page.insert_text((43, y), "Readback ATC - " + title, fontsize=8, fontname="helv", color=grey)
+        page.insert_text((r.width / 2 - pymupdf.get_text_length(DATED, "helv", 8) / 2, y), DATED,
+                         fontsize=8, fontname="helv", color=grey)
         num = f"{i + 1} / {len(doc)}"
         page.insert_text((r.width - 43 - pymupdf.get_text_length(num, "helv", 8), y), num,
                          fontsize=8, fontname="helv", color=grey)
