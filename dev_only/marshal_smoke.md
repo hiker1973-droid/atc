@@ -91,9 +91,9 @@ Radio: **`Marshal, Raider 99, commencing, state 5.0.`**
 
 Expected: response acks commencing and instructs pilot to call 3-mile
 initial for the actual paddles handoff. Three variants — any of:
-- `Raider 99, Marshal, copy commencing, state 5.0, check in three mile initial, paddles handoff.`
-- `Raider 99, Marshal, commencing, state 5.0, report three mile initial for paddles.`
-- `Raider 99, Marshal, roger commencing, state 5.0, call three mile initial, paddles will have you.`
+- `Raider 99, Marshal, copy commencing, state 5.0, check in three mile initial.`
+- `Raider 99, Marshal, commencing, state 5.0, report three mile initial.`
+- `Raider 99, Marshal, roger commencing, state 5.0, call three mile initial.`
 
 Log check: `Marshal: stack step-down (internal, no TX)` info line if other
 aircraft were in stack — collapse should NOT transmit.

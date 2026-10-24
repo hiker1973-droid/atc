@@ -25,7 +25,7 @@ import (
 //
 //	"Texaco 1, Knight 1-1, flight of 2, 15 mile initial for port observation with intent to refuel"
 //	   -> "Knight 11, Texaco one one, cleared port observation, one three thousand, velocity two six zero. How much do you request?"
-//	"Knight 1-1, request 5.0"                       -> "Knight 11, Texaco copies five thousand pounds."
+//	"Knight 1-1, request 5.0"                       -> "Knight 11, Texaco, you are cleared for five thousand pounds."
 //	"Knight 1-1, 1 mile trail for port observation" -> "Knight 11, Texaco, continue port observation."
 //	"Knight 1-1, established port observation"      -> "Knight 11, Texaco, copy. Port and starboard baskets open."
 //	"Knight 1-3, moving to starboard basket"        -> "Knight 13, Texaco, cleared starboard basket."
@@ -527,9 +527,9 @@ func (n *tankerNet) Response(text, cs string) string {
 			f.stage = tankerGiveSet
 		}
 		if amount < 0 {
-			return fmt.Sprintf("%s, %s copies, full give.", cs, n.Short)
+			return fmt.Sprintf("%s, %s, you are cleared for full give.", cs, n.Short)
 		}
-		return fmt.Sprintf("%s, %s copies %s.", cs, n.Short, spokenThousands(amount))
+		return fmt.Sprintf("%s, %s, you are cleared for %s.", cs, n.Short, spokenThousands(amount))
 
 	// "15 mile initial for port observation with intent to refuel"
 	case checkIn || f.stage == 0:
@@ -539,10 +539,10 @@ func (n *tankerNet) Response(text, cs string) string {
 		switch { // "intent to refuel, request 5.0" in one call
 		case amount < 0:
 			f.stage = tankerGiveSet
-			return lead + " Copies full give."
+			return lead + " You are cleared for full give."
 		case amount > 0:
 			f.stage = tankerGiveSet
-			return lead + " Copies " + spokenThousands(amount) + "."
+			return lead + " You are cleared for " + spokenThousands(amount) + "."
 		}
 		return lead + " How much do you request?"
 	}

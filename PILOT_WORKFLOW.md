@@ -129,7 +129,7 @@ Marshal handles the inbound stack to the boat — case recovery info, BRC, stack
 
 5. **Commencing** (ack + instruction to call 3-mile initial; you stay on Marshal).
    - Pilot: *"Marshal, Raider 1, commencing"* (optionally with state)
-   - ATC: *"…copy commencing, state 5.0, check in three mile initial, paddles handoff"* — stay on Marshal, continue approach.
+   - ATC: *"…copy commencing, state 5.0, check in three mile initial"* — stay on Marshal, continue approach.
    - Internal: stack collapses silently — no step-down radio call.
 
 6. **3-mile initial → LSO handoff** (the actual paddles handoff).

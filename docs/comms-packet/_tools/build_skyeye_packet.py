@@ -337,7 +337,7 @@ def c05_marshal_case1():
         ("STATE", "Marshal, Raider 1, state 5.2 - under 2.0 is priority."),
         ("ESTABLISHED", "Marshal, Raider 1, established angels 3"),
         ("", "Reply: signal Charlie - or your stack position, hold."),
-        ("COMMENCING", "Reply: call three mile initial for paddles."),
+        ("COMMENCING", "Reply: call three mile initial."),
         ("INITIAL", "At 3 nm. Reply: contact paddles, good luck."),
     ], split=280)
     NK.band(c, "THE STACK")
@@ -473,7 +473,7 @@ def c08_marshal_calls_stack():
         ("", "position one, hold for Charlie."),
         ("YOU", "Marshal, Raider 1, commencing, state 4.0."),
         ("MARSHAL", "Raider 1, Union Marshal, copy commencing, state 4.0,"),
-        ("", "check in three mile initial, paddles handoff."),
+        ("", "check in three mile initial."),
         ("YOU", "Marshal, Raider 1, initial."),
         ("MARSHAL", "Raider 1, Union Marshal, contact paddles, good luck."),
     ], split=150)
@@ -781,7 +781,7 @@ def c16_texaco():
         ("COMMAND", "request tanker  ->  bearing, range, contact the nearest Texaco"),
         ("INITIAL", "15 mile initial for port observation, intent to refuel"),
         ("", "->  cleared port observation ... How much do you request?"),
-        ("GIVE", "request 5.0  (or full)  ->  copies five thousand pounds"),
+        ("GIVE", "request 5.0  (or full)  ->  cleared for five thousand pounds"),
         ("TRAIL", "1 mile trail for port observation  ->  continue"),
         ("OBSERVATION", "established port observation  ->  baskets open"),
         ("BASKET", "moving to starboard basket  ->  cleared starboard basket"),
@@ -822,7 +822,7 @@ def c16_shell():
         ("COMMAND", "request tanker  ->  bearing, range, contact the nearest Shell"),
         ("INITIAL", "15 mile initial for port observation, intent to refuel"),
         ("", "->  cleared port observation ... How much do you request?"),
-        ("GIVE", "request 5.0  (or full)  ->  copies five thousand pounds"),
+        ("GIVE", "request 5.0  (or full)  ->  cleared for five thousand pounds"),
         ("TRAIL", "1 mile trail for port observation  ->  continue"),
         ("OBSERVATION", "established port observation  ->  boom open"),
         ("BOOM", "moving to the boom  ->  cleared to the boom"),

@@ -88,7 +88,7 @@ func TestTankerProcedureFlow(t *testing.T) {
 	runTanker(t, tn, []struct{ call, want string }{
 		{"Texaco 1, Knight 1-1, flight of 2, 15 mile initial for port observation with intent to refuel",
 			"Knight 11, Texaco one one, cleared port observation, one three thousand, velocity three three six. How much do you request?"},
-		{"Knight 1-1, request 5.0", "Knight 11, Texaco copies five thousand pounds."},
+		{"Knight 1-1, request 5.0", "Knight 11, Texaco, you are cleared for five thousand pounds."},
 		{"Texaco 1, Knight 1-1, flight of 2, 1 mile trail for port observation", "Knight 11, Texaco, continue port observation."},
 		{"Texaco 1, Knight 1-1, established port observation", "Knight 11, Texaco, copy. Port and starboard baskets open."},
 		{"Knight 1-1, moving to port basket", "Knight 11, Texaco, cleared port basket."},
@@ -112,7 +112,7 @@ func TestTankerOperatorFlow(t *testing.T) {
 	runTanker(t, tn, []struct{ call, want string }{
 		{"Texaco 1-1, Raider 302, one Hornet, 15 miles, intent to refuel.",
 			"Raider 302, Texaco one one, cleared port observation, one three thousand, velocity three three six. How much do you request?"},
-		{"Texaco, Raider 302, request 5.0.", "Raider 302, Texaco copies five thousand pounds."},
+		{"Texaco, Raider 302, request 5.0.", "Raider 302, Texaco, you are cleared for five thousand pounds."},
 		{"Raider 302, one mile trail.", "Raider 302, Texaco, continue port observation."},
 		{"Raider 302, established.", "Raider 302, Texaco, copy. Port and starboard baskets open."},
 		{"Raider 302, ready pre-contact.", "Raider 302, Texaco, copy, call ready pre-contact."},
@@ -149,7 +149,7 @@ func TestTankerBaskets(t *testing.T) {
 func TestTankerShortcuts(t *testing.T) {
 	tn := testTanker()
 	got := tn.Response("Texaco 1-1, Raider 302, intent to refuel, request 6.0", "Raider 302")
-	if !strings.HasSuffix(got, "velocity three three six. Copies six thousand pounds.") {
+	if !strings.HasSuffix(got, "velocity three three six. You are cleared for six thousand pounds.") {
 		t.Errorf("combined: %q", got)
 	}
 	if got := tn.Response("Texaco 1-1, say again", ""); !strings.Contains(got, "say again your callsign") {
@@ -165,7 +165,7 @@ func TestTankerRadioCheck(t *testing.T) {
 		{"Texaco 1-1, Raider 3-0-2, com check.", "Raider 302, Texaco one one, loud and clear."},
 		{"Texaco 1-1, Raider 302, 15 mile initial, intent to refuel",
 			"Raider 302, Texaco one one, cleared port observation, one three thousand, velocity three three six. How much do you request?"},
-		{"Texaco 1-1, Raider 302, request 5,000 pounds.", "Raider 302, Texaco copies five thousand pounds."},
+		{"Texaco 1-1, Raider 302, request 5,000 pounds.", "Raider 302, Texaco, you are cleared for five thousand pounds."},
 		{"Texaco 11, Raider 302, comm check.", "Raider 302, Texaco one one, loud and clear."},
 		{"Raider 302, 1 mile trail for port observation", "Raider 302, Texaco, continue port observation."},
 	})
@@ -181,7 +181,7 @@ func TestTankerDay1019Flow(t *testing.T) {
 	runTanker(t, tn, []struct{ call, want string }{
 		{"Texaco 3-1, one flight of F-18, Raider 302, 15-mile trail, intent to refuel.",
 			"Raider 302, Texaco three one, cleared port observation, one three thousand, velocity three three six. How much do you request?"},
-		{"Texaco 31, Raider 302, request 3,000 pounds.", "Raider 302, Texaco copies three thousand pounds."},
+		{"Texaco 31, Raider 302, request 3,000 pounds.", "Raider 302, Texaco, you are cleared for three thousand pounds."},
 		{"Texaco 31, Raider 302, one-mile trail for portside observation.", "Raider 302, Texaco, continue port observation."},
 		{"Texaco 31, Raider 302, establish portside.", "Raider 302, Texaco, copy. Port and starboard baskets open."},
 		{"Texaco 3-1, Raider 302 passing behind for portside basket.", "Raider 302, Texaco, cleared port basket."},
@@ -250,7 +250,7 @@ func TestTankerBoomFlow(t *testing.T) {
 	runTanker(t, tn, []struct{ call, want string }{
 		{"Shell 1-1, Venom 1-1, flight of 2, 15 mile initial for port observation with intent to refuel",
 			"Venom 11, Shell one one, cleared port observation, two two thousand, velocity two eight eight. How much do you request?"},
-		{"Venom 1-1, request 5.0", "Venom 11, Shell copies five thousand pounds."},
+		{"Venom 1-1, request 5.0", "Venom 11, Shell, you are cleared for five thousand pounds."},
 		{"Venom 1-1, established port observation", "Venom 11, Shell, copy. Boom open."},
 		{"Venom 1-1, moving to the boom", "Venom 11, Shell, cleared to the boom."},
 		{"Venom 1-2, established port observation", "Venom 12, Shell, copy, boom occupied. Hold port observation."},

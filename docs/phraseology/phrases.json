@@ -765,13 +765,13 @@
   "role": "tanker",
   "say": "Texaco 1-1, Raider 1-1, request 5.0.",
   "tower": "",
-  "want": "copies"
+  "want": "cleared for"
  },
  {
   "role": "tanker",
   "say": "Texaco 1-1, Raider 1-1, request full.",
   "tower": "",
-  "want": "copies"
+  "want": "cleared for"
  },
  {
   "role": "tanker",

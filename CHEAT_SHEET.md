@@ -77,7 +77,7 @@ Recovery case (Case 1 day / Case 3 night-IMC) is auto-detected. Same triggers, d
 |---|---|
 | `see you at ten` | radar contact, say state |
 | `established angels [X]` | signal Charlie (deck clear) OR hold |
-| `commencing` | check in 3-mile initial, paddles handoff |
+| `commencing` | check in 3-mile initial |
 | `initial` (at 3 nm) | contact paddles, good luck |
 
 **Case 3 (night / IMC)**

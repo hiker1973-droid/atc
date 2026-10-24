@@ -171,14 +171,14 @@ paddles handoff. The pilot is still on Marshal freq until they call
 `initial` at 3nm — see §6.
 
 **If pilot also reports state:**
-1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, check in three mile initial, paddles handoff.`
-2. `{CALLSIGN}, Marshal, commencing, state {STATE}, report three mile initial for paddles.`
-3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, call three mile initial, paddles will have you.`
+1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, check in three mile initial.`
+2. `{CALLSIGN}, Marshal, commencing, state {STATE}, report three mile initial.`
+3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, call three mile initial.`
 
 **Without state:**
-1. `{CALLSIGN}, Marshal, copy commencing, check in three mile initial, paddles handoff.`
-2. `{CALLSIGN}, Marshal, commencing, report three mile initial for paddles.`
-3. `{CALLSIGN}, Marshal, roger commencing, call three mile initial, paddles will have you.`
+1. `{CALLSIGN}, Marshal, copy commencing, check in three mile initial.`
+2. `{CALLSIGN}, Marshal, commencing, report three mile initial.`
+3. `{CALLSIGN}, Marshal, roger commencing, call three mile initial.`
 
 ---
 
@@ -351,6 +351,6 @@ compatibility if we re-track post-commence aircraft later.
 | 10nm | `see you at 10` | radar contact, [DIST] miles, say state | ✅ §2 |
 | 10nm | `state [XX]` | copy state | ✅ §3 |
 | Stack | `established angels [XX], position [X]` | signal Charlie / hold | ✅ §4 |
-| Commencing | `commencing, state [XX]` | copy commencing, check in three mile initial for paddles (state collapses silently — see §8) | ✅ §5, §8 |
+| Commencing | `commencing, state [XX]` | copy commencing, check in three mile initial (state collapses silently — see §8) | ✅ §5, §8 |
 | 3NM Initial | `initial` | contact paddles, good luck (paddles handoff; no TACAN cited) | ✅ §6 |
 | Push freq | `pushing button [XX]` / `checking in` | LSO `contact` (separate role/freq) | ⏳ LSO not implemented |

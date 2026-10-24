@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v2.9"
-DATE = "22 OCT 2026"          # change together with VER
+VER = "v3.0"
+DATE = "24 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -186,7 +186,7 @@ TEXACO = [
     ("Radio check", "comm check  /  radio check", "Loud and clear", "loud and clear"),
     ("Initial", "15 mile initial for port observation, intent to refuel",
      "Cleared port observation, angels, velocity. How much do you request?", "cleared port observation"),
-    ("Give", "request 5.0  /  request full", "Copies five thousand pounds / full give", "copies"),
+    ("Give", "request 5.0  /  request full", "You are cleared for five thousand pounds / full give", "cleared for"),
     ("1 mile trail", "1 mile trail for port observation", "Continue port observation", "continue port observation"),
     ("Observation", "established port observation  /  establish portside", "Copy. Port and starboard baskets open", "baskets open"),
     ("Basket", "moving to port basket", "Cleared port basket (or standby, basket occupied)", "cleared port basket"),
@@ -701,7 +701,7 @@ def build():
                 ("Texaco", "Raider 11, Texaco one one, cleared port observation, one three thousand, velocity two six "
                            "zero. How much do you request?"),
                 ("Pilot", "Texaco 1-1, Raider 1-1, request 5.0."),
-                ("Texaco", "Raider 11, Texaco copies five thousand pounds."),
+                ("Texaco", "Raider 11, Texaco, you are cleared for five thousand pounds."),
                 ("Pilot", "Texaco 1-1, Raider 1-1, moving on to mission."),
                 ("Texaco", "Raider 11, Texaco, cleared to depart. Stay classy, Raider.")])
     d.callout("Tanker rules", [

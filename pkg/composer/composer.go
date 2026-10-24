@@ -1490,15 +1490,15 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s, check in three mile initial, paddles handoff.", callsign, s),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, report three mile initial for paddles.", callsign, s),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, state %s, call three mile initial, paddles will have you.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s, check in three mile initial.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, report three mile initial.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, state %s, call three mile initial.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, check in three mile initial, paddles handoff.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, report three mile initial for paddles.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, call three mile initial, paddles will have you.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, check in three mile initial.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, report three mile initial.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, call three mile initial.", callsign),
 	})
 }
 
