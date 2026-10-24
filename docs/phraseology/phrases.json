@@ -807,7 +807,7 @@
   "role": "tanker",
   "say": "Texaco 1-1, Raider 1-1, ready pre-contact.",
   "tower": "",
-  "want": "call ready pre-contact"
+  "want": "cleared contact"
  },
  {
   "role": "tanker",

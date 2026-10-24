@@ -115,7 +115,7 @@ func TestTankerOperatorFlow(t *testing.T) {
 		{"Texaco, Raider 302, request 5.0.", "Raider 302, Texaco, you are cleared for five thousand pounds."},
 		{"Raider 302, one mile trail.", "Raider 302, Texaco, continue port observation."},
 		{"Raider 302, established.", "Raider 302, Texaco, copy. Port and starboard baskets open."},
-		{"Raider 302, ready pre-contact.", "Raider 302, Texaco, copy, call ready pre-contact."},
+		{"Raider 302, ready pre-contact.", "Raider 302, Texaco, cleared contact port basket."},
 		{"Texaco, Raider 302, refuel complete.", "Raider 302, Texaco, cleared starboard reform."},
 		{"Texaco, Raider 302, departing.", "Raider 302, Texaco, copy, cleared to depart. Fortuna super te, Viking."},
 	})
@@ -185,7 +185,7 @@ func TestTankerDay1019Flow(t *testing.T) {
 		{"Texaco 31, Raider 302, one-mile trail for portside observation.", "Raider 302, Texaco, continue port observation."},
 		{"Texaco 31, Raider 302, establish portside.", "Raider 302, Texaco, copy. Port and starboard baskets open."},
 		{"Texaco 3-1, Raider 302 passing behind for portside basket.", "Raider 302, Texaco, cleared port basket."},
-		{"Ready pre-contact.", "Raider 302, Texaco, copy, call ready pre-contact."},
+		{"Ready pre-contact.", "Raider 302, Texaco, cleared contact port basket."},
 		{"Texaco 31, Raider 302 satisfied, moving to starboard side reform.", "Raider 302, Texaco, cleared starboard reform."},
 		{"Texaco 3-1, Raider 302, establish starboard side.", "Raider 302, Texaco, copy."},
 		{"Texaco 3-1, Raider 302 moving on mission.", "Raider 302, Texaco, copy, cleared to depart. Fortuna super te, Viking."},

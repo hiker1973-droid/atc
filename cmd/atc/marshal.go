@@ -92,7 +92,10 @@ func isDepartureClearCall(lower string) bool {
 // back as "<callsign>, Union Marshal, …" and a callsign is never one of these
 // words, so the echo still fails to match. Up to three since DCS3 2026-10-17
 // 12:56:19 "You and your marshal, Raider 312, angels 2000, 8.8 DME".
-var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|here|hear|in|inner|leader|you|your|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,3}marshall?\b\W*`)
+//
+// "Junior Marshall" (Day 2026-10-23 17:10:28) and "Senior Marshal" (2026-10-24
+// 08:01:51) are the same "Union", both answering "say state".
+var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|junior|senior|here|hear|in|inner|leader|you|your|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,3}marshall?\b\W*`)
 
 // unaddressedStackCallsign accepts one call that skips the address: a
 // callsign-led "Raider 312, established, angels 2, entry point 3, state 6.5"
@@ -660,6 +663,13 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	if _, ok := splitMarshalAddress(text); !ok {
 		cs := unaddressedStackCallsign(text)
 		if cs == "" {
+			if asked, fuel := pendingStateAnswer(text, time.Now()); asked != "" {
+				// The answer to "say state" with the address garbled (marshal_recent.go).
+				log.Info().Str("callsign", asked).Str("text", text).Msg("Marshal: state answer without the address - accepted")
+				noteMarshalWorked(asked, time.Now())
+				transmit(comp.MarshalCopyState(stackTXCallsign(stack, asked), fuel))
+				return
+			}
 			log.Info().Str("text", text).Msg("Marshal: not addressed to Marshal — ignored")
 			return
 		}
@@ -673,6 +683,10 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	intent := classifyMarshalCall(lower, fuelState)
 	if marshalResolvesAlias(intent) {
 		callsign = resolveStackCallsign(callsign, lower, stack) // marshal_alias.go
+	}
+	callsign = fixMarshalCallsign(callsign, intent, stack, time.Now()) // marshal_recent.go
+	if intent != marshalNone && intent != marshalReadback {
+		noteMarshalWorked(callsign, time.Now())
 	}
 	// Every response leads with the callsign. Without one the TX would open
 	// ", Union Marshal, …" and its echo would pass the guard above.
@@ -765,6 +779,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			transmit(comp.MarshalCopyState(say, fuelState))
 			break
 		}
+		noteMarshalAskedState(callsign, time.Now())
 		transmit(comp.MarshalRadarContact(say, 10))
 
 	case marshalDepartureClear:

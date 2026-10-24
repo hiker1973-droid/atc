@@ -30,6 +30,7 @@ import (
 //	"Knight 1-1, established port observation"      -> "Knight 11, Texaco, copy. Port and starboard baskets open."
 //	"Knight 1-3, moving to starboard basket"        -> "Knight 13, Texaco, cleared starboard basket."
 //	"Knight 1-3, established starboard basket"      -> "Knight 13, Texaco, copy, call ready pre-contact."
+//	"Knight 1-3, ready pre-contact"                 -> "Knight 13, Texaco, cleared contact starboard basket."
 //	"Knight 1-3, satisfied, moving to starboard reform" -> "Knight 13, Texaco, cleared starboard reform."
 //	"Knight 1-3, established starboard reform"      -> "Knight 13, Texaco, copy."
 //	"Texaco 1, Knight 1-1, checking out, resuming navigation, pushing 282"
@@ -234,6 +235,10 @@ var (
 	tankerBasketRe      = regexp.MustCompile(`\b(?:(port|starboard|left|right)\s+)?(basket|drogue|hose|boom)\b`)
 	tankerMovingRe      = regexp.MustCompile(`\b(moving|move|request(ing)?|cleared?)\b`)
 	tankerPreContactRe  = regexp.MustCompile(`\bpre-?\s?contact\b`)
+	// "Ready pre-contact": the pilot asking for contact (operator 2026-10-24:
+	// it was answered "copy, call ready pre-contact", asking for the call just
+	// made). "established pre-contact" still gets the prompt.
+	tankerReadyRe = regexp.MustCompile(`\bready\b[\s,]*(?:for\s+)?pre-?\s?contact\b`)
 	tankerReformRe      = regexp.MustCompile(`\b(reform|satisfied|complete|completed|disconnect(ed|ing)?|done)\b`)
 	tankerCheckOutRe    = regexp.MustCompile(`\b(checking out|check out|resuming (navigation|mission|nav)|pushing|departing|leaving|clear(ing)? (of|the) tanker|moving on|on (to )?(the )?mission|proceeding (to )?(the )?mission|back to (the )?mission)\b`)
 	tankerFullRe        = regexp.MustCompile(`\b(full|top(ped)? off|fill (it|her|us) up|max)\b`)
@@ -490,6 +495,9 @@ func (n *tankerNet) Response(text, cs string) string {
 				side = "port"
 			}
 			f.stage, f.basket = tankerBasket, side
+			if tankerReadyRe.MatchString(lower) {
+				return fmt.Sprintf("%s, %s, cleared contact %s basket.", cs, n.Short, side)
+			}
 			return fmt.Sprintf("%s, %s, copy, call ready pre-contact.", cs, n.Short)
 		}
 		if side == "" { // "moving to the basket": the open one
@@ -554,6 +562,7 @@ func (n *tankerNet) Response(text, cs string) string {
 //
 //	"Shell 1-1, Venom 1-1, moving to the boom"     -> "Venom 11, Shell, cleared to the boom."
 //	"Venom 1-1, established pre-contact"           -> "Venom 11, Shell, copy, call ready pre-contact."
+//	"Venom 1-1, ready pre-contact"                 -> "Venom 11, Shell, cleared contact."
 //	"Venom 1-2, established port observation" (boom taken) -> "... copy, boom occupied. Hold port observation."
 func (n *tankerNet) boomResponse(lower, cs string, f *tankerFlight, boom, preContact, established, reform bool) (string, bool) {
 	switch {
@@ -562,6 +571,9 @@ func (n *tankerNet) boomResponse(lower, cs string, f *tankerFlight, boom, preCon
 	case boom || preContact:
 		if established || preContact && !tankerMovingRe.MatchString(lower) {
 			f.stage, f.basket = tankerBasket, "boom"
+			if tankerReadyRe.MatchString(lower) {
+				return fmt.Sprintf("%s, %s, cleared contact.", cs, n.Short), true
+			}
 			return fmt.Sprintf("%s, %s, copy, call ready pre-contact.", cs, n.Short), true
 		}
 		if n.basketHolder("boom", cs) != "" {

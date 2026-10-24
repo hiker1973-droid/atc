@@ -96,7 +96,7 @@ S.append(section("2. Texaco (252.100 / 252.300): initial to checking out",
          "Taken: \"standby, starboard basket occupied. Port basket open.\""],
         ["<b>At the basket</b>",
          "\"Knight 1-3, <b>established starboard basket</b>\"",
-         "\"Knight 1-3, Texaco, copy, call ready pre-contact.\""],
+         "\"Knight 1-3, Texaco, copy, call ready pre-contact.\" - then \"ready pre-contact\": \"cleared contact starboard basket.\""],
         ["<b>In DCS</b>",
          "AI comms menu: <b>Ready pre-contact</b>",
          "DCS tanker: \"Cleared contact\" (or \"Return pre-contact\": a little closer and higher). Plug and take fuel."],
@@ -112,7 +112,7 @@ S.append(section("2. Texaco (252.100 / 252.300): initial to checking out",
     ], [0.95, 3.15, 3.3]),
     "<b>Flight lead</b> makes the initial, trail, observation and checking-out calls for the flight. "
     "<b>Each jet</b> makes its own basket and reform calls. "
-    "<b>Shortcut:</b> give your amount in the initial (\"...with intent to refuel, request 6.0\"): Texaco copies it "
+    "<b>Shortcut:</b> give your amount in the initial (\"...with intent to refuel, request 6.0\"): Texaco clears it "
     "instead of asking.",
     "Texaco's altitude and velocity come live from Tacview: velocity is its indicated airspeed, worked out from its "
     "track over the last hour (both legs of the racetrack, so the wind cancels). Match it on your HUD."))
