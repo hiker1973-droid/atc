@@ -61,6 +61,12 @@
   table.roles select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 5px;
     padding: 0.3rem 0.4rem; font-size: 0.82rem; max-width: 17rem; }
   table.roles select.changed, table.roles input.changed { border-color: var(--amber); }
+  /* The Save / Reset column stays in view: the table is wider than the
+     section on most screens (operator 2026-10-23: "no save button I see"). */
+  table.roles th:last-child, table.roles td:last-child { position: sticky; right: 0; background: var(--panel);
+    box-shadow: -8px 0 8px -8px rgba(0,0,0,0.6); }
+  table.roles tr.offrow td:last-child { opacity: 1; }
+  table.roles button.pending { box-shadow: 0 0 0 2px var(--amber); }
   table.roles input.name { width: 9.5rem; font-family: inherit; }
   table.roles input.speed { width: 4.2rem; }
   table.roles tr.offrow td:not(:first-child):not(:nth-child(2)) { opacity: 0.4; }
@@ -317,7 +323,7 @@ function roleRow(kind, id, label, note, s, ov) {
   const on = !ov.off;
   return `<tr data-kind="${kind}" data-id="${esc(id)}" class="${on ? '' : 'offrow'}">
     <td><b>${esc(label)}</b>${note ? `<span class="note2">${esc(note)}</span>` : ''}</td>
-    <td><input type="checkbox" data-f="on" ${on ? 'checked' : ''} ${dis} title="${kind === 'tower' || s.main ? 'Off: this role does not start' : 'Off: this station stays silent'}"></td>
+    <td><input type="checkbox" data-f="on" ${on ? 'checked' : ''} onchange="markRole(this)" ${dis} title="${kind === 'tower' || s.main ? 'Off: this role does not start' : 'Off: this station stays silent'}"></td>
     <td>${freqCell}</td>
     <td>${nameCell}</td>
     <td style="white-space:nowrap"><select data-f="eleven" data-bat="${esc(bat.eleven)}" class="${ch(eff.eleven, bat.eleven)}" onchange="markRole(this)" ${dis}>${elevenOptions(eff.eleven, kind === 'tower')}</select><button class="play" title="Play" onclick="playSample('eleven', this)">▶</button></td>
@@ -331,6 +337,9 @@ function roleRow(kind, id, label, note, s, ov) {
 function markRole(el) {
   const v = el.dataset.f === 'freq' ? mhz(parseFloat(el.value)) : el.value.trim();
   el.classList.toggle('changed', v !== el.dataset.bat && !(el.dataset.f === 'freq' && v === mhz(parseFloat(el.dataset.bat))));
+  // Something in this row is not saved yet: ring its Save button.
+  const save = el.closest('tr').querySelector('button.primary');
+  if (save) { save.classList.add('pending'); save.title = 'Save this row (not saved yet)'; }
 }
 
 function renderRoles() {
