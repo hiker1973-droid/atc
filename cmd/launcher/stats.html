@@ -47,6 +47,17 @@
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.9rem; min-width: 9rem; }
   .card b { display: block; font-size: 1.35rem; } .card span { color: var(--muted); font-size: 0.78rem; }
   .msg { font-size: 0.82rem; }
+  /* ElevenLabs credits (moved here from the dashboard, operator 2026-10-23) */
+  .el-bar { height: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin: 0.2rem 0 0.5rem; }
+  .el-bar > div { height: 100%; background: var(--green); }
+  .el-bar.warn > div { background: var(--amber); }
+  .el-bar.error > div { background: var(--red); }
+  .el-line { color: var(--muted); font-size: 0.82rem; margin: 0.15rem 0; font-variant-numeric: tabular-nums; }
+  .el-line b { color: var(--text); font-weight: 600; }
+  .el-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+  .el-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.76rem; color: var(--muted); }
+  .el-chip b { color: var(--text); font-weight: 600; }
+  .el-chip.bad { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
@@ -90,6 +101,12 @@
       (_OK_ 5, OK 4, (OK) 3, B 2.5, --- 2, WO 1, C 0; a foul-deck wave-off is not scored).</p>
     <div class="tablewrap"><table id="board"></table></div>
     <div class="key" id="key"></div>
+  </section>
+
+  <section id="elSection" style="display:none">
+    <h2>ElevenLabs credits <span class="muted" style="font-weight:400;font-size:0.82rem" id="elSub"></span></h2>
+    <p class="sub">The voices' usage this billing period, on every rig. When the account runs out, every role falls back to the OpenAI voices.</p>
+    <div id="elBody"></div>
   </section>
 
   <section>
@@ -202,7 +219,58 @@ async function upload() {
   load();
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// ElevenLabs credits. Always the local launcher's /api/elevenlabs-fleet: the
+// account is shared, so it is the same number whichever rig the page drives.
+// ──────────────────────────────────────────────────────────────────────────
+const elNum = n => (n || 0).toLocaleString('en-US');
+const elDate = t => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); // reset dates are UTC midnights
+const elEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function refreshEleven() {
+  let u;
+  try { u = await fetch('/api/elevenlabs-fleet', { cache: 'no-store' }).then(r => r.json()); }
+  catch (e) { $('elSub').textContent = 'unavailable'; return; }
+  // Headline = the servers' burn: SkyEye's own transmissions, auditions left
+  // out (operator 2026-10-15). The account total is the line underneath - it
+  // is what runs out, and the 80 % / 95 % alerts follow it.
+  const acct = u.source === 'account';
+  const used = u.skyeyeCredits || 0;
+  const pct = u.quota ? Math.min(100, 100 * used / u.quota) : 0;
+  $('elSub').textContent = `${elDate(u.periodStart)} – ${elDate(u.periodEnd)} · resets ${elDate(u.periodEnd)}`;
+  const voices = Object.entries(u.skyeyeByVoice || {}).sort((a, b) => b[1] - a[1]);
+  const rigs = (u.rigs || []).map(r => r.err
+    ? `<span class="el-chip bad" title="${elEsc(r.err)}">${elEsc(r.label || r.rig)} ${/404/.test(r.err) ? 'needs a launcher update' : 'unreachable'}</span>`
+    : `<span class="el-chip">${elEsc(r.label || r.rig)} <b>${elNum(r.credits)}</b></span>`).join('');
+  const days = Object.entries(u.skyeyeByDay || {}).sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 7);
+  const acctLine = acct
+    ? `Account total, auditions included: <b>${elNum(u.credits)}</b> of ${elNum(u.quota)} (<b>${(u.percent || 0).toFixed(1)}%</b>) · ${elEsc(u.account.tier || '')} plan · resets ${new Date(u.periodEnd).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    : `Account figures unavailable${u.accountErr ? ' (' + elEsc(u.accountErr.slice(0, 120)) + ')' : ''} - plan size and reset from launcher settings`;
+  $('elBody').innerHTML = `
+    <div class="el-line">Servers: <b>${elNum(used)}</b> credits this period · today <b>${elNum(u.skyeyeToday)}</b> · on pace for <b>${elNum(u.skyeyeProjected)}</b> by ${elDate(u.periodEnd)} (${pct.toFixed(1)}% of the plan)</div>
+    <div class="el-bar ${u.level}"><div style="width:${pct}%"></div></div>
+    <div class="el-line">By role / voice</div>
+    <div class="el-chips">${voices.length ? voices.map(([v, c]) => `<span class="el-chip">${elEsc(v || '?')} <b>${elNum(c)}</b></span>`).join('') : '<span class="el-chip">no transmissions yet</span>'}</div>
+    <div class="el-line" style="margin-top:0.5rem">By rig</div>
+    <div class="el-chips">${rigs}</div>
+    ${days.length ? `<div class="el-line" style="margin-top:0.5rem">By day (UTC)</div><div class="el-chips">${days.map(([d, c]) => `<span class="el-chip">${d.slice(5)} <b>${elNum(c)}</b></span>`).join('')}</div>` : ''}
+    <div class="el-line" style="margin-top:0.5rem">${acctLine}</div>
+    <div class="el-line" style="color:var(--muted)">Servers = every SkyEye transmission since each rig ran this build. At 100% of the account every role drops to OpenAI voices.</div>`;
+}
+
+
+// Only when there is ElevenLabs usage to show (a copy with no ElevenLabs key has none).
+async function showEleven() {
+  try {
+    const u = await fetch('/api/elevenlabs-fleet', { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
+    if (!u || !(u.quota || u.skyeyeCredits || u.credits)) return;
+  } catch (e) { return; }
+  $('elSection').style.display = '';
+  refreshEleven();
+}
+
 load();
+showEleven();
+setInterval(() => { if ($('elSection').style.display !== 'none') refreshEleven(); }, 60000);
 </script>
 <script src="/branding.js"></script>
 </body>

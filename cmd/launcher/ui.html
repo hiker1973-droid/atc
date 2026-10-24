@@ -114,6 +114,13 @@
 
   /* Row 2: weather / stack / cats */
   .row-2 { display: grid; grid-template-columns: 1.1fr 2fr 1.4fr; gap: 0.7rem; }
+  .row-2.no-carrier { grid-template-columns: 1fr; }
+  .row-2.no-carrier .carrier-panel { display: none; }
+  .role-bar { display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; margin: 0 0 0.4rem; }
+  .role-bar-label { color: var(--label); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 0.2rem; }
+  button.btn.mini { padding: 0.2rem 0.6rem; font-size: 0.72rem; }
+  .log-legend button.btn.mini { margin-left: 0.6rem; }
+  .sub-head { margin: 0.9rem 0 0.4rem; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--label); font-weight: 600; }
   .weather-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem 0.7rem; }
   .weather-grid .cell { }
   .weather-grid .cell .lbl { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -366,29 +373,42 @@
 </header>
 
 <main>
-  <!-- Role cards -->
+  <!-- Dashboard order (operator 2026-10-23, "cleaning up the dashboard"):
+       what is live during a session first - the roles, who is airborne,
+       the airfield lines, weather and the carrier, the radio - and the
+       after-the-session panels last. ElevenLabs credits moved to Stats. -->
+
+  <!-- Role cards, with the selected theatre's towers all at once -->
+  <div class="role-bar">
+    <span class="role-bar-label">Towers</span>
+    <button class="btn start mini" onclick="startTowers()" title="Start every tower in this theatre">Start all</button>
+    <button class="btn stop mini" onclick="stopTowers()" title="Stop every tower in this theatre">Stop all</button>
+  </div>
   <section class="role-row" id="roleCards"></section>
 
-  <!-- ElevenLabs credits, fleet-wide -->
+  <!-- Air picture from Tacview: everyone airborne, ranged off blue bullseye;
+       the towers' pattern traffic underneath when there is any -->
   <section class="row-departures">
     <div class="panel">
-      <h3>ElevenLabs Credits — all rigs <span class="sub" id="elSub">—</span></h3>
-      <div id="elBody"><div class="empty">No usage recorded yet.</div></div>
+      <h3>Airborne <span class="sub" id="airborneSub">—</span></h3>
+      <div id="airborneTbl"><div class="empty">No air picture.</div></div>
+      <div id="patternWrap" style="display:none">
+        <h4 class="sub-head">In the pattern <span class="sub" id="patternSub">0 contacts</span></h4>
+        <div id="patternTbl"></div>
+      </div>
     </div>
   </section>
 
-  <!-- Comms report, fleet-wide: near misses and comms discipline -->
+  <!-- Per-airfield takeoff & landing lines (Marshal-stack style) -->
   <section class="row-departures">
     <div class="panel">
-      <h3>Comms Report — all rigs <span class="sub" id="crSub">—</span>
-        <select class="cr-hours" id="crHours" onchange="refreshComms()" title="How far back">
-          <option value="3">3 h</option><option value="24" selected>24 h</option><option value="72">3 days</option><option value="168">7 days</option>
-        </select></h3>
-      <div id="crBody"><div class="empty">Nothing reported yet.</div></div>
+      <h3>Airfield Traffic — Takeoff &amp; Landing Lines <span class="sub" id="trafficSub"></span></h3>
+      <div id="trafficTbl"><div class="empty">No airfield traffic.</div></div>
     </div>
   </section>
 
-  <!-- Row 2: Weather / Marshal Stack / Catapults -->
+  <!-- Weather / Marshal Stack / Catapults (the carrier panels only in a
+       theatre with a carrier) -->
   <section class="row-2">
     <div class="panel">
       <h3>Weather — <span id="wxPrimary">OMDM</span> <select class="case-pill" id="wxCase" onchange="setCase(this.value)" title="Carrier recovery case — Auto follows ceiling, visibility and night"><option value="0">AUTO</option><option value="1">CASE 1</option><option value="3">CASE 3</option></select><button class="btn info wx-set-btn" onclick="openWeatherModal()">Set Weather</button></h3>
@@ -402,51 +422,14 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel carrier-panel">
       <h3>Marshal Stack — CVN-72 ABE <span class="sub" id="stackHdrSub">BRC —</span></h3>
       <div id="stackTbl"><div class="empty">Phase 2 — Marshal process needs dashboard port wired.</div></div>
     </div>
 
-    <div class="panel">
+    <div class="panel carrier-panel">
       <h3>Catapults — CVN-72 <span class="sub" id="catsHdrSub"></span></h3>
       <div id="catsTbl"><div class="empty">Phase 2 — Deckboss process needs dashboard port wired.</div></div>
-    </div>
-  </section>
-
-  <!-- Per-airfield takeoff & landing lines (Marshal-stack style) -->
-  <section class="row-departures">
-    <div class="panel">
-      <h3>Airfield Traffic — Takeoff &amp; Landing Lines <span class="sub" id="trafficSub"></span></h3>
-      <div id="trafficTbl"><div class="empty">No airfield traffic.</div></div>
-    </div>
-  </section>
-
-  <!-- Air picture from Tacview: everyone airborne, ranged off blue bullseye -->
-  <section class="row-departures">
-    <div class="panel">
-      <h3>Airborne <span class="sub" id="airborneSub">—</span></h3>
-      <div id="airborneTbl"><div class="empty">No air picture.</div></div>
-    </div>
-  </section>
-
-  <!-- Row 3: Aircraft / Freqs / Controls -->
-  <section class="row-3">
-    <div class="panel">
-      <h3>Aircraft In Pattern <span class="sub" id="patternSub">0 contacts</span></h3>
-      <div id="patternTbl"><div class="empty">No aircraft in pattern.</div></div>
-    </div>
-
-    <div class="panel">
-      <h3>Controls</h3>
-      <div class="ctrl-grid">
-        <button class="btn start" onclick="startGroup(['Al Minhad Tower','Al Dhafra Tower','Al Ain Tower'])">Start All Towers</button>
-        <button class="btn stop"  onclick="stopGroup(['Al Minhad Tower','Al Dhafra Tower','Al Ain Tower'])">Stop All Towers</button>
-        <button class="btn warn"  onclick="restartRole('Al Minhad Tower')">Restart Al Minhad</button>
-        <button class="btn start" onclick="startRole('Deckboss')">Start Deckboss</button>
-        <button class="btn stop"  onclick="stopRole('Deckboss')">Stop Deckboss</button>
-        <button class="btn info"  onclick="document.querySelector('.row-2').scrollIntoView({behavior:'smooth'})">Marshal Stack</button>
-        <button class="btn info"  onclick="openLogModal()">Full Log</button>
-      </div>
     </div>
   </section>
 
@@ -458,9 +441,22 @@
         <span><span class="pip" style="background:var(--gold)"></span>Pilot RX</span>
         <span><span class="pip" style="background:#9fc1ee"></span>Sys</span>
         <span><span class="pip" style="background:var(--red)"></span>Err</span>
+        <button class="btn info mini" onclick="openLogModal()" title="Every role's log in full">Full Log</button>
       </span>
     </h3>
     <div class="log" id="logFeed"></div>
+  </section>
+
+  <!-- Comms report, fleet-wide: near misses and comms discipline (for the
+       debrief: last on the page) -->
+  <section class="row-departures">
+    <div class="panel">
+      <h3>Comms Report — all rigs <span class="sub" id="crSub">—</span>
+        <select class="cr-hours" id="crHours" onchange="refreshComms()" title="How far back">
+          <option value="3">3 h</option><option value="24" selected>24 h</option><option value="72">3 days</option><option value="168">7 days</option>
+        </select></h3>
+      <div id="crBody"><div class="empty">Nothing reported yet.</div></div>
+    </div>
   </section>
 </main>
 
@@ -905,7 +901,16 @@ async function refreshCarrier() {
 // ──────────────────────────────────────────────────────────────────────────
 // Rendering
 // ──────────────────────────────────────────────────────────────────────────
+// The carrier panels (Marshal stack, catapults) only in a theatre with a
+// carrier; the towers' Start all / Stop all act on this theatre's towers.
+function theatreHasCarrier() {
+  return (THEATRES[currentTheatre].combos || []).some(c => c.id === 'marshal' || c.id === 'deckboss');
+}
+function startTowers() { startGroup(TOWERS.map(t => t.role)); }
+function stopTowers() { stopGroup(TOWERS.map(t => t.role)); }
+
 function renderCards() {
+  document.querySelector('.row-2').classList.toggle('no-carrier', !theatreHasCarrier());
   const parts = [];
 
   for (const t of TOWERS) {
@@ -1242,6 +1247,7 @@ function renderAirfieldTraffic() {
     deps.sort((a,b) => (a.slot||99) - (b.slot||99));
     pat.sort((a,b) => landingRank(a.phase) - landingRank(b.phase));
     totT += deps.length; totL += pat.length;
+    if (!deps.length && !pat.length) continue; // only the fields with someone in a line
 
     const depRows = deps.length ? deps.map((d,i) => {
       const lbl = DEP_STATE_LABEL[d.state] || (d.state||'').toUpperCase();
@@ -1271,7 +1277,8 @@ function renderAirfieldTraffic() {
       </div>`);
   }
   $('trafficSub').textContent = `${totT} for takeoff · ${totL} landing`;
-  $('trafficTbl').innerHTML = blocks.length ? blocks.join('') : '<div class="empty">No airfield traffic.</div>';
+  $('trafficTbl').innerHTML = blocks.length ? blocks.join('')
+    : '<div class="empty">All clear: nobody in a takeoff or landing line.</div>';
 }
 
 function renderPattern() {
@@ -1284,8 +1291,9 @@ function renderPattern() {
     }
   }
   $('patternSub').textContent = `${all.length} contact${all.length===1?'':'s'}`;
+  $('patternWrap').style.display = all.length ? '' : 'none'; // under Airborne, only when someone is in it
   if (!all.length) {
-    $('patternTbl').innerHTML = '<div class="empty">No aircraft in pattern.</div>';
+    $('patternTbl').innerHTML = '';
     return;
   }
   const rows = all.map(ac => {
@@ -1606,44 +1614,6 @@ async function refreshAll() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// ElevenLabs credits. Always the local launcher's /api/elevenlabs-fleet: the
-// account is shared, so it is the same number whichever rig the page drives.
-// ──────────────────────────────────────────────────────────────────────────
-const elNum = n => (n || 0).toLocaleString('en-US');
-const elDate = t => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); // reset dates are UTC midnights
-const elEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-async function refreshEleven() {
-  let u;
-  try { u = await fetch('/api/elevenlabs-fleet', { cache: 'no-store' }).then(r => r.json()); }
-  catch (e) { $('elSub').textContent = 'unavailable'; return; }
-  // Headline = the servers' burn: SkyEye's own transmissions, auditions left
-  // out (operator 2026-10-15). The account total is the line underneath - it
-  // is what runs out, and the 80 % / 95 % alerts follow it.
-  const acct = u.source === 'account';
-  const used = u.skyeyeCredits || 0;
-  const pct = u.quota ? Math.min(100, 100 * used / u.quota) : 0;
-  $('elSub').textContent = `${elDate(u.periodStart)} – ${elDate(u.periodEnd)} · resets ${elDate(u.periodEnd)}`;
-  const voices = Object.entries(u.skyeyeByVoice || {}).sort((a, b) => b[1] - a[1]);
-  const rigs = (u.rigs || []).map(r => r.err
-    ? `<span class="el-chip bad" title="${elEsc(r.err)}">${elEsc(r.label || r.rig)} ${/404/.test(r.err) ? 'needs a launcher update' : 'unreachable'}</span>`
-    : `<span class="el-chip">${elEsc(r.label || r.rig)} <b>${elNum(r.credits)}</b></span>`).join('');
-  const days = Object.entries(u.skyeyeByDay || {}).sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 7);
-  const acctLine = acct
-    ? `Account total, auditions included: <b>${elNum(u.credits)}</b> of ${elNum(u.quota)} (<b>${(u.percent || 0).toFixed(1)}%</b>) · ${elEsc(u.account.tier || '')} plan · resets ${new Date(u.periodEnd).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-    : `Account figures unavailable${u.accountErr ? ' (' + elEsc(u.accountErr.slice(0, 120)) + ')' : ''} - plan size and reset from launcher settings`;
-  $('elBody').innerHTML = `
-    <div class="el-line">Servers: <b>${elNum(used)}</b> credits this period · today <b>${elNum(u.skyeyeToday)}</b> · on pace for <b>${elNum(u.skyeyeProjected)}</b> by ${elDate(u.periodEnd)} (${pct.toFixed(1)}% of the plan)</div>
-    <div class="el-bar ${u.level}"><div style="width:${pct}%"></div></div>
-    <div class="el-line">By role / voice</div>
-    <div class="el-chips">${voices.length ? voices.map(([v, c]) => `<span class="el-chip">${elEsc(v || '?')} <b>${elNum(c)}</b></span>`).join('') : '<span class="el-chip">no transmissions yet</span>'}</div>
-    <div class="el-line" style="margin-top:0.5rem">By rig</div>
-    <div class="el-chips">${rigs}</div>
-    ${days.length ? `<div class="el-line" style="margin-top:0.5rem">By day (UTC)</div><div class="el-chips">${days.map(([d, c]) => `<span class="el-chip">${d.slice(5)} <b>${elNum(c)}</b></span>`).join('')}</div>` : ''}
-    <div class="el-line" style="margin-top:0.5rem">${acctLine}</div>
-    <div class="el-line" style="color:var(--muted)">Servers = every SkyEye transmission since each rig ran this build. At 100% of the account every role drops to OpenAI voices.</div>`;
-}
-
-// ──────────────────────────────────────────────────────────────────────────
 // One-click update of the rig this page drives (same as the Fleet page's
 // button): POST /api/update, then follow GET /api/update. The launcher
 // restarts itself last, so calls fail for a few seconds; done when the rig's
@@ -1712,6 +1682,7 @@ const CR_KINDS = {
   not_understood: ['Not understood', ''],
   lost_call: ['Call lost (Whisper)', ''],
 };
+const elEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 async function refreshComms() {
   const hours = ($('crHours') || {}).value || 24;
   let r;
@@ -1763,10 +1734,8 @@ async function refreshBuild() {
 // Boot
 refreshBuild();
 setInterval(refreshBuild, 60000);
-refreshEleven();
 refreshComms();
 setInterval(refreshComms, 60000);
-setInterval(refreshEleven, 60000);
 updateRegionButtons();
 loadIdentity();
 checkSetup();
