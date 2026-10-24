@@ -638,6 +638,7 @@ def main():
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sample", action="store_true")
     ap.add_argument("--board-dir", help='folder of "YYYY-MM-DD Rig.log" day logs for the greenie board')
+    ap.add_argument("--summary-dir", help="Reports/_summary: passes for board days whose raw logs are gone")
     ap.add_argument("--field-log", action="append", default=[], help="RIG=path of a field tower's log (Senaki)")
     ap.add_argument("--problem", action="append", default=[], help="a rig that could not be read (noted)")
     ap.add_argument("--no-copy", action="store_true", help="don't copy to the Desktop Documentation folder")
@@ -662,6 +663,20 @@ def main():
             if m and month.isoformat() <= m.group(1) <= end.isoformat():
                 blogs.append((m.group(2), os.path.join(a.board_dir, f)))
         board = collect(blogs + logs, month, end)["pass"]
+        if a.summary_dir:
+            # Days whose raw logs the roll-up has deleted (10 days kept): their
+            # passes from the day summaries (docs/reports-rollup).
+            have = {os.path.basename(p)[:10] for _, p in blogs}
+            for f in sorted(os.listdir(a.summary_dir)) if os.path.isdir(a.summary_dir) else []:
+                d = f[:-5]
+                if not f.endswith(".json") or d in have or not (month.isoformat() <= d < start.isoformat()):
+                    continue
+                try:
+                    s = json.load(open(os.path.join(a.summary_dir, f), encoding="utf-8"))
+                except ValueError:
+                    continue
+                for p in (s.get("paddles") or {}).get("passes") or []:
+                    board.append(dict(p, t=dt.datetime.fromisoformat(p["t"])))
     build(ev, start, end, rigs, out, a.sample, a.problem, board)
     if not a.no_copy:
         for d in DESKTOP:

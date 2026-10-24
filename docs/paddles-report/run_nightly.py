@@ -81,7 +81,8 @@ def main():
             f.write(body)
         logs += ["--field-log", "%s=%s" % (rig, path)]
     cmd = [sys.executable, "-I", os.path.join(HERE, "build_paddles_report.py"), "--date", a.date,
-           "--out", data, "--no-copy", "--board-dir", data] + logs
+           "--out", data, "--no-copy", "--board-dir", data,
+           "--summary-dir", os.path.join(a.out, "_summary")] + logs
     for p in problems:
         cmd += ["--problem", p]
     rc = subprocess.call(cmd)
