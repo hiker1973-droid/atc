@@ -66,7 +66,7 @@
   table.roles th:last-child, table.roles td:last-child { position: sticky; right: 0; background: var(--panel);
     box-shadow: -8px 0 8px -8px rgba(0,0,0,0.6); }
   table.roles tr.offrow td:last-child { opacity: 1; }
-  table.roles button.pending { box-shadow: 0 0 0 2px var(--amber); }
+  table.roles button.pending, #restartBtn.pending { box-shadow: 0 0 0 2px var(--amber); }
   table.roles input.name { width: 9.5rem; font-family: inherit; }
   table.roles input.speed { width: 4.2rem; }
   table.roles tr.offrow td:not(:first-child):not(:nth-child(2)) { opacity: 0.4; }
@@ -315,7 +315,8 @@ function roleRow(kind, id, label, note, s, ov) {
        ${ov.freq ? `<span class="def">was ${mhz(bat.freq)}</span>` : ''}`
     : `<span class="muted">${kind === 'tower' ? 'Frequencies table' : "Command's"}</span>`;
   const nameCell = s.nameFlag
-    ? `<input class="name ${ch(eff.name, bat.name)}" data-f="name" value="${esc(eff.name)}" data-bat="${esc(bat.name)}" oninput="markRole(this)" ${dis}>`
+    ? `<input class="name ${ch(eff.name, bat.name)}" data-f="name" value="${esc(eff.name)}" data-bat="${esc(bat.name)}" oninput="markRole(this)" ${dis}>
+       ${ov.name ? `<span class="def">was ${esc(bat.name)}</span>` : ''}`
     : '<span class="muted">—</span>';
   const speedCell = s.speedFlag
     ? `<input class="speed ${ch(eff.speed, bat.speed)}" inputmode="decimal" data-f="speed" value="${eff.speed || ''}" data-bat="${bat.speed}" oninput="markRole(this)" ${dis}>`
@@ -330,7 +331,7 @@ function roleRow(kind, id, label, note, s, ov) {
     <td style="white-space:nowrap"><select data-f="voice" data-bat="${esc(bat.voice)}" class="${ch(eff.voice, bat.voice)}" onchange="markRole(this)" ${dis}>${openaiOptions(eff.voice)}</select><button class="play" title="Play" onclick="playSample('openai', this)">▶</button></td>
     <td>${speedCell}</td>
     <td style="white-space:nowrap"><button class="primary" onclick="saveRole(this)" ${dis}>Save</button>
-      ${Object.keys(ov).length ? `<button onclick="resetRole(this)" ${dis} title="Back to the start script's settings">Reset</button>` : ''}</td>
+      ${Object.keys(ov).length ? `<button onclick="resetRole(this)" ${dis} title="Undo this row's saved changes: back to the start script's settings">Default</button>` : ''}</td>
   </tr>`;
 }
 
@@ -373,6 +374,12 @@ async function postRole(tr, override) {
   if (tr.dataset.kind === 'tower') body.icao = tr.dataset.id; else body.key = tr.dataset.id;
   const res = await post(body);
   await load();
+  // Operator 2026-10-24: Save then "Reset" undid the save. A saved change waits
+  // for the restart: say so, and ring the Restart button.
+  if (res.ok) {
+    res.msg = 'Saved on this server. Press ⟳ Restart this theatre\'s roles (below) to use it.';
+    document.getElementById('restartBtn').classList.add('pending');
+  }
   show(document.getElementById('roleMsg'), res);
 }
 function saveRole(btn) {
@@ -383,7 +390,11 @@ function saveRole(btn) {
   if (o.off && !confirm('Turn this off? It stays silent until you turn it back on.')) return;
   postRole(tr, o);
 }
-function resetRole(btn) { postRole(btn.closest('tr'), {}); }
+function resetRole(btn) {
+  const tr = btn.closest('tr');
+  if (!confirm(`Undo the saved changes for ${tr.querySelector('td b').textContent} and go back to the start script's settings?`)) return;
+  postRole(tr, {});
+}
 
 let audio = null;
 async function playSample(provider, btn) {
@@ -405,7 +416,9 @@ async function playSample(provider, btn) {
 
 async function restartTheatre() {
   if (!confirm('Restart every running role in this theatre now?')) return;
-  show(document.getElementById('roleMsg'), await post({ op: 'restart', theatre }));
+  const res = await post({ op: 'restart', theatre });
+  if (res.ok) document.getElementById('restartBtn').classList.remove('pending');
+  show(document.getElementById('roleMsg'), res);
 }
 
 async function loadVoices() {
