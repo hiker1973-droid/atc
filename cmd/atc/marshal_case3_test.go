@@ -81,7 +81,7 @@ func TestWilburCase3Calls(t *testing.T) {
 	if _, resp := f.heard("319, Hornet ball, 4.4."); resp != netHandled {
 		t.Errorf("ball call: %q", resp)
 	}
-	if cs, _ := f.heard("Paddles contact, Raider 319, call the ball at three-quarters of a mile."); cs != "" && lsoCheckInRe.MatchString("call the ball at three-quarters of a mile") {
+	if lsoCheckInRe.MatchString(lsoCheckInReply("Raider 319")) || lsoCheckInRe.MatchString(lsoAbeamReply("Raider 319")) {
 		t.Error("Paddles' own reply reads as a check-in")
 	}
 }
