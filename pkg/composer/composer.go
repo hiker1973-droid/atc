@@ -1310,6 +1310,7 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 	wx := marshalWeatherPhrase(ceilingFt, visNm)
 	rad := spellDigits3(assignedRadial)
 	eat := spellDigits(eatMinute)
+	dme := spellDigits(Case3HoldDME(stackAngels))
 
 	brcStr := ""
 	if brc >= 0 {
@@ -1329,12 +1330,12 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, hold on the %s at angels %s, commence at %s, report established.",
-			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, holding radial %s, angels %s, commence at %s, report established.",
-			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your hold is the %s at angels %s, commence at %s, report established.",
-			callsign, radarStr, wx, brcStr, alt, rad, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, hold on the %s radial, %s DME, angels %s, commence at %s, report established.",
+			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, holding radial %s, %s DME, angels %s, commence at %s, report established.",
+			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your hold is the %s radial, %s DME, angels %s, commence at %s, report established.",
+			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
 	})
 }
 
@@ -1386,12 +1387,17 @@ func (c *ATCComposer) MarshalEstablishedAckCase3(callsign string, angels, assign
 	ang := numberWord(angels)
 	rad := spellDigits3(assignedRadial)
 	eat := spellDigits(eatMinute)
+	dme := spellDigits(Case3HoldDME(angels))
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", roger established angels %s on the %s, commence at %s.", callsign, ang, rad, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+", copy established radial %s angels %s, your push time is %s.", callsign, rad, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+", in the hold angels %s on the %s, expect commence at %s.", callsign, ang, rad, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger established angels %s on the %s radial, %s DME, commence at %s.", callsign, ang, rad, dme, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy established radial %s, %s DME, angels %s, your push time is %s.", callsign, rad, dme, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", in the hold angels %s on the %s radial, %s DME, expect commence at %s.", callsign, ang, rad, dme, eat),
 	})
 }
+
+// Case3HoldDME is a Case 3 holding fix's distance: angels plus 15 nm, so
+// angels 6 holds at 21 DME and each slot up is a mile further out.
+func Case3HoldDME(angels int) int { return angels + 15 }
 
 // MarshalSayBRC responds to a pilot's "say BRC" / "request BRC" call.
 // Returns the carrier's current Base Recovery Course (bow direction) as

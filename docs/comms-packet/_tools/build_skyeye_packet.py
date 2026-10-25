@@ -377,7 +377,7 @@ def c06_marshal_case3():
                  "next push.\"", False)]])
     NK.band(c, "CASE III CALLS", "what changes")
     NK.steps(c, [
-        ("MARKING MOMS", "Reply: hold on the radial NNN at angels N,"),
+        ("MARKING MOMS", "Reply: hold on the NNN radial, DD DME, angels N,"),
         ("", "commence at MM, report established."),
         ("ESTABLISHED", "Reply: commence at MM. There is no Charlie."),
         ("COMMENCING", "At your MM. Reply: descend to platform 5,000,"),
@@ -504,14 +504,14 @@ def c09_marshal_calls_case3():
         ("", "mother's weather ceiling eight hundred overcast,"),
         ("", "visibility 2, Case Three recovery, BRC 275,"),
         ("", "altimeter two niner niner two, hold on the zero niner"),
-        ("", "five at angels two, commence at one five,"),
+        ("", "five radial, two one DME, angels six, commence at one five,"),
         ("", "report established."),
     ], split=150)
     NK.band(c, "HOLD TO PLATFORM", "in order")
     NK.steps(c, [
-        ("YOU", "Marshal, Raider 1, established angels two."),
-        ("MARSHAL", "Raider 1, Union Marshal, roger established angels two"),
-        ("", "on the zero niner five, commence at one five."),
+        ("YOU", "Marshal, Raider 1, established angels six."),
+        ("MARSHAL", "Raider 1, Union Marshal, roger established angels six"),
+        ("", "on the zero niner five radial, two one DME, commence at one five."),
         ("YOU", "Marshal, Raider 1, commencing."),
         ("MARSHAL", "Raider 1, Union Marshal, copy commencing, descend to"),
         ("", "platform five thousand, final bearing two six six,"),

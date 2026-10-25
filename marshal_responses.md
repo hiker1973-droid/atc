@@ -272,9 +272,13 @@ Issues a holding clearance instead of "Marshal at angels N, see me at ten":
 State side-effects: `MarshalStack` now stores `AssignedRadial` and `EAT` per aircraft so the §4 established ack can recite the same values.
 
 **Responses:**
-1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, hold on the {RADIAL} at angels {ANGELS}, commence at {EAT}, report established.`
-2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, holding radial {RADIAL}, angels {ANGELS}, commence at {EAT}, report established.`
-3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your hold is the {RADIAL} at angels {ANGELS}, commence at {EAT}, report established.`
+1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, hold on the {RADIAL} radial, {DME} DME, angels {ANGELS}, commence at {EAT}, report established.`
+2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, holding radial {RADIAL}, {DME} DME, angels {ANGELS}, commence at {EAT}, report established.`
+3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your hold is the {RADIAL} radial, {DME} DME, angels {ANGELS}, commence at {EAT}, report established.`
+
+Case 3 stacks from **angels 6** up (`marshalCase3MinAngels`, the lowest free slot), and each hold is at
+**{DME} = angels + 15** (angels 6 at 21 DME, angels 7 at 22). Cases 1 and 2 keep angels 2-9 overhead.
+(2026-10-25: Night gave Raider 319 "angels two" for Case Three.)
 
 `{RADAR}` uses the Case 3 "from the Abe" variant (same three shapes, mother → Abe). BRC clause is omitted when carrier is off scope; radial falls back to spoken `zero zero zero` in that case. Case 3 uses "commence at {EAT}" phrasing rather than "expected approach time {EAT}" so §1 and §4 stay consistent ("commence at" appears in both).
 
@@ -283,7 +287,7 @@ State side-effects: `MarshalStack` now stores `AssignedRadial` and `EAT` per air
 No Charlie / hold-for-Charlie in Case 3 — the pilot commences on the EAT clock, regardless of deck status.
 
 **Responses:**
-1. `{CALLSIGN}, Marshal, roger established angels {ANGELS} on the {RADIAL}, commence at {EAT}.`
+1. `{CALLSIGN}, Marshal, roger established angels {ANGELS} on the {RADIAL} radial, {DME} DME, commence at {EAT}.`
 2. `{CALLSIGN}, Marshal, copy established radial {RADIAL} angels {ANGELS}, your push time is {EAT}.`
 3. `{CALLSIGN}, Marshal, in the hold angels {ANGELS} on the {RADIAL}, expect commence at {EAT}.`
 

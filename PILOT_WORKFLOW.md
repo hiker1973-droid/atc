@@ -147,12 +147,12 @@ When weather drops the recovery to **Case 3** (night, or ceiling <1500 ft, or vi
 Marshal will also broadcast a stack-wide advisory when the case flips mid-recovery (e.g. dusk crossing 18:00 mission-local). Listen for *"All marshal aircraft, recovery is now Case Three, acknowledge on next push."*
 
 1. **Marking mom (Case 3).** Same trigger.
-   - ATC: *"…Case Three recovery, BRC 088, altimeter 29.92, hold on the two six eight at angels seven, commence at three six, report established."*
+   - ATC: *"…Case Three recovery, BRC 088, altimeter 29.92, hold on the two six eight radial, two two DME, angels seven, commence at three six, report established."*
    - You get an **assigned radial** (reciprocal of BRC) to hold on, not a "see me at ten" instruction. The kneeboard's race-track hold is 250 kts, 1-min legs, 6 nm DME.
    - **Commence at NN** = minute-of-hour when you leave the hold and start descent. Note it — you call commencing at that time, not when the deck clears.
 
 2. **Established in hold (Case 3).** Same trigger.
-   - ATC: *"…roger established angels seven on the two six eight, commence at three six."*
+   - ATC: *"…roger established angels seven on the two six eight radial, two two DME, commence at three six."*
    - No "signal Charlie" / "hold for Charlie" — Case 3 commences on the clock, not on deck status.
 
 3. **Commencing (Case 3).** Same trigger.

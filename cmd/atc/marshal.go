@@ -358,6 +358,15 @@ func marshalZoneName() string {
 	return ""
 }
 
+// marshalAngelsBand is the stack's altitude band for the recovery case:
+// angels 2-9 overhead in Case 1 and 2, angels 6 and up in Case 3.
+func marshalAngelsBand(c state.RecoveryCase) (lo, hi int) {
+	if c == state.CaseThree {
+		return marshalCase3MinAngels, marshalCase3MaxAngels
+	}
+	return marshalMinAngels, marshalMaxAngels
+}
+
 const (
 	marshalCallsign = "Union Marshal"
 	// Stack altitude band — Marshal assigns the lowest unoccupied angel in
@@ -365,6 +374,11 @@ const (
 	// reservations and any Tacview contact within 50nm of the carrier.
 	marshalMinAngels = 2
 	marshalMaxAngels = 9
+	// Case 3 stacks from angels 6 up, each at angels + 15 DME on the holding
+	// radial (operator 2026-10-25: Night, Raider 319 was given "angels two"
+	// for Case Three; "yes fix case 3").
+	marshalCase3MinAngels = 6
+	marshalCase3MaxAngels = 20
 	// Case 3 EAT scheduling — first aircraft commences at now+lead, each
 	// subsequent slot adds interval. Standard Case 3 spacing is ~1 min per
 	// aircraft; lead gives the pilot time to enter the hold.
@@ -729,15 +743,16 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			joinSection(stack, callsign, wing)
 			say = stackTXCallsign(stack, callsign)
 		}
+		// Pull live recovery case from state so phraseology stays in sync with
+		// any mid-recovery transition the watcher already announced.
+		recCase := atcCtrl.GetRecoveryCase()
+		lo, hi := marshalAngelsBand(recCase)
 		reserved := stack.ReservedAngels(callsign)
-		stackAngels := atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, reserved)
+		stackAngels := atcCtrl.AssignMarshalAngels(lo, hi, reserved)
 		stack.SetAngels(callsign, stackAngels)
 		brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		rBrg = magneticDeg(atcCtrl, rBrg)
-		// Pull live recovery case from state so phraseology stays in sync with
-		// any mid-recovery transition the watcher already announced.
-		recCase := atcCtrl.GetRecoveryCase()
 		caseLabel := composer.CaseLabel(int(recCase))
 		// Build stack summary for response
 		stackInfo := ""
@@ -822,8 +837,8 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			if m := angelsInCallRe.FindStringSubmatch(lower); m != nil {
 				angels, _ = strconv.Atoi(m[1])
 			}
-			if angels < marshalMinAngels || angels > marshalMaxAngels {
-				angels = atcCtrl.AssignMarshalAngels(marshalMinAngels, marshalMaxAngels, stack.ReservedAngels(callsign))
+			if lo, hi := marshalAngelsBand(atcCtrl.GetRecoveryCase()); angels < lo || angels > hi {
+				angels = atcCtrl.AssignMarshalAngels(lo, hi, stack.ReservedAngels(callsign))
 			}
 			stack.SetAngels(callsign, angels)
 			log.Info().Str("callsign", callsign).Int("angels", angels).Msg("Marshal: established without marking mom's - added to the stack")
