@@ -169,6 +169,10 @@ const intentMissBufferSize = 50
 type ATCController struct {
 	mu sync.Mutex
 
+	// rotationHeldLogged: the jet a held runway change was last logged for,
+	// so the hold logs once (RotateRunwayIfDue ticks every minute).
+	rotationHeldLogged string
+
 	allPositions   map[string]*TacviewContact
 	allPositionsMu sync.RWMutex
 
@@ -419,6 +423,13 @@ func (c *ATCController) SetCalmRotation(kts float64) {
 // the slot hasn't changed.
 func (c *ATCController) RotateRunwayIfDue() {
 	from, to, changed := c.airfieldState.RotateRunwayIfDue()
+	if held := c.airfieldState.RotationHold(); held != c.rotationHeldLogged {
+		c.rotationHeldLogged = held
+		if held != "" {
+			log.Info().Str("airfield", c.airfieldState.Airfield.ICAO).Str("runway", c.airfieldState.ActiveRunway).
+				Str("waitingFor", held).Msg("runway rotation due - held while a jet is using the runway")
+		}
+	}
 	if !changed {
 		return
 	}

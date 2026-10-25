@@ -78,3 +78,60 @@ func TestCalmRunwayVaries(t *testing.T) {
 		t.Fatalf("calm rotation not varied: ends %v, same-hour %v", seen, sameHour)
 	}
 }
+
+// Night 2026-10-25: Raider 319 was cleared to taxi to one runway, the slot
+// rolled while he taxied, and he was cleared for takeoff on the other. The
+// roll now waits while a jet is using the field, and happens once it is clear.
+func TestCalmRotationHoldsForTraffic(t *testing.T) {
+	af := calmField()
+	s := NewAirfieldState(af)
+	s.DisableRunwayRotation()
+	s.SetCalmRotation(5)
+	// A time whose next slot picks the other end.
+	now := time.Now()
+	for i := 0; i < 200 && af.CalmRunway(now).Designator == af.CalmRunway(now.Add(airfield.RotationSlotDuration)).Designator; i++ {
+		now = now.Add(airfield.RotationSlotDuration)
+	}
+	s.mu.Lock()
+	s.ActiveRunway, s.calmSlot = af.CalmRunway(now).Designator, airfield.CalmSlot(now)
+	s.mu.Unlock()
+	first := s.ActiveRunway
+	next := now.Add(airfield.RotationSlotDuration)
+
+	ac := s.GetOrCreate("Raider 319")
+	ac.Phase, ac.LastContact = PhaseDeparting, next // cleared to taxi, called just now
+	if _, _, changed := s.rotateRunwayIfDue(next); changed || s.ActiveRunway != first || s.RotationHold() != "Raider 319" {
+		t.Fatalf("slot rolled under a taxiing jet: runway %s, held by %q", s.ActiveRunway, s.RotationHold())
+	}
+	// Still held while he is holding short and cleared for takeoff.
+	ac.Phase = PhaseClearedTakeoff
+	if _, _, changed := s.rotateRunwayIfDue(next.Add(time.Minute)); changed {
+		t.Fatal("slot rolled under a jet cleared for takeoff")
+	}
+	// Airborne and handed off: the field is clear, the slot applies.
+	ac.Phase = PhaseAirborne
+	if from, to, changed := s.rotateRunwayIfDue(next.Add(2 * time.Minute)); !changed || from != first || to == first || s.RotationHold() != "" {
+		t.Fatalf("after departure: %s -> %s changed %v, held by %q", from, to, changed, s.RotationHold())
+	}
+}
+
+// A jet that went quiet long ago does not hold the runway for ever.
+func TestCalmRotationIgnoresStaleTraffic(t *testing.T) {
+	af := calmField()
+	s := NewAirfieldState(af)
+	s.DisableRunwayRotation()
+	s.SetCalmRotation(5)
+	now := time.Now()
+	for i := 0; i < 200 && af.CalmRunway(now).Designator == af.CalmRunway(now.Add(airfield.RotationSlotDuration)).Designator; i++ {
+		now = now.Add(airfield.RotationSlotDuration)
+	}
+	s.mu.Lock()
+	s.ActiveRunway, s.calmSlot = af.CalmRunway(now).Designator, airfield.CalmSlot(now)
+	s.mu.Unlock()
+	next := now.Add(airfield.RotationSlotDuration)
+	ac := s.GetOrCreate("Venom 212")
+	ac.Phase, ac.LastContact = PhaseInbound, next.Add(-40*time.Minute)
+	if _, _, changed := s.rotateRunwayIfDue(next); !changed {
+		t.Fatal("a jet silent for 40 minutes held the runway")
+	}
+}
