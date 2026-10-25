@@ -101,7 +101,14 @@ const (
 	TowerVoiceFlag  = "tts-voice"
 	TowerElevenFlag = "elevenlabs-tower-voice"
 	TowerSpeedFlag  = "tts-speed"
+	// TowerNameFlag is what the tower calls itself ("Senaki Tower" when unset).
+	TowerNameFlag = "callsign"
 )
+
+// TowerStation stands for a tower in Validate: its name is spoken, so it may
+// hold spaces.
+var TowerStation = Station{Key: "tower", Label: "Tower", Owner: OwnerTower, Name: TowerNameFlag,
+	Voice: TowerVoiceFlag, Eleven: TowerElevenFlag, Speed: TowerSpeedFlag, NameIsCallsign: true}
 
 // Defaults are atc.exe's own flag defaults, for a station whose bat line does
 // not name the flag. cmd/atc's TestRoleCatalogDefaults keeps them in step.
@@ -158,10 +165,21 @@ type Override struct {
 	Off    bool    `json:"off,omitempty"`
 }
 
-// Theatre is one theatre's changes: catalog stations by key, towers by ICAO.
+// Theatre is one theatre's changes: catalog stations by key, towers and ATIS
+// by ICAO, and the tankers beyond the two catalog slots (extras.go).
 type Theatre struct {
 	Stations map[string]Override `json:"stations,omitempty"`
 	Towers   map[string]Override `json:"towers,omitempty"`
+	ATIS     map[string]ATIS     `json:"atis,omitempty"`
+	// Nets: changes to the bat's --tanker-net tankers, by their callsign.
+	Nets map[string]Override `json:"nets,omitempty"`
+	// Tankers added on the Settings page.
+	Tankers []TankerNet `json:"tankers,omitempty"`
+}
+
+// Empty reports whether the theatre holds no changes at all.
+func (t Theatre) Empty() bool {
+	return len(t.Stations) == 0 && len(t.Towers) == 0 && len(t.ATIS) == 0 && len(t.Nets) == 0 && len(t.Tankers) == 0
 }
 
 // File is roles.json.
@@ -364,6 +382,11 @@ func (f File) Apply(theatre, owner, icao string, fl Flags) (Result, error) {
 			if o.Off { // a field the squadron does not use (Setup page)
 				res.Off = true
 				return res, nil
+			}
+			if o.Name != "" {
+				if err := set(TowerNameFlag, o.Name); err != nil {
+					return res, err
+				}
 			}
 			if o.Voice != "" {
 				if err := set(TowerVoiceFlag, o.Voice); err != nil {

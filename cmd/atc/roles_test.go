@@ -189,3 +189,31 @@ func TestCommandHandoffFollows(t *testing.T) {
 		t.Fatalf("Batumi %v Kobuleti %v", airfield.UGSB.HandoffFreqMHz, airfield.UG5X.HandoffFreqMHz)
 	}
 }
+
+// Settings > Roles > ATIS: Batumi taken off the air, Senaki renamed and
+// revoiced, and Tbilisi (no ATIS of its own) given one on 235.000.
+func TestApplyATISRoles(t *testing.T) {
+	oldCfg, oldTheatre := roleCfg, roleTheatre
+	tbilisi := airfield.ByICAO("UGTB")
+	oldFreq := tbilisi.ATISFreqMHz
+	t.Cleanup(func() { roleCfg, roleTheatre, tbilisi.ATISFreqMHz = oldCfg, oldTheatre, oldFreq })
+	roleTheatre = "caucasus"
+	roleCfg = rolecfg.File{Theatres: map[string]rolecfg.Theatre{"caucasus": {ATIS: map[string]rolecfg.ATIS{
+		"UGSB": {Off: true},
+		"UGKS": {Name: "Senaki Information", Voice: "sage"},
+		"UGTB": {Added: true, Freq: 235},
+		"ETAR": {Added: true, Freq: 240}, // another theatre's field: ignored
+	}}}}
+	got := applyATISRoles(atisStationsForMap("caucasus"))
+	var names []string
+	for _, st := range got {
+		names = append(names, fmt.Sprintf("%s %.3f %s", st.Name, st.FreqMHz, st.Voice))
+	}
+	want := "Kobuleti ATIS 232.000 shimmer|Kutaisi ATIS 233.000 alloy|Senaki Information 234.000 sage|Mozdok ATIS 237.000 onyx|Tbilisi ATIS 235.000 alloy"
+	if s := strings.Join(names, "|"); s != want {
+		t.Fatalf("stations\n got %s\nwant %s", s, want)
+	}
+	if tbilisi.ATISFreqMHz != 235 || got[len(got)-1].Advisory == "" {
+		t.Fatalf("Tbilisi's ATIS frequency %v, advisory %q", tbilisi.ATISFreqMHz, got[len(got)-1].Advisory)
+	}
+}

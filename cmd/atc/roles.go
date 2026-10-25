@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -65,7 +66,18 @@ func applyRoleConfig(fs *pflag.FlagSet) {
 		return
 	}
 	roleCfg = f
-	roleConfigResult.res, roleConfigResult.err = f.Apply(roleTheatre, rolecfg.OwnerOf(given), flagAirfield, pflagFlags{fs})
+	owner := rolecfg.OwnerOf(given)
+	roleConfigResult.res, roleConfigResult.err = f.Apply(roleTheatre, owner, flagAirfield, pflagFlags{fs})
+
+	// Command's tankers beyond the two catalog slots: the bat's --tanker-net
+	// lines with the Settings changes, and the tankers added there.
+	if owner == rolecfg.OwnerCommand {
+		nets := f.TankerNets(roleTheatre, flagTankerNets)
+		if strings.Join(nets, "|") != strings.Join(flagTankerNets, "|") {
+			flagTankerNets = nets
+			roleConfigResult.res.Changed = append(roleConfigResult.res.Changed, "tanker-net="+strings.Join(nets, ","))
+		}
+	}
 
 	// A red tower hands off to Red Command wherever Settings put it.
 	if o, ok := f.Station(roleTheatre, "red-command"); ok {
@@ -93,6 +105,61 @@ func logRoleConfig() error {
 		return fmt.Errorf("turned off in Settings (roles.json)")
 	}
 	return nil
+}
+
+// applyATISRoles puts the Settings page's ATIS changes on the theatre's
+// stations: renamed, revoiced, taken off the air, and a field that has no ATIS
+// of its own given one (its weather, runway and altimeter; no TACAN or ILS,
+// which only the built-in stations carry).
+func applyATISRoles(stations []*atisStation) []*atisStation {
+	set := roleCfg.Theatres[roleTheatre].ATIS
+	if len(set) == 0 {
+		return stations
+	}
+	advisory := "vSFG-7 training flights in area. Advise information on initial contact."
+	if len(stations) > 0 {
+		advisory = stations[0].Advisory
+	}
+	kept := stations[:0:0]
+	have := map[string]bool{}
+	for _, st := range stations {
+		o := set[st.ICAO]
+		if o.Off {
+			log.Info().Str("icao", st.ICAO).Msg("ATIS off on the Settings page")
+			continue
+		}
+		if o.Name != "" {
+			st.Name = o.Name
+		}
+		if o.Voice != "" {
+			st.Voice = o.Voice
+		}
+		have[st.ICAO] = true
+		kept = append(kept, st)
+	}
+	icaos := make([]string, 0, len(set))
+	for icao := range set {
+		icaos = append(icaos, icao)
+	}
+	sort.Strings(icaos)
+	for _, icao := range icaos {
+		o := set[icao]
+		af := airfield.ByICAO(icao)
+		if !o.Added || o.Off || have[icao] || af == nil || !airfield.ValidFreqMHz(o.Freq) || airfield.TheatreOfICAO(icao) != roleTheatre {
+			continue
+		}
+		name, voice := o.Name, o.Voice
+		if name == "" {
+			name = af.Name + " ATIS"
+		}
+		if voice == "" {
+			voice = "alloy"
+		}
+		af.ATISFreqMHz = o.Freq // the tower's "information" calls name it
+		kept = append(kept, &atisStation{Name: name, FreqMHz: o.Freq, Voice: voice, ICAO: icao, Advisory: advisory})
+		log.Info().Str("icao", icao).Float64("freq", o.Freq).Msg("ATIS added on the Settings page")
+	}
+	return kept
 }
 
 // commandHandoffFollows points the theatre's towers that hand off to Command

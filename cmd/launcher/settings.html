@@ -72,6 +72,19 @@
   table.roles tr.offrow td:not(:first-child):not(:nth-child(2)) { opacity: 0.4; }
   td .note2 { display: block; color: var(--muted); font-size: 0.7rem; margin-top: 0.15rem; white-space: normal; max-width: 14rem; }
   .play { padding: 0.3rem 0.45rem; margin-left: 0.2rem; }
+  .rgroup { margin-top: 1rem; }
+  .rgroup h3 { margin: 0 0 0.15rem; font-size: 0.92rem; }
+  .rgroup .gsub { color: var(--muted); font-size: 0.78rem; margin: 0 0 0.4rem; }
+  .addbar { display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; }
+  .addbar select, .addform select, .addform input { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 0.3rem 0.4rem; font-size: 0.82rem; }
+  .addform { display: flex; gap: 0.45rem; align-items: flex-end; flex-wrap: wrap; margin-top: 0.5rem; padding: 0.6rem;
+    border: 1px dashed var(--border); border-radius: 6px; }
+  .addform label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.74rem; color: var(--muted); }
+  .addform input.n { width: 5rem; font-family: Consolas, monospace; }
+  .addform input.w { width: 9rem; }
+  table.roles input.n { width: 4.2rem; }
+  button.danger { border-color: var(--red); color: var(--red); background: transparent; }
   .banner { border: 1px solid var(--amber); color: var(--amber); border-radius: 6px; padding: 0.6rem 0.8rem;
     margin-bottom: 1rem; font-size: 0.85rem; display: none; }
 </style>
@@ -194,17 +207,16 @@
 
   <section>
     <h2>Roles</h2>
-    <p class="sub">Every station this theatre's start scripts run: frequency, name, voices, speed, on/off. A change
-      to Marshal or Command also moves the handoffs that point at it. ElevenLabs speaks when there is a key and credit;
-      the OpenAI voice is the fallback. ▶ plays a sample: ElevenLabs' own preview clip (free) or one short line.</p>
+    <p class="sub">Every station this theatre runs, in three groups: ATIS, the towers, and the rest (Command, JTAC,
+      tankers, AWACS, carrier). Change a name, frequency, voice or speed and press Save on that row; Remove takes a
+      station off the air, and Add brings one back or starts a new one. A change to Marshal or Command also moves the
+      handoffs that point at it. ElevenLabs speaks when there is a key and credit; the OpenAI voice is the fallback.
+      &#9654; plays a sample: ElevenLabs' own preview clip (free) or one short line.</p>
     <div class="tabs" id="roleTabs"></div>
-    <div class="tablewrap"><table class="roles">
-      <thead><tr><th>Station</th><th>On</th><th>Freq</th><th>Name</th><th>ElevenLabs voice</th><th>OpenAI voice</th><th>Speed</th><th></th></tr></thead>
-      <tbody id="roles"></tbody>
-    </table></div>
+    <div id="roleSections"></div>
     <div class="msg" id="roleMsg" style="margin-top:0.6rem"></div>
     <div style="display:flex;gap:0.6rem;align-items:center;margin-top:0.7rem;flex-wrap:wrap">
-      <button class="primary" id="restartBtn" onclick="restartTheatre()">⟳ Restart this theatre's roles</button>
+      <button class="primary" id="restartBtn" onclick="restartTheatre()">&#10227; Restart this theatre's roles</button>
       <span class="note" style="margin:0">Pilots hear a short gap while each role comes back.</span>
     </div>
   </section>
@@ -291,10 +303,12 @@ function elevenLabel(v) {
   const tags = [l.gender, l.accent, (l.age || '').replace('_', ' '), l.descriptive].filter(Boolean).join(', ');
   return v.name.split(' - ')[0] + (tags ? ' — ' + tags : '');
 }
-function elevenOptions(cur, auto) {
+function elevenOptions(cur, auto, names) {
   const list = voices.eleven || [];
   let html = auto ? `<option value="" ${cur === '' ? 'selected' : ''}>Automatic (by the field's accent)</option>` : '';
-  if (cur && !list.some(v => v.id === cur)) html += `<option value="${esc(cur)}" selected>${esc(cur)} (not in your account)</option>`;
+  // A tanker's voice can be one of Readback's own names for a voice (--tanker-net).
+  if (names) html += tankerVoiceNames.map(n => `<option value="${n}" ${n === cur ? 'selected' : ''}>${n[0].toUpperCase() + n.slice(1)} (Readback's tanker voices)</option>`).join('');
+  if (cur && !list.some(v => v.id === cur) && !(names && tankerVoiceNames.includes(cur))) html += `<option value="${esc(cur)}" selected>${esc(cur)} (not in your account)</option>`;
   const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name));
   return html + sorted.map(v => `<option value="${esc(v.id)}" ${v.id === cur ? 'selected' : ''}>${esc(elevenLabel(v))}</option>`).join('');
 }
@@ -302,38 +316,41 @@ function openaiOptions(cur) {
   return voices.openai.map(v => `<option value="${v.ID}" ${v.ID === cur ? 'selected' : ''}>${v.ID} — ${esc(v.Desc)}</option>`).join('');
 }
 
-function roleRow(kind, id, label, note, s, ov) {
-  // s: catalog flags (null for a tower); values shown are the change, or the bat's.
+function roleRow(kind, id, label, note, s, ov, extra) {
+  // s: the station's flags and bat values; values shown are the change, or the bat's.
   const dis = data.canEdit ? '' : 'disabled';
-  const eff = {
-    freq: ov.freq || s?.bat?.freq || 0, name: ov.name || s?.bat?.name || '',
-    voice: ov.voice || s?.bat?.voice || '', eleven: ov.eleven ?? '', speed: ov.speed || s?.bat?.speed || 0,
-  };
-  if (!ov.eleven) eff.eleven = s?.bat?.eleven || '';
   const bat = s.bat;
+  const eff = {
+    freq: ov.freq || bat.freq || 0, name: ov.name || bat.name || '',
+    voice: ov.voice || bat.voice || '', eleven: ov.eleven || bat.eleven || '', speed: ov.speed || bat.speed || 0,
+  };
   const ch = (a, b) => (String(a) !== String(b) ? 'changed' : '');
   const freqCell = s.freqFlag
     ? `<input inputmode="decimal" data-f="freq" value="${mhz(eff.freq)}" data-bat="${mhz(bat.freq)}" class="${ch(mhz(eff.freq), mhz(bat.freq))}" oninput="markRole(this)" ${dis}>
        ${ov.freq ? `<span class="def">was ${mhz(bat.freq)}</span>` : ''}`
-    : `<span class="muted">${kind === 'tower' ? 'Frequencies table' : "Command's"}</span>`;
+    : `<span class="muted">${s.freqText || "Command's"}</span>`;
   const nameCell = s.nameFlag
     ? `<input class="name ${ch(eff.name, bat.name)}" data-f="name" value="${esc(eff.name)}" data-bat="${esc(bat.name)}" oninput="markRole(this)" ${dis}>
        ${ov.name ? `<span class="def">was ${esc(bat.name)}</span>` : ''}`
-    : '<span class="muted">—</span>';
+    : '<span class="muted">&mdash;</span>';
   const speedCell = s.speedFlag
     ? `<input class="speed ${ch(eff.speed, bat.speed)}" inputmode="decimal" data-f="speed" value="${eff.speed || ''}" data-bat="${bat.speed}" oninput="markRole(this)" ${dis}>`
     : '<span class="muted">fixed</span>';
-  const on = !ov.off;
-  return `<tr data-kind="${kind}" data-id="${esc(id)}" class="${on ? '' : 'offrow'}">
-    <td><b>${esc(label)}</b>${note ? `<span class="note2">${esc(note)}</span>` : ''}</td>
-    <td><input type="checkbox" data-f="on" ${on ? 'checked' : ''} onchange="markRole(this)" ${dis} title="${kind === 'tower' || s.main ? 'Off: this role does not start' : 'Off: this station stays silent'}"></td>
+  const elevenCell = s.noEleven ? '<span class="muted">&mdash;</span>'
+    : `<span style="white-space:nowrap"><select data-f="eleven" data-bat="${esc(bat.eleven)}" class="${ch(eff.eleven, bat.eleven)}" onchange="markRole(this)" ${dis}>${elevenOptions(eff.eleven, kind === 'tower', s.elevenNames)}</select><button class="play" title="Play" onclick="playSample('eleven', this)">&#9654;</button></span>`;
+  const openaiCell = s.noOpenAI ? '<span class="muted">&mdash;</span>'
+    : `<span style="white-space:nowrap"><select data-f="voice" data-bat="${esc(bat.voice)}" class="${ch(eff.voice, bat.voice)}" onchange="markRole(this)" ${dis}>${s.voiceDefault ? `<option value="" ${eff.voice ? '' : 'selected'}>${esc(s.voiceDefault)}</option>` : ''}${openaiOptions(eff.voice)}</select><button class="play" title="Play" onclick="playSample('openai', this)">&#9654;</button></span>`;
+  const canReset = Object.keys(ov).some(k => k !== 'off' && k !== 'added' && k !== 'freqOwn');
+  return `<tr data-kind="${kind}" data-id="${esc(id)}">
+    <td><b>${esc(label)}</b>${note ? `<span class="note2">${note}</span>` : ''}</td>
     <td>${freqCell}</td>
     <td>${nameCell}</td>
-    <td style="white-space:nowrap"><select data-f="eleven" data-bat="${esc(bat.eleven)}" class="${ch(eff.eleven, bat.eleven)}" onchange="markRole(this)" ${dis}>${elevenOptions(eff.eleven, kind === 'tower')}</select><button class="play" title="Play" onclick="playSample('eleven', this)">▶</button></td>
-    <td style="white-space:nowrap"><select data-f="voice" data-bat="${esc(bat.voice)}" class="${ch(eff.voice, bat.voice)}" onchange="markRole(this)" ${dis}>${openaiOptions(eff.voice)}</select><button class="play" title="Play" onclick="playSample('openai', this)">▶</button></td>
-    <td>${speedCell}</td>
+    <td>${elevenCell}</td>
+    <td>${openaiCell}</td>
+    <td>${extra || speedCell}</td>
     <td style="white-space:nowrap"><button class="primary" onclick="saveRole(this)" ${dis}>Save</button>
-      ${Object.keys(ov).length ? `<button onclick="resetRole(this)" ${dis} title="Undo this row's saved changes: back to the start script's settings">Default</button>` : ''}</td>
+      <button class="danger" onclick="removeRole(this)" ${dis} title="${esc(s.removeTitle || 'Take it off the air')}">Remove</button>
+      ${canReset ? `<button onclick="resetRole(this)" ${dis} title="Undo this row's saved changes: back to the start script's settings">Default</button>` : ''}</td>
   </tr>`;
 }
 
@@ -345,57 +362,240 @@ function markRole(el) {
   if (save) { save.classList.add('pending'); save.title = 'Save this row (not saved yet)'; }
 }
 
+// The theatre's rows by kind and id, for Save / Remove / Add.
+let roleItems = {};
+const item = (kind, id) => roleItems[kind + ':' + id];
+const tankerVoiceNames = ['eric', 'brian', 'hank', 'charlie', 'daniel', 'adam', 'george', 'gideon'];
+const fmtTanker = t => `${t.angels}k ft &middot; ${t.kias} kt &middot; ${t.boom ? 'boom' : 'basket'}`;
+
+function group(title, sub, head, rows, add) {
+  return `<div class="rgroup"><h3>${esc(title)}</h3><p class="gsub">${sub}</p>
+    <div class="tablewrap"><table class="roles"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="muted">None on the air.</td></tr>`}</tbody></table></div>
+    ${add}</div>`;
+}
+
+function addBar(kind, options) {
+  if (!options.length || !data.canEdit) return '';
+  return `<div class="addbar"><select id="add-${kind}"><option value="">Add&hellip;</option>${options.map(o =>
+    `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>
+    <button onclick="addRole('${kind}')">Add</button><span class="msg" id="addmsg-${kind}"></span></div><div id="addform-${kind}"></div>`;
+}
+
 function renderRoles() {
   const r = (data.roles || {})[theatre] || { stations: [], towers: [] };
-  const rows = [];
-  for (const s of r.stations) rows.push(roleRow('station', s.key, s.label, s.note, s, s.override || {}));
-  for (const t of r.towers) {
-    const s = { bat: t.bat, speedFlag: 'tts-speed' };
-    rows.push(roleRow('tower', t.icao, t.name + ' Tower', '', s, t.override || {}));
+  roleItems = {};
+  const head = ['Station', 'Freq', 'Name', 'ElevenLabs voice', 'OpenAI voice', 'Speed', ''];
+  const out = [];
+
+  // ATIS
+  if (r.hasATIS) {
+    const rows = [], add = [];
+    for (const a of r.atis || []) {
+      roleItems['atis:' + a.icao] = a;
+      const ov = a.override || {};
+      if (ov.off) { add.push({ value: 'atis:' + a.icao, label: `${ov.name || a.name} (removed)` }); continue; }
+      const s = { bat: { name: a.name, voice: '' }, nameFlag: 'name', noEleven: true, voiceDefault: 'the station\'s own voice',
+        freqFlag: a.added ? 'freq' : '', freqText: 'Frequencies table',
+        removeTitle: a.added ? 'Take this ATIS off the air and forget it' : 'Take this ATIS off the air' };
+      if (a.added) s.bat.freq = a.freq;
+      const o = {};
+      if (ov.name) o.name = ov.name;
+      if (ov.voice) o.voice = ov.voice;
+      rows.push(roleRow('atis', a.icao, `${a.field} ATIS`, a.added ? 'added here' : `${mhz(a.freq)} MHz`, s, o,
+        '<span class="muted">fixed</span>'));
+    }
+    for (const f of r.noATIS || []) add.push({ value: 'newatis:' + f.icao, label: `New ATIS at ${f.name}` });
+    out.push(group('ATIS', 'One recorded broadcast per field: weather, runway, altimeter. ATIS speaks with the OpenAI voices.',
+      head, rows, addBar('atis', add)));
   }
-  document.getElementById('roles').innerHTML = rows.join('') ||
-    '<tr><td colspan="8" class="muted">No start scripts for this theatre on this rig.</td></tr>';
+
+  // Towers
+  {
+    const rows = [], add = [];
+    for (const t of r.towers || []) {
+      roleItems['tower:' + t.icao] = t;
+      const ov = t.override || {};
+      if (ov.off) { add.push({ value: 'tower:' + t.icao, label: `${ov.name || t.bat.name} (removed)` }); continue; }
+      const s = { bat: t.bat, nameFlag: 'callsign', speedFlag: 'tts-speed', freqText: 'Frequencies table',
+        removeTitle: 'This tower does not start' };
+      rows.push(roleRow('tower', t.icao, t.name, '', s, ov));
+    }
+    out.push(group('Towers', 'One controller per field: ground, tower and departure. The name is what it calls itself on the radio; the frequencies are in the Frequencies table above.',
+      head, rows, addBar('tower', add)));
+  }
+
+  // Everything else
+  {
+    const rows = [], add = [];
+    for (const s of r.stations || []) {
+      roleItems['station:' + s.key] = s;
+      const ov = s.override || {};
+      if (ov.off) { add.push({ value: 'station:' + s.key, label: `${s.label} (removed)` }); continue; }
+      s.removeTitle = s.main ? 'This role does not start' : 'This station stays silent';
+      rows.push(roleRow('station', s.key, s.label, esc(s.note || ''), s, ov));
+    }
+    for (const n of r.nets || []) {
+      const id = n.added ? n.bat.name : n.key;
+      const kind = n.added ? 'tanker' : 'net';
+      roleItems[kind + ':' + id] = n;
+      const ov = n.added ? {} : (n.override || {});
+      if (ov.off) { add.push({ value: 'net:' + id, label: `Tanker ${ov.name || n.bat.name} (removed)` }); continue; }
+      const s = { bat: { freq: n.bat.freq, name: n.bat.name, eleven: n.bat.eleven }, freqFlag: 'f', nameFlag: 'n',
+        noOpenAI: true, elevenNames: true, removeTitle: n.added ? 'Take this tanker off the air and forget it' : 'This tanker stays silent' };
+      const extra = n.added
+        ? `<input class="n" data-f="angels" value="${n.bat.angels}" title="altitude, thousands of feet" ${data.canEdit ? '' : 'disabled'}> k ft
+           <input class="n" data-f="kias" value="${n.bat.kias}" title="knots indicated" ${data.canEdit ? '' : 'disabled'}> kt
+           <select data-f="boom" ${data.canEdit ? '' : 'disabled'}><option value="">basket</option><option value="1" ${n.bat.boom ? 'selected' : ''}>boom</option></select>`
+        : `<span class="muted">${fmtTanker(n.bat)}</span>`;
+      rows.push(roleRow(kind, id, 'Tanker', n.added ? 'added here' : 'from the start script', s, ov, extra));
+    }
+    if (r.hasCommand) add.push({ value: 'newtanker', label: 'New tanker' });
+    out.push(group('Other stations', 'Command and what it runs (Overlord, JTAC, tankers), the AWACS, and the carrier: Deckboss, Marshal and Paddles.',
+      head, rows, addBar('other', add)));
+  }
+
+  document.getElementById('roleSections').innerHTML = (r.stations || []).length || (r.towers || []).length
+    ? out.join('') : '<p class="muted">No start scripts for this theatre on this rig.</p>';
   if (voices.elevenError) show(document.getElementById('roleMsg'), { ok: false, msg: 'ElevenLabs voice list: ' + voices.elevenError });
 }
 
 function rowOverride(tr) {
   const o = {};
   const get = f => tr.querySelector(`[data-f="${f}"]`);
-  const fr = get('freq'), nm = get('name'), sp = get('speed'), on = get('on');
+  const fr = get('freq'), nm = get('name'), sp = get('speed'), vo = get('voice'), el = get('eleven');
   if (fr && fr.value.trim()) o.freq = parseFloat(fr.value);
   if (nm) o.name = nm.value.trim();
-  o.voice = get('voice').value;
-  o.eleven = get('eleven').value;
+  if (vo) o.voice = vo.value;
+  if (el) o.eleven = el.value;
   if (sp && sp.value.trim()) o.speed = parseFloat(sp.value);
-  if (on && !on.checked) o.off = true;
   return o;
 }
 
-async function postRole(tr, override) {
-  const body = { op: 'role', theatre, override };
-  if (tr.dataset.kind === 'tower') body.icao = tr.dataset.id; else body.key = tr.dataset.id;
+// One row's save, by kind: the catalog stations and towers (role), ATIS,
+// the start script's tankers (net) and the added ones (tanker).
+async function postRole(kind, id, o, remove) {
+  let body;
+  switch (kind) {
+    case 'station': body = { op: 'role', theatre, key: id, override: o }; break;
+    case 'tower': body = { op: 'role', theatre, icao: id, override: o }; break;
+    case 'atis': {
+      const a = item('atis', id) || {};
+      body = { op: 'atis', theatre, icao: id, atisSet: { added: !!a.added || !!o.added, off: !!o.off, name: o.name || '', voice: o.voice || '', freq: (a.added || o.added) ? (o.freq || a.freq || 0) : 0 } };
+      if (a.added && o.off) body.atisSet = { added: false }; // removing an added ATIS forgets it
+      break;
+    }
+    case 'net': body = { op: 'net', theatre, key: id, override: o }; break;
+    case 'tanker': body = { op: 'tanker', theatre, prev: id, tanker: o, remove: !!remove }; break;
+  }
   const res = await post(body);
   await load();
   // Operator 2026-10-24: Save then "Reset" undid the save. A saved change waits
   // for the restart: say so, and ring the Restart button.
   if (res.ok) {
-    res.msg = 'Saved on this server. Press ⟳ Restart this theatre\'s roles (below) to use it.';
+    res.msg = 'Saved on this server. Press \u27f3 Restart this theatre\'s roles (below) to use it.';
     document.getElementById('restartBtn').classList.add('pending');
   }
   show(document.getElementById('roleMsg'), res);
+  return res;
 }
+
+function tankerFrom(tr, base) {
+  const get = f => tr.querySelector(`[data-f="${f}"]`);
+  const o = rowOverride(tr);
+  return { freq: o.freq || 0, name: o.name || '', eleven: o.eleven || '',
+    angels: parseInt(get('angels')?.value ?? base.angels, 10), kias: parseInt(get('kias')?.value ?? base.kias, 10),
+    boom: get('boom') ? get('boom').value === '1' : !!base.boom };
+}
+
 function saveRole(btn) {
-  const tr = btn.closest('tr'), o = rowOverride(tr);
+  const tr = btn.closest('tr'), kind = tr.dataset.kind, id = tr.dataset.id, o = rowOverride(tr);
   if (o.freq !== undefined && !(o.freq >= 30 && o.freq <= 400)) {
     show(document.getElementById('roleMsg'), { ok: false, msg: 'Frequency must be 30-400 MHz.' }); return;
   }
-  if (o.off && !confirm('Turn this off? It stays silent until you turn it back on.')) return;
-  postRole(tr, o);
+  if (kind === 'tanker') { postRole(kind, id, tankerFrom(tr, item('tanker', id).bat)); return; }
+  const cur = item(kind, id);
+  if (kind === 'atis') o.added = !!(cur && cur.added);
+  postRole(kind, id, o);
 }
+
+function removeRole(btn) {
+  const tr = btn.closest('tr'), kind = tr.dataset.kind, id = tr.dataset.id;
+  const label = tr.querySelector('td b').textContent;
+  const cur = item(kind, id) || {};
+  const what = kind === 'station' && cur.main ? `Remove ${label}? It will not start until you add it back.`
+    : `Take ${label} off the air?` + (kind === 'tanker' || (kind === 'atis' && cur.added) ? ' It is forgotten; Add can make it again.' : ' Add brings it back.');
+  if (!confirm(what)) return;
+  if (kind === 'tanker') { postRole('tanker', id, {}, true); return; }
+  // Keep the row's saved changes, so Add brings it back as it was.
+  const o = Object.assign({}, (kind === 'atis' ? cur.override : cur.override) || {}, { off: true });
+  postRole(kind, id, o);
+}
+
 function resetRole(btn) {
-  const tr = btn.closest('tr');
+  const tr = btn.closest('tr'), kind = tr.dataset.kind, id = tr.dataset.id;
   if (!confirm(`Undo the saved changes for ${tr.querySelector('td b').textContent} and go back to the start script's settings?`)) return;
-  postRole(tr, {});
+  const cur = item(kind, id) || {};
+  postRole(kind, id, kind === 'atis' && cur.added ? { added: true, freq: cur.freq } : {});
+}
+
+function addRole(kind) {
+  const sel = document.getElementById('add-' + kind), v = sel.value, msg = document.getElementById('addmsg-' + kind);
+  if (!v) { show(msg, { ok: false, msg: 'Pick one first.' }); return; }
+  const [k, id] = v.split(':');
+  if (k === 'newatis') return showAddForm(kind, 'atis', id);
+  if (k === 'newtanker') return showAddForm(kind, 'tanker', '');
+  // Bring a removed one back as it was.
+  const cur = item(k, id) || {};
+  const o = Object.assign({}, cur.override || {});
+  delete o.off;
+  postRole(k, id, o);
+}
+
+function showAddForm(kind, what, icao) {
+  const dis = data.canEdit ? '' : 'disabled';
+  const box = document.getElementById('addform-' + kind);
+  if (what === 'atis') {
+    const f = ((data.roles[theatre] || {}).noATIS || []).find(x => x.icao === icao) || { name: icao };
+    box.innerHTML = `<div class="addform" data-icao="${esc(icao)}">
+      <b style="align-self:center">New ATIS at ${esc(f.name)}</b>
+      <label>Frequency (MHz)<input class="n" data-f="freq" inputmode="decimal" placeholder="e.g. 235.000" ${dis}></label>
+      <label>Name<input class="w" data-f="name" value="${esc(f.name)} ATIS" ${dis}></label>
+      <label>OpenAI voice<select data-f="voice" ${dis}>${openaiOptions('alloy')}</select></label>
+      <button class="primary" onclick="submitAdd(this, 'atis')" ${dis}>Add ATIS</button>
+      <button onclick="this.closest('.addform').remove()">Cancel</button></div>`;
+  } else {
+    box.innerHTML = `<div class="addform">
+      <b style="align-self:center">New tanker</b>
+      <label>Callsign<input class="w" data-f="name" placeholder="e.g. Arco-1-1" ${dis}></label>
+      <label>Frequency (MHz)<input class="n" data-f="freq" inputmode="decimal" placeholder="e.g. 253.300" ${dis}></label>
+      <label>Altitude (k ft)<input class="n" data-f="angels" value="22" ${dis}></label>
+      <label>Speed (KIAS)<input class="n" data-f="kias" value="280" ${dis}></label>
+      <label>Refuels with<select data-f="boom" ${dis}><option value="">basket (Navy jets)</option><option value="1">boom (Air Force jets)</option></select></label>
+      <label>ElevenLabs voice<select data-f="eleven" ${dis}>${elevenOptions('eric', false, true)}</select></label>
+      <button class="primary" onclick="submitAdd(this, 'tanker')" ${dis}>Add tanker</button>
+      <button onclick="this.closest('.addform').remove()">Cancel</button></div>`;
+  }
+}
+
+async function submitAdd(btn, what) {
+  const form = btn.closest('.addform'), get = f => form.querySelector(`[data-f="${f}"]`);
+  const freq = parseFloat(get('freq').value);
+  if (!(freq >= 30 && freq <= 400)) { show(document.getElementById('roleMsg'), { ok: false, msg: 'Frequency must be 30-400 MHz.' }); return; }
+  let res;
+  if (what === 'atis') {
+    const icao = form.dataset.icao;
+    res = await post({ op: 'atis', theatre, icao, atisSet: { added: true, freq, name: get('name').value.trim(), voice: get('voice').value } });
+  } else {
+    res = await post({ op: 'tanker', theatre, prev: '', tanker: { name: get('name').value.trim(), freq,
+      angels: parseInt(get('angels').value, 10), kias: parseInt(get('kias').value, 10), boom: get('boom').value === '1', eleven: get('eleven').value } });
+  }
+  if (res.ok) {
+    await load();
+    res.msg = 'Added on this server. Press \u27f3 Restart this theatre\'s roles (below) to put it on the air.';
+    document.getElementById('restartBtn').classList.add('pending');
+  }
+  show(document.getElementById('roleMsg'), res);
 }
 
 let audio = null;
@@ -433,6 +633,7 @@ async function loadVoices() {
 }
 
 function freqCell(f, kind, def, ov) {
+  if (kind === 'atis' && f.atisNote) return `<td class="muted">${esc(f.atisNote)}</td>`;
   if (kind === 'atis' && !def) return '<td class="muted">none</td>';
   const val = ov || def, dis = data.canEdit ? '' : 'disabled';
   return `<td><input inputmode="decimal" data-kind="${kind}" data-def="${mhz(def)}" value="${mhz(val)}"

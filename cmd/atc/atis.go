@@ -781,6 +781,10 @@ func atisOnlyLoop(ctx context.Context, srsAddr, apiKey, eamPassword string) {
 
 	stations := filterATISStations(atisStationsForMap(flagMap), flagATISStations)
 	applyATISFreqOverrides(stations)
+	if stations = applyATISRoles(stations); len(stations) == 0 {
+		log.Warn().Msg("every ATIS in this theatre is off on the Settings page - nothing to broadcast")
+		return
+	}
 
 	var atcCtrl *controller.ATCController
 	if windDir >= 0 {

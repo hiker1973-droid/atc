@@ -222,6 +222,8 @@ type fieldFreqView struct {
 	// HandoffFollows: the handoff is Command's frequency from the Roles
 	// section, not the field's own.
 	HandoffFollows bool `json:"handoffFollows,omitempty"`
+	// ATISNote: the field's ATIS is set under Roles (added there, or off).
+	ATISNote string `json:"atisNote,omitempty"`
 }
 
 type theatreView struct {
@@ -267,6 +269,12 @@ func settingsSnapshot() map[string]any {
 			// Mirrors cmd/atc commandHandoffFollows.
 			if cmdOv.Freq > 0 && !cmdOv.Off && strings.EqualFold(af.HandoffCallsign, "command") && fv.Override.Handoff == 0 {
 				fv.Handoff, fv.HandoffFollows = cmdOv.Freq, true
+			}
+			switch a := rc.Theatres[t.Key].ATIS[af.ICAO]; {
+			case a.Off:
+				fv.ATISNote = "off (Roles)"
+			case a.Added && af.ATISFreqMHz == 0:
+				fv.ATISNote = fmt.Sprintf("%.3f (Roles)", a.Freq)
 			}
 			tv.Fields = append(tv.Fields, fv)
 		}
@@ -380,6 +388,11 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		Override rolecfg.Override `json:"override"`
 		Provider string           `json:"provider"`
 		Voice    string           `json:"voice"`
+		// op atis / net / tanker (rolesettings.go)
+		ATISSet rolecfg.ATIS      `json:"atisSet"`
+		Tanker  rolecfg.TankerNet `json:"tanker"`
+		Prev    string            `json:"prev"`
+		Remove  bool              `json:"remove"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&req); err != nil {
 		http.Error(w, "bad JSON", http.StatusBadRequest)
@@ -429,6 +442,21 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true, "msg": "Saved. Restart the theatre's roles to use it."})
+	case "atis", "net", "tanker":
+		var err error
+		switch req.Op {
+		case "atis":
+			err = setATIS(req.Theatre, strings.ToUpper(strings.TrimSpace(req.ICAO)), req.ATISSet)
+		case "net":
+			err = setNet(req.Theatre, req.Key, req.Override)
+		default:
+			err = setTanker(req.Theatre, req.Prev, req.Tanker, req.Remove)
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "msg": "Saved. Restart the theatre's roles to use it."})
 	case "tts":
 		// The voice engine (cmd/atc/tts_windows.go): free Windows voices, or
 		// OpenAI's. ElevenLabs speaks wherever its key and a role's voice are set.
@@ -464,7 +492,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "audio/mpeg")
 		w.Write(b)
 	default:
-		http.Error(w, "op must be set, test, freq, role, restart or sample", http.StatusBadRequest)
+		http.Error(w, "op must be set, test, freq, role, atis, net, tanker, restart or sample", http.StatusBadRequest)
 	}
 }
 

@@ -399,8 +399,21 @@
   <tr><td>Server connection</td><td>The SRS server address, its External AWACS Mode password, and Tacview's address.</td></tr>
   <tr><td>Frequencies</td><td>Each field's tower, ATIS and departure-handoff frequency. Changed values are marked; clear a
     box to go back to the default.</td></tr>
-  <tr><td>Roles</td><td>For every station: on/off, frequency, name, ElevenLabs voice, OpenAI voice and speed. &#9654; plays a
-    sample of a voice.</td></tr>
+  <tr><td>Roles</td><td>Every station in three groups, <b>ATIS</b>, <b>Towers</b> and <b>Other stations</b> (Command, Overlord,
+    JTAC, tankers, AWACS, Deckboss, Marshal, Paddles): frequency, name, ElevenLabs voice, OpenAI voice and speed.
+    &#9654; plays a sample of a voice. <b>Remove</b> takes a station off the air; each group's <b>Add</b> list brings a
+    removed one back or starts a new one (below).</td></tr>
+</table>
+<table>
+  <tr><th>Group</th><th>Add can start</th><th>Notes</th></tr>
+  <tr><td>ATIS</td><td>An ATIS at a field that has none, on a frequency you choose.</td><td>A new ATIS reads the weather,
+    runway and altimeter; only the built-in ones also give TACAN and ILS. The built-in ones' frequencies are in the
+    Frequencies table.</td></tr>
+  <tr><td>Towers</td><td>A tower you removed.</td><td>The name is what the tower calls itself on the radio, e.g.
+    "Senaki Approach". Pilots still call it by the field's name.</td></tr>
+  <tr><td>Other stations</td><td>A station you removed, or a <b>new tanker</b>: callsign (e.g. Arco-1-1), frequency,
+    altitude, speed, basket or boom, and voice.</td><td>Command speaks for every tanker, so tankers need Command running.
+    Removing Command, GCI, Marshal, Deckboss or Paddles stops that controller from starting.</td></tr>
 </table>
 <div class="note"><b>Saving a role:</b> after you change a row, its <b>Save</b> button (always at the right of the table)
   is ringed until you press it. Changes reach a controller when it restarts: press <b>Restart this theatre's roles</b>

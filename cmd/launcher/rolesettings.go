@@ -61,14 +61,51 @@ type towerView struct {
 	ICAO     string           `json:"icao"`
 	Name     string           `json:"name"`
 	Role     string           `json:"role"`
-	Bat      stationValues    `json:"bat"`
+	Bat      stationValues    `json:"bat"` // Bat.Name: what it calls itself, "Senaki Tower"
 	Override rolecfg.Override `json:"override"`
+}
+
+// atisView is one field's ATIS: built in (its frequency in the Frequencies
+// table), or added on this page.
+type atisView struct {
+	ICAO     string       `json:"icao"`
+	Field    string       `json:"field"`
+	Name     string       `json:"name"` // the default, "Batumi ATIS"
+	Freq     float64      `json:"freq"` // as it will broadcast
+	Added    bool         `json:"added,omitempty"`
+	Override rolecfg.ATIS `json:"override"`
+}
+
+// netView is a tanker beyond the catalog's two: one of the bat's
+// --tanker-net lines (Key = its callsign there) or one added here.
+type netView struct {
+	Key      string            `json:"key,omitempty"`
+	Bat      rolecfg.TankerNet `json:"bat"`
+	Override rolecfg.Override  `json:"override"`
+	Added    bool              `json:"added,omitempty"`
+}
+
+type fieldRef struct {
+	ICAO string `json:"icao"`
+	Name string `json:"name"`
 }
 
 type theatreRolesView struct {
 	Stations []stationView `json:"stations"`
 	Towers   []towerView   `json:"towers"`
+	// HasATIS / HasCommand: the theatre's bats run an ATIS / a Command, so
+	// ATIS stations / tankers can be added.
+	HasATIS    bool       `json:"hasATIS"`
+	HasCommand bool       `json:"hasCommand"`
+	ATIS       []atisView `json:"atis"`
+	Nets       []netView  `json:"nets"`
+	// NoATIS: the theatre's fields with no ATIS, which Add can give one.
+	NoATIS []fieldRef `json:"noATIS"`
+
+	key string
 }
+
+func (v theatreRolesView) theatre() string { return v.key }
 
 // batFlags reads a role's atc.exe flags as its bat line gives them, without
 // the leading "--".
@@ -145,7 +182,7 @@ func theatreRoles(theatre string, cfg rolecfg.File) theatreRolesView {
 		}
 	}
 	th := cfg.Theatres[theatre]
-	view := theatreRolesView{Stations: []stationView{}, Towers: []towerView{}}
+	view := theatreRolesView{Stations: []stationView{}, Towers: []towerView{}, key: theatre}
 	for _, s := range rolecfg.Stations {
 		r, ok := byOwner[s.Owner]
 		if !ok {
@@ -173,9 +210,14 @@ func theatreRoles(theatre string, cfg rolecfg.File) theatreRolesView {
 			continue
 		}
 		seen[icao] = true
+		name := fl[rolecfg.TowerNameFlag]
+		if name == "" || strings.Contains(name, "%") {
+			name = af.Name + " Tower"
+		}
 		view.Towers = append(view.Towers, towerView{
 			ICAO: icao, Name: af.Name, Role: r.Name,
 			Bat: stationValues{
+				Name:   name,
 				Voice:  flagOr(fl, rolecfg.TowerVoiceFlag),
 				Eleven: flagOr(fl, rolecfg.TowerElevenFlag),
 				Speed:  atof(flagOr(fl, rolecfg.TowerSpeedFlag)),
@@ -183,7 +225,283 @@ func theatreRoles(theatre string, cfg rolecfg.File) theatreRolesView {
 			Override: th.Towers[icao],
 		})
 	}
+
+	// ATIS: one process speaks every field's broadcast.
+	if _, ok := byOwner[rolecfg.OwnerATIS]; ok {
+		view.HasATIS = true
+		freqs, _ := airfield.ReadFreqOverrides(freqsPath())
+		for _, af := range airfield.FieldsForMap(theatre) {
+			o := th.ATIS[af.ICAO]
+			v := atisView{ICAO: af.ICAO, Field: af.Name, Name: af.Name + " ATIS", Override: o}
+			switch {
+			case af.ATISFreqMHz > 0:
+				v.Freq = af.ATISFreqMHz
+				if f := freqs.Fields[af.ICAO].ATIS; airfield.ValidFreqMHz(f) {
+					v.Freq = f
+				}
+			case o.Added:
+				v.Freq, v.Added = o.Freq, true
+			default:
+				view.NoATIS = append(view.NoATIS, fieldRef{ICAO: af.ICAO, Name: af.Name})
+				continue
+			}
+			view.ATIS = append(view.ATIS, v)
+		}
+	}
+
+	// Tankers past the catalog's two: the Command bat's --tanker-net lines,
+	// then the ones added here.
+	if r, ok := byOwner[rolecfg.OwnerCommand]; ok {
+		view.HasCommand = true
+		for _, spec := range batRepeated(r, "tanker-net") {
+			t, err := rolecfg.ParseTankerNet(spec)
+			if err != nil {
+				continue
+			}
+			view.Nets = append(view.Nets, netView{Key: t.Name, Bat: t, Override: th.Nets[t.Name]})
+		}
+		for _, t := range th.Tankers {
+			view.Nets = append(view.Nets, netView{Bat: t, Added: true})
+		}
+	}
+	view.Nets = append([]netView{}, view.Nets...)
+	view.ATIS = append([]atisView{}, view.ATIS...)
+	view.NoATIS = append([]fieldRef{}, view.NoATIS...)
 	return view
+}
+
+// batRepeated is every value a repeatable flag has on a role's bat line
+// (batFlags keeps only the last).
+func batRepeated(r Role, name string) []string {
+	var out []string
+	toks := splitCmdLine(r.cmd)
+	for i := 0; i < len(toks); i++ {
+		switch t := toks[i]; {
+		case t == "--"+name && i+1 < len(toks):
+			out = append(out, toks[i+1])
+			i++
+		case strings.HasPrefix(t, "--"+name+"="):
+			out = append(out, strings.TrimPrefix(t, "--"+name+"="))
+		}
+	}
+	return out
+}
+
+// editTheatre changes one theatre's part of roles.json under the lock.
+func editTheatre(theatre string, edit func(view theatreRolesView, th *rolecfg.Theatre) error) error {
+	rolesCfgMu.Lock()
+	defer rolesCfgMu.Unlock()
+	cfg, err := rolecfg.Read(rolesCfgPath())
+	if err != nil {
+		return fmt.Errorf("roles.json: %w", err)
+	}
+	th := cfg.Theatres[theatre]
+	if err := edit(theatreRoles(theatre, cfg), &th); err != nil {
+		return err
+	}
+	if th.Empty() {
+		delete(cfg.Theatres, theatre)
+	} else {
+		cfg.Theatres[theatre] = th
+	}
+	return writeRolesCfg(cfg)
+}
+
+// setATIS stores a field's ATIS changes: a new name or voice, off the air, or
+// (a field with none) a new ATIS on its own frequency.
+func setATIS(theatre, icao string, a rolecfg.ATIS) error {
+	a.Name, a.Voice = strings.TrimSpace(a.Name), strings.TrimSpace(a.Voice)
+	return editTheatre(theatre, func(view theatreRolesView, th *rolecfg.Theatre) error {
+		if !view.HasATIS {
+			return fmt.Errorf("no ATIS runs in %s", theatre)
+		}
+		builtIn, known := false, false
+		for _, v := range view.ATIS {
+			if v.ICAO == icao {
+				known, builtIn = true, !v.Added
+				if a.Name == v.Name {
+					a.Name = ""
+				}
+			}
+		}
+		for _, f := range view.NoATIS {
+			if f.ICAO == icao {
+				known = true
+				if a.Name == f.Name+" ATIS" {
+					a.Name = ""
+				}
+			}
+		}
+		if !known {
+			return fmt.Errorf("%s is not a field in %s", icao, theatre)
+		}
+		if builtIn {
+			a.Added, a.Freq = false, 0
+		} else if !a.Added { // removing an added ATIS forgets it
+			delete(th.ATIS, icao)
+			return nil
+		}
+		if err := rolecfg.ValidateATIS(a); err != nil {
+			return err
+		}
+		if a.Added && !a.Off {
+			if other := freqInUse(view, a.Freq, "atis:"+icao); other != "" {
+				return fmt.Errorf("%.3f is already %s's frequency", a.Freq, other)
+			}
+		}
+		if th.ATIS == nil {
+			th.ATIS = map[string]rolecfg.ATIS{}
+		}
+		if a == (rolecfg.ATIS{}) {
+			delete(th.ATIS, icao)
+		} else {
+			th.ATIS[icao] = a
+		}
+		return nil
+	})
+}
+
+// setNet stores changes to one of the bat's --tanker-net tankers.
+func setNet(theatre, key string, o rolecfg.Override) error {
+	o.Name, o.Eleven = strings.TrimSpace(o.Name), strings.TrimSpace(o.Eleven)
+	return editTheatre(theatre, func(view theatreRolesView, th *rolecfg.Theatre) error {
+		var nv *netView
+		for i := range view.Nets {
+			if !view.Nets[i].Added && view.Nets[i].Key == key {
+				nv = &view.Nets[i]
+			}
+		}
+		if nv == nil {
+			return fmt.Errorf("no tanker %s in %s's start script", key, theatre)
+		}
+		t := nv.Bat
+		if o.Freq > 0 {
+			t.Freq = o.Freq
+		}
+		if o.Name != "" {
+			t.Name = o.Name
+		}
+		if o.Eleven != "" {
+			t.Eleven = o.Eleven
+		}
+		if err := t.Validate(); err != nil {
+			return err
+		}
+		if !o.Off {
+			if other := freqInUse(view, t.Freq, "net:"+key); other != "" {
+				return fmt.Errorf("%.3f is already %s's frequency", t.Freq, other)
+			}
+		}
+		if fmt.Sprintf("%.3f", o.Freq) == fmt.Sprintf("%.3f", nv.Bat.Freq) {
+			o.Freq = 0
+		}
+		if o.Name == nv.Bat.Name {
+			o.Name = ""
+		}
+		if o.Eleven == nv.Bat.Eleven {
+			o.Eleven = ""
+		}
+		o.Voice, o.Speed = "", 0
+		if th.Nets == nil {
+			th.Nets = map[string]rolecfg.Override{}
+		}
+		if o == (rolecfg.Override{}) {
+			delete(th.Nets, key)
+		} else {
+			th.Nets[key] = o
+		}
+		return nil
+	})
+}
+
+// setTanker adds a tanker (prev ""), changes the one called prev, or removes it.
+func setTanker(theatre, prev string, t rolecfg.TankerNet, remove bool) error {
+	t.Name, t.Eleven = strings.TrimSpace(t.Name), strings.TrimSpace(t.Eleven)
+	return editTheatre(theatre, func(view theatreRolesView, th *rolecfg.Theatre) error {
+		if !view.HasCommand {
+			return fmt.Errorf("no Command runs in %s to speak for a tanker", theatre)
+		}
+		at := -1
+		for i, x := range th.Tankers {
+			if prev != "" && x.Name == prev {
+				at = i
+			}
+		}
+		if prev != "" && at < 0 {
+			return fmt.Errorf("no added tanker %s", prev)
+		}
+		if remove {
+			if at < 0 {
+				return fmt.Errorf("which tanker?")
+			}
+			th.Tankers = append(th.Tankers[:at:at], th.Tankers[at+1:]...)
+			return nil
+		}
+		if err := t.Validate(); err != nil {
+			return err
+		}
+		self := "tanker:" + prev
+		for _, s := range view.Stations {
+			if strings.EqualFold(strings.ReplaceAll(s.Bat.Name, " ", "-"), t.Name) || strings.EqualFold(s.Override.Name, t.Name) {
+				return fmt.Errorf("%s is already a station's name", t.Name)
+			}
+		}
+		for _, n := range view.Nets {
+			name := n.Bat.Name
+			if n.Override.Name != "" {
+				name = n.Override.Name
+			}
+			if strings.EqualFold(name, t.Name) && !(n.Added && n.Bat.Name == prev) {
+				return fmt.Errorf("there is already a tanker called %s", t.Name)
+			}
+		}
+		if other := freqInUse(view, t.Freq, self); other != "" {
+			return fmt.Errorf("%.3f is already %s's frequency", t.Freq, other)
+		}
+		if at >= 0 {
+			th.Tankers[at] = t
+		} else {
+			th.Tankers = append(th.Tankers, t)
+		}
+		return nil
+	})
+}
+
+// freqInUse names the station already on freq in this theatre ("" for none),
+// not counting self ("atis:UGTB", "net:Shell-1-1", "tanker:Arco-1-1").
+func freqInUse(view theatreRolesView, freq float64, self string) string {
+	same := func(f float64) bool { return f > 0 && fmt.Sprintf("%.3f", f) == fmt.Sprintf("%.3f", freq) }
+	for _, s := range view.Stations {
+		f := s.Bat.Freq
+		if s.Override.Freq > 0 {
+			f = s.Override.Freq
+		}
+		if !s.Override.Off && same(f) {
+			return s.Label
+		}
+	}
+	for _, n := range view.Nets {
+		f, key := n.Bat.Freq, "net:"+n.Key
+		if n.Added {
+			key = "tanker:" + n.Bat.Name
+		} else if n.Override.Freq > 0 {
+			f = n.Override.Freq
+		}
+		if key != self && !n.Override.Off && same(f) {
+			return n.Bat.Name
+		}
+	}
+	for _, a := range view.ATIS {
+		if "atis:"+a.ICAO != self && !a.Override.Off && same(a.Freq) {
+			return a.Field + " ATIS"
+		}
+	}
+	for _, af := range airfield.FieldsForMap(view.theatre()) {
+		if same(af.TowerFreqMHz) {
+			return af.Name + " Tower"
+		}
+	}
+	return ""
 }
 
 func stationViewFor(s rolecfg.Station, role string, fl map[string]string, ov rolecfg.Override) stationView {
@@ -266,10 +584,10 @@ func setRoleOverride(theatre, key, icao string, o rolecfg.Override) error {
 		if tv == nil {
 			return fmt.Errorf("no %s tower in %s", icao, theatre)
 		}
-		if o.Freq != 0 || o.Name != "" {
+		if o.Freq != 0 {
 			return fmt.Errorf("a tower's frequency is in the Frequencies table")
 		}
-		if err := rolecfg.Validate(nil, o); err != nil {
+		if err := rolecfg.Validate(&rolecfg.TowerStation, o); err != nil {
 			return err
 		}
 		if o = trimOverride(o, tv.Bat); o == (rolecfg.Override{}) {
@@ -280,7 +598,7 @@ func setRoleOverride(theatre, key, icao string, o rolecfg.Override) error {
 	default:
 		return fmt.Errorf("want a station key or a tower icao")
 	}
-	if len(th.Stations) == 0 && len(th.Towers) == 0 {
+	if th.Empty() {
 		delete(cfg.Theatres, theatre)
 	} else {
 		cfg.Theatres[theatre] = th
