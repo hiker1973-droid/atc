@@ -57,3 +57,5 @@ dist/
 # build_installer.bat copies the guides into the installer payload
 cmd/installer/payload/*.pdf
 sides.json
+# Settings > Roles writes the stations added there (cmd/launcher/addedroles.go)
+start_added_*.bat

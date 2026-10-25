@@ -12,6 +12,7 @@ import (
 
 	"github.com/paulmach/orb"
 	"github.com/rs/zerolog/log"
+	flag "github.com/spf13/pflag"
 )
 
 // JTAC: Hitman 1-1 on 61.000 FM, and Hitman 2-1 on 62.000 FM when
@@ -523,13 +524,62 @@ type jtacConfig struct {
 	Voice   voiceProfile
 }
 
-// jtacConfigs: Hitman 1-1 (--jtac-freq), plus Hitman 2-1 when --jtac2-freq is set.
+// jtacConfigs: Hitman 1-1 (--jtac-freq), plus Hitman 2-1 when --jtac2-freq is
+// set, plus each --jtac-net.
 func jtacConfigs() []jtacConfig {
 	cfgs := []jtacConfig{{FreqMHz: flagJTACFreq, Name: flagJTACName, Spoken: flagJTACSpoken, Sector: flagJTACSector, Voice: jtacVoice()}}
 	if flagJTAC2Freq > 0 {
 		cfgs = append(cfgs, jtacConfig{FreqMHz: flagJTAC2Freq, Name: flagJTAC2Name, Spoken: flagJTAC2Spoken, Sector: flagJTAC2Sector, Voice: jtac2Voice()})
 	}
+	for _, spec := range flagJTACNets {
+		c, err := parseJTACNet(spec)
+		if err != nil {
+			log.Error().Err(err).Msg("--jtac-net ignored")
+			continue
+		}
+		cfgs = append(cfgs, c)
+	}
 	return cfgs
+}
+
+// More JTACs (operator 2026-10-25: Settings > Roles "add JTAC"), each a
+// --jtac-net: FREQ/Callsign-N-N/sector/voice, e.g. 63/Hitman-3-1/all/george.
+// Sector "all" works the whole range (Command's board); a sector name gets
+// that sector's targets, like Hitman 1-1 and 2-1.
+var flagJTACNets []string
+
+func registerJTACNetFlags(f *flag.FlagSet) {
+	f.StringArrayVar(&flagJTACNets, "jtac-net", nil,
+		"With --jtac-freq: one more JTAC, FREQ/Callsign-N-N/sector|all/voice, e.g. 63/Hitman-3-1/all/george (repeatable)")
+}
+
+// parseJTACNet reads one --jtac-net.
+func parseJTACNet(spec string) (jtacConfig, error) {
+	p := strings.Split(spec, "/")
+	if len(p) != 4 {
+		return jtacConfig{}, fmt.Errorf("want FREQ/Callsign-N-N/sector|all/voice, got %q", spec)
+	}
+	freq, err := strconv.ParseFloat(p[0], 64)
+	if err != nil || freq <= 0 {
+		return jtacConfig{}, fmt.Errorf("bad frequency in %q", spec)
+	}
+	sector := strings.TrimSpace(p[2])
+	if strings.EqualFold(sector, "all") {
+		sector = ""
+	}
+	id, ok := tankerNetVoices[strings.ToLower(p[3])]
+	if !ok {
+		id = p[3] // a raw ElevenLabs voice ID
+	}
+	words := strings.Fields(strings.ReplaceAll(p[1], "-", " "))
+	for i, w := range words[1:] {
+		if n, err := strconv.Atoi(w); err == nil {
+			words[i+1] = spokenDigits(n)
+		}
+	}
+	return jtacConfig{FreqMHz: freq, Name: p[1], Spoken: strings.Join(words, " "), Sector: sector,
+		Voice: voiceProfile{voice: "ash", speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC2,
+			eleven: elTower(id, strings.Replace(p[1], "-", " ", 1))}}, nil
 }
 
 // startJTACs runs the JTAC nets beside Command, in the same process so they
@@ -543,7 +593,7 @@ func startJTACs(ctx context.Context, apiKey string, store *tacviewPositions) {
 	cfgs := jtacConfigs()
 	for _, c := range cfgs {
 		n := &jtacNet{Spoken: c.Spoken, FreqMHz: c.FreqMHz}
-		if len(cfgs) > 1 {
+		if len(cfgs) > 1 && c.Sector != "" { // no sector: the whole range, on Command's board
 			ts := sectorTargets(board.targets, c.Sector)
 			if len(ts) == 0 {
 				log.Warn().Str("jtac", c.Name).Str("sector", c.Sector).Msg("JTAC sector has no targets on this map - giving it the whole range")

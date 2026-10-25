@@ -411,9 +411,17 @@
     Frequencies table.</td></tr>
   <tr><td>Towers</td><td>A tower you removed.</td><td>The name is what the tower calls itself on the radio, e.g.
     "Senaki Approach". Pilots still call it by the field's name.</td></tr>
-  <tr><td>Other stations</td><td>A station you removed, or a <b>new tanker</b>: callsign (e.g. Arco-1-1), frequency,
-    altitude, speed, basket or boom, and voice.</td><td>Command speaks for every tanker, so tankers need Command running.
-    Removing Command, GCI, Marshal, Deckboss or Paddles stops that controller from starting.</td></tr>
+  <tr><td>Other stations</td><td>A station you removed, or a new one:
+    <ul class="tight">
+      <li><b>Tanker</b>: callsign (e.g. Arco-1-1), frequency, altitude, speed, basket or boom, and voice.</li>
+      <li><b>JTAC</b>: callsign (e.g. Hitman-3-1), frequency, a range sector or the whole range, and voice.</li>
+      <li><b>AWACS</b>: a second GCI with its own callsign (e.g. Magic), frequency and voices.</li>
+      <li><b>Command</b>: a second Command with its own SRS name, frequency and voices.</li>
+    </ul></td>
+    <td>Command speaks for every tanker and JTAC, so they need Command running; an added JTAC also needs Hitman 1-1 on,
+    and Command sends tasked flights to it like the others. A second AWACS or Command runs in its own window, starts and
+    stops with the theatre, and appears on the dashboard; the tankers, JTACs, Overlord and handoffs stay with the
+    theatre's own Command. Removing Command, GCI, Marshal, Deckboss or Paddles stops that controller from starting.</td></tr>
 </table>
 <div class="note"><b>Saving a role:</b> after you change a row, its <b>Save</b> button (always at the right of the table)
   is ringed until you press it. Changes reach a controller when it restarts: press <b>Restart this theatre's roles</b>

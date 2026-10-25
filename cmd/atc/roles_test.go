@@ -217,3 +217,60 @@ func TestApplyATISRoles(t *testing.T) {
 		t.Fatalf("Tbilisi's ATIS frequency %v, advisory %q", tbilisi.ATISFreqMHz, got[len(got)-1].Advisory)
 	}
 }
+
+// TestHelperParseArgs is not a test: TestAddedStationLines runs it in a child
+// process with SKYEYE_PARSE_ARGS, because parsing sets the flag globals.
+func TestHelperParseArgs(t *testing.T) {
+	args := os.Getenv("SKYEYE_PARSE_ARGS")
+	if args == "" {
+		t.Skip("helper")
+	}
+	cmd := newRootCommand()
+	if err := cmd.ParseFlags(strings.Fields(args)); err != nil {
+		fmt.Println(`{"err":` + strconv.Quote(err.Error()) + `}`)
+		return
+	}
+	var jtacs []string
+	for _, c := range jtacConfigs() {
+		jtacs = append(jtacs, fmt.Sprintf("%s/%g/%s", c.Spoken, c.FreqMHz, c.Sector))
+	}
+	b, _ := json.Marshal(map[string]any{"added": flagAddedStation, "log": logNameOr("x"), "watch": flagHandoffWatch,
+		"overlord": flagOverlordName, "callsign": flagGCICallsign, "jtacs": jtacs})
+	fmt.Println(string(b))
+}
+
+// The lines the launcher writes for an added AWACS / Command / JTAC
+// (cmd/launcher addedroles.go) parse, and mean what they should.
+func TestAddedStationLines(t *testing.T) {
+	parse := func(args string) map[string]any {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestHelperParseArgs$")
+		cmd.Env = append(os.Environ(), "SKYEYE_PARSE_ARGS="+args)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			var m map[string]any
+			if json.Unmarshal([]byte(strings.TrimSpace(line)), &m) == nil {
+				if m["err"] != nil {
+					t.Fatalf("%s: %v", args, m["err"])
+				}
+				return m
+			}
+		}
+		t.Fatalf("no output: %s", out)
+		return nil
+	}
+	g := parse("--gci-only --map caucasus --airfield UGSB --gci-picture-interval 5m --srs-addr x:1 --gci-callsign Magic --gci-freq 265 --gci-voice sage --log-name gci-gci2 --added-station gci2")
+	if g["callsign"] != "Magic" || g["added"] != "gci2" || g["log"] != "gci-gci2" {
+		t.Errorf("AWACS %v", g)
+	}
+	c := parse("--command-only --map caucasus --command-freq 283 --command-name Second-Command --handoff-marshal-freq 0 --overlord-name= --handoff-watch=false --log-name command-command2 --added-station command2")
+	if c["watch"] != false || c["overlord"] != "" || c["log"] != "command-command2" {
+		t.Errorf("Command %v", c)
+	}
+	j := parse("--command-only --command-freq 282 --jtac-freq 61 --jtac2-freq 62 --jtac-net 63/Hitman-3-1/all/george --jtac-net 64/Hitman-4-1/Cherkessk/adam")
+	if got := fmt.Sprint(j["jtacs"]); got != "[Hitman one one/61/Kuban Valley Hitman two one/62/Cherkessk Hitman three one/63/ Hitman four one/64/Cherkessk]" {
+		t.Errorf("JTACs %s", got)
+	}
+}

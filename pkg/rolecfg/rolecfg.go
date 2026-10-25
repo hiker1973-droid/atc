@@ -175,11 +175,16 @@ type Theatre struct {
 	Nets map[string]Override `json:"nets,omitempty"`
 	// Tankers added on the Settings page.
 	Tankers []TankerNet `json:"tankers,omitempty"`
+	// JTACs added there, beside Hitman 1-1 and 2-1 (--jtac-net).
+	JTACs []JTACNet `json:"jtacs,omitempty"`
+	// A second AWACS or Command, each its own atc.exe (added.go).
+	Added []AddedStation `json:"added,omitempty"`
 }
 
 // Empty reports whether the theatre holds no changes at all.
 func (t Theatre) Empty() bool {
-	return len(t.Stations) == 0 && len(t.Towers) == 0 && len(t.ATIS) == 0 && len(t.Nets) == 0 && len(t.Tankers) == 0
+	return len(t.Stations) == 0 && len(t.Towers) == 0 && len(t.ATIS) == 0 && len(t.Nets) == 0 &&
+		len(t.Tankers) == 0 && len(t.JTACs) == 0 && len(t.Added) == 0
 }
 
 // File is roles.json.

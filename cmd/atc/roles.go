@@ -66,6 +66,11 @@ func applyRoleConfig(fs *pflag.FlagSet) {
 		return
 	}
 	roleCfg = f
+	if flagAddedStation != "" {
+		// Added on the Settings page: its bat line is written from there whole,
+		// and the theatre's own Command / AWACS changes are not its.
+		return
+	}
 	owner := rolecfg.OwnerOf(given)
 	roleConfigResult.res, roleConfigResult.err = f.Apply(roleTheatre, owner, flagAirfield, pflagFlags{fs})
 
@@ -76,6 +81,11 @@ func applyRoleConfig(fs *pflag.FlagSet) {
 		if strings.Join(nets, "|") != strings.Join(flagTankerNets, "|") {
 			flagTankerNets = nets
 			roleConfigResult.res.Changed = append(roleConfigResult.res.Changed, "tanker-net="+strings.Join(nets, ","))
+		}
+		// JTACs added there, beside Hitman 1-1 and 2-1.
+		if j := f.JTACNets(roleTheatre); len(j) > 0 {
+			flagJTACNets = append(flagJTACNets, j...)
+			roleConfigResult.res.Changed = append(roleConfigResult.res.Changed, "jtac-net="+strings.Join(j, ","))
 		}
 	}
 

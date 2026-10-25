@@ -356,6 +356,8 @@ func newRootCommand() *cobra.Command {
 	registerGCIFlags(f)
 	registerApproachGradeFlags(f)
 	registerTankerFlags(f)
+	registerJTACNetFlags(f)
+	registerAddedFlags(f)
 	registerCoalitionFlags(f)
 	registerSayFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
@@ -438,6 +440,7 @@ func run(cmd *cobra.Command, args []string) error {
 	case logSlug == "":
 		logSlug = "misc"
 	}
+	logSlug = logNameOr(logSlug) // a second AWACS or Command (added.go)
 	logPath := filepath.Join(logDir, fmt.Sprintf("atc-%s.log", logSlug))
 	rotateLogIfNeeded(logPath)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -521,6 +524,9 @@ func run(cmd *cobra.Command, args []string) error {
 	side := ""
 	if flagCommandOnly {
 		side = flagCoalition
+	}
+	if flagAddedStation != "" { // one added beside the theatre's own (added.go)
+		side += "|" + flagAddedStation
 	}
 	key := instanceKey(mode, af.ICAO, flagMap, side, flagSRSAddr)
 	if ok, err := claimInstance(key); err != nil {
@@ -838,8 +844,12 @@ func run(cmd *cobra.Command, args []string) error {
 				noteOwnTX(cmdFreq, text)
 				transmitExternalAudioFile(ctx, mp3, cmdFreq, flagCommandName, srsHost, srsPort, flagExternalAudio)
 			}
-			go runCommandHandoffWatch(ctx, tracker, store, handoffTX)
-			log.Info().Str("tacview", flagTacviewAddr).Msg("Command: tower-handoff watcher armed")
+			if flagHandoffWatch {
+				go runCommandHandoffWatch(ctx, tracker, store, handoffTX)
+				log.Info().Str("tacview", flagTacviewAddr).Msg("Command: tower-handoff watcher armed")
+			} else {
+				log.Info().Msg("Command: tower handoffs left to the theatre's own Command (--handoff-watch=false)")
+			}
 		}
 
 		if flagJTACFreq > 0 {

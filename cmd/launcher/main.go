@@ -297,6 +297,9 @@ func roleFromCmd(bat, title, cmd string) Role {
 	default:
 		r.LogFile = "atc-" + strings.ToLower(r.Airfield) + ".log"
 	}
+	if m := reLogName.FindStringSubmatch(cmd); m != nil { // an added AWACS or Command's own (addedroles.go)
+		r.LogFile = "atc-" + strings.ToLower(m[1]) + ".log"
+	}
 	return r
 }
 
@@ -1258,7 +1261,11 @@ func startRegion(region string) error {
 	refreshKeyEnv() // a key set with setx after this launcher started still reaches the roles
 	cmd := exec.Command("cmd", "/c", "start", "", full)
 	cmd.Dir = rootDir
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	startAddedBat(region) // the stations added on the Settings page (addedroles.go)
+	return nil
 }
 
 // stopRegion kills every running role window belonging to the region. Returns
@@ -1433,7 +1440,7 @@ func regionStartRoles(region string) []string {
 	if err != nil {
 		return nil
 	}
-	text := strings.ToLower(string(body))
+	text := strings.ToLower(string(body)) + " " + strings.ToLower(addedBat(region)) // startRegion runs it too
 	rolesMu.Lock()
 	defer rolesMu.Unlock()
 	var out []string

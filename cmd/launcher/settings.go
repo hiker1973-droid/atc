@@ -389,10 +389,12 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		Provider string           `json:"provider"`
 		Voice    string           `json:"voice"`
 		// op atis / net / tanker (rolesettings.go)
-		ATISSet rolecfg.ATIS      `json:"atisSet"`
-		Tanker  rolecfg.TankerNet `json:"tanker"`
-		Prev    string            `json:"prev"`
-		Remove  bool              `json:"remove"`
+		ATISSet rolecfg.ATIS         `json:"atisSet"`
+		Tanker  rolecfg.TankerNet    `json:"tanker"`
+		JTAC    rolecfg.JTACNet      `json:"jtac"`  // op jtac (addedroles.go)
+		Added   rolecfg.AddedStation `json:"added"` // op added
+		Prev    string               `json:"prev"`
+		Remove  bool                 `json:"remove"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&req); err != nil {
 		http.Error(w, "bad JSON", http.StatusBadRequest)
@@ -442,13 +444,17 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true, "msg": "Saved. Restart the theatre's roles to use it."})
-	case "atis", "net", "tanker":
+	case "atis", "net", "tanker", "jtac", "added":
 		var err error
 		switch req.Op {
 		case "atis":
 			err = setATIS(req.Theatre, strings.ToUpper(strings.TrimSpace(req.ICAO)), req.ATISSet)
 		case "net":
 			err = setNet(req.Theatre, req.Key, req.Override)
+		case "jtac":
+			err = setJTAC(req.Theatre, req.Prev, req.JTAC, req.Remove)
+		case "added":
+			err = setAdded(req.Theatre, req.Prev, req.Added, req.Remove)
 		default:
 			err = setTanker(req.Theatre, req.Prev, req.Tanker, req.Remove)
 		}

@@ -101,6 +101,14 @@ type theatreRolesView struct {
 	Nets       []netView  `json:"nets"`
 	// NoATIS: the theatre's fields with no ATIS, which Add can give one.
 	NoATIS []fieldRef `json:"noATIS"`
+	// JTACs added beside Hitman 1-1 (CanJTAC: Hitman 1-1 is on, so they run),
+	// and a second AWACS or Command (CanGCI / CanCommand: the theatre has its
+	// own to copy). addedroles.go.
+	JTACs      []rolecfg.JTACNet      `json:"jtacs"`
+	Added      []rolecfg.AddedStation `json:"added"`
+	CanJTAC    bool                   `json:"canJTAC"`
+	CanGCI     bool                   `json:"canGCI"`
+	CanCommand bool                   `json:"canCommand"`
 
 	key string
 }
@@ -169,7 +177,7 @@ func theatreRoles(theatre string, cfg rolecfg.File) theatreRolesView {
 	byOwner := map[string]Role{}
 	var towers []Role
 	for _, r := range rs {
-		if r.Region != theatre || r.cmd == "" || off[r.Name] {
+		if r.Region != theatre || r.cmd == "" || off[r.Name] || isAddedRole(r) { // added ones are listed from roles.json
 			continue
 		}
 		owner := rolecfg.OwnerOf(batFlags(r))
@@ -263,7 +271,14 @@ func theatreRoles(theatre string, cfg rolecfg.File) theatreRolesView {
 		for _, t := range th.Tankers {
 			view.Nets = append(view.Nets, netView{Bat: t, Added: true})
 		}
+		// Added JTACs run only beside Hitman 1-1 (startJTACs needs --jtac-freq).
+		fl := batFlags(r)
+		view.CanJTAC = nonzeroFreq(flagOr(fl, "jtac-freq")) && !th.Stations["hitman1"].Off
+		view.CanCommand = true
 	}
+	_, view.CanGCI = byOwner[rolecfg.OwnerGCI]
+	view.JTACs = append([]rolecfg.JTACNet{}, th.JTACs...)
+	view.Added = append([]rolecfg.AddedStation{}, th.Added...)
 	view.Nets = append([]netView{}, view.Nets...)
 	view.ATIS = append([]atisView{}, view.ATIS...)
 	view.NoATIS = append([]fieldRef{}, view.NoATIS...)
@@ -496,6 +511,16 @@ func freqInUse(view theatreRolesView, freq float64, self string) string {
 			return a.Field + " ATIS"
 		}
 	}
+	for _, j := range view.JTACs {
+		if "jtac:"+j.Name != self && same(j.Freq) {
+			return j.Name
+		}
+	}
+	for _, a := range view.Added {
+		if "added:"+a.ID != self && same(a.Freq) {
+			return a.Name
+		}
+	}
 	for _, af := range airfield.FieldsForMap(view.theatre()) {
 		if same(af.TowerFreqMHz) {
 			return af.Name + " Tower"
@@ -633,6 +658,10 @@ func restartTheatre(theatre string) []string {
 				started[r.Bat] = true
 				_ = startRole(n)
 			}
+		}
+		// Stations added in Settings since the theatre started come up too.
+		if !started[addedBat(theatre)] {
+			startAddedBat(theatre)
 		}
 	}()
 	return running

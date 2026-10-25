@@ -337,7 +337,7 @@ function roleRow(kind, id, label, note, s, ov, extra) {
     ? `<input class="speed ${ch(eff.speed, bat.speed)}" inputmode="decimal" data-f="speed" value="${eff.speed || ''}" data-bat="${bat.speed}" oninput="markRole(this)" ${dis}>`
     : '<span class="muted">fixed</span>';
   const elevenCell = s.noEleven ? '<span class="muted">&mdash;</span>'
-    : `<span style="white-space:nowrap"><select data-f="eleven" data-bat="${esc(bat.eleven)}" class="${ch(eff.eleven, bat.eleven)}" onchange="markRole(this)" ${dis}>${elevenOptions(eff.eleven, kind === 'tower', s.elevenNames)}</select><button class="play" title="Play" onclick="playSample('eleven', this)">&#9654;</button></span>`;
+    : `<span style="white-space:nowrap"><select data-f="eleven" data-bat="${esc(bat.eleven)}" class="${ch(eff.eleven, bat.eleven)}" onchange="markRole(this)" ${dis}>${s.voiceDefault && kind === 'added' ? `<option value="" ${eff.eleven ? '' : 'selected'}>${esc(s.voiceDefault)}</option>` : ''}${elevenOptions(eff.eleven, kind === 'tower', s.elevenNames)}</select><button class="play" title="Play" onclick="playSample('eleven', this)">&#9654;</button></span>`;
   const openaiCell = s.noOpenAI ? '<span class="muted">&mdash;</span>'
     : `<span style="white-space:nowrap"><select data-f="voice" data-bat="${esc(bat.voice)}" class="${ch(eff.voice, bat.voice)}" onchange="markRole(this)" ${dis}>${s.voiceDefault ? `<option value="" ${eff.voice ? '' : 'selected'}>${esc(s.voiceDefault)}</option>` : ''}${openaiOptions(eff.voice)}</select><button class="play" title="Play" onclick="playSample('openai', this)">&#9654;</button></span>`;
   const canReset = Object.keys(ov).some(k => k !== 'off' && k !== 'added' && k !== 'freqOwn');
@@ -450,8 +450,26 @@ function renderRoles() {
         : `<span class="muted">${fmtTanker(n.bat)}</span>`;
       rows.push(roleRow(kind, id, 'Tanker', n.added ? 'added here' : 'from the start script', s, ov, extra));
     }
+    for (const j of r.jtacs || []) {
+      roleItems['jtac:' + j.name] = j;
+      const s = { bat: { freq: j.freq, name: j.name, eleven: j.eleven || 'george' }, freqFlag: 'f', nameFlag: 'n',
+        noOpenAI: true, elevenNames: true, removeTitle: 'Take this JTAC off the air and forget it' };
+      const extra = `<input class="name" data-f="sector" value="${esc(j.sector || '')}" placeholder="whole range" title="the range sector it runs; empty = every target" ${data.canEdit ? '' : 'disabled'}>`;
+      rows.push(roleRow('jtac', j.name, 'JTAC', r.canJTAC ? 'added here' : 'added here &middot; <span class="warn">silent while Hitman 1-1 is off</span>', s, {}, extra));
+    }
+    for (const a of r.added || []) {
+      roleItems['added:' + a.id] = a;
+      const label = a.kind === 'gci' ? 'AWACS' : 'Command';
+      const s = { bat: { freq: a.freq, name: a.name, eleven: a.eleven || '', voice: a.voice || '' }, freqFlag: 'f', nameFlag: 'n',
+        voiceDefault: a.kind === 'gci' ? "the AWACS's own voice" : "Command's own voice",
+        removeTitle: `Stop this ${label} and forget it` };
+      rows.push(roleRow('added', a.id, label, 'added here &middot; its own window', s, {}, '<span class="muted">its own</span>'));
+    }
     if (r.hasCommand) add.push({ value: 'newtanker', label: 'New tanker' });
-    out.push(group('Other stations', 'Command and what it runs (Overlord, JTAC, tankers), the AWACS, and the carrier: Deckboss, Marshal and Paddles.',
+    if (r.canJTAC) add.push({ value: 'newjtac', label: 'New JTAC' });
+    if (r.canGCI) add.push({ value: 'newgci', label: 'New AWACS (a second GCI)' });
+    if (r.canCommand) add.push({ value: 'newcommand', label: 'New Command (a second one)' });
+    out.push(group('Other stations', 'Command and what it runs (Overlord, JTACs, tankers), the AWACS, and the carrier: Deckboss, Marshal and Paddles. Add makes a new tanker, JTAC, AWACS or Command.',
       head, rows, addBar('other', add)));
   }
 
@@ -487,6 +505,8 @@ async function postRole(kind, id, o, remove) {
     }
     case 'net': body = { op: 'net', theatre, key: id, override: o }; break;
     case 'tanker': body = { op: 'tanker', theatre, prev: id, tanker: o, remove: !!remove }; break;
+    case 'jtac': body = { op: 'jtac', theatre, prev: id, jtac: o, remove: !!remove }; break;
+    case 'added': body = { op: 'added', theatre, prev: id, added: o, remove: !!remove }; break;
   }
   const res = await post(body);
   await load();
@@ -514,6 +534,15 @@ function saveRole(btn) {
     show(document.getElementById('roleMsg'), { ok: false, msg: 'Frequency must be 30-400 MHz.' }); return;
   }
   if (kind === 'tanker') { postRole(kind, id, tankerFrom(tr, item('tanker', id).bat)); return; }
+  if (kind === 'jtac') {
+    postRole(kind, id, { freq: o.freq || 0, name: o.name || '', eleven: o.eleven || '', sector: tr.querySelector('[data-f="sector"]').value.trim() });
+    return;
+  }
+  if (kind === 'added') {
+    const a = item('added', id);
+    postRole(kind, id, { kind: a.kind, freq: o.freq || 0, name: o.name || '', voice: o.voice || '', eleven: o.eleven || '' });
+    return;
+  }
   const cur = item(kind, id);
   if (kind === 'atis') o.added = !!(cur && cur.added);
   postRole(kind, id, o);
@@ -524,9 +553,9 @@ function removeRole(btn) {
   const label = tr.querySelector('td b').textContent;
   const cur = item(kind, id) || {};
   const what = kind === 'station' && cur.main ? `Remove ${label}? It will not start until you add it back.`
-    : `Take ${label} off the air?` + (kind === 'tanker' || (kind === 'atis' && cur.added) ? ' It is forgotten; Add can make it again.' : ' Add brings it back.');
+    : `Take ${label} off the air?` + (['tanker', 'jtac', 'added'].includes(kind) || (kind === 'atis' && cur.added) ? ' It is forgotten; Add can make it again.' : ' Add brings it back.');
   if (!confirm(what)) return;
-  if (kind === 'tanker') { postRole('tanker', id, {}, true); return; }
+  if (kind === 'tanker' || kind === 'jtac' || kind === 'added') { postRole(kind, id, {}, true); return; }
   // Keep the row's saved changes, so Add brings it back as it was.
   const o = Object.assign({}, (kind === 'atis' ? cur.override : cur.override) || {}, { off: true });
   postRole(kind, id, o);
@@ -545,6 +574,9 @@ function addRole(kind) {
   const [k, id] = v.split(':');
   if (k === 'newatis') return showAddForm(kind, 'atis', id);
   if (k === 'newtanker') return showAddForm(kind, 'tanker', '');
+  if (k === 'newjtac') return showAddForm(kind, 'jtac', '');
+  if (k === 'newgci') return showAddForm(kind, 'gci', '');
+  if (k === 'newcommand') return showAddForm(kind, 'command', '');
   // Bring a removed one back as it was.
   const cur = item(k, id) || {};
   const o = Object.assign({}, cur.override || {});
@@ -564,6 +596,30 @@ function showAddForm(kind, what, icao) {
       <label>OpenAI voice<select data-f="voice" ${dis}>${openaiOptions('alloy')}</select></label>
       <button class="primary" onclick="submitAdd(this, 'atis')" ${dis}>Add ATIS</button>
       <button onclick="this.closest('.addform').remove()">Cancel</button></div>`;
+  } else if (what === 'jtac') {
+    box.innerHTML = `<div class="addform">
+      <b style="align-self:center">New JTAC</b>
+      <label>Callsign<input class="w" data-f="name" placeholder="e.g. Hitman-3-1" ${dis}></label>
+      <label>Frequency (MHz)<input class="n" data-f="freq" inputmode="decimal" placeholder="e.g. 63.000" ${dis}></label>
+      <label>Range sector<input class="w" data-f="sector" placeholder="whole range" ${dis}></label>
+      <label>ElevenLabs voice<select data-f="eleven" ${dis}>${elevenOptions('george', false, true)}</select></label>
+      <button class="primary" onclick="submitAdd(this, 'jtac')" ${dis}>Add JTAC</button>
+      <button onclick="this.closest('.addform').remove()">Cancel</button>
+      <span class="note" style="flex-basis:100%;margin:0">Command sends tasked flights to it like Hitman 1-1 and 2-1. With no sector it works every target.</span></div>`;
+  } else if (what === 'gci' || what === 'command') {
+    const gci = what === 'gci';
+    box.innerHTML = `<div class="addform" data-kind="${what}">
+      <b style="align-self:center">New ${gci ? 'AWACS' : 'Command'}</b>
+      <label>${gci ? 'Callsign (one word)' : 'SRS name (no spaces)'}<input class="w" data-f="name" placeholder="${gci ? 'e.g. Magic' : 'e.g. Second-Command'}" ${dis}></label>
+      <label>Frequency (MHz)<input class="n" data-f="freq" inputmode="decimal" placeholder="${gci ? 'e.g. 265.000' : 'e.g. 283.000'}" ${dis}></label>
+      <label>ElevenLabs voice<select data-f="eleven" ${dis}><option value="">${gci ? "the AWACS's own" : "Command's own"}</option>${elevenOptions('', false)}</select></label>
+      <label>OpenAI voice<select data-f="voice" ${dis}><option value="">${gci ? "the AWACS's own" : "Command's own"}</option>${openaiOptions('')}</select></label>
+      <button class="primary" onclick="submitAdd(this, 'added')" ${dis}>Add ${gci ? 'AWACS' : 'Command'}</button>
+      <button onclick="this.closest('.addform').remove()">Cancel</button>
+      <span class="note" style="flex-basis:100%;margin:0">${gci
+        ? 'A second GCI in its own window, with the same picture as the theatre\'s own on its own frequency and callsign.'
+        : 'A second Command in its own window on its own frequency. The tankers, JTACs, Overlord, Marshal handoffs and tower handoffs stay with the theatre\'s own Command.'}
+        It starts with the theatre.</span></div>`;
   } else {
     box.innerHTML = `<div class="addform">
       <b style="align-self:center">New tanker</b>
@@ -586,6 +642,12 @@ async function submitAdd(btn, what) {
   if (what === 'atis') {
     const icao = form.dataset.icao;
     res = await post({ op: 'atis', theatre, icao, atisSet: { added: true, freq, name: get('name').value.trim(), voice: get('voice').value } });
+  } else if (what === 'jtac') {
+    res = await post({ op: 'jtac', theatre, prev: '', jtac: { name: get('name').value.trim(), freq,
+      sector: get('sector').value.trim(), eleven: get('eleven').value } });
+  } else if (what === 'added') {
+    res = await post({ op: 'added', theatre, prev: '', added: { kind: form.dataset.kind, name: get('name').value.trim(), freq,
+      voice: get('voice').value, eleven: get('eleven').value } });
   } else {
     res = await post({ op: 'tanker', theatre, prev: '', tanker: { name: get('name').value.trim(), freq,
       angels: parseInt(get('angels').value, 10), kias: parseInt(get('kias').value, 10), boom: get('boom').value === '1', eleven: get('eleven').value } });
