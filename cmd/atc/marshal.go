@@ -188,7 +188,16 @@ const (
 	// marshalReadback is a readback or a plain "copy": no reply, and not an
 	// intent miss in the logs.
 	marshalReadback
+	// Case III approach reports (marshal_case3.go): needles, coupled,
+	// command control.
+	marshalNeedles
+	marshalACLSReport
 )
+
+// case3ReadbackRe is the pilot reading back a Case III marshal: "marshal on
+// the 263, 21 DME, angels 6, expected approach time 23" - it holds a DME, so
+// without this it read as a DME report.
+var case3ReadbackRe = regexp.MustCompile(`\b(?:approach time|commence at|push time|marshal on the)\b`)
 
 // establishedRe covers "established angels 2" and Whisper's flown variants
 // "establish angels 2" and "established, angels two", plus "entering stack
@@ -315,6 +324,16 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		// Ahead of the DME report: "three mile initial" (DCS3 2026-10-17
 		// 11:04:31) got "contact 3 DME, continue" instead of paddles.
 		return marshalInitial
+	case case3ReadbackRe.MatchString(lower) && strings.Contains(lower, "angels"):
+		return marshalReadback
+	case needlesRe.MatchString(lower):
+		return marshalNeedles
+	case containsAny(lower, "coupled", "command control"):
+		return marshalACLSReport
+	case containsAny(lower, "commencing"):
+		// Ahead of the state report: the card's call is "commencing, altimeter
+		// 30.16, state 9.5" (DimOn card 26), which read as a state report.
+		return marshalCommencing
 	case unlabelledMarkingMomRe.MatchString(lower) && strings.Contains(lower, "angels"):
 		// "Raider 312 is 221 for 59, Angels 28, state 6.4" (DCS3 2026-10-17
 		// 10:40:44) is a marking mom's without the words; it got "state, copy".
@@ -445,7 +464,8 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		}
 	}()
 
-	go watchCharlie(ctx, stack, comp, transmit, atcCtrl) // marshal_charlie.go
+	go watchCharlie(ctx, stack, comp, transmit, atcCtrl)      // marshal_charlie.go
+	go watchCase3Paddles(ctx, comp, transmit, atcCtrl)       // marshal_case3.go
 
 	// DEBUG: with --marshal-test-tx, transmit "test" every 30s to verify the
 	// outbound SRS path independently of pilot audio. Leave the flag off in
@@ -677,6 +697,9 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	if _, ok := splitMarshalAddress(text); !ok {
 		cs := unaddressedStackCallsign(text)
 		if cs == "" {
+			cs = unaddressedApproachCallsign(text, time.Now()) // marshal_case3.go
+		}
+		if cs == "" {
 			if asked, fuel := pendingStateAnswer(text, time.Now()); asked != "" {
 				// The answer to "say state" with the address garbled (marshal_recent.go).
 				log.Info().Str("callsign", asked).Str("text", text).Msg("Marshal: state answer without the address - accepted")
@@ -765,9 +788,12 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			// keyed off stack position. If BRC unknown (carrier off scope)
 			// fall back to radial 0 — composer still spells it, and the
 			// BRC clause is omitted in the response.
+			// The marshal radial is the final bearing's reciprocal (the
+			// squadron's DimOn card 26: "FB + 180"), not the BRC's - 9 degrees
+			// apart on the angled deck.
 			radial := 0
 			if brc >= 0 {
-				radial = (int(math.Round(brc)) + 180) % 360
+				radial = (int(math.Round(brc)) - marshalFinalBearingOffset + 180 + 360) % 360
 			}
 			eat := time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin) * time.Minute)
 			stack.SetAssignedRadial(callsign, radial)
@@ -885,13 +911,15 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			}
 			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
 			transmit(comp.MarshalCopyCommencingCase3(say, fuelState, finalBearing, brcDeg))
+			trackCase3Approach(callsign, say, time.Now()) // Paddles at three miles (marshal_case3.go)
 		} else {
 			transmit(comp.MarshalCopyCommencing(say, fuelState))
 		}
 		// Internal stack collapse only — pack remaining aircraft down to fill
 		// the vacated slot so the next "marking moms" gets the correct angels.
 		// Per 07.png Marshal does not transmit step-down clearances.
-		for _, sd := range stack.CollapseStack(marshalMinAngels) {
+		lo, _ := marshalAngelsBand(atcCtrl.GetRecoveryCase()) // Case 3 stays at angels 6 and up
+		for _, sd := range stack.CollapseStack(lo) {
 			log.Info().Str("callsign", sd.Callsign).Int("from", sd.OldAngels).Int("to", sd.NewAngels).Msg("Marshal: stack step-down (internal, no TX)")
 		}
 
@@ -909,7 +937,23 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		}
 		stack.SetPhase(callsign, "platform")
 		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
-		transmit(comp.MarshalAtPlatform(say, finalBearing))
+		_, _, _, onRadar := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		transmit(comp.MarshalAtPlatform(say, finalBearing, !onRadar))
+
+	case marshalNeedles:
+		// No ACLS here: a needles report is acknowledged, and with negative
+		// needles the jet flies the ILS ("bullseye"), as the card has it.
+		negative := containsAny(lower, "negative needles", "no needles", "needles negative")
+		log.Info().Str("callsign", callsign).Bool("negative", negative).Str("text", text).Msg("Marshal: Case 3 needles report")
+		transmit(comp.MarshalNeedlesAck(say, negative))
+
+	case marshalACLSReport:
+		what := "coupled"
+		if strings.Contains(lower, "command control") {
+			what = "command control"
+		}
+		log.Info().Str("callsign", callsign).Str("report", what).Msg("Marshal: Case 3 ACLS report")
+		transmit(comp.MarshalApproachAck(say, what))
 
 	case marshalPushCommand:
 		// Pilot's courtesy call on the departure push issued above. Short ack

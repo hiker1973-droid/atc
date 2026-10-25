@@ -265,16 +265,17 @@ change announcement before their next call.
 ### §1 Case 3 Marking mom (`MarshalMarkingMomCase3`)
 
 Issues a holding clearance instead of "Marshal at angels N, see me at ten":
-- **assigned radial** = `(BRC + 180) mod 360`, spelled 3-digit (e.g. `two eight seven`)
+- **assigned radial** = `(final bearing + 180) mod 360` = `(BRC - 9 + 180) mod 360`, spelled 3-digit (e.g. `two eight seven`);
+  the squadron's DimOn card 26 puts the marshal fix on FB + 180 (was BRC + 180 until 2026-10-25)
 - **assigned angels** = lowest unoccupied slot in `[marshalMinAngels, marshalMaxAngels]` (same logic as Case 1)
 - **EAT** = `now + leadMin + (pos-1)*intervalMin`, minute-of-hour spelled 2-digit. Defaults: lead = 10 min, interval = 1 min. Tunable in `cmd/atc/marshal.go`.
 
 State side-effects: `MarshalStack` now stores `AssignedRadial` and `EAT` per aircraft so the §4 established ack can recite the same values.
 
 **Responses:**
-1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, hold on the {RADIAL} radial, {DME} DME, angels {ANGELS}, commence at {EAT}, report established.`
-2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, holding radial {RADIAL}, {DME} DME, angels {ANGELS}, commence at {EAT}, report established.`
-3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your hold is the {RADIAL} radial, {DME} DME, angels {ANGELS}, commence at {EAT}, report established.`
+1. `{CALLSIGN}, Marshal,{RADAR} mother's weather {WX}, Case Three recovery, BRC {BRC}, altimeter {ALTIMETER}, marshal on the {RADIAL}, {DME} DME, angels {ANGELS}, expected approach time is {EAT}, report established.`
+2. `{CALLSIGN}, Marshal,{RADAR} Case Three, mother {WX}, BRC {BRC}, altimeter {ALTIMETER}, marshal on the {RADIAL} radial, {DME} DME, angels {ANGELS}, expected approach time {EAT}, report established.`
+3. `{CALLSIGN}, Marshal,{RADAR} Case Three recovery, {WX}, BRC {BRC}, altimeter {ALTIMETER}, your marshal is the {RADIAL} radial, {DME} DME, angels {ANGELS}, expected approach time is {EAT}, report established.`
 
 Case 3 stacks from **angels 6** up (`marshalCase3MinAngels`, the lowest free slot), and each hold is at
 **{DME} = angels + 15** (angels 6 at 21 DME, angels 7 at 22). Cases 1 and 2 keep angels 2-9 overhead.
@@ -287,9 +288,9 @@ Case 3 stacks from **angels 6** up (`marshalCase3MinAngels`, the lowest free slo
 No Charlie / hold-for-Charlie in Case 3 — the pilot commences on the EAT clock, regardless of deck status.
 
 **Responses:**
-1. `{CALLSIGN}, Marshal, roger established angels {ANGELS} on the {RADIAL} radial, {DME} DME, commence at {EAT}.`
+1. `{CALLSIGN}, Marshal, roger established angels {ANGELS}, marshal on the {RADIAL}, {DME} DME, expected approach time is {EAT}.`
 2. `{CALLSIGN}, Marshal, copy established radial {RADIAL} angels {ANGELS}, your push time is {EAT}.`
-3. `{CALLSIGN}, Marshal, in the hold angels {ANGELS} on the {RADIAL}, expect commence at {EAT}.`
+3. `{CALLSIGN}, Marshal, in the hold angels {ANGELS} on the {RADIAL} radial, {DME} DME, expected approach time is {EAT}.`
 
 If the aircraft was originally checked in under Case 1/2 and the case flipped mid-flight (so `EAT` was never assigned), the handler computes one at established-time using the current stack position.
 
@@ -338,6 +339,25 @@ compatibility if we re-track post-commence aircraft later.
 1. `{CALLSIGN}, Marshal, copy platform, final bearing {FB}.`
 2. `{CALLSIGN}, Marshal, roger platform, final bearing {FB}.`
 3. `{CALLSIGN}, Marshal, platform, final bearing {FB}.`
+
+Off radar (no Tacview fix on the jet) the reply ends `, at three miles contact paddles.` instead.
+
+### Case 3 handoff to Paddles (`MarshalCase3Paddles`, `marshal_case3.go`)
+
+In Case 3 nobody calls a three-mile initial, so Marshal watches each jet that commenced and, as Tacview puts it
+at 3 nm from the carrier, transmits:
+
+1. `{CALLSIGN}, Marshal, three miles, contact paddles, call the ball.`
+2. `{CALLSIGN}, Marshal, three miles, switch paddles, call the ball at three-quarters.`
+
+### Case 3 approach reports (`marshal_case3.go`)
+
+The card's calls after commencing (`#, checking in, XX miles`, `#, platform`, `#, needles up and left`,
+`#, negative needles`, `#, coupled`, `#, command control`) are taken without the Marshal address from a jet
+that commenced in the last 20 minutes. `checking in, XX miles` gets the DME reply; needles get
+`roger needles` (negative: `roger negative needles, fly bullseye`); coupled / command control get `roger ...`.
+The readback `marshal on the NNN, DD DME, angels N, expected approach time MM` gets no reply.
+`commencing, altimeter 30.16, state 9.5` is commencing (it read as a state report before 2026-10-25).
 
 ### Not yet wired (Phase 3)
 - "say needles" / ball call — LSO/CATCC territory, parked for the LSO role.

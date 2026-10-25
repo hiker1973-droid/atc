@@ -162,7 +162,7 @@ MARSHAL = [
     ("Fuel state", "state 5.2", "Copy state; under 2.0 expedite", "state"),
     ("Established", "established angels 2", "Signal Charlie, or hold", "established"),
     ("Commencing", "commencing", "Check in three mile initial", "commencing"),
-    ("Platform (Case III)", "platform", "Final bearing NNN", "platform"),
+    ("Platform (Case III)", "platform", "Final bearing NNN; at three miles Marshal hands you to Paddles", "platform"),
     ("Initial", "initial", "Contact paddles, good luck", "initial"),
     ("Clear (departure)", "clear seven miles", "Push Command 282.0", "clear"),
     ("Radar check", "radar check", "Angels, range, bearing from mother", "radar_check"),
@@ -658,10 +658,13 @@ def build():
                 ("Pilot", "Marshal, Raider 1-1, established angels two."),
                 ("Marshal", "Raider 1-1, Union Marshal, signal Charlie.")])
     d.callout("Case III (night, or ceiling under 1,500 ft / visibility under 3 nm)", [
-        "Marking moms gets a holding fix and a push time: hold on the NNN radial, DD DME, angels N, commence at MM. "
+        "Marking moms gets a holding fix and a push time: marshal on the NNN, DD DME, angels N, expected approach time is MM. "
         "The stack starts at angels 6; the DME is angels + 15 (angels 6 at 21 DME).",
-        "Commencing: descend to platform 5,000, final bearing NNN. Call \"platform\" passing 5,000 ft - your last call.",
-        "Radial = BRC + 180. Final bearing = BRC - 9. All magnetic."])
+        "Commencing: descend to platform 5,000, final bearing NNN. Call \"platform\" passing 5,000 ft. "
+        "At three miles Marshal says \"contact paddles, call the ball\": switch and make the ball call at three-quarters.",
+        "Needles, coupled and command control reports get a \"roger\"; negative needles gets \"fly bullseye\". "
+        "Calls after commencing may start with your modex alone.",
+        "Marshal radial = final bearing + 180. Final bearing = BRC - 9. All magnetic."])
 
     # 9. Paddles
     cau = TH["caucasus"]

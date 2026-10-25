@@ -1330,11 +1330,13 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 	}
 
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, hold on the %s radial, %s DME, angels %s, commence at %s, report established.",
+		// The squadron's DimOn card 26: "marshal on the 287, 23 DME, angels 8,
+		// expected approach time is 36".
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, marshal on the %s, %s DME, angels %s, expected approach time is %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, holding radial %s, %s DME, angels %s, commence at %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, marshal on the %s radial, %s DME, angels %s, expected approach time %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your hold is the %s radial, %s DME, angels %s, commence at %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your marshal is the %s radial, %s DME, angels %s, expected approach time is %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
 	})
 }
@@ -1371,13 +1373,41 @@ func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState floa
 // MarshalAtPlatform — Case 3 platform ack. Pilot is passing 5000 ft descending
 // inside ~20 nm. Marshal acks and re-recites the final bearing; from here
 // the pilot continues to glideslope intercept and ball call (LSO territory).
-func (c *ATCComposer) MarshalAtPlatform(callsign string, finalBearing int) string {
+func (c *ATCComposer) MarshalAtPlatform(callsign string, finalBearing int, sayPaddles bool) string {
 	fb := spellDigits3(finalBearing)
+	// Off radar Marshal cannot call the 3-mile handoff, so it is given here.
+	tail := "."
+	if sayPaddles {
+		tail = ", at three miles contact paddles."
+	}
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", copy platform, final bearing %s.", callsign, fb),
-		fmt.Sprintf("%s, "+c.towerCallsign+", roger platform, final bearing %s.", callsign, fb),
-		fmt.Sprintf("%s, "+c.towerCallsign+", platform, final bearing %s.", callsign, fb),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy platform, final bearing %s%s", callsign, fb, tail),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger platform, final bearing %s%s", callsign, fb, tail),
+		fmt.Sprintf("%s, "+c.towerCallsign+", platform, final bearing %s%s", callsign, fb, tail),
 	})
+}
+
+// MarshalCase3Paddles is the Case 3 handoff at three miles, from the radar
+// picture: in Case 3 nobody calls a three-mile initial.
+func (c *ATCComposer) MarshalCase3Paddles(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, contact paddles, call the ball.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, switch paddles, call the ball at three-quarters.", callsign),
+	})
+}
+
+// MarshalNeedlesAck answers a Case 3 needles report; negative needles flies
+// the ILS ("fly bullseye").
+func (c *ATCComposer) MarshalNeedlesAck(callsign string, negative bool) string {
+	if negative {
+		return fmt.Sprintf("%s, "+c.towerCallsign+", roger negative needles, fly bullseye.", callsign)
+	}
+	return fmt.Sprintf("%s, "+c.towerCallsign+", roger needles.", callsign)
+}
+
+// MarshalApproachAck acknowledges "coupled" / "command control".
+func (c *ATCComposer) MarshalApproachAck(callsign, what string) string {
+	return fmt.Sprintf("%s, "+c.towerCallsign+", roger %s.", callsign, what)
 }
 
 // MarshalEstablishedAckCase3 — Case 3 established-in-hold ack. References EAT
@@ -1389,9 +1419,9 @@ func (c *ATCComposer) MarshalEstablishedAckCase3(callsign string, angels, assign
 	eat := spellDigits(eatMinute)
 	dme := spellDigits(Case3HoldDME(angels))
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", roger established angels %s on the %s radial, %s DME, commence at %s.", callsign, ang, rad, dme, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+", copy established radial %s, %s DME, angels %s, your push time is %s.", callsign, rad, dme, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+", in the hold angels %s on the %s radial, %s DME, expect commence at %s.", callsign, ang, rad, dme, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger established angels %s, marshal on the %s, %s DME, expected approach time is %s.", callsign, ang, rad, dme, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy established, %s radial, %s DME, angels %s, expected approach time %s.", callsign, rad, dme, ang, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", in the hold angels %s on the %s radial, %s DME, expected approach time is %s.", callsign, ang, rad, dme, eat),
 	})
 }
 

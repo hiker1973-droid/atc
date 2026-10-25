@@ -377,14 +377,15 @@ def c06_marshal_case3():
                  "next push.\"", False)]])
     NK.band(c, "CASE III CALLS", "what changes")
     NK.steps(c, [
-        ("MARKING MOMS", "Reply: hold on the NNN radial, DD DME, angels N,"),
-        ("", "commence at MM, report established."),
-        ("ESTABLISHED", "Reply: commence at MM. There is no Charlie."),
+        ("MARKING MOMS", "Reply: marshal on the NNN, DD DME, angels N,"),
+        ("", "expected approach time is MM, report established."),
+        ("ESTABLISHED", "Reply: expected approach time MM. There is no Charlie."),
         ("COMMENCING", "At your MM. Reply: descend to platform 5,000,"),
         ("", "final bearing NNN, confirm BRC NNN,"),
         ("", "report platform."),
         ("PLATFORM", "Passing 5,000 ft. Reply: final bearing NNN."),
-        ("INITIAL", "Do not call it in Case III - platform is your last call."),
+        ("3 MILES", "Marshal: contact paddles, call the ball. Switch and"),
+        ("", "make the ball call at three-quarters. No initial call."),
     ], split=280)
     c.bullets([
         [("Holding radial = BRC + 180.  Final bearing = BRC - 9.", True),
@@ -503,15 +504,15 @@ def c09_marshal_calls_case3():
         ("", "range 30 miles from the Abe, bearing three four zero,"),
         ("", "mother's weather ceiling eight hundred overcast,"),
         ("", "visibility 2, Case Three recovery, BRC 275,"),
-        ("", "altimeter two niner niner two, hold on the zero niner"),
-        ("", "five radial, two one DME, angels six, commence at one five,"),
+        ("", "altimeter two niner niner two, marshal on the zero eight"),
+        ("", "six, two one DME, angels six, expected approach time is one five,"),
         ("", "report established."),
     ], split=150)
     NK.band(c, "HOLD TO PLATFORM", "in order")
     NK.steps(c, [
         ("YOU", "Marshal, Raider 1, established angels six."),
         ("MARSHAL", "Raider 1, Union Marshal, roger established angels six"),
-        ("", "on the zero niner five radial, two one DME, commence at one five."),
+        ("", "marshal on the zero eight six, two one DME, expected approach time is one five."),
         ("YOU", "Marshal, Raider 1, commencing."),
         ("MARSHAL", "Raider 1, Union Marshal, copy commencing, descend to"),
         ("", "platform five thousand, final bearing two six six,"),
