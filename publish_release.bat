@@ -18,6 +18,9 @@ git diff --quiet HEAD -- || (
 call "%~dp0build_installer.bat" || exit /b 1
 gh release create v%PV% dist\Readback-Setup.exe "cmd\launcher\help\Readback ATC Installation Guide.pdf" "cmd\launcher\help\Readback ATC User Manual.pdf" --repo %REPO% --title "Readback ATC %PV%" --notes-file docs\releases\%PV%.md || goto :fail
 git tag -a readback-v%PV% -m "Readback ATC %PV%" && git push origin readback-v%PV%
+:: The summary post in #download (GitHub's own release post is switched off).
+:: The release is out either way; a failed post can be re-run by hand.
+python -I -X utf8 docs\releases\post_discord.py %PV% || echo Discord post failed: run  python -I -X utf8 docs\releases\post_discord.py %PV%
 echo Published Readback ATC %PV%.
 exit /b 0
 :fail
