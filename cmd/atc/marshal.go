@@ -95,7 +95,10 @@ func isDepartureClearCall(lower string) bool {
 //
 // "Junior Marshall" (Day 2026-10-23 17:10:28) and "Senior Marshal" (2026-10-24
 // 08:01:51) are the same "Union", both answering "say state".
-var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|junior|senior|here|hear|in|inner|leader|you|your|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,3}marshall?\b\W*`)
+//
+// "You're in Marshall, Raider 319, platform" (Night 2026-10-25 14:35:56) was
+// dropped: the apostrophe splits off "re", now a filler too.
+var marshalAddressRe = regexp.MustCompile(`(?i)^\W*(?:(?:union|unit|onion|junior|senior|here|hear|in|inner|leader|you|your|re|youre|to|there|did|either|ma|the|hey|uh|um|okay|ok|and|so|need)\W+){0,3}marshall?\b\W*`)
 
 // unaddressedStackCallsign accepts one call that skips the address: a
 // callsign-led "Raider 312, established, angels 2, entry point 3, state 6.5"
@@ -403,6 +406,8 @@ const (
 	// aircraft; lead gives the pilot time to enter the hold.
 	marshalCase3LeadTimeMin = 10
 	marshalCase3IntervalMin = 1
+	// The least notice a new approach time gives a jet already in the hold.
+	marshalCase3MinNotice = 2 * time.Minute
 	// Final bearing = BRC - offset (deck-angle compensation so the lineup
 	// lands on the angled runway, not the bow). Typical Case 3 offset is
 	// 9-10° left of BRC.
@@ -887,6 +892,14 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			if eat.IsZero() {
 				eat = time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(position-1)*marshalCase3IntervalMin) * time.Minute)
 				stack.SetEAT(callsign, eat)
+			} else if now := time.Now(); eat.Before(now.Add(marshalCase3MinNotice)) {
+				// Night 2026-10-25 14:29: Raider 319 reported established six
+				// minutes after his :23 and was told "your push time is two
+				// three" again. A time already gone gets a new one.
+				old := eat
+				eat = now.Add(marshalCase3MinNotice).Truncate(time.Minute).Add(time.Minute)
+				stack.SetEAT(callsign, eat)
+				log.Info().Str("callsign", callsign).Time("was", old).Time("eat", eat).Msg("Marshal: Case 3 approach time had passed - new one")
 			}
 			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Msg("Marshal: Case 3 established in hold")
 			transmit(comp.MarshalEstablishedAckCase3(say, angels, radial, eat.Minute()))

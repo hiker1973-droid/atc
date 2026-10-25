@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vsfg7/atc/pkg/lso"
 )
 
 // The squadron's DimOn Case III cards (26-27): the pilot's readback of the
@@ -57,5 +59,29 @@ func TestCase3ApproachCallsWithoutAddress(t *testing.T) {
 	// A commenced jet stops counting once it is long gone.
 	if got := unaddressedApproachCallsign("319, platform", now.Add(caseThreeApproachFor+time.Minute)); got != "" {
 		t.Errorf("stale approach jet still matched: %q", got)
+	}
+}
+
+// Night 2026-10-25, Raider 319's Case III: two calls that went unanswered.
+func TestWilburCase3Calls(t *testing.T) {
+	// "Union Marshal" heard as "You're in Marshall".
+	if _, ok := splitMarshalAddress("You're in Marshall, Raider 319 platform."); !ok {
+		t.Error(`"You're in Marshall" not taken as the Marshal address`)
+	}
+	// Our own TX still is not.
+	if _, ok := splitMarshalAddress("Raider 319, Union Marshal, copy platform, final bearing zero eight four."); ok {
+		t.Error("Marshal's own TX taken as addressed to it")
+	}
+	// "three-mile initial" on Paddles: a check-in, told to call the ball.
+	f := newLSOFeed(lso.NimitzParams(), func(lso.Call) {})
+	if cs, resp := f.heard("Raider 319, three-mile initial."); cs != "Raider 319" || resp != "Paddles contact, Raider 319, call the ball at three-quarters of a mile." {
+		t.Errorf("three-mile initial: %q %q", cs, resp)
+	}
+	// The ball call is still the ball call, and Paddles' own words are not a check-in.
+	if _, resp := f.heard("319, Hornet ball, 4.4."); resp != netHandled {
+		t.Errorf("ball call: %q", resp)
+	}
+	if cs, _ := f.heard("Paddles contact, Raider 319, call the ball at three-quarters of a mile."); cs != "" && lsoCheckInRe.MatchString("call the ball at three-quarters of a mile") {
+		t.Error("Paddles' own reply reads as a check-in")
 	}
 }

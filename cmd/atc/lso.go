@@ -327,6 +327,18 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		}
 		// Wording: operator 2026-10-22.
 		return cs, lsoAbeamReply(cs)
+	case lsoCheckInRe.MatchString(text):
+		// Case III: the jet comes from Marshal at three miles and checks in
+		// ("Raider 319, three-mile initial", Night 2026-10-25 14:41:33, an
+		// intent miss). Paddles takes it and asks for the ball call.
+		cs := extractCallsignSkippingAddress(text, "paddles", "patels", "paddle")
+		if !lsoCallsignRe.MatchString(cs) {
+			cs = modex
+		}
+		if cs == "" {
+			return "", ""
+		}
+		return cs, lsoCheckInReply(cs)
 	case lsoBreakRe.MatchString(text):
 		// "302 in the break": Paddles copies and asks for the abeam call,
 		// which sets up the ball call.
@@ -346,6 +358,15 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		return cs, cs + ", Paddles, loud and clear."
 	}
 	return "", ""
+}
+
+// lsoCheckInRe is a jet checking in with Paddles on a straight-in: "three-mile
+// initial", "three miles", "checking in".
+var lsoCheckInRe = regexp.MustCompile(`(?i)\b(?:(?:three|3)[\s-]*miles?(?:\s+initial)?|initial|checking in|check in)\b`)
+
+// lsoCheckInReply is Paddles' answer to a Case III check-in.
+func lsoCheckInReply(cs string) string {
+	return "Paddles contact, " + cs + ", call the ball at three-quarters of a mile."
 }
 
 // lsoAbeamReply is Paddles' answer to "302 abeam" (operator 2026-10-22:
