@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report a Problem</title>
+<style>
+  :root { --bg:var(--hx-0d1117, #0d1117); --panel:var(--hx-161b22, #161b22); --panel-2:var(--hx-1c2330, #1c2330); --border:var(--hx-30363d, #30363d); --text:var(--hx-c9d1d9, #c9d1d9); --muted:var(--hx-8b949e, #8b949e);
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1.2rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel); }
+  .patch { width: 34px; height: 34px; border-radius: 50%; flex: none;
+    box-shadow: 0 0 0 1px var(--hx-30363d, #30363d), 0 0 8px rgba(88,166,255,0.22); }
+  header .logo { font-weight: 800; color: var(--blue); }
+  header .title { font-weight: 600; margin-right: 0.5rem; }
+  .spacer { flex: 1; }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; border: 1px solid var(--border);
+    padding: 0.28rem 0.6rem; border-radius: 5px; }
+  header a:hover { color: var(--text); }
+  button, input, select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 0.4rem 0.6rem; font-size: 0.88rem; font-family: inherit; }
+  button { cursor: pointer; white-space: nowrap; }
+  button:hover:not(:disabled) { border-color: var(--blue); }
+  button.primary { background: var(--hx-1f6feb, #1f6feb); border-color: var(--hx-1f6feb, #1f6feb); color: var(--hx-ffffff, #fff); }
+  main { padding: 1rem 1.2rem 3rem; max-width: 820px; margin: 0 auto; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem 1rem; margin-bottom: 1rem; }
+  section h2 { margin: 0 0 0.2rem; font-size: 1rem; }
+  .sub { color: var(--muted); font-size: 0.84rem; margin: 0 0 0.9rem; line-height: 1.45; }
+  label.f { display: block; font-weight: 600; margin: 0.8rem 0 0.3rem; }
+  label.f small { font-weight: 400; color: var(--muted); margin-left: 0.4rem; }
+  textarea, input[type=text], select { width: 100%; }
+  textarea { min-height: 8rem; resize: vertical; line-height: 1.4; }
+  .row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  .row > div { flex: 1 1 14rem; }
+  .actions { display: flex; gap: 0.6rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+  .msg { font-size: 0.84rem; }
+  .ok { color: var(--green); } .bad { color: var(--red); } .muted { color: var(--muted); }
+  ol.steps { margin: 0.3rem 0 0; padding-left: 1.3rem; line-height: 1.6; }
+  ul.tight { margin: 0.3rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.84rem; line-height: 1.5; }
+  #post { font-family: Consolas, Menlo, monospace; font-size: 0.82rem; min-height: 9rem; }
+</style>
+</head>
+<body>
+<header>
+  <img class="patch" src="/logo.png" alt="">
+  <span class="logo">vSFG-7</span><span class="title">Report a problem</span>
+  <span class="spacer"></span>
+  <a href="/">Dashboard</a><a href="/settings">Settings</a><a href="/help/">Help</a>
+</header>
+<main>
+  <section id="form">
+    <h2>Report a problem</h2>
+    <p class="sub">Tell us what went wrong. Readback puts your description together with its logs and
+      settings in one zip file, which you post in <b>#bug-reports</b> on the vSFG-7 Discord.
+      Nothing is sent from here.</p>
+
+    <label class="f" for="what">What happened <small>what you did, what you expected, what you heard instead</small></label>
+    <textarea id="what" maxlength="4000" placeholder="e.g. Called Senaki Tower for taxi at about 19:20, no reply. Called again, still nothing. Batumi answered fine."></textarea>
+
+    <div class="row">
+      <div>
+        <label class="f" for="when">When <small>roughly, this PC's time</small></label>
+        <input type="datetime-local" id="when">
+      </div>
+      <div>
+        <label class="f" for="where">Where</label>
+        <select id="where"><option value="">Not sure / everything</option><option>The dashboard or launcher</option><option>Installing or updating</option></select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="makeBtn" onclick="make()">Make the report</button>
+      <span class="msg" id="makeMsg"></span>
+    </div>
+    <ul class="tight">
+      <li>In the zip: your description, the Readback and Windows versions, the licence state, the roles and
+        their status, the settings, your changes to roles, frequencies and sides, and the last part of every role's log.</li>
+      <li>Your OpenAI, ElevenLabs and Claude keys, the SRS password and the licence key are never included:
+        they are removed from everything, logs too.</li>
+      <li>The logs do include pilot callsigns and what was said on the radio.</li>
+    </ul>
+  </section>
+
+  <section id="done" style="display:none">
+    <h2>Now post it</h2>
+    <ol class="steps">
+      <li>The zip has downloaded: <b id="zipName"></b> (in your Downloads folder).</li>
+      <li>Copy this message: <button onclick="copyPost()">Copy</button> <span class="msg" id="copyMsg"></span></li>
+      <li>In <b>#bug-reports</b> on the vSFG-7 Discord, paste the message and attach the zip.</li>
+    </ol>
+    <label class="f" for="post">The message</label>
+    <textarea id="post" readonly></textarea>
+    <div class="actions">
+      <button onclick="again()">Report another problem</button>
+      <button onclick="download()">Download the zip again</button>
+    </div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const localInput = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+let version = '', zip = null, zipName = '';
+
+async function load() {
+  $('when').value = localInput(new Date());
+  try {
+    const roles = await (await fetch('/api/roles')).json();
+    const names = [...new Set(roles.filter(r => r.status === 'running').map(r => r.name))].sort();
+    $('where').insertAdjacentHTML('beforeend', names.map(n => `<option>${esc(n)}</option>`).join(''));
+  } catch (e) {}
+  try {
+    const u = await (await fetch('/api/app-update')).json();
+    version = u.current || '';
+  } catch (e) {}
+  if (!version) {
+    try { version = 'build ' + (await (await fetch('/api/version')).json()).short; } catch (e) {}
+  }
+}
+
+function whenText() {
+  const v = $('when').value;
+  return v ? new Date(v).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+async function make() {
+  const what = $('what').value.trim();
+  if (!what) { $('makeMsg').innerHTML = '<span class="bad">Say what happened first.</span>'; $('what').focus(); return; }
+  const f = new URLSearchParams({ what, when: whenText(), where: $('where').value });
+  $('makeBtn').disabled = true;
+  $('makeMsg').textContent = 'Gathering the logs…';
+  try {
+    const r = await fetch('/api/bug-report', { method: 'POST', body: f });
+    if (r.status === 403) throw new Error('Only an operator of this server can make a report.');
+    if (!r.ok) throw new Error((await r.text()).trim() || 'HTTP ' + r.status);
+    zip = await r.blob();
+    zipName = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'Readback-problem.zip';
+    download();
+    $('zipName').textContent = zipName;
+    $('post').value = [
+      `**Readback problem**${version ? ' · ' + version : ''}`,
+      `**When:** ${whenText() || '-'}`,
+      `**Where:** ${$('where').value || 'not sure'}`,
+      `**What happened:** ${what}`,
+      `(logs in ${zipName})`,
+    ].join('\n');
+    $('form').style.display = 'none';
+    $('done').style.display = '';
+    $('makeMsg').textContent = '';
+  } catch (e) {
+    $('makeMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+  } finally {
+    $('makeBtn').disabled = false;
+  }
+}
+
+function download() {
+  if (!zip) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zip);
+  a.download = zipName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+async function copyPost() {
+  try { await navigator.clipboard.writeText($('post').value); }
+  catch (e) { $('post').select(); document.execCommand('copy'); }
+  $('copyMsg').innerHTML = '<span class="ok">Copied.</span>';
+}
+
+function again() {
+  zip = null; $('what').value = ''; $('when').value = localInput(new Date()); $('where').value = '';
+  $('done').style.display = 'none'; $('form').style.display = ''; $('copyMsg').textContent = '';
+}
+
+load();
+</script>
+<script src="/branding.js"></script>
+</body>
+</html>

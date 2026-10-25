@@ -34,7 +34,7 @@ import (
 	"github.com/vsfg7/atc/pkg/miz"
 )
 
-//go:embed ui.html fleet.html logs.html pilots.html settings.html setup.html reports.html stats.html logo.png readback.png help
+//go:embed ui.html fleet.html logs.html pilots.html settings.html setup.html reports.html stats.html bugreport.html logo.png readback.png help
 var uiFS embed.FS
 
 var (
@@ -135,6 +135,7 @@ func main() {
 	mux.HandleFunc("/setup", serveSetupUI)
 	mux.HandleFunc("/reports", serveReportsUI)
 	mux.HandleFunc("/stats", serveStatsUI) // greenie board and flight stats over time (stats.go)
+	mux.HandleFunc("/report-problem", serveBugReportPage) // a zip for #bug-reports (bugreport.go)
 	mux.HandleFunc("/reports/aar", handleAARPage)           // one report as its printable page (aar.go)
 	mux.HandleFunc("/reports/preview", handleReportPreview) // a prepared report's pages before Claude writes
 	mux.HandleFunc("/logo.png", serveLogo)
@@ -185,6 +186,7 @@ func main() {
 	mux.HandleFunc("/api/reports/prepare", requireControl(handleReportPrepare))   // summarise, show what would be sent
 	mux.HandleFunc("/api/reports/generate", requireControl(handleReportGenerate)) // send to Claude with the customer's key
 	mux.HandleFunc("/api/stats/upload", requireControl(handleStatsUpload))        // keep a server dcs.log for the Stats tab
+	mux.HandleFunc("/api/bug-report", requireControl(handleBugReport))            // the logs and settings, keys removed, as a zip
 	// GET = the field sides (viewer); POST = set one (control, checked inside).
 	mux.HandleFunc("/api/sides", handleSides)
 	// GET = keys (masked), connection and frequencies (viewer); POST = change one (control, checked inside).
