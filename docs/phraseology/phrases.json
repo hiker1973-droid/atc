@@ -673,6 +673,30 @@
  },
  {
   "role": "marshal",
+  "say": "Marshal, Raider 1-1, needles up and left.",
+  "tower": "",
+  "want": "needles"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, negative needles.",
+  "tower": "",
+  "want": "needles"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, coupled.",
+  "tower": "",
+  "want": "coupled"
+ },
+ {
+  "role": "marshal",
+  "say": "Marshal, Raider 1-1, command control.",
+  "tower": "",
+  "want": "coupled"
+ },
+ {
+  "role": "marshal",
   "say": "Marshal, Raider 1-1, initial.",
   "tower": "",
   "want": "initial"
@@ -706,6 +730,12 @@
   "say": "Paddles, Raider 302, in the break.",
   "tower": "",
   "want": "break"
+ },
+ {
+  "role": "lso",
+  "say": "Paddles, Raider 302, three-mile initial.",
+  "tower": "",
+  "want": "check_in"
  },
  {
   "role": "lso",

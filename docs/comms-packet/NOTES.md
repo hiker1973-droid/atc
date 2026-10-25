@@ -1,11 +1,21 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 22 OCT 2026.  v1.35.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
+**Built 25 OCT 2026.  v1.38.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
 `vSFG-7_SkyEye_ATC_Comms_v1.35.pdf` — cover + 29 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
+
+## v1.38 (25 OCT 2026) — Case III to the squadron card
+
+After Raider 319's Case III on Night (angels 2, no DME, no Paddles handoff), Readback ATC 0.2.6
+(origin/main abe9c29) follows the DimOn cards 26 - 27. Card 6: marshal radial = final bearing + 180,
+stack from angels 6, DME = angels + 15, a missed approach time gets a new one, Paddles at 3 miles.
+Card 9: "marshal on the 086, 21 DME, angels 6, expected approach time is 15" and the 3-mile
+"contact paddles, call the ball". Sortie card: Marshal line covers Case I initial / Case III platform.
+Kneeboard AI ATC FREQS lists Mozdok Tower as "dial" (no preset on the cards yet).
+Phraseology v3.1: Paddles three-mile check-in, Marshal needles / coupled rows (all in TestDocPhrases).
 
 ## v1.37 (22 OCT 2026) — Texaco 2-1 and the Shells
 

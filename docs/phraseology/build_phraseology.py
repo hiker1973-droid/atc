@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.0"
-DATE = "24 OCT 2026"          # change together with VER
+VER = "v3.1"
+DATE = "25 OCT 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -163,6 +163,8 @@ MARSHAL = [
     ("Established", "established angels 2", "Signal Charlie, or hold", "established"),
     ("Commencing", "commencing", "Check in three mile initial", "commencing"),
     ("Platform (Case III)", "platform", "Final bearing NNN; at three miles Marshal hands you to Paddles", "platform"),
+    ("Needles (Case III)", "needles up and left  /  negative needles", "Roger needles  /  roger negative needles, fly bullseye", "needles"),
+    ("Coupled (Case III)", "coupled  /  command control", "Roger coupled  /  roger command control", "coupled"),
     ("Initial", "initial", "Contact paddles, good luck", "initial"),
     ("Clear (departure)", "clear seven miles", "Push Command 282.0", "clear"),
     ("Radar check", "radar check", "Angels, range, bearing from mother", "radar_check"),
@@ -174,6 +176,7 @@ MARSHAL = [
 PADDLES = [
     ("Radio check", "radio check", "Loud and clear", "radio_check"),
     ("In the break", "in the break", "Roger, call abeam", "break"),
+    ("Case III check-in", "three-mile initial", "Paddles contact, call the ball at three-quarters of a mile", "check_in"),
     ("Abeam (the 180)", "abeam", "Paddles contact, Hornet in the groove, at three-quarters of a mile call the ball", "abeam"),
     ("Ball call", "Hornet ball, 5.5  /  three-quarter mile, 5.4", "Roger ball", "ball"),
     ("No ball in sight", "Clara, 5.0", "Paddles contact, keep it coming", "clara"),
@@ -670,7 +673,7 @@ def build():
     cau = TH["caucasus"]
     d.h1("9. Paddles - %s MHz (LSO)" % f3(cau["lso"]))
     d.para("SkyEye's LSO on CVN-72 Abe (Black Sea Day / Night and Foothold Syria). Hornet COMM 2 CH 4. Marshal sends "
-           "you here at the initial (\"contact paddles\"). Paddles talks you down the glideslope from Tacview: you fly, "
+           "you here at the initial, or in Case III at three miles (\"contact paddles\"). Paddles talks you down the glideslope from Tacview: you fly, "
            "he calls. Give your modex or full callsign; the examples use Raider 302.")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("lso", PADDLES, "Paddles", cs="Raider 302"), (0.22, 0.38, 0.40))
