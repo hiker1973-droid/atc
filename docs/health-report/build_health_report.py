@@ -53,6 +53,29 @@ GCI_CALLS = {"brevity.ThreatCall": "gci_threat", "brevity.MergedCall": "gci_merg
 # Start-up banners and other lines that are not problems.
 NOISE = re.compile(r"^═|^Speed warnings and conflict detection DISABLED|^TACVIEW OFFLINE|"
                    r"^\.miz weather read failed|^Tacview connected — no air contacts yet")
+# Link drops and the retries after them: counted in the SRS / Tacview columns,
+# one per outage, so they stay out of the warnings. Command logs one line per
+# radio it runs (8 on Caucasus), which made one drop look like eight.
+LINK = re.compile(r"SRS disconnected|SRS connect failed|SRS TCP failed|Tacview.*disconnected")
+# Drops this close together are one outage.
+OUTAGE_GAP = dt.timedelta(seconds=120)
+
+
+def outages(times):
+    """The start of each outage in a list of drop times."""
+    out = []
+    for t in sorted(times):
+        if not out or t - last > OUTAGE_GAP:
+            out.append(t)
+        last = t
+    return out
+
+
+def when(ts):
+    try:
+        return dt.datetime.fromisoformat(ts)
+    except ValueError:
+        return None
 
 
 def table(head, rows, widths, style=()):
@@ -92,6 +115,7 @@ def analyse(entry, date):
     problems = Counter()
     first, last = {}, {}
     misses = []
+    drops = {"srs": [], "tacview": []}
     for o in read_lines(entry["path"]):
         ts = o.get("time", "")
         if not ts.startswith(date):
@@ -113,10 +137,10 @@ def analyse(entry, date):
         if "intent miss" in msg or msg == "no callsign in call - not answered" or msg == GCI_MISS:
             m["misses"] += 1
             misses.append((ts[11:16], o.get("text", "")))
-        if "SRS disconnected" in msg:
-            m["srs"] += 1
-        if "Tacview" in msg and "disconnected" in msg:
-            m["tacview"] += 1
+        if "SRS disconnected" in msg and when(ts):
+            drops["srs"].append(when(ts))
+        if "Tacview" in msg and "disconnected" in msg and when(ts):
+            drops["tacview"].append(when(ts))
         if "TTS failed" in msg or "TTS synthesis failed" in msg:
             m["tts"] += 1
         if msg.startswith("ElevenLabs TTS failed"):
@@ -127,13 +151,30 @@ def analyse(entry, date):
             m["eacrash"] += 1
         if msg == "ATIS generating new audio":
             m["atis_new"] += 1
-        if lvl in ("warn", "error") and not NOISE.search(msg):
+        if lvl in ("warn", "error") and not NOISE.search(msg) and not LINK.search(msg):
             m[lvl] += 1
             key = (lvl, msg[:90])
             problems[key] += 1
             first.setdefault(key, ts[11:16])
             last[key] = ts[11:16]
-    return m, problems, first, last, misses
+    for k in drops:
+        drops[k] = outages(drops[k])
+        m[k] = len(drops[k])
+    return m, problems, first, last, misses, drops
+
+
+def shared_outages(results):
+    """Split each role's outages into the rig's own (most of its roles dropped
+    together: the SRS server or DCS restarting, usually at a mission load) and
+    the role's alone, which is the only kind worth a look."""
+    live = [r for r in results if r[0]["lines"]]
+    for k in ("srs", "tacview"):
+        users = [r for r in live if r[5][k]] if k == "tacview" else live
+        need = max(2, (len(users) + 1) // 2)
+        for m, _, _, _, _, drops in live:
+            server = sum(1 for t in drops[k]
+                         if sum(1 for o in users if any(abs(t - u) <= OUTAGE_GAP for u in o[5][k])) >= need)
+            m[k + "_server"], m[k + "_own"] = server, len(drops[k]) - server
 
 
 def status(m, kind):
@@ -147,10 +188,10 @@ def status(m, kind):
         why.append("Whisper errors %d" % m["whisper"])
     if m["heard"] >= 4 and m["misses"] / m["heard"] > 0.2:
         why.append("%d%% not understood" % round(100 * m["misses"] / m["heard"]))
-    if m["srs"]:
-        why.append("SRS drops %d" % m["srs"])
-    if m["tacview"] > 2:
-        why.append("Tacview drops %d" % m["tacview"])
+    if m["srs_own"]:
+        why.append("SRS drops %d on its own" % m["srs_own"])
+    if m["tacview_own"] > 2:
+        why.append("Tacview drops %d on its own" % m["tacview_own"])
     if m["eleven"]:
         why.append("ElevenLabs fallbacks %d" % m["eleven"])
     if m["error"]:
@@ -163,6 +204,8 @@ def status(m, kind):
                                                  ("recoveries held", "gci_held")) if m[f]]
     if m["echo_saved"]:
         note.append("%d calls saved by the Whisper retry" % m["echo_saved"])
+    if m["srs_server"]:
+        note.append("rig-wide SRS outages %d" % m["srs_server"])
     if red:
         return "red", ", ".join(why + note)
     if why:
@@ -187,8 +230,12 @@ def build(man, out_path):
     states = Counter()
     for rig in man["rigs"]:
         rows = []
-        for e in rig["logs"]:
-            m, probs, first, last, misses = analyse(e, date)
+        results = [analyse(e, date) for e in rig["logs"]]
+        shared_outages(results)
+        server = outages([t for r in results for t in r[5]["srs"]
+                          if r[0]["srs_server"] and any(abs(t - u) <= OUTAGE_GAP for o in results if o is not r for u in o[5]["srs"])])
+        rig["srs_server"] = server
+        for e, (m, probs, first, last, misses, _) in zip(rig["logs"], results):
             if not m["lines"] and not e.get("running", True):
                 continue  # a field this rig's mission doesn't use
             st, why = status(m, e["kind"])
@@ -238,14 +285,20 @@ def build(man, out_path):
     widths = [0.62, 1.38, 0.42, 0.42, 0.5, 0.47, 0.33, 0.5, 0.52, 0.38, 0.4, 1.66]
     for rig, rows in per_rig:
         info = rig.get("version", "")
-        S.append(KeepTogether([Paragraph("%s &middot; <font size=8 color='#555555'>%s%s</font>" % (
-            rig["rig"], rig["host"], (" &middot; build " + info) if info else ""), h), table(head, rows, widths)]))
+        parts = [Paragraph("%s &middot; <font size=8 color='#555555'>%s%s</font>" % (
+            rig["rig"], rig["host"], (" &middot; build " + info) if info else ""), h), table(head, rows, widths)]
+        if rig.get("srs_server"):
+            parts.append(Paragraph("SRS server outages (every role dropped together, usually a mission load): %s" %
+                                   ", ".join(t.strftime("%H:%M") for t in rig["srs_server"]), note))
+        S.append(KeepTogether(parts))
     S.append(Paragraph(
         "<b>Starts</b>: the role (re)started - Updates and region restarts. <b>Heard / Replied / Missed</b>: pilot "
-        "calls transcribed, transmissions sent, calls not understood. <b>SRS / Tacview</b>: link drops. "
+        "calls transcribed, transmissions sent, calls not understood. <b>SRS / Tacview</b>: link outages, one per "
+        "outage however many radios the role runs. "
         "<b>TTS / STT</b>: speech or Whisper failures. Towers that share a log (Batumi + Deckboss) are one row. "
-        "<b>Red</b>: speech failed, Whisper failing, or over 40% of calls not understood; <b>amber</b>: link "
-        "drops, ElevenLabs fallbacks, errors, or over 20% not understood. ATIS ExternalAudio crashes are resent "
+        "<b>Red</b>: speech failed, Whisper failing, or over 40% of calls not understood; <b>amber</b>: a link "
+        "drop the rest of the rig didn't have (an outage every role shares is the SRS server or DCS restarting, "
+        "listed under the rig and not flagged), ElevenLabs fallbacks, errors, or over 20% not understood. ATIS ExternalAudio crashes are resent "
         "and not flagged.", note))
 
     if allprob:
