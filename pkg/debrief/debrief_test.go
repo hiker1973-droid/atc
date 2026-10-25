@@ -253,6 +253,29 @@ func TestReadRadio(t *testing.T) {
 	}
 }
 
+// The AWACS: Command hears the call on the Darkstar channel and the GCI
+// answers in its own words ("GCI TX"), on that same station.
+func TestReadRadioGCI(t *testing.T) {
+	dir := t.TempDir()
+	lines := `{"level":"info","text":"Darkstar, Raider 302, com check.","channel":"Darkstar","time":"2026-10-24T12:32:39-06:00","message":"Command heard"}
+{"level":"info","call":"brevity.RadioCheckResponse","text":"RAIDER 3 0 2, DARKSTAR, 5 by 5.","freq":264,"time":"2026-10-24T12:32:40-06:00","message":"GCI TX"}
+`
+	os.WriteFile(filepath.Join(dir, "atc-gci.log"), []byte(lines), 0o644)
+	from := time.Date(2026, 10, 24, 18, 0, 0, 0, time.UTC)
+	rad, err := ReadRadio(dir, from, from.Add(2*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rad.Lines) != 2 || rad.Lines[1].Kind != "atc" || rad.Lines[1].Station != "DARKSTAR" ||
+		CallsignKey(rad.Lines[1].Callsign) != CallsignKey(rad.Lines[0].Callsign) {
+		t.Fatalf("lines %+v", rad.Lines)
+	}
+	c := commsScores(&Session{}, rad, nil)
+	if len(c) != 1 || c[0].Answered != 1 {
+		t.Fatalf("scores %+v", c)
+	}
+}
+
 func TestWrite(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("x-api-key") != "k" || r.URL.Path != "/v1/messages" {

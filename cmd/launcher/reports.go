@@ -218,6 +218,7 @@ func handleReports(w http.ResponseWriter, r *http.Request) {
 		"tacview":     localTacview(),
 		"missions":    localMissions(),
 		"saved":       savedReports(),
+		"radioRigs":   radioRigs(),
 	})
 }
 
@@ -324,15 +325,24 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 		from, to = in.Server.Start, in.Server.End
 	}
 	in.From, in.To = from, to
+	radioNote := ""
 	if r.FormValue("radio") == "1" && !from.IsZero() {
-		rad, err := debrief.ReadRadio(filepath.Join(rootDir, "logs"), from, to)
-		if err == nil && len(rad.Lines) > 0 {
-			in.Radio = rad
-			sources = append(sources, fmt.Sprintf("Readback radio logs (%d lines)", len(rad.Lines)))
+		which := r.FormValue("radioFrom")
+		if which == "" {
+			which = "auto"
+		}
+		var src string
+		in.Radio, src, radioNote = readReportRadio(which, from, to)
+		if in.Radio != nil {
+			sources = append(sources, src)
 		}
 	}
 	if len(sources) == 0 {
-		http.Error(w, "nothing to report from: choose a Tacview recording or a dcs.log, or a time window with Readback radio traffic", http.StatusBadRequest)
+		msg := "nothing to report from: choose a Tacview recording or a dcs.log, or a time window with Readback radio traffic"
+		if radioNote != "" {
+			msg += " (" + radioNote + ")"
+		}
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 	var rec *debrief.Recording
@@ -383,6 +393,9 @@ func handleReportPrepare(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Radio != nil {
 		stats["radioLines"] = len(in.Radio.Lines)
+	}
+	if radioNote != "" {
+		stats["radioNote"] = radioNote
 	}
 	if in.Server != nil {
 		stats["serverProblems"] = len(in.Server.Problems)

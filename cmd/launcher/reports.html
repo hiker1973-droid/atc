@@ -124,7 +124,7 @@
     <div class="src">
       <div class="lab">Readback radio<small>what was said on Readback's frequencies</small></div>
       <div>
-        <label><input type="checkbox" id="radio" checked> Include the radio logs on this PC</label><br>
+        <label><input type="checkbox" id="radio" checked> Include the radio logs from</label> <select id="radioFrom" onchange="try { localStorage.setItem('readback.radioFrom', this.value); } catch (e) {}"></select><br>
         <label><input type="checkbox" id="matchTacview" checked onchange="syncWindow()"> Use the Tacview recording's times</label>
         <div class="pick" id="window" style="margin-top:0.4rem">
           <span class="muted">From</span><input type="datetime-local" id="from">
@@ -228,6 +228,12 @@ async function load() {
   $('make').style.display = state.canGenerate ? '' : 'none';
   const opts = (list, keep, first) => '<option value="">- none -</option>' + (list || []).map((s, i) =>
     `<option value="${esc(s.path)}" ${s.path === keep || (keep === null && first && i === 0 && s.label.startsWith('Loaded')) ? 'selected' : ''}>${esc(s.label)} - ${when(s.modified)}, ${kb(s.size)}</option>`).join('');
+  const rigs = state.radioRigs || [{ name: 'local', label: 'This PC' }];
+  let rf = $('radioFrom').value;
+  if (!rf) { try { rf = localStorage.getItem('readback.radioFrom') || ''; } catch (e) {} }
+  const choices = rigs.length > 1 ? [{ name: 'auto', label: 'whichever rig heard the session' }, ...rigs] : rigs;
+  if (!choices.some(c => c.name === rf)) rf = choices[0].name;
+  $('radioFrom').innerHTML = choices.map(c => `<option value="${esc(c.name)}" ${c.name === rf ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
   const firstLoad = !$('mizPath').dataset.loaded;
   $('mizPath').innerHTML = opts(state.missions, firstLoad ? null : $('mizPath').value, true); // preselect the server's loaded mission
   $('mizPath').dataset.loaded = '1';
@@ -269,6 +275,7 @@ async function prepare() {
   src('acmiFile', 'acmi', 'acmiPath');
   if ($('dcsFile').files[0]) f.append('dcslog', $('dcsFile').files[0]); else f.append('dcsPath', $('dcsPath').value);
   f.append('radio', $('radio').checked ? '1' : '0');
+  f.append('radioFrom', $('radioFrom').value);
   f.append('matchTacview', $('matchTacview').checked ? '1' : '0');
   if ($('from').value) f.append('from', new Date($('from').value).toISOString());
   if ($('to').value) f.append('to', new Date($('to').value).toISOString());
@@ -290,6 +297,7 @@ async function prepare() {
     $('pvFacts').innerHTML = (s.facts || []).map(x => `<tr><th>${esc(x.label)}</th><td>${esc(x.value)}</td></tr>`).join('');
     const chips = [];
     (s.sources || []).forEach(x => chips.push(x));
+    if (s.radioNote) chips.push(s.radioNote + ': no Comms page');
     if (s.events === false) chips.push('no server events: kills are not scored without the DCS server\'s own dcs.log');
     if (s.players != null) chips.push(`${s.players} players`);
     if (s.engagements) chips.push(`${s.engagements} engagements`);

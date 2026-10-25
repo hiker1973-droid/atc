@@ -87,6 +87,7 @@ var radioMarkers = [][]byte{
 	// log their own way.
 	[]byte(`"message":"Command heard"`), []byte(`"message":"Command transcribed"`), []byte(`"message":"Command TX"`),
 	[]byte(`"message":"Marshal heard"`), []byte(`"message":"Marshal TX"`),
+	[]byte(`"message":"GCI TX"`), // the AWACS answers a call Command heard on its channel
 }
 
 // channelStation names a Command channel as a station: "Texaco-3-1" -> "TEXACO 3-1".
@@ -159,11 +160,14 @@ func readRadioFile(path, station string, from, to time.Time, rad *Radio) {
 					chanOf[CallsignKey(line.Callsign)] = line
 				}
 			}
-		case l.Message == "Tower TX" || strings.HasPrefix(l.Message, "TX via ") || l.Message == "Command TX" || l.Message == "Marshal TX":
+		case l.Message == "Tower TX" || strings.HasPrefix(l.Message, "TX via ") || l.Message == "Command TX" || l.Message == "Marshal TX" || l.Message == "GCI TX":
 			line.Kind, line.Text = "atc", l.Text
 			line.Callsign = CallsignIn(l.Text)
 			if line.Callsign == "" && CallsignKey(l.Callsign) != "" {
 				line.Callsign = l.Callsign
+			}
+			if l.Message == "GCI TX" && lastPilot >= 0 && l.Time.Sub(rad.Lines[lastPilot].At) < 90*time.Second {
+				line.Station = rad.Lines[lastPilot].Station // "DARKSTAR", the channel the call came in on
 			}
 			if l.Message == "Command TX" { // on the channel the call it answers came in on
 				if c, ok := chanOf[CallsignKey(line.Callsign)]; ok && line.Callsign != "" && l.Time.Sub(c.At) < 90*time.Second {
