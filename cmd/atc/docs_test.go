@@ -285,6 +285,7 @@ var marshalIntents = map[string]marshalIntent{
 	"dme": marshalDME, "state": marshalState, "established": marshalEstablished, "commencing": marshalCommencing,
 	"platform": marshalPlatform, "pushing_command": marshalPushCommand, "initial": marshalInitial,
 	"check_in": marshalCheckIn, "needles": marshalNeedles, "coupled": marshalACLSReport,
+	"push_time": marshalPushTime,
 }
 
 func jtacKind(lower string) string {

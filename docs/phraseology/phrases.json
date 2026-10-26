@@ -667,6 +667,12 @@
  },
  {
   "role": "marshal",
+  "say": "Marshal, Raider 1-1, request push time.",
+  "tower": "",
+  "want": "push_time"
+ },
+ {
+  "role": "marshal",
   "say": "Marshal, Raider 1-1, platform.",
   "tower": "",
   "want": "platform"

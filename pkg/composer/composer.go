@@ -1425,6 +1425,26 @@ func (c *ATCComposer) MarshalEstablishedAckCase3(callsign string, angels, assign
 	})
 }
 
+// MarshalPushTime answers a holding jet asking for its Case 3 approach time.
+func (c *ATCComposer) MarshalPushTime(callsign string, eatMinute int) string {
+	eat := spellDigits(eatMinute)
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", expected approach time is %s.", callsign, eat),
+		fmt.Sprintf("%s, "+c.towerCallsign+", your push time is %s.", callsign, eat),
+	})
+}
+
+// MarshalNoPushTime answers a push time request outside Case 3: no approach
+// times, the jet waits for Charlie.
+func (c *ATCComposer) MarshalNoPushTime(callsign, caseLabel string) string {
+	return fmt.Sprintf("%s, "+c.towerCallsign+", %s, no push time, hold for Charlie.", callsign, caseLabel)
+}
+
+// MarshalSayMarkingMoms asks a jet Marshal has no record of to check in.
+func (c *ATCComposer) MarshalSayMarkingMoms(callsign string) string {
+	return fmt.Sprintf("%s, "+c.towerCallsign+", not in my stack, say marking moms.", callsign)
+}
+
 // Case3HoldDME is a Case 3 holding fix's distance: angels plus 15 nm, so
 // angels 6 holds at 21 DME and each slot up is a mile further out.
 func Case3HoldDME(angels int) int { return angels + 15 }

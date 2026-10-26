@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/vsfg7/atc/pkg/lso"
+	"github.com/vsfg7/atc/pkg/state"
 )
 
 // The squadron's DimOn Case III cards (26-27): the pilot's readback of the
@@ -25,6 +26,12 @@ func TestMarshalCase3Calls(t *testing.T) {
 		{"Marshal, 319, negative needles", marshalNeedles},
 		{"Marshal, 319, coupled", marshalACLSReport},
 		{"Marshal, 319, command control", marshalACLSReport},
+		// Night 2026-10-25 18:05:09, an intent miss.
+		{"Union Marshal Raider 319 requesting push time.", marshalPushTime},
+		{"Marshal, 319, say push time", marshalPushTime},
+		{"Marshal, 319, request approach time", marshalPushTime},
+		// A readback with the time in it is still a readback.
+		{"Marshal, 319, marshalling on 264, 21 DME, angels 6, push time 01", marshalReadback},
 	}
 	for _, tc := range cases {
 		lower := strings.ToLower(tc.text)
@@ -59,6 +66,35 @@ func TestCase3ApproachCallsWithoutAddress(t *testing.T) {
 	// A commenced jet stops counting once it is long gone.
 	if got := unaddressedApproachCallsign("319, platform", now.Add(caseThreeApproachFor+time.Minute)); got != "" {
 		t.Errorf("stale approach jet still matched: %q", got)
+	}
+}
+
+// Approach times are a whole minute, a minute clear of every other jet's.
+func TestCase3EATSpacing(t *testing.T) {
+	stack := state.NewMarshalStack()
+	base := time.Date(2026, 10, 25, 18, 0, 20, 0, time.UTC)
+	stack.Enqueue("Raider 1", 5)
+	stack.SetEAT("Raider 1", base.Add(10*time.Minute).Truncate(time.Minute).Add(time.Minute)) // :11
+	stack.Enqueue("Raider 2", 5)
+	stack.SetEAT("Raider 2", time.Date(2026, 10, 25, 18, 12, 40, 0, time.UTC)) // :12, old seconds
+	stack.Enqueue("Raider 3", 5)
+	if got := case3EAT(stack, "Raider 3", base.Add(10*time.Minute)); got.Minute() != 13 || got.Second() != 0 {
+		t.Errorf("Raider 3 got %s, want 18:13:00", got.Format("15:04:05"))
+	}
+	// Its own time does not block it.
+	if got := case3EAT(stack, "Raider 1", base.Add(10*time.Minute)); got.Minute() != 11 {
+		t.Errorf("Raider 1 got %s, want :11", got.Format("15:04"))
+	}
+	// Late: a new time at least two minutes out, clear of the others.
+	now := time.Date(2026, 10, 25, 18, 9, 30, 0, time.UTC)
+	stack.SetEAT("Raider 3", now.Add(-3*time.Minute))
+	if got := case3HoldEAT(stack, "Raider 3", 3, now.Add(-3*time.Minute), now); got.Minute() != 13 {
+		t.Errorf("late Raider 3 got %s, want :13", got.Format("15:04"))
+	}
+	// On time: kept.
+	keep := time.Date(2026, 10, 25, 18, 20, 0, 0, time.UTC)
+	if got := case3HoldEAT(stack, "Raider 3", 3, keep, now); !got.Equal(keep) {
+		t.Errorf("on-time EAT changed to %s", got.Format("15:04"))
 	}
 }
 

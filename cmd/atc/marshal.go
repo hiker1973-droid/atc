@@ -195,7 +195,14 @@ const (
 	// command control.
 	marshalNeedles
 	marshalACLSReport
+	// marshalPushTime is a holding jet asking for its approach time
+	// ("requesting push time", Night 2026-10-25 18:05:09, an intent miss).
+	marshalPushTime
 )
+
+// pushTimeRequestRe is a request for the Case III approach time. A readback
+// ("push time 01") has no request word, so it stays a readback.
+var pushTimeRequestRe = regexp.MustCompile(`\b(?:request(?:ing)?|say(?: again)?|need|confirm|what(?:'s| is))\s+(?:(?:my|our|the|a|new|an)\s+)?(?:push|approach|commence|commencement|eat)(?:\s+time)?\b|\b(?:push|approach) time\s*\?`)
 
 // case3ReadbackRe is the pilot reading back a Case III marshal: "marshal on
 // the 263, 21 DME, angels 6, expected approach time 23" - it holds a DME, so
@@ -323,6 +330,8 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		// was ever holding and the Charlie watcher had nobody to signal.
 		// "request Charlie" (10:53:18, an intent miss) is the same call.
 		return marshalEstablished
+	case pushTimeRequestRe.MatchString(lower):
+		return marshalPushTime
 	case containsAny(lower, "initial"):
 		// Ahead of the DME report: "three mile initial" (DCS3 2026-10-17
 		// 11:04:31) got "contact 3 DME, continue" instead of paddles.
@@ -469,8 +478,8 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		}
 	}()
 
-	go watchCharlie(ctx, stack, comp, transmit, atcCtrl)      // marshal_charlie.go
-	go watchCase3Paddles(ctx, comp, transmit, atcCtrl)       // marshal_case3.go
+	go watchCharlie(ctx, stack, comp, transmit, atcCtrl) // marshal_charlie.go
+	go watchCase3Paddles(ctx, comp, transmit, atcCtrl)   // marshal_case3.go
 
 	// DEBUG: with --marshal-test-tx, transmit "test" every 30s to verify the
 	// outbound SRS path independently of pilot audio. Leave the flag off in
@@ -800,7 +809,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			if brc >= 0 {
 				radial = (int(math.Round(brc)) - marshalFinalBearingOffset + 180 + 360) % 360
 			}
-			eat := time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin) * time.Minute)
+			eat := case3EAT(stack, callsign, time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin)*time.Minute))
 			stack.SetAssignedRadial(callsign, radial)
 			stack.SetEAT(callsign, eat)
 			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Msg("Marshal: Case 3 aircraft checking in")
@@ -889,18 +898,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			// Case 3: commence on EAT, not Charlie. If EAT was never set
 			// (Case 3 transition mid-recovery, pilot never got a Case 3
 			// marking-mom), compute one now from current stack position.
-			if eat.IsZero() {
-				eat = time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(position-1)*marshalCase3IntervalMin) * time.Minute)
-				stack.SetEAT(callsign, eat)
-			} else if now := time.Now(); eat.Before(now.Add(marshalCase3MinNotice)) {
-				// Night 2026-10-25 14:29: Raider 319 reported established six
-				// minutes after his :23 and was told "your push time is two
-				// three" again. A time already gone gets a new one.
-				old := eat
-				eat = now.Add(marshalCase3MinNotice).Truncate(time.Minute).Add(time.Minute)
-				stack.SetEAT(callsign, eat)
-				log.Info().Str("callsign", callsign).Time("was", old).Time("eat", eat).Msg("Marshal: Case 3 approach time had passed - new one")
-			}
+			eat = case3HoldEAT(stack, callsign, position, eat, time.Now()) // marshal_case3.go
 			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Msg("Marshal: Case 3 established in hold")
 			transmit(comp.MarshalEstablishedAckCase3(say, angels, radial, eat.Minute()))
 		} else if atcCtrl.IsDeckClear() && marshalCharlie.nextCharlie(stack.GetAll(), time.Now()) == callsign {
@@ -993,6 +991,21 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		// button reference was dropped — pilots know to switch.
 		log.Info().Str("callsign", callsign).Msg("Marshal: 3nm initial, handing off to LSO")
 		transmit(comp.MarshalPushButton(say))
+
+	case marshalPushTime:
+		ac, inStack := stack.GetAircraft(callsign)
+		switch {
+		case atcCtrl.GetRecoveryCase() != state.CaseThree:
+			log.Info().Str("callsign", callsign).Msg("Marshal: push time asked outside Case 3")
+			transmit(comp.MarshalNoPushTime(say, composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))))
+		case !inStack:
+			log.Info().Str("callsign", callsign).Msg("Marshal: push time asked by a jet not in the stack")
+			transmit(comp.MarshalSayMarkingMoms(say))
+		default:
+			eat := case3HoldEAT(stack, callsign, ac.Position, ac.EAT, time.Now())
+			log.Info().Str("callsign", callsign).Time("eat", eat).Msg("Marshal: Case 3 push time")
+			transmit(comp.MarshalPushTime(say, eat.Minute()))
+		}
 
 	case marshalReadback:
 		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal: readback, no reply")

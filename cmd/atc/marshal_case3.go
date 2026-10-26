@@ -10,7 +10,47 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vsfg7/atc/pkg/composer"
 	"github.com/vsfg7/atc/pkg/controller"
+	"github.com/vsfg7/atc/pkg/state"
 )
+
+// case3EAT is the first whole minute at or after earliest that no other jet in
+// the stack holds: Case III approach times are marshalCase3IntervalMin apart
+// (operator 2026-10-25: "push time spacing is 1 min for other aircraft").
+func case3EAT(stack *state.MarshalStack, callsign string, earliest time.Time) time.Time {
+	eat := earliest.Truncate(time.Minute)
+	if eat.Before(earliest) {
+		eat = eat.Add(time.Minute)
+	}
+	taken := map[int64]bool{}
+	for _, ac := range stack.GetAll() {
+		if ac.Callsign != callsign && !ac.EAT.IsZero() {
+			taken[ac.EAT.Truncate(time.Minute).Unix()] = true
+		}
+	}
+	for taken[eat.Unix()] {
+		eat = eat.Add(time.Duration(marshalCase3IntervalMin) * time.Minute)
+	}
+	return eat
+}
+
+// case3HoldEAT is a holding jet's approach time: the one it has, or a new one
+// if it never got one or it is too close to give. Night 2026-10-25 14:29:
+// Raider 319 reported established six minutes after his :23 and was told "your
+// push time is two three" again.
+func case3HoldEAT(stack *state.MarshalStack, callsign string, position int, eat, now time.Time) time.Time {
+	switch {
+	case eat.IsZero():
+		eat = case3EAT(stack, callsign, now.Add(time.Duration(marshalCase3LeadTimeMin+(position-1)*marshalCase3IntervalMin)*time.Minute))
+	case eat.Before(now.Add(marshalCase3MinNotice)):
+		old := eat
+		eat = case3EAT(stack, callsign, now.Add(marshalCase3MinNotice))
+		log.Info().Str("callsign", callsign).Time("was", old).Time("eat", eat).Msg("Marshal: Case 3 approach time had passed - new one")
+	default:
+		return eat
+	}
+	stack.SetEAT(callsign, eat)
+	return eat
+}
 
 // Case III approach, after commencing (operator 2026-10-25, against the
 // squadron's DimOn Case III kneeboard, cards 26-27: "do all 4"):
