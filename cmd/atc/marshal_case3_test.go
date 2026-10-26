@@ -32,6 +32,12 @@ func TestMarshalCase3Calls(t *testing.T) {
 		{"Marshal, 319, request approach time", marshalPushTime},
 		// A readback with the time in it is still a readback.
 		{"Marshal, 319, marshalling on 264, 21 DME, angels 6, push time 01", marshalReadback},
+		// The bolter pattern (Master Arms Case III page).
+		{"Marshal, 319, bolter", marshalBolter},
+		{"Marshal, 319, waved off, 1 mile", marshalBolter},
+		{"Marshal, 319, wave off", marshalBolter},
+		{"Marshal, 319, abeam", marshalAbeam},
+		{"Marshal, 319, abeam, state 4.2", marshalAbeam},
 	}
 	for _, tc := range cases {
 		lower := strings.ToLower(tc.text)
@@ -46,7 +52,7 @@ func TestMarshalCase3Calls(t *testing.T) {
 func TestCase3ApproachCallsWithoutAddress(t *testing.T) {
 	now := time.Now()
 	case3Approach.Lock()
-	case3Approach.jets = map[string]case3Jet{}
+	case3Approach.jets = map[string]*case3Jet{}
 	case3Approach.Unlock()
 	trackCase3Approach("Raider 319", "Raider 319", now)
 
@@ -58,6 +64,9 @@ func TestCase3ApproachCallsWithoutAddress(t *testing.T) {
 		"312, platform":              "", // not commenced with us
 		"Raider 319, Union Marshal, three miles, contact paddles, call the ball.": "", // our echo
 		"319, request taxi": "", // not an approach call
+		"319, bolter":       "Raider 319",
+		"319, abeam":        "Raider 319",
+		"Raider 319, Union Marshal, roger abeam, four miles past abeam turn final, final bearing zero eight four.": "",
 	} {
 		if got := unaddressedApproachCallsign(text, now); got != want {
 			t.Errorf("%q: %q, want %q", text, got, want)
@@ -119,5 +128,68 @@ func TestWilburCase3Calls(t *testing.T) {
 	}
 	if lsoCheckInRe.MatchString(lsoCheckInReply("Raider 319")) || lsoCheckInRe.MatchString(lsoAbeamReply("Raider 319")) {
 		t.Error("Paddles' own reply reads as a check-in")
+	}
+}
+
+// One jet round the Case III approach on the Tacview picture: dirty up at 8,
+// Paddles at 3, a bolter climbing away ahead, Paddles again astern at 3, then
+// the trap. Final lies on 264 true from the ship.
+func TestCase3ApproachPattern(t *testing.T) {
+	now := time.Now()
+	j := &case3Jet{say: "Raider 319", since: now, astern: -1}
+	steps := []struct {
+		angels, dist, brg int
+		want              case3Say
+	}{
+		{5, 18, 264, case3SayNothing},
+		{2, 8, 264, case3SayDirty},
+		{1, 6, 264, case3SayNothing},
+		{1, 3, 264, case3SayPaddles},
+		{0, 1, 264, case3SayNothing},
+		{0, 0, 264, case3SayNothing}, // touched down, went round
+		{1, 1, 84, case3SayNothing},
+		{1, 2, 84, case3SayBolter},
+		{1, 4, 84, case3SayNothing},
+		{1, 2, 174, case3SayNothing}, // abeam on the downwind, inside 3 miles
+		{1, 4, 250, case3SayNothing},
+		{1, 3, 262, case3SayPaddles},
+		{0, 1, 264, case3SayNothing},
+		{0, 0, 264, case3SayNothing},
+		{0, 0, 264, case3SayNothing},
+		{0, 0, 264, case3SayNothing},
+		{0, 0, 264, case3Trapped},
+	}
+	for i, s := range steps {
+		if got := j.step(s.angels, s.dist, s.brg, now); got != s.want {
+			t.Fatalf("step %d (%d nm, %03d): %d, want %d", i, s.dist, s.brg, got, s.want)
+		}
+	}
+	if got := case3AsternTrue(93); got != 264 {
+		t.Errorf("astern for BRC 093: %d, want 264", got)
+	}
+}
+
+// A jet that calls its own bolter is told the pattern once; the radar seeing
+// it a moment later says nothing more, and a second call gets an ack.
+func TestCase3BolterCalled(t *testing.T) {
+	now := time.Now()
+	case3Approach.Lock()
+	case3Approach.jets = map[string]*case3Jet{}
+	case3Approach.Unlock()
+	trackCase3Approach("Raider 319", "Raider 319", now)
+	if case3CalledPattern("Raider 319", "Raider 319", 264, now) {
+		t.Error("first bolter call already told")
+	}
+	if !case3CalledPattern("Raider 319", "Raider 319", 264, now.Add(10*time.Second)) {
+		t.Error("second bolter call not seen as told")
+	}
+	case3Approach.Lock()
+	j := case3Approach.jets["Raider 319"]
+	case3Approach.Unlock()
+	if j.phase != case3Pattern || j.astern != 264 {
+		t.Errorf("phase %d astern %d", j.phase, j.astern)
+	}
+	if got := j.step(1, 2, 84, now); got != case3SayNothing {
+		t.Errorf("radar repeated the bolter pattern: %d", got)
 	}
 }

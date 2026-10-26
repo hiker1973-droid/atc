@@ -198,6 +198,10 @@ const (
 	// marshalPushTime is a holding jet asking for its approach time
 	// ("requesting push time", Night 2026-10-25 18:05:09, an intent miss).
 	marshalPushTime
+	// marshalBolter and marshalAbeam: the Case III bolter pattern
+	// (marshal_case3.go).
+	marshalBolter
+	marshalAbeam
 )
 
 // pushTimeRequestRe is a request for the Case III approach time. A readback
@@ -332,6 +336,10 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		return marshalEstablished
 	case pushTimeRequestRe.MatchString(lower):
 		return marshalPushTime
+	case bolterCallRe.MatchString(lower):
+		return marshalBolter
+	case strings.Contains(lower, "abeam"):
+		return marshalAbeam
 	case containsAny(lower, "initial"):
 		// Ahead of the DME report: "three mile initial" (DCS3 2026-10-17
 		// 11:04:31) got "contact 3 DME, continue" instead of paddles.
@@ -920,8 +928,9 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 				brcDeg = int(math.Round(brc)) % 360
 				finalBearing = (brcDeg - marshalFinalBearingOffset + 360) % 360
 			}
-			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Msg("Marshal: Case 3 commencing, descend to platform")
-			transmit(comp.MarshalCopyCommencingCase3(say, fuelState, finalBearing, brcDeg))
+			_, _, _, onRadar := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Bool("radarContact", onRadar).Msg("Marshal: Case 3 commencing, descend to platform")
+			transmit(comp.MarshalCopyCommencingCase3(say, fuelState, finalBearing, brcDeg, onRadar))
 			trackCase3Approach(callsign, say, time.Now()) // Paddles at three miles (marshal_case3.go)
 		} else {
 			transmit(comp.MarshalCopyCommencing(say, fuelState))
@@ -991,6 +1000,40 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		// button reference was dropped — pilots know to switch.
 		log.Info().Str("callsign", callsign).Msg("Marshal: 3nm initial, handing off to LSO")
 		transmit(comp.MarshalPushButton(say))
+
+	case marshalBolter:
+		if atcCtrl.GetRecoveryCase() != state.CaseThree {
+			log.Info().Str("callsign", callsign).Msg("Marshal: bolter call outside Case 3 - to Paddles")
+			transmit(comp.MarshalPushButton(say))
+			break
+		}
+		what := "bolter"
+		if !strings.Contains(lower, "bolter") {
+			what = "wave off"
+		}
+		told := case3CalledPattern(callsign, say, case3AsternTrue(atcCtrl.GetCarrierBRCFor(callsign)), time.Now())
+		log.Info().Str("callsign", callsign).Str("call", what).Bool("alreadyTold", told).Msg("Marshal: Case 3 bolter pattern")
+		if told {
+			transmit(comp.MarshalApproachAck(say, what))
+		} else {
+			transmit(comp.MarshalCase3Bolter(say, what))
+		}
+
+	case marshalAbeam:
+		if atcCtrl.GetRecoveryCase() != state.CaseThree {
+			log.Info().Str("callsign", callsign).Msg("Marshal: abeam call outside Case 3 - to Paddles")
+			transmit(comp.MarshalPushButton(say))
+			break
+		}
+		brcTrue := atcCtrl.GetCarrierBRCFor(callsign)
+		brc := atcCtrl.ToMagnetic(brcTrue)
+		finalBearing := 0
+		if brc >= 0 {
+			finalBearing = (int(math.Round(brc)) - marshalFinalBearingOffset + 360) % 360
+		}
+		case3CalledPattern(callsign, say, case3AsternTrue(brcTrue), time.Now())
+		log.Info().Str("callsign", callsign).Int("finalBearing", finalBearing).Msg("Marshal: Case 3 abeam in the bolter pattern")
+		transmit(comp.MarshalCase3Abeam(say, finalBearing))
 
 	case marshalPushTime:
 		ac, inStack := stack.GetAircraft(callsign)

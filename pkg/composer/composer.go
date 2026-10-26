@@ -1348,25 +1348,31 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 // tail — in Case 3 the pilot reports platform next, then continues to the
 // LSO ball call.
 // finalBearing and brcDeg are 0-359 (spelled 3-digit). brcDeg < 0 → the
-// BRC-confirm clause is omitted. fuelState > 0 → state included.
-func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState float64, finalBearing, brcDeg int) string {
+// BRC-confirm clause is omitted. fuelState > 0 → state included. radar → the
+// ack opens "radar contact", as a carrier's approach control does (Master Arms
+// Case III page, operator 2026-10-26).
+func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState float64, finalBearing, brcDeg int, radar bool) string {
 	fb := spellDigits3(finalBearing)
 	brcStr := ""
 	if brcDeg >= 0 {
 		brcStr = fmt.Sprintf(", confirm BRC %s", spellDigits3(brcDeg))
 	}
+	rc := ""
+	if radar {
+		rc = " radar contact,"
+	}
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, state %s, descend to platform five thousand, final bearing %s%s, report platform.", callsign, s, fb, brcStr),
-			fmt.Sprintf("%s, "+c.towerCallsign+", commencing, state %s, platform five thousand, final bearing %s%s, report platform.", callsign, s, fb, brcStr),
-			fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, state %s, descend platform, final bearing %s%s, call platform.", callsign, s, fb, brcStr),
+			fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing,%s state %s, descend to platform five thousand, final bearing %s%s, report platform.", callsign, rc, s, fb, brcStr),
+			fmt.Sprintf("%s, "+c.towerCallsign+", commencing,%s state %s, platform five thousand, final bearing %s%s, report platform.", callsign, rc, s, fb, brcStr),
+			fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing,%s state %s, descend platform, final bearing %s%s, call platform.", callsign, rc, s, fb, brcStr),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing, descend to platform five thousand, final bearing %s%s, report platform.", callsign, fb, brcStr),
-		fmt.Sprintf("%s, "+c.towerCallsign+", commencing, platform five thousand, final bearing %s%s, report platform.", callsign, fb, brcStr),
-		fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing, descend platform, final bearing %s%s, call platform.", callsign, fb, brcStr),
+		fmt.Sprintf("%s, "+c.towerCallsign+", copy commencing,%s descend to platform five thousand, final bearing %s%s, report platform.", callsign, rc, fb, brcStr),
+		fmt.Sprintf("%s, "+c.towerCallsign+", commencing,%s platform five thousand, final bearing %s%s, report platform.", callsign, rc, fb, brcStr),
+		fmt.Sprintf("%s, "+c.towerCallsign+", roger commencing,%s descend platform, final bearing %s%s, call platform.", callsign, rc, fb, brcStr),
 	})
 }
 
@@ -1394,6 +1400,30 @@ func (c *ATCComposer) MarshalCase3Paddles(callsign string) string {
 		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, contact paddles, call the ball.", callsign),
 		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, switch paddles, call the ball at three-quarters.", callsign),
 	})
+}
+
+// MarshalCase3DirtyUp is the Case 3 call at eight miles on final.
+func (c *ATCComposer) MarshalCase3DirtyUp(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", eight miles, dirty up.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", eight miles, dirty up, continue.", callsign),
+	})
+}
+
+// MarshalCase3Bolter is the Case 3 bolter pattern: straight ahead, climb to
+// 1200, downwind at four miles, report abeam. what is "bolter" or "wave off"
+// as the pilot called it, "" when seen on the radar.
+func (c *ATCComposer) MarshalCase3Bolter(callsign, what string) string {
+	if what != "" {
+		what = "roger " + what + ", "
+	}
+	return fmt.Sprintf("%s, "+c.towerCallsign+", %sclimb to one thousand two hundred, at four miles turn downwind, report abeam.", callsign, what)
+}
+
+// MarshalCase3Abeam answers "abeam" in the bolter pattern: back to final at
+// four miles past abeam, and Paddles again at three miles.
+func (c *ATCComposer) MarshalCase3Abeam(callsign string, finalBearing int) string {
+	return fmt.Sprintf("%s, "+c.towerCallsign+", roger abeam, four miles past abeam turn final, final bearing %s.", callsign, spellDigits3(finalBearing))
 }
 
 // MarshalNeedlesAck answers a Case 3 needles report; negative needles flies
