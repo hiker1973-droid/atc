@@ -7,7 +7,12 @@ cd /d %~dp0
 for /f %%v in ('git describe --tags --always --dirty') do set VER=%%v
 set /p PV=<product_version.txt
 echo Building Readback-Setup %PV% (%VER%)
+:: The #bug-reports webhook for Help > Report a problem's Send button, from a
+:: file outside the repo (never committed). Without it the page only saves the zip.
+set BW=
+if exist "%USERPROFILE%\readback-bugreport-webhook.txt" set /p BW=<"%USERPROFILE%\readback-bugreport-webhook.txt"
 set LDF=-X main.productVersion=%PV%
+if defined BW (set "LDF=%LDF% -X main.bugWebhook=%BW%" & echo Report a problem: Send button included) else echo Report a problem: no webhook file, Save only
 go build -o cmd\installer\payload\atc.exe .\cmd\atc || goto :fail
 go build -ldflags "%LDF%" -o cmd\installer\payload\launcher.exe .\cmd\launcher || goto :fail
 copy /y "cmd\launcher\help\Readback ATC *.pdf" cmd\installer\payload\ >nul || goto :fail

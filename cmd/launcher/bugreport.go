@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/windows/registry"
@@ -30,6 +33,24 @@ import (
 
 // bugLogTail is how much of the end of each role log goes in.
 const bugLogTail = 1 << 20
+
+// bugWebhook is the #bug-reports webhook (operator 2026-10-26). It is set at
+// build time by build_installer.bat from a file outside the repo; empty, the
+// page only saves the zip for the person to post.
+var bugWebhook string
+
+const (
+	// bugSendLimit keeps the zip under Discord's 10 MB upload limit.
+	bugSendLimit = 9 << 20
+	// bugSendGap is the least time between two sends from one install.
+	bugSendGap = 2 * time.Minute
+)
+
+var (
+	bugSendMu   sync.Mutex
+	bugLastSend time.Time
+	bugClient   = &http.Client{Timeout: 90 * time.Second}
+)
 
 // Things that look like keys even where we don't know the value.
 var bugSecretRE = regexp.MustCompile(`\b(sk-[A-Za-z0-9_-]{16,}|sk_[A-Za-z0-9]{16,}|SKYEYE1-[A-Za-z0-9._-]{8,})`)
@@ -54,6 +75,19 @@ func handleBugReport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	what, when, where := bugForm(r)
+	now := time.Now()
+	var buf bytes.Buffer
+	if err := writeBugReport(&buf, what, when, where, now, bugLogTail); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Readback-problem-%s.zip"`, now.Format("2006-01-02-1504")))
+	w.Write(buf.Bytes())
+}
+
+func bugForm(r *http.Request) (what, when, where string) {
 	clip := func(s string, n int) string {
 		s = strings.TrimSpace(s)
 		if len(s) > n {
@@ -61,16 +95,125 @@ func handleBugReport(w http.ResponseWriter, r *http.Request) {
 		}
 		return s
 	}
-	what, when, where := clip(r.FormValue("what"), 4000), clip(r.FormValue("when"), 200), clip(r.FormValue("where"), 200)
-	now := time.Now()
-	var buf bytes.Buffer
-	if err := writeBugReport(&buf, what, when, where, now); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	return clip(r.FormValue("what"), 4000), clip(r.FormValue("when"), 200), clip(r.FormValue("where"), 200)
+}
+
+// handleBugReportCanSend: GET -> whether this copy has the webhook, so the
+// page shows the Send button.
+func handleBugReportCanSend(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"canSend": bugWebhook != ""})
+}
+
+// handleBugReportSend: POST (control) what / when / where -> the zip posted to
+// #bug-reports through the webhook, with a short message. Logs are cut shorter
+// until the zip fits Discord.
+func handleBugReportSend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST", http.StatusMethodNotAllowed)
 		return
 	}
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Readback-problem-%s.zip"`, now.Format("2006-01-02-1504")))
-	w.Write(buf.Bytes())
+	if bugWebhook == "" {
+		http.Error(w, "This copy cannot send reports. Save the zip and post it in #bug-reports instead.", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	what, when, where := bugForm(r)
+	if what == "" {
+		http.Error(w, "Say what happened first.", http.StatusBadRequest)
+		return
+	}
+	now := time.Now()
+	bugSendMu.Lock()
+	if wait := bugSendGap - now.Sub(bugLastSend); !bugLastSend.IsZero() && wait > 0 {
+		bugSendMu.Unlock()
+		http.Error(w, fmt.Sprintf("A report was sent a moment ago. Try again in %d seconds.", int(wait.Seconds())+1), http.StatusTooManyRequests)
+		return
+	}
+	bugLastSend = now
+	bugSendMu.Unlock()
+	fail := func(code int, msg string) {
+		bugSendMu.Lock()
+		bugLastSend = time.Time{}
+		bugSendMu.Unlock()
+		http.Error(w, msg, code)
+	}
+
+	var buf bytes.Buffer
+	for _, tail := range []int{bugLogTail, 256 << 10, 64 << 10} {
+		buf.Reset()
+		if err := writeBugReport(&buf, what, when, where, now, tail); err != nil {
+			fail(http.StatusInternalServerError, err.Error())
+			return
+		}
+		if buf.Len() <= bugSendLimit {
+			break
+		}
+	}
+	if buf.Len() > bugSendLimit {
+		fail(http.StatusRequestEntityTooLarge, "The report is too big to send. Save the zip and post it in #bug-reports instead.")
+		return
+	}
+	name := fmt.Sprintf("Readback-problem-%s.zip", now.Format("2006-01-02-1504"))
+	if err := postBugReport(bugWebhook, bugMessage(what, when, where), name, buf.Bytes()); err != nil {
+		fail(http.StatusBadGateway, "Could not send: "+err.Error()+". Save the zip and post it in #bug-reports instead.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ok": true, "name": name})
+}
+
+// bugMessage is the post above the zip: who, which version, and what they said,
+// keys removed, inside Discord's 2,000 characters.
+func bugMessage(what, when, where string) string {
+	head := fmt.Sprintf("**Readback problem** · %s · %s\n**When:** %s\n**Where:** %s\n**What happened:** ",
+		squadronName(readBranding()), orDash(productVersion), orDash(when), orDash(where))
+	what = string(scrub([]byte(what), bugSecrets()))
+	if room := 1990 - len(head); len(what) > room {
+		what = strings.ToValidUTF8(what[:room], "") + "…"
+	}
+	return head + what
+}
+
+// postBugReport uploads the zip with its message. Nobody is pinged, whatever
+// the text says.
+func postBugReport(webhook, msg, name string, zipData []byte) error {
+	payload, _ := json.Marshal(map[string]any{
+		"username":         "Readback bug report",
+		"content":          msg,
+		"allowed_mentions": map[string]any{"parse": []string{}},
+	})
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	pj, _ := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {`form-data; name="payload_json"`},
+		"Content-Type":        {"application/json"},
+	})
+	pj.Write(payload)
+	fw, _ := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {fmt.Sprintf(`form-data; name="files[0]"; filename=%q`, name)},
+		"Content-Type":        {"application/zip"},
+	})
+	fw.Write(zipData)
+	mw.Close()
+	req, err := http.NewRequest(http.MethodPost, webhook, &body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := bugClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("no connection to Discord")
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("Discord answered HTTP %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // bugSecrets are the key values on this PC, longest first.
@@ -98,7 +241,7 @@ func scrub(b []byte, secrets []string) []byte {
 	return bugSecretRE.ReplaceAll(b, []byte("[key removed]"))
 }
 
-func writeBugReport(w io.Writer, what, when, where string, now time.Time) error {
+func writeBugReport(w io.Writer, what, when, where string, now time.Time, logTail int) error {
 	secrets := bugSecrets()
 	z := zip.NewWriter(w)
 	add := func(name string, b []byte) error {
@@ -184,9 +327,9 @@ func writeBugReport(w io.Writer, what, when, where string, now time.Time) error 
 	// The end of each log: the live file, topped up from the last rotated copy.
 	logs, _ := filepath.Glob(filepath.Join(rootDir, "logs", "*.log"))
 	for _, p := range logs {
-		b := tailFile(p, bugLogTail)
-		if len(b) < bugLogTail {
-			b = append(tailFile(p+".1", bugLogTail-len(b)), b...)
+		b := tailFile(p, logTail)
+		if len(b) < logTail {
+			b = append(tailFile(p+".1", logTail-len(b)), b...)
 		}
 		if len(b) == 0 {
 			continue

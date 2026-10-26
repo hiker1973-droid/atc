@@ -187,6 +187,8 @@ func main() {
 	mux.HandleFunc("/api/reports/generate", requireControl(handleReportGenerate)) // send to Claude with the customer's key
 	mux.HandleFunc("/api/stats/upload", requireControl(handleStatsUpload))        // keep a server dcs.log for the Stats tab
 	mux.HandleFunc("/api/bug-report", requireControl(handleBugReport))            // the logs and settings, keys removed, as a zip
+	mux.HandleFunc("/api/bug-report/send", requireControl(handleBugReportSend))   // the same zip, posted to #bug-reports
+	mux.HandleFunc("/api/bug-report/can-send", handleBugReportCanSend)            // GET: is the Send button there
 	// GET = the field sides (viewer); POST = set one (control, checked inside).
 	mux.HandleFunc("/api/sides", handleSides)
 	// GET = keys (masked), connection and frequencies (viewer); POST = change one (control, checked inside).

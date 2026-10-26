@@ -54,8 +54,8 @@
 <main>
   <section id="form">
     <h2>Report a problem</h2>
-    <p class="sub">Tell us what went wrong. Readback puts your description together with its logs and
-      settings in one zip file, which you post in <b>#bug-reports</b> on the vSFG-7 Discord.
+    <p class="sub" id="intro">Tell us what went wrong. Readback puts your description together with its logs and
+      settings in one zip file, which you post in <b>#bug-reports</b> on our Discord.
       Nothing is sent from here.</p>
 
     <label class="f" for="what">What happened <small>what you did, what you expected, what you heard instead</small></label>
@@ -73,6 +73,7 @@
     </div>
 
     <div class="actions">
+      <button class="primary" id="sendBtn" hidden onclick="send()">Send to the Readback team</button>
       <button class="primary" id="makeBtn" onclick="make()">Make the report</button>
       <span class="msg" id="makeMsg"></span>
     </div>
@@ -82,7 +83,17 @@
       <li>Your OpenAI, ElevenLabs and Claude keys, the SRS password and the licence key are never included:
         they are removed from everything, logs too.</li>
       <li>The logs do include pilot callsigns and what was said on the radio.</li>
+      <li id="sendNote" hidden>Send posts it in #bug-reports on our Discord, where members of that server can read it.</li>
     </ul>
+  </section>
+
+  <section id="sent" style="display:none">
+    <h2>Sent</h2>
+    <p class="sub">Your report is in <b>#bug-reports</b> on our Discord as <b id="sentName"></b>.
+      If we need more, we will ask there. Join the server to follow it up.</p>
+    <div class="actions">
+      <button onclick="again()">Report another problem</button>
+    </div>
   </section>
 
   <section id="done" style="display:none">
@@ -90,7 +101,7 @@
     <ol class="steps">
       <li>The zip has downloaded: <b id="zipName"></b> (in your Downloads folder).</li>
       <li>Copy this message: <button onclick="copyPost()">Copy</button> <span class="msg" id="copyMsg"></span></li>
-      <li>In <b>#bug-reports</b> on the vSFG-7 Discord, paste the message and attach the zip.</li>
+      <li>In <b>#bug-reports</b> on our Discord, paste the message and attach the zip.</li>
     </ol>
     <label class="f" for="post">The message</label>
     <textarea id="post" readonly></textarea>
@@ -125,6 +136,40 @@ async function load() {
 function whenText() {
   const v = $('when').value;
   return v ? new Date(v).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+async function canSend() {
+  try {
+    const r = await fetch('/api/bug-report/can-send');
+    if (!r.ok || !(await r.json()).canSend) return;
+  } catch (e) { return; }
+  $('sendBtn').hidden = false;
+  $('sendNote').hidden = false;
+  $('makeBtn').classList.remove('primary');
+  $('makeBtn').textContent = 'Save the zip instead';
+  $('intro').innerHTML = 'Tell us what went wrong. Readback puts your description together with its logs and ' +
+    'settings in one zip and sends it to <b>#bug-reports</b> on our Discord. You can also save the zip and post it yourself.';
+}
+
+async function send() {
+  const what = $('what').value.trim();
+  if (!what) { $('makeMsg').innerHTML = '<span class="bad">Say what happened first.</span>'; $('what').focus(); return; }
+  const f = new URLSearchParams({ what, when: whenText(), where: $('where').value });
+  $('sendBtn').disabled = $('makeBtn').disabled = true;
+  $('makeMsg').textContent = 'Gathering the logs and sending…';
+  try {
+    const r = await fetch('/api/bug-report/send', { method: 'POST', body: f });
+    if (r.status === 403) throw new Error('Only an operator of this server can send a report.');
+    if (!r.ok) throw new Error((await r.text()).trim() || 'HTTP ' + r.status);
+    $('sentName').textContent = (await r.json()).name || 'a zip';
+    $('form').style.display = 'none';
+    $('sent').style.display = '';
+    $('makeMsg').textContent = '';
+  } catch (e) {
+    $('makeMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+  } finally {
+    $('sendBtn').disabled = $('makeBtn').disabled = false;
+  }
 }
 
 async function make() {
@@ -176,10 +221,11 @@ async function copyPost() {
 
 function again() {
   zip = null; $('what').value = ''; $('when').value = localInput(new Date()); $('where').value = '';
-  $('done').style.display = 'none'; $('form').style.display = ''; $('copyMsg').textContent = '';
+  $('done').style.display = 'none'; $('sent').style.display = 'none'; $('form').style.display = ''; $('copyMsg').textContent = '';
 }
 
 load();
+canSend();
 </script>
 <script src="/branding.js"></script>
 </body>
