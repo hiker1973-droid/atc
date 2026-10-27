@@ -219,7 +219,36 @@ def summarise(days, day):
     spike = bool(med and yday["Total"] > 2 * med)
     return {"day": day.isoformat(), "yesterday": yday, "monthToDate": mtd, "projectedMonth": proj,
             "lastMonth": last, "lastMonthFull": ln == calendar.monthrange(last_first.year, last_first.month)[1],
-            "median14": med, "spike": spike}
+            "median14": med, "spike": spike, "monthly": monthly(days, day)}
+
+
+# ATIS replay (Readback 0.3.2, 0355edb): ATIS is recorded once per weather and
+# runway and replayed, and the light-wind runway changes once a day instead of
+# every 4 h. Expected to take off about three quarters of the OpenAI voice bill
+# once the rigs run it; the 7-day rate shows the real figure a week after.
+ATIS_REPLAY_CUT = 0.75
+
+
+def monthly(days, day):
+    """A month of running at the last 7 days' rate, per source - the projection the
+    Stats page shows (operator 2026-10-27: "a monthly projection for cost based on
+    changes"). While OpenAI voice still runs over $1 a day, a second column estimates
+    the month with the ATIS replay in place."""
+    keys = [k for k in days if k <= day.isoformat()][-7:]
+    if not keys:
+        return None
+    n = len(keys)
+    rate = {name: sum(f(days[k]) for k in keys) / n for name, f in CATS}
+    tts = sum((days[k].get("openai") or {}).get("tts", 0) for k in keys) / n
+    month = {k: v * 30 for k, v in rate.items()}
+    month["Total"] = sum(month.values())
+    out = {"days": n, "from": keys[0], "to": keys[-1], "perDay": rate, "month": month, "ttsPerDay": tts}
+    if tts > 1.0:
+        after = dict(month)
+        after["OpenAI"] = month["OpenAI"] - tts * 30 * ATIS_REPLAY_CUT
+        after["Total"] = sum(v for k, v in after.items() if k != "Total")
+        out["withAtisReplay"] = after
+    return out
 
 
 # ------------------------------------------------------------------ PDF
@@ -283,6 +312,20 @@ def build_pdf(path, days, s, cfg, errors):
             for n, _ in CATS] + [["<b>Total</b>"] + ["<b>%s</b>" % usd(s[k]["Total"]) for k in
                                                       ("yesterday", "monthToDate", "projectedMonth", "lastMonth")]]
     S.append(table(["Source", "Yesterday", "Month to date", "Projected month", "Last month"], rows, [2.4, 1.15, 1.15, 1.25, 1.15]))
+
+    m = s.get("monthly")
+    if m:
+        S.append(Paragraph("Monthly projection (30 days at the last %d days' rate, %s to %s)" % (m["days"], m["from"], m["to"]), h))
+        after = m.get("withAtisReplay")
+        head = ["Source", "Per day", "Per month"] + (["With ATIS replay (est.)"] if after else [])
+        rows = [[n, usd(m["perDay"][n]), usd(m["month"][n])] + ([usd(after[n])] if after else []) for n, _ in CATS]
+        rows.append(["<b>Total</b>", "<b>%s</b>" % usd(sum(m["perDay"].values())), "<b>%s</b>" % usd(m["month"]["Total"])] +
+                    (["<b>%s</b>" % usd(after["Total"])] if after else []))
+        S.append(table(head, rows, [2.4, 1.2, 1.3] + ([1.9] if after else [])))
+        if after:
+            S.append(Paragraph("The last column takes %d%% off the OpenAI voice bill (%s a day now) for the ATIS replay in "
+                               "Readback 0.3.2, once the rigs are updated. A week after that the 7-day rate shows the real "
+                               "figure and this column goes." % (ATIS_REPLAY_CUT * 100, usd(m["ttsPerDay"])), note))
 
     S.append(Paragraph("Last 14 days", h))
     keys = [k for k in days if k <= s["day"]][-14:]

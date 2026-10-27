@@ -298,6 +298,14 @@ async function showCosts() {
       ${srcs.map(n => `<tr><td>${n}</td>${cols.map(([, k]) => `<td style="text-align:right">${usd(s[k][n])}</td>`).join('')}</tr>`).join('')}
       <tr><td><b>Total</b></td>${cols.map(([, k]) => `<td style="text-align:right"><b>${usd(s[k].Total)}</b></td>`).join('')}</tr>
     </table></div>
+    ${s.monthly ? (() => { const m = s.monthly, a = m.withAtisReplay; return `
+    <div class="el-line" style="margin-top:0.6rem">Monthly projection: 30 days at the last ${m.days} days' rate (${m.from.slice(5)} to ${m.to.slice(5)})</div>
+    <div class="tablewrap"><table>
+      <tr><th>Source</th><th style="text-align:right">Per day</th><th style="text-align:right">Per month</th>${a ? '<th style="text-align:right">With ATIS replay (est.)</th>' : ''}</tr>
+      ${srcs.map(n => `<tr><td>${n}</td><td style="text-align:right">${usd(m.perDay[n])}</td><td style="text-align:right">${usd(m.month[n])}</td>${a ? `<td style="text-align:right">${usd(a[n])}</td>` : ''}</tr>`).join('')}
+      <tr><td><b>Total</b></td><td style="text-align:right"><b>${usd(Object.values(m.perDay).reduce((x, y) => x + y, 0))}</b></td><td style="text-align:right"><b>${usd(m.month.Total)}</b></td>${a ? `<td style="text-align:right"><b>${usd(a.Total)}</b></td>` : ''}</tr>
+    </table></div>
+    ${a ? `<div class="el-line" style="color:var(--muted)">The estimate takes three quarters off OpenAI's voice bill (${usd(m.ttsPerDay)} a day now) for the 0.3.2 ATIS replay once the rigs are updated; it goes when the real rate drops.</div>` : ''}`; })() : ''}
     <div class="el-line" style="margin-top:0.6rem">Last 14 days</div>
     <div class="tablewrap"><table>
       <tr><th>Day</th><th style="text-align:right">OpenAI voice</th><th style="text-align:right">OpenAI hearing</th><th style="text-align:right">AWS</th><th style="text-align:right">ElevenLabs</th><th style="text-align:right">Power</th><th style="text-align:right">Total</th></tr>
