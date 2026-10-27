@@ -7,6 +7,12 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.39 (27 OCT 2026) — Case III bolter pattern, ten-minute approach times
+
+Follows Readback ATC 0.3.2 (origin/main 9de1eb0). Card 6: approach times ten minutes apart, "radar contact"
+on commencing, Marshal's "eight miles, dirty up", and a BOLTER step (climb to 1,200, turn downwind at 4 miles,
+report abeam, Paddles again at 3 miles). Card 9: the same word for word, with a BOLTER / WAVE-OFF band.
+
 ## v1.38 (25 OCT 2026) — Case III to the squadron card
 
 After Raider 319's Case III on Night (angels 2, no DME, no Paddles handoff), Readback ATC 0.2.6

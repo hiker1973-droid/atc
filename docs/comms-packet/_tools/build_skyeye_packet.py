@@ -85,6 +85,11 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.39 (operator 2026-10-27, "update the comms packet") follows origin/main 9de1eb0 (Readback
+ATC 0.3.2): Case III approach times ten minutes apart, "radar contact" on commencing, Marshal's
+"eight miles, dirty up", and the Case III bolter / wave-off pattern - climb to 1,200, turn
+downwind at 4 miles, report abeam, back to Paddles at 3 miles (cards 6, 9).
+
 v1.38 (operator 2026-10-25, after Raider 319's Case III on Night) follows origin/main abe9c29
 (Readback ATC 0.2.6): Case III to the squadron's DimOn cards 26 - 27 - the stack starts at angels 6,
 DME = angels + 15, marshal radial = final bearing + 180, "marshal on the NNN, DD DME, angels N,
@@ -135,8 +140,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.38"
-DATE = "25 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.39"
+DATE = "27 OCT 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -385,19 +390,23 @@ def c06_marshal_case3():
         ("MARKING MOMS", "Reply: marshal on the NNN, DD DME, angels N,"),
         ("", "expected approach time is MM, report established."),
         ("ESTABLISHED", "Reply: approach time MM. There is no Charlie."),
-        ("COMMENCING", "At your MM. Reply: descend to platform 5,000,"),
-        ("", "final bearing NNN, confirm BRC NNN,"),
-        ("", "report platform."),
+        ("COMMENCING", "At your MM. Reply: radar contact, descend to"),
+        ("", "platform 5,000, final bearing NNN,"),
+        ("", "confirm BRC NNN, report platform."),
         ("PLATFORM", "Passing 5,000 ft. Reply: final bearing NNN."),
+        ("8 MILES", "Marshal: eight miles, dirty up. No reply."),
         ("3 MILES", "Marshal: contact paddles, call the ball. Switch and"),
         ("", "make the ball call at three-quarters. No initial call."),
+        ("BOLTER", "Marshal: climb to 1,200, at 4 miles turn"),
+        ("", "downwind, report abeam. Abeam: turn final,"),
+        ("", "Paddles again at 3 miles."),
     ], split=280)
     c.bullets([
         [("Marshal radial = final bearing + 180.  Final bearing = BRC - 9.", True),
          ("All magnetic. The stack starts at angels 6; the DME is angels + 15 (angels 6 at 21 DME).", False)],
         [("MM is minutes past the hour.", True),
-         ("The first aircraft commences 10 minutes out; each one after adds a minute. Miss your "
-          "time and Marshal gives you a new one.", False)],
+         ("The first aircraft commences 10 minutes out; each one after is 10 minutes later. Miss "
+          "your time and Marshal gives you a new one.", False)],
     ])
     return save(c, "06_marshal_case3.jpg")
 
@@ -522,14 +531,25 @@ def c09_marshal_calls_case3():
         ("", "marshal on the zero eight six, two one DME,"),
         ("", "expected approach time is one five."),
         ("YOU", "Marshal, Raider 1, commencing."),
-        ("MARSHAL", "Raider 1, Union Marshal, copy commencing, descend to"),
-        ("", "platform five thousand, final bearing two six six,"),
-        ("", "confirm BRC two seven five, report platform."),
+        ("MARSHAL", "Raider 1, Union Marshal, copy commencing, radar contact,"),
+        ("", "descend to platform five thousand, final bearing"),
+        ("", "two six six, confirm BRC two seven five, report platform."),
         ("YOU", "Marshal, Raider 1, platform."),
         ("MARSHAL", "Raider 1, Union Marshal, copy platform,"),
         ("", "final bearing two six six."),
+        ("8 MILES", "Raider 1, Union Marshal, eight miles, dirty up."),
         ("3 MILES", "Raider 1, Union Marshal, three miles,"),
         ("", "contact paddles, call the ball."),
+    ], split=150)
+    NK.band(c, "BOLTER / WAVE-OFF", "Marshal sees it, or you call it")
+    NK.steps(c, [
+        ("YOU", "Raider 1, bolter.   (or: Raider 1, wave off.)"),
+        ("MARSHAL", "Raider 1, Union Marshal, roger bolter, climb to one"),
+        ("", "thousand two hundred, at four miles turn downwind,"),
+        ("", "report abeam."),
+        ("YOU", "Raider 1, abeam."),
+        ("MARSHAL", "Raider 1, Union Marshal, roger abeam, four miles past"),
+        ("", "abeam turn final, final bearing two six six."),
     ], split=150)
     NK.band(c, "CASE CHANGE", "to everyone in the stack")
     NK.steps(c, [
@@ -538,7 +558,7 @@ def c09_marshal_calls_case3():
     ], split=150)
     c.bullets([
         [("Radial 086 = final bearing 266 + 180.  Final bearing = BRC 275 - 9.", True),
-         ("\"Approach time one five\" is 15 minutes past the hour.", False)],
+         ("\"Approach time one five\" is 15 minutes past the hour; the next jet's is ten minutes later.", False)],
     ])
     NK.subtle(c, MSH_NOTE)
     return save(c, "09_marshal_calls_case3.jpg")
@@ -1301,7 +1321,7 @@ def c19_trouble():
         [("Deckboss uses the DCS AI carrier frequency.", True),
          ("You may hear the AI carrier controller on 128.600 as well.", False)],
     ])
-    NK.subtle(c, "Built from the SkyeyeATC code, origin/main abe9c29, 25 OCT 2026.")
+    NK.subtle(c, "Built from the SkyeyeATC code, origin/main 9de1eb0, 27 OCT 2026.")
     return save(c, "19_trouble.jpg")
 
 
