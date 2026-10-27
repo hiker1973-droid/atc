@@ -389,3 +389,23 @@ td { border-bottom: 1px solid #dde2e6; padding: 2px 4px; } td.n, th.n { text-ali
 	b.WriteString(`</body></html>`)
 	return b.String()
 }
+
+// handleCosts: GET -> the running-costs data docs/costs/run_costs.py writes each
+// night on the dev box (%USERPROFILE%\readback-costs-data.json: OpenAI, AWS,
+// ElevenLabs, power). 404 anywhere else, so the Stats page's Costs panel only
+// shows on our own machine (operator 2026-10-27, "just for us").
+func handleCosts(w http.ResponseWriter, _ *http.Request) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		http.NotFound(w, nil)
+		return
+	}
+	b, err := os.ReadFile(filepath.Join(home, "readback-costs-data.json"))
+	if err != nil {
+		http.NotFound(w, nil)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(b)
+}

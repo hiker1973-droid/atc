@@ -173,6 +173,7 @@ func main() {
 	mux.HandleFunc("/api/reports/pdf", handleAARPDF)
 	mux.HandleFunc("/api/reports/png", handleAARPNG) // the first page as a picture, for Discord
 	mux.HandleFunc("/api/stats", handleStats)
+	mux.HandleFunc("/api/costs", handleCosts) // dev box only: running costs (stats.go)
 	mux.HandleFunc("/api/stats/csv", handleStatsCSV)
 	mux.HandleFunc("/api/stats/pdf", handleStatsPDF)
 
