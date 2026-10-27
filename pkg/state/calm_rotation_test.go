@@ -63,8 +63,8 @@ func TestCalmRotationKeepsManualPickWithinSlot(t *testing.T) {
 	}
 }
 
-// Both ends come up, and the same clock hour does not land on the same end
-// every day (the reason for hashing instead of cycling).
+// Both ends come up, and the same day of the week does not land on the same
+// end every week (the reason for hashing instead of cycling).
 func TestCalmRunwayVaries(t *testing.T) {
 	seen := map[int]bool{}
 	sameHour := map[int]bool{}
@@ -72,7 +72,7 @@ func TestCalmRunwayVaries(t *testing.T) {
 		seen[airfield.CalmSlotIndex("UGSB", slot, 2)] = true
 	}
 	for day := int64(0); day < 10; day++ {
-		sameHour[airfield.CalmSlotIndex("UGSB", day*6+4, 2)] = true
+		sameHour[airfield.CalmSlotIndex("UGSB", day*7+4, 2)] = true
 	}
 	if len(seen) != 2 || len(sameHour) != 2 {
 		t.Fatalf("calm rotation not varied: ends %v, same-hour %v", seen, sameHour)

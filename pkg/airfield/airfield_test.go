@@ -53,20 +53,20 @@ func TestRotationRunway_Cycles(t *testing.T) {
 }
 
 // Verifies that times within a slot return the same runway — i.e. transitions
-// are crisp at the 4h boundary, not gradual.
+// are crisp at the slot boundary, not gradual.
 func TestRotationRunway_NoDriftWithinSlot(t *testing.T) {
 	anchor := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	for _, offsetMin := range []int{0, 1, 60, 119, 239} {
+	for _, offsetMin := range []int{0, 1, 60, 239, 1439} {
 		now := anchor.Add(time.Duration(offsetMin) * time.Minute)
 		got := OMDM.RotationRunway(now, anchor).Designator
 		if got != "09" {
 			t.Errorf("OMDM at +%dmin: got %q, want \"09\" (still slot 0)", offsetMin, got)
 		}
 	}
-	// 240 min = 4h exactly → slot 1
-	gotBoundary := OMDM.RotationRunway(anchor.Add(240*time.Minute), anchor).Designator
+	// one slot exactly → slot 1
+	gotBoundary := OMDM.RotationRunway(anchor.Add(RotationSlotDuration), anchor).Designator
 	if gotBoundary != "27" {
-		t.Errorf("OMDM at +240min (slot 1): got %q, want \"27\"", gotBoundary)
+		t.Errorf("OMDM one slot on (slot 1): got %q, want \"27\"", gotBoundary)
 	}
 }
 

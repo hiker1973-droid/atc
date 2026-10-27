@@ -12,8 +12,15 @@ import (
 
 // RotationSlotDuration is the wall-clock length of one runway-rotation slot.
 // Declared as a var (not const) so debug builds can shorten it via the
-// --runway-slot flag for live verification without waiting 4h between rolls.
-var RotationSlotDuration = 4 * time.Hour
+// --runway-slot flag for live verification without waiting between rolls.
+// A day since 2026-10-27 (was 4h): every runway change re-records all of the
+// theatre's ATIS, and the 4h slots were most of the OpenAI bill.
+var RotationSlotDuration = 24 * time.Hour
+
+// calmSlotOffset puts the light-wind slot boundary at 10:00 UTC (04:00 MDT,
+// 03:00 MST), with nobody flying and alongside Night's 04:00 mission restart,
+// rather than at 00:00 UTC, which is the evening session.
+const calmSlotOffset = 10 * time.Hour
 
 // Runway defines a single runway end.
 type Runway struct {
@@ -156,7 +163,8 @@ func (a *Airfield) RotationRunway(now, startTime time.Time) Runway {
 // ATIS agree. The runway end for a slot is a hash of the field and the slot
 // number: a plain cycle would put the same runway at the same time of day
 // every day (six 4h slots, two ends), so an evening session would never see
-// the other end. Operator 2026-10-14 ("do 4").
+// the other end. Operator 2026-10-14 ("do 4"); one slot a day since 2026-10-27,
+// which the hash still varies from day to day.
 func (a *Airfield) CalmRunway(now time.Time) Runway {
 	cycle := make([]Runway, 0, len(a.RunwayPairs)*2)
 	for _, pair := range a.RunwayPairs {
@@ -170,7 +178,7 @@ func (a *Airfield) CalmRunway(now time.Time) Runway {
 
 // CalmSlot is the wall-clock rotation slot now falls in.
 func CalmSlot(now time.Time) int64 {
-	return now.Unix() / int64(RotationSlotDuration/time.Second)
+	return (now.Unix() - int64(calmSlotOffset/time.Second)) / int64(RotationSlotDuration/time.Second)
 }
 
 // CalmSlotIndex picks one of n runway ends for a field's slot.

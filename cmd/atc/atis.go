@@ -170,7 +170,11 @@ func spellRunwayWords(designator string) string {
 }
 
 func buildATISText(station *atisStation, state *atisState) string {
-	ident := identWord(state.ident)
+	return buildATISTextIdent(station, state, identWord(state.ident))
+}
+
+// buildATISTextIdent is the ATIS read with ident as the information letter.
+func buildATISTextIdent(station *atisStation, state *atisState, ident string) string {
 	windStr := fmt.Sprintf("wind %03.0f at %d", state.windFrom, int(state.windKts))
 	if state.windKts < 3 { windStr = "wind calm" }
 	altStr := fmt.Sprintf("%.2f", state.altimeter)
@@ -285,7 +289,26 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 		currentKey := state.weatherKey()
 		weatherChanged := currentKey != lastKey
 
-		// Regenerate TTS if weather changed or no cache yet
+		// Regenerate TTS if weather changed or no cache yet - or replay the
+		// recording of these same words if one was made before (atis_library.go).
+		libKey := ""
+		if weatherChanged || state.cachedMP3 == nil {
+			secondLang, wantSecond := atisSecondLang(station, flagMap)
+			libKey = atisLibraryKey(station, state, secondLang, wantSecond)
+			if mp3, ident, ok := atisLibraryGet(station.ICAO, libKey); ok {
+				log.Info().Str("station", station.Name).Str("ident", identWord(ident)).
+					Bool("weatherChanged", weatherChanged).Msg("ATIS replaying an earlier recording - no TTS")
+				state.cachedMP3 = mp3
+				_ = os.WriteFile(state.cachePath, mp3, 0644)
+				state.ident = (ident + 1) % 26
+				lastKey = currentKey
+				mp3Out := state.cachedMP3
+				state.mu.Unlock()
+				transmitExternalAudioFile(ctx, mp3Out, station.FreqMHz, station.Name, srsHost, srsPort,
+					flagExternalAudio)
+				return
+			}
+		}
 		if weatherChanged || state.cachedMP3 == nil {
 			enText := buildATISText(station, state)
 			secondLang, wantSecond := atisSecondLang(station, flagMap)
@@ -337,6 +360,9 @@ func atisLoop(ctx context.Context, station *atisStation, apiKey, eamPassword, sr
 
 			state.cachedMP3 = combined
 			_ = os.WriteFile(state.cachePath, combined, 0644)
+			if !isWinClip(combined) {
+				atisLibraryPut(station.ICAO, libKey, state.ident, combined)
+			}
 			if weatherChanged {
 				state.ident = (state.ident + 1) % 26
 				lastKey = currentKey
