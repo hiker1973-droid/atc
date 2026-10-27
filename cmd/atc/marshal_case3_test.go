@@ -78,30 +78,34 @@ func TestCase3ApproachCallsWithoutAddress(t *testing.T) {
 	}
 }
 
-// Approach times are a whole minute, a minute clear of every other jet's.
+// Approach times are a whole minute, ten minutes clear of every other jet's.
 func TestCase3EATSpacing(t *testing.T) {
 	stack := state.NewMarshalStack()
 	base := time.Date(2026, 10, 25, 18, 0, 20, 0, time.UTC)
 	stack.Enqueue("Raider 1", 5)
 	stack.SetEAT("Raider 1", base.Add(10*time.Minute).Truncate(time.Minute).Add(time.Minute)) // :11
 	stack.Enqueue("Raider 2", 5)
-	stack.SetEAT("Raider 2", time.Date(2026, 10, 25, 18, 12, 40, 0, time.UTC)) // :12, old seconds
+	stack.SetEAT("Raider 2", time.Date(2026, 10, 25, 18, 21, 40, 0, time.UTC)) // :21, old seconds
 	stack.Enqueue("Raider 3", 5)
-	if got := case3EAT(stack, "Raider 3", base.Add(10*time.Minute)); got.Minute() != 13 || got.Second() != 0 {
-		t.Errorf("Raider 3 got %s, want 18:13:00", got.Format("15:04:05"))
+	if got := case3EAT(stack, "Raider 3", base.Add(10*time.Minute)); got.Minute() != 31 || got.Second() != 0 {
+		t.Errorf("Raider 3 got %s, want 18:31:00", got.Format("15:04:05"))
 	}
 	// Its own time does not block it.
 	if got := case3EAT(stack, "Raider 1", base.Add(10*time.Minute)); got.Minute() != 11 {
 		t.Errorf("Raider 1 got %s, want :11", got.Format("15:04"))
 	}
-	// Late: a new time at least two minutes out, clear of the others.
+	// Late: a new time at least two minutes out, ten clear of the others.
 	now := time.Date(2026, 10, 25, 18, 9, 30, 0, time.UTC)
 	stack.SetEAT("Raider 3", now.Add(-3*time.Minute))
-	if got := case3HoldEAT(stack, "Raider 3", 3, now.Add(-3*time.Minute), now); got.Minute() != 13 {
-		t.Errorf("late Raider 3 got %s, want :13", got.Format("15:04"))
+	if got := case3HoldEAT(stack, "Raider 3", 3, now.Add(-3*time.Minute), now); got.Minute() != 31 {
+		t.Errorf("late Raider 3 got %s, want :31", got.Format("15:04"))
+	}
+	// Ten minutes past the last jet is clear.
+	if got := case3EAT(stack, "Raider 3", time.Date(2026, 10, 25, 18, 40, 0, 0, time.UTC)); got.Minute() != 40 {
+		t.Errorf("clear slot got %s, want :40", got.Format("15:04"))
 	}
 	// On time: kept.
-	keep := time.Date(2026, 10, 25, 18, 20, 0, 0, time.UTC)
+	keep := time.Date(2026, 10, 25, 18, 50, 0, 0, time.UTC)
 	if got := case3HoldEAT(stack, "Raider 3", 3, keep, now); !got.Equal(keep) {
 		t.Errorf("on-time EAT changed to %s", got.Format("15:04"))
 	}

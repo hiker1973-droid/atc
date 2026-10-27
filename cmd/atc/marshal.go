@@ -419,10 +419,10 @@ const (
 	marshalCase3MinAngels = 6
 	marshalCase3MaxAngels = 20
 	// Case 3 EAT scheduling — first aircraft commences at now+lead, each
-	// subsequent slot adds interval. Standard Case 3 spacing is ~1 min per
-	// aircraft; lead gives the pilot time to enter the hold.
+	// subsequent slot adds interval; lead gives the pilot time to enter the
+	// hold. Interval 10 min (operator 2026-10-26, was 1 since 2026-10-25).
 	marshalCase3LeadTimeMin = 10
-	marshalCase3IntervalMin = 1
+	marshalCase3IntervalMin = 10
 	// The least notice a new approach time gives a jet already in the hold.
 	marshalCase3MinNotice = 2 * time.Minute
 	// Final bearing = BRC - offset (deck-angle compensation so the lineup

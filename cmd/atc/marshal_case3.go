@@ -14,22 +14,29 @@ import (
 	"github.com/vsfg7/atc/pkg/state"
 )
 
-// case3EAT is the first whole minute at or after earliest that no other jet in
-// the stack holds: Case III approach times are marshalCase3IntervalMin apart
-// (operator 2026-10-25: "push time spacing is 1 min for other aircraft").
+// case3EAT is the first whole minute at or after earliest that is at least
+// marshalCase3IntervalMin from every other jet's approach time in the stack
+// (operator 2026-10-25 "push time spacing is 1 min for other aircraft",
+// 2026-10-26 ten minutes).
 func case3EAT(stack *state.MarshalStack, callsign string, earliest time.Time) time.Time {
+	gap := time.Duration(marshalCase3IntervalMin) * time.Minute
 	eat := earliest.Truncate(time.Minute)
 	if eat.Before(earliest) {
 		eat = eat.Add(time.Minute)
 	}
-	taken := map[int64]bool{}
+	var taken []time.Time
 	for _, ac := range stack.GetAll() {
 		if ac.Callsign != callsign && !ac.EAT.IsZero() {
-			taken[ac.EAT.Truncate(time.Minute).Unix()] = true
+			taken = append(taken, ac.EAT.Truncate(time.Minute))
 		}
 	}
-	for taken[eat.Unix()] {
-		eat = eat.Add(time.Duration(marshalCase3IntervalMin) * time.Minute)
+	for moved := true; moved; {
+		moved = false
+		for _, t := range taken {
+			if d := eat.Sub(t); d > -gap && d < gap {
+				eat, moved = t.Add(gap), true
+			}
+		}
 	}
 	return eat
 }
