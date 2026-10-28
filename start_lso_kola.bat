@@ -23,9 +23,12 @@ set GOMAXPROCS=2
 set GOGC=50
 set GOMEMLIMIT=256MiB
 
-:: DCS-gRPC for DCS's own LSO grade and wire. No Kola rig has been fixed yet, so
-:: this defaults to :50051 (Day's port); set SKYEYE_GRPC for the rig Kola runs on.
+:: DCS-gRPC for DCS's own LSO grade and wire, picked by the rig's SRS port as in
+:: start_lso_caucasus.bat: Day (SRS :5008) :50051, Foothold (:5002) :50052,
+:: Night (:5004) :50053, so Kola runs on any of them. SKYEYE_GRPC overrides.
 set GRPC=localhost:50051
+if "%SRS%"=="localhost:5002" set GRPC=localhost:50052
+if "%SRS%"=="localhost:5004" set GRPC=localhost:50053
 if defined SKYEYE_GRPC set GRPC=%SKYEYE_GRPC%
 
 :: Kola Paddles (LSO). Same role, frequency and voice as start_lso_caucasus.bat
