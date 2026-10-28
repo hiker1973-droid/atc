@@ -444,9 +444,9 @@ def main():
     except Exception as e:
         errors.append("AWS costs unavailable: %s" % type(e).__name__)
     try:
+        # No key file = no API use: the Console is an individual account (no
+        # Admin keys) and showed $0 for October (operator 2026-10-28).
         claude_api = fetch_anthropic(start, end)
-        if claude_api is None:
-            errors.append("Claude API costs: no admin key yet (%s) - plan fee only." % ANTHROPIC_KEY)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
             errors.append("Claude API costs unavailable: HTTP %d - the admin key has expired or is not an admin key "
