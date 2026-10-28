@@ -47,6 +47,10 @@ REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 CONFIG = os.path.join(HOME, "readback-costs.json")
 OPENAI_KEY = os.path.join(HOME, "readback-openai-admin-key.txt")
 ANTHROPIC_KEY = os.path.join(HOME, "readback-anthropic-admin-key.txt")
+# Operator 2026-10-28: the Anthropic keys expire every 30 days. The key file's
+# age stands in for the key's: warn from day 25, and a 401 says renew it.
+ANTHROPIC_KEY_DAYS = 30
+ANTHROPIC_KEY_WARN = 25
 LAUNCHER_COPY = os.path.join(HOME, "readback-costs-data.json")
 AWS_PROFILE = "omm-costs"
 
@@ -444,9 +448,20 @@ def main():
         if claude_api is None:
             errors.append("Claude API costs: no admin key yet (%s) - plan fee only." % ANTHROPIC_KEY)
     except urllib.error.HTTPError as e:
-        errors.append("Claude API costs unavailable: HTTP %d (admin key?)" % e.code)
+        if e.code in (401, 403):
+            errors.append("Claude API costs unavailable: HTTP %d - the admin key has expired or is not an admin key "
+                          "(sk-ant-admin...). Make a new one in the Console and replace %s." % (e.code, ANTHROPIC_KEY))
+        else:
+            errors.append("Claude API costs unavailable: HTTP %d" % e.code)
     except Exception as e:
         errors.append("Claude API costs unavailable: %s" % type(e).__name__)
+
+    if os.path.exists(ANTHROPIC_KEY):
+        made = dt.date.fromtimestamp(os.path.getmtime(ANTHROPIC_KEY))
+        age = (dt.date.today() - made).days
+        if age >= ANTHROPIC_KEY_WARN:
+            errors.append("Claude admin key is %d days old - it expires about %s. Make a new one and replace %s." %
+                          (age, (made + dt.timedelta(days=ANTHROPIC_KEY_DAYS)).isoformat(), ANTHROPIC_KEY))
 
     data_dir = os.path.join(a.out, "_data", "costs")
     os.makedirs(data_dir, exist_ok=True)
