@@ -129,16 +129,22 @@ func batFreq(t *testing.T, name, flag string) float64 {
 func currentDocFacts(t *testing.T) []docTheatre {
 	var out []docTheatre
 	for _, th := range docTheatres {
+		// Paddles and GCI came to PG after the other theatres, as
+		// start_lso_pg.bat / start_gci_pg.bat beside its unsuffixed scripts.
+		newer := th.suffix
+		if newer == "" {
+			newer = "_" + th.key
+		}
 		d := docTheatre{Key: th.key, Title: th.title,
 			Command:  batFreq(t, "start_command"+th.suffix+".bat", "command-freq"),
 			JTAC:     batFreq(t, "start_command"+th.suffix+".bat", "jtac-freq"),
 			JTAC2:    batFreq(t, "start_command"+th.suffix+".bat", "jtac2-freq"),
 			Deckboss: batFreq(t, "start_deckboss"+th.suffix+".bat", "deckboss-freq"),
 			Marshal:  batFreq(t, "start_marshal"+th.suffix+".bat", "marshal-freq"),
-			LSO:      batFreq(t, "start_lso"+th.suffix+".bat", "lso-freq"),
+			LSO:      batFreq(t, "start_lso"+newer+".bat", "lso-freq"),
 			Tanker:   batFreq(t, "start_command"+th.suffix+".bat", "tanker-freq"),
 			Tanker2:  batFreq(t, "start_command"+th.suffix+".bat", "tanker2-freq"),
-			GCI:      batFreq(t, "start_gci"+th.suffix+".bat", "gci-freq"),
+			GCI:      batFreq(t, "start_gci"+newer+".bat", "gci-freq"),
 		}
 		clines, _ := batLaunches(t, "start_command"+th.suffix+".bat")
 		for _, l := range clines {
@@ -152,7 +158,7 @@ func currentDocFacts(t *testing.T) []docTheatre {
 			}
 		}
 		if d.GCI > 0 {
-			lines, _ := batLaunches(t, "start_gci"+th.suffix+".bat")
+			lines, _ := batLaunches(t, "start_gci"+newer+".bat")
 			for _, l := range lines {
 				if v := batFlag(l, "gci-callsign"); v != "" {
 					d.GCIName = v
