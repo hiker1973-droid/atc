@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Nightly Readback running-costs report: OpenAI, AWS, ElevenLabs and rig power, one PDF.
+"""Nightly Readback running-costs report: OpenAI, AWS, ElevenLabs, Claude and rig power, one PDF.
 
 Operator 2026-10-27: "add AWS, OpenAI and power estimate spend (I want us to keep
 track on gui or a nightly report) ... just for us". Dev box only; nothing here
@@ -11,6 +11,10 @@ ships in the installer.
               user readback-costs, ce:GetCostAndUsage only), by day (UTC) and service.
               It is the OMM mod library's S3 bucket. Each call costs AWS $0.01.
   ElevenLabs  the plan's monthly fee spread over the days of the month.
+  Claude      the Max plan's monthly fee spread the same way, plus API usage exact
+              from Anthropic's cost report (admin key in
+              %USERPROFILE%\\readback-anthropic-admin-key.txt), by day (UTC). Operator
+              2026-10-28: "we need to add Claude spend to our tracking" (Max $100).
   Power       an estimate: each machine's average watts x 24 h, priced on Xcel
               Colorado residential time-of-use (on-peak weekdays 17-21), times a
               factor for the bill's fees and riders. All in the config file.
@@ -42,6 +46,7 @@ HOME = os.path.expanduser("~")
 REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 CONFIG = os.path.join(HOME, "readback-costs.json")
 OPENAI_KEY = os.path.join(HOME, "readback-openai-admin-key.txt")
+ANTHROPIC_KEY = os.path.join(HOME, "readback-anthropic-admin-key.txt")
 LAUNCHER_COPY = os.path.join(HOME, "readback-costs-data.json")
 AWS_PROFILE = "omm-costs"
 
@@ -61,6 +66,7 @@ DEFAULT_CONFIG = {
     "power": {"offPeak": 0.075, "onPeakSummer": 0.213, "onPeakWinter": 0.18,
               "summerMonths": [6, 7, 8, 9], "onPeakStart": 17, "onPeakEnd": 21, "feesFactor": 1.25},
     "elevenLabsMonthlyUSD": 22.0,
+    "claudeMonthlyUSD": 100.0,
 }
 
 
@@ -112,6 +118,30 @@ def fetch_openai(start, end):
         page = data.get("next_page")
 
 
+def fetch_anthropic(start, end):
+    """{date: usd} of Claude API usage for [start, end), UTC days. None with no admin key."""
+    if not os.path.exists(ANTHROPIC_KEY):
+        return None
+    with open(ANTHROPIC_KEY, encoding="utf-8") as f:
+        key = f.read().strip()
+    out, page = {}, None
+    while True:
+        url = ("https://api.anthropic.com/v1/organizations/cost_report?starting_at=%sT00:00:00Z"
+               "&ending_at=%sT00:00:00Z&bucket_width=1d&limit=31" % (start.isoformat(), end.isoformat()))
+        if page:
+            url += "&page=" + page
+        req = urllib.request.Request(url, headers={"x-api-key": key, "anthropic-version": "2023-06-01"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            data = json.load(r)
+        for b in data.get("data", []):
+            day = b["starting_at"][:10]
+            # amount is a decimal string in cents
+            out[day] = out.get(day, 0.0) + sum(float(res.get("amount") or 0) for res in b.get("results", [])) / 100.0
+        if not data.get("has_more"):
+            return out
+        page = data.get("next_page")
+
+
 def fetch_aws(start, end):
     """{date: {service: usd}} for [start, end), UTC days."""
     import boto3
@@ -151,7 +181,7 @@ def power_day(cfg, day):
 
 
 # ------------------------------------------------------------------ data
-def build_days(cfg, start, end, openai, aws, errors):
+def build_days(cfg, start, end, openai, aws, claude_api, errors):
     days = {}
     d = start
     while d < end:
@@ -159,20 +189,25 @@ def build_days(cfg, start, end, openai, aws, errors):
         o = openai.get(k) if openai is not None else None
         a = aws.get(k) if aws is not None else None
         pw, kwh = power_day(cfg, d)
-        el = cfg["elevenLabsMonthlyUSD"] / calendar.monthrange(d.year, d.month)[1]
+        month_days = calendar.monthrange(d.year, d.month)[1]
+        el = cfg["elevenLabsMonthlyUSD"] / month_days
+        api = claude_api.get(k, 0.0) if claude_api is not None else None
+        plan = cfg["claudeMonthlyUSD"] / month_days
         row = {
             "openai": None if o is None else dict(o, total=sum(o.values())),
             "aws": None if a is None else {"services": a, "total": sum(a.values())},
             "power": {"machines": pw, "total": sum(pw.values()), "kwh": kwh},
             "elevenlabs": el,
+            "claude": {"plan": plan, "api": api, "total": plan + (api or 0)},
         }
-        row["total"] = sum(x for x in (
-            row["openai"]["total"] if row["openai"] else 0,
-            row["aws"]["total"] if row["aws"] else 0,
-            row["power"]["total"], el))
+        row["total"] = row_total(row)
         days[k] = row
         d += dt.timedelta(days=1)
     return days
+
+
+def row_total(row):
+    return sum(f(row) for _, f in CATS)
 
 
 def merge(old, new):
@@ -183,10 +218,11 @@ def merge(old, new):
         for src in ("openai", "aws"):
             if row[src] is None and prev.get(src):
                 row[src] = prev[src]
-        row["total"] = sum(x for x in (
-            row["openai"]["total"] if row["openai"] else 0,
-            row["aws"]["total"] if row["aws"] else 0,
-            row["power"]["total"], row["elevenlabs"]))
+        c, pc = row["claude"], prev.get("claude") or {}
+        if c["api"] is None and pc.get("api") is not None:
+            c["api"] = pc["api"]
+            c["total"] = c["plan"] + c["api"]
+        row["total"] = row_total(row)
         out[k] = row
     return dict(sorted(out.items()))
 
@@ -194,6 +230,7 @@ def merge(old, new):
 CATS = [("OpenAI", lambda r: r["openai"]["total"] if r.get("openai") else 0),
         ("AWS (OMM S3)", lambda r: r["aws"]["total"] if r.get("aws") else 0),
         ("ElevenLabs", lambda r: r["elevenlabs"]),
+        ("Claude", lambda r: r["claude"]["total"] if r.get("claude") else 0),
         ("Power", lambda r: r["power"]["total"])]
 
 
@@ -291,7 +328,7 @@ def build_pdf(path, days, s, cfg, errors):
     doc = SimpleDocTemplate(path, pagesize=letter, leftMargin=0.55 * inch, rightMargin=0.55 * inch,
                             topMargin=0.5 * inch, bottomMargin=0.5 * inch, title="Readback Costs %s" % s["day"])
     S = [Paragraph("Readback Running Costs", title),
-         Paragraph("%s &middot; OpenAI + AWS exact, ElevenLabs plan fee, power estimated &middot; internal" %
+         Paragraph("%s &middot; OpenAI, AWS, Claude API exact; ElevenLabs and Claude plan fees; power estimated &middot; internal" %
                    day.strftime("%a %d %b %Y"), sub)]
     tiles = [("Yesterday", s["yesterday"]["Total"]), ("Month to date", s["monthToDate"]["Total"]),
              ("Projected %s" % day.strftime("%b"), s["projectedMonth"]["Total"]),
@@ -333,13 +370,17 @@ def build_pdf(path, days, s, cfg, errors):
     for k in reversed(keys):
         r = days[k]
         o = r.get("openai") or {}
+        cl = r.get("claude") or {}
         rows.append([dt.date.fromisoformat(k).strftime("%a %d %b"),
                      usd(o.get("tts", 0)) if o else "-", usd(o.get("stt", 0)) if o else "-",
                      usd(o.get("other", 0)) if o else "-",
                      usd(r["aws"]["total"]) if r.get("aws") else "-",
-                     usd(r["elevenlabs"]), usd(r["power"]["total"]), "<b>%s</b>" % usd(r["total"])])
-    S.append(table(["Day", "OpenAI voice", "OpenAI hearing", "OpenAI other", "AWS", "ElevenLabs", "Power", "Total"],
-                   rows, [1.15, 0.95, 0.95, 0.9, 0.8, 0.85, 0.8, 0.85]))
+                     usd(r["elevenlabs"]), usd(cl["plan"]) if cl else "-",
+                     usd(cl["api"]) if cl.get("api") is not None else "-",
+                     usd(r["power"]["total"]), "<b>%s</b>" % usd(r["total"])])
+    S.append(table(["Day", "OpenAI voice", "OpenAI hearing", "OpenAI other", "AWS", "Eleven Labs", "Claude plan",
+                    "Claude API", "Power", "Total"],
+                   rows, [0.95, 0.75, 0.75, 0.7, 0.6, 0.75, 0.7, 0.7, 0.6, 0.7]))
 
     aws_mtd = {}
     for k, r in days.items():
@@ -368,7 +409,9 @@ def build_pdf(path, days, s, cfg, errors):
     S.append(Paragraph(
         "OpenAI and AWS days are UTC days as their billing reports them; power and ElevenLabs are local days. OpenAI voice "
         "is gpt-4o-mini-tts (ATIS and any role not on ElevenLabs); hearing is transcription. ElevenLabs is the plan's "
-        "$%.2f a month spread over the month; the credits it buys are on the Stats page." % cfg["elevenLabsMonthlyUSD"], note))
+        "$%.2f a month spread over the month; the credits it buys are on the Stats page. Claude plan is the Max plan's "
+        "$%.2f a month the same way; Claude API is the Anthropic Console bill (UTC days)." %
+        (cfg["elevenLabsMonthlyUSD"], cfg["claudeMonthlyUSD"]), note))
     doc.build(S)
 
 
@@ -383,7 +426,7 @@ def main():
     end = day + dt.timedelta(days=1)
     start = min(end - dt.timedelta(days=a.days), (day.replace(day=1) - dt.timedelta(days=1)).replace(day=1))
 
-    errors, openai, aws = [], None, None
+    errors, openai, aws, claude_api = [], None, None, None
     try:
         openai = fetch_openai(start, end)
     except urllib.error.HTTPError as e:
@@ -396,6 +439,14 @@ def main():
             errors.append("AWS reported $0 for every day - Cost Explorer may still be filling in.")
     except Exception as e:
         errors.append("AWS costs unavailable: %s" % type(e).__name__)
+    try:
+        claude_api = fetch_anthropic(start, end)
+        if claude_api is None:
+            errors.append("Claude API costs: no admin key yet (%s) - plan fee only." % ANTHROPIC_KEY)
+    except urllib.error.HTTPError as e:
+        errors.append("Claude API costs unavailable: HTTP %d (admin key?)" % e.code)
+    except Exception as e:
+        errors.append("Claude API costs unavailable: %s" % type(e).__name__)
 
     data_dir = os.path.join(a.out, "_data", "costs")
     os.makedirs(data_dir, exist_ok=True)
@@ -404,7 +455,7 @@ def main():
     if os.path.exists(store):
         with open(store, encoding="utf-8") as f:
             old = json.load(f).get("days", {})
-    days = merge(old, build_days(cfg, start, end, openai, aws, errors))
+    days = merge(old, build_days(cfg, start, end, openai, aws, claude_api, errors))
     s = summarise(days, day)
     blob = {"updated": dt.datetime.now().isoformat(timespec="seconds"), "summary": s, "errors": errors,
             "machines": cfg["machines"], "days": days}

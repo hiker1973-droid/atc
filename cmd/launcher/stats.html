@@ -112,7 +112,7 @@
 
   <section id="costSection" style="display:none">
     <h2>Running costs <span class="muted" style="font-weight:400;font-size:0.82rem" id="costSub"></span></h2>
-    <p class="sub">What Readback costs us to run: OpenAI and AWS from their billing, ElevenLabs the plan fee, power an estimate. Only on this machine; updated nightly.</p>
+    <p class="sub">What Readback costs us to run: OpenAI, AWS and the Claude API from their billing, ElevenLabs and Claude the plan fees, power an estimate. Only on this machine; updated nightly.</p>
     <div id="costBody"></div>
   </section>
 
@@ -284,7 +284,7 @@ async function showCosts() {
   let c;
   try { c = await fetch('/api/costs', { cache: 'no-store' }).then(r => r.ok ? r.json() : null); } catch (e) { return; }
   if (!c || !c.summary) return;
-  const s = c.summary, srcs = ['OpenAI', 'AWS (OMM S3)', 'ElevenLabs', 'Power'];
+  const s = c.summary, srcs = ['OpenAI', 'AWS (OMM S3)', 'ElevenLabs', 'Claude', 'Power'];
   const cols = [['Yesterday', 'yesterday'], ['Month to date', 'monthToDate'], ['Projected month', 'projectedMonth'], ['Last month', 'lastMonth']];
   const days = Object.keys(c.days).filter(k => k <= s.day).slice(-14).reverse();
   const cell = (r, f) => r ? usd(f(r)) : '-';
@@ -308,10 +308,10 @@ async function showCosts() {
     ${a ? `<div class="el-line" style="color:var(--muted)">The estimate takes three quarters off OpenAI's voice bill (${usd(m.ttsPerDay)} a day now) for the 0.3.2 ATIS replay once the rigs are updated; it goes when the real rate drops.</div>` : ''}`; })() : ''}
     <div class="el-line" style="margin-top:0.6rem">Last 14 days</div>
     <div class="tablewrap"><table>
-      <tr><th>Day</th><th style="text-align:right">OpenAI voice</th><th style="text-align:right">OpenAI hearing</th><th style="text-align:right">AWS</th><th style="text-align:right">ElevenLabs</th><th style="text-align:right">Power</th><th style="text-align:right">Total</th></tr>
+      <tr><th>Day</th><th style="text-align:right">OpenAI voice</th><th style="text-align:right">OpenAI hearing</th><th style="text-align:right">AWS</th><th style="text-align:right">ElevenLabs</th><th style="text-align:right">Claude</th><th style="text-align:right">Power</th><th style="text-align:right">Total</th></tr>
       ${days.map(k => { const r = c.days[k]; return `<tr><td>${k.slice(5)}</td>
         <td style="text-align:right">${cell(r.openai, o => o.tts)}</td><td style="text-align:right">${cell(r.openai, o => o.stt)}</td>
-        <td style="text-align:right">${cell(r.aws, a => a.total)}</td><td style="text-align:right">${usd(r.elevenlabs)}</td>
+        <td style="text-align:right">${cell(r.aws, a => a.total)}</td><td style="text-align:right">${usd(r.elevenlabs)}</td><td style="text-align:right">${cell(r.claude, c => c.total)}</td>
         <td style="text-align:right">${usd(r.power.total)}</td><td style="text-align:right"><b>${usd(r.total)}</b></td></tr>`; }).join('')}
     </table></div>
     <div class="el-line" style="color:var(--muted);margin-top:0.4rem">Power: ${(c.machines || []).map(m => `${elEsc(m.name)} ${m.watts} W`).join(' · ')} - estimates; set them in readback-costs.json. Full report: Reports\\YYYY-MM\\date Costs.pdf.</div>`;
