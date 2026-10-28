@@ -8,7 +8,9 @@ const (
 	batMarshalSyria  = `%~dp0atc.exe --marshal-only --airfield LCRA --marshal-freq 306.3 --marshal-voice coral --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --dashboard-port 6004 %MIZ_FLAG% --log-level %LOG%`
 	batLSOCauc       = `%~dp0atc.exe --lso-only --airfield UGSB --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%`
 	batLSOSyria      = `%~dp0atc.exe --lso-only --airfield LCRA --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%`
-	batATISPG        = `%~dp0atc.exe --atis-only --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%`
+	batLSOPG         = `%~dp0atc.exe --lso-only --airfield OMDM --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%`
+	batLSOKola       = `%~dp0atc.exe --lso-only --airfield ENBO --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr %SRS% --tacview-addr %TACVIEW% --lso-grpc-addr %GRPC% --eam-password %EAM% --log-level %LOG%`
+	batATISPG        =`%~dp0atc.exe --atis-only --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%`
 	batATISCaucasus  = `%~dp0atc.exe --atis-only --map caucasus --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%`
 	batCommandPG     = `%~dp0atc.exe --command-only --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%`
 	batCommandCauc   = `%~dp0atc.exe --command-only --map caucasus --command-freq 282.0 --command-name vSFG-7-Command --command-voice sage --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%`
@@ -26,6 +28,10 @@ func TestRoleMatchesProcCaucasusCarrier(t *testing.T) {
 	lsoCauc := proc(4, `C:\SkyeyeATC\atc.exe --lso-only --airfield UGSB --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr localhost:5008 --tacview-addr localhost:42676 --lso-grpc-addr localhost:50051 --eam-password hunter2 --log-level info`)
 	lsoSyria := proc(5, `C:\SkyeyeATC\atc.exe --lso-only --airfield LCRA --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr localhost:5002 --tacview-addr localhost:42676 --lso-grpc-addr localhost:50052 --eam-password hunter2 --log-level info`)
 	batumi := proc(3, `C:\SkyeyeATC\atc.exe --airfield UGSB --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --tts-voice nova --dashboard-port 6011 --runway-rotation=false --log-level info`)
+	lsoPG := proc(6, `C:\SkyeyeATC\atc.exe --lso-only --airfield OMDM --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr localhost:5008 --tacview-addr localhost:42676 --lso-grpc-addr localhost:50051 --eam-password hunter2 --log-level info`)
+	lsoKola := proc(7, `C:\SkyeyeATC\atc.exe --lso-only --airfield ENBO --lso-freq 128.3 --lso-voice ash --tts-speed 1.66 --srs-addr localhost:5008 --tacview-addr localhost:42676 --lso-grpc-addr localhost:50051 --eam-password hunter2 --log-level info`)
+	deckPG := proc(8, `C:\SkyeyeATC\atc.exe --airfield OMDM --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --deckboss-freq 128.6 --deckboss-voice verse --no-atis --dashboard-port 6005 --log-level info`)
+	deckKola := proc(9, `C:\SkyeyeATC\atc.exe --airfield ENBO --srs-addr localhost:5008 --eam-password hunter2 --tacview-addr localhost:42676 --deckboss-freq 128.6 --deckboss-voice verse --handoff-marshal-freq 306.3 --no-atis --dashboard-port 6005 --log-level info`)
 	cases := []struct {
 		name string
 		bat  string
@@ -44,6 +50,12 @@ func TestRoleMatchesProcCaucasusCarrier(t *testing.T) {
 		{"syria paddles matches its bat", batLSOSyria, lsoSyria, true},
 		{"syria paddles bat is not the caucasus paddles", batLSOSyria, lsoCauc, false},
 		{"caucasus paddles bat is not the syria paddles", batLSOCauc, lsoSyria, false},
+		{"pg paddles matches its bat", batLSOPG, lsoPG, true},
+		{"kola paddles matches its bat", batLSOKola, lsoKola, true},
+		{"pg paddles bat is not the caucasus paddles", batLSOPG, lsoCauc, false},
+		{"kola paddles bat is not the pg paddles", batLSOKola, lsoPG, false},
+		{"pg paddles bat is not the pg deckboss", batLSOPG, deckPG, false},
+		{"kola paddles bat is not the kola deckboss", batLSOKola, deckKola, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
