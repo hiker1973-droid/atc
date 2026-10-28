@@ -1,7 +1,7 @@
 @echo off
 :: vSFG-7 — Persian Gulf region launcher (dashboard-driven).
 :: Starts every PG role: ATIS -> Towers (Minhad, Dhafra, Al Ain) -> Marshal ->
-:: Command -> Deckboss -> GCI Overlord -> Paddles. Does NOT start the launcher (it is already running when
+:: Command -> Deckboss -> GCI Darkstar -> Paddles. Does NOT start the launcher (it is already running when
 :: the dashboard's Start Region button fires this). For the full cold-boot that
 :: also opens the dashboard, use start_all.bat instead.
 cd /d %~dp0
@@ -21,7 +21,7 @@ call "%~dp0start_command.bat"
 echo [vSFG-7] Launching Deckboss...
 call "%~dp0start_deckboss.bat"
 
-echo [vSFG-7] Launching GCI Overlord (266.000)...
+echo [vSFG-7] Launching GCI Darkstar (264.000)...
 call "%~dp0start_gci_pg.bat"
 
 echo [vSFG-7] Launching Paddles...

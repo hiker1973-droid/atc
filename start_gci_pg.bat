@@ -23,10 +23,10 @@ set GOMAXPROCS=2
 set GOGC=50
 set GOMEMLIMIT=256MiB
 
-:: GCI -- Overlord 266.000 AM for the Persian Gulf (operator 2026-10-28, Epic Fury:
-:: "we need overlord gci setup for PG"). Same role as start_gci_syria.bat and
-:: start_gci_caucasus.bat - read the notes there. 266.000 is the Hornets' COMM1 CH7
-:: in Epic Fury v1.14 and Foothold's Overlord; the mission's AI AWACS keep their own
-:: nets (Darkstar 1-1 E-3 264, Wizard 1-1 E-2 265), so the two never talk over
-:: each other. No PG height grid: radar horizon only, no terrain masking.
-start "vSFG-7 GCI Overlord (Persian Gulf)" cmd /c "%~dp0atc.exe --gci-only --map pg --airfield OMDM --gci-callsign Overlord --gci-freq 266.0 --gci-picture-interval 5m --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"
+:: GCI -- Darkstar 264.000 AM for the Persian Gulf (operator 2026-10-28, Epic Fury:
+:: "can we turn darkstar on for pg?"; Overlord 266 was the first try the same day).
+:: Same role as start_gci_caucasus.bat - read the notes there. 264.000 is the
+:: Hornets' COMM1 CH5 and the mission's AI E-3 Darkstar 1-1, as on Caucasus: DCS's
+:: AI AWACS never transmits on SRS, so pilots on SRS hear only this one. No PG
+:: height grid: radar horizon only, no terrain masking.
+start "vSFG-7 GCI Darkstar (Persian Gulf)" cmd /c "%~dp0atc.exe --gci-only --map pg --airfield OMDM --gci-callsign Darkstar --gci-freq 264.0 --gci-picture-interval 5m --srs-addr %SRS% --tacview-addr %TACVIEW% --eam-password %EAM% --log-level %LOG%"
