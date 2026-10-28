@@ -17,9 +17,11 @@ import "strings"
 //     2026-10-20 (Whisper split off the "Se").
 //   - Mozdok (XRMF, red side): "Monstar Tower" and "Mazda Ground" were dropped
 //     on Day 2026-10-22; "Mazdoc traffic" was heard on blue Command.
+//   - Senaki again: "Scooby Tower, Venom 201 reporting 14 miles" and "Sukhoi
+//     Tower, Venom 201, clear the active" were dropped on Day 2026-10-27.
 var fieldSpokenAliases = map[string][]string{
 	"mozdok tower":          {"monstar", "mazda", "mazdoc", "mazdok", "mozdoc", "mozdock", "mosdok", "mozdog"},
-	"senaki tower":          {"snarky", "select ski", "senacky", "senaky", "the naki", "naki"},
+	"senaki tower":          {"snarky", "select ski", "senacky", "senaky", "the naki", "naki", "scooby", "sukhoi"},
 	"tbilisi tower":         {"tbilissi", "tiblisi", "tibilisi", "t bilisi", "lochini", "double ace", "double-ace", "to velocity"},
 	"mafraq tower":          {"king hussein", "hussein"},
 	"h4 tower":              {"h 4", "h-4", "h four"},

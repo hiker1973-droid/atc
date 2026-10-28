@@ -25,6 +25,18 @@ import (
 // of the text than to enqueue an empty-string aircraft.
 var squadronCallsignRe = regexp.MustCompile(`(?i)\b(Raider|Venom|Viper)\s+\d{1,4}\b`)
 
+// Seen on Day / Foothold 2026-10-27 - 28:
+//   - shipDigitRe: "Venom 0-2-0-2, ship F-16" is Whisper's "Venom 0-2-0,
+//     2-ship F-16"; it was answered as Venom 0202.
+//   - callsignThenTowerRe: "Venom 212, tower, Venom 212 airborne" (Bassel)
+//     opens with the callsign and was dropped as not addressed.
+//   - flightSizeLeadRe: a "callsign" that is really the flight size.
+var (
+	shipDigitRe         = regexp.MustCompile(`\b(\d-?\d-?\d)-?(\d),?\s+ship\b`)
+	callsignThenTowerRe = regexp.MustCompile(`^\s*[a-z]{3,}[\s-]*\d[\d\s-]*,?\s+(?:tower|traffic)\b`)
+	flightSizeLeadRe    = regexp.MustCompile(`(?i)^(?:a\s+)?(?:flight of\b|(?:two|three|four|five|six|[2-6])[\s-]?ship\b|(?:two|three|four|five|six|[2-6])\s+(?:f/?a?[\s-]?1[68]s?|hornets?|vipers?|jets)\b)`)
+)
+
 // ── Conflict thresholds ───────────────────────────────────────────────────────
 
 const (
@@ -1394,6 +1406,7 @@ func isModexReadback(lower string) bool {
 // ParseIntent converts a raw STT transcript into an ATCRequest.
 // Returns nil if the transmission is not addressed to this tower.
 func ParseIntent(text string, towerCallsign string) *ATCRequest {
+	text = shipDigitRe.ReplaceAllString(text, "$1, $2-ship")
 	lower := strings.ToLower(text)
 
 	// Extract keywords from callsign for fuzzy matching.
@@ -1430,6 +1443,7 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	if !isDirect && !isCTAF {
 		if strings.HasPrefix(lower, "tower,") || strings.HasPrefix(lower, "tower ") ||
 			strings.HasPrefix(lower, "traffic,") || strings.HasPrefix(lower, "traffic ") ||
+			callsignThenTowerRe.MatchString(lower) ||
 			addressedByFieldName(lower, primaryKey, aliases) {
 			isDirect = true
 		}
@@ -1438,9 +1452,16 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 	if !isDirect && !isCTAF {
 		return nil
 	}
+	cs := extractCallsign(text, towerCallsign)
+	if flightSizeLeadRe.MatchString(cs) {
+		// The flight size is not a callsign: "Senaki Tower, flight of two
+		// F-16s inbound" (Day 2026-10-27 21:02) was answered "flight of two
+		// F-16s flight, Senaki Tower". No callsign = say again with one.
+		cs = strings.TrimSpace(squadronCallsignRe.FindString(text))
+	}
 	req := &ATCRequest{
 		Raw:      text,
-		Callsign: JoinModexDigits(extractCallsign(text, towerCallsign)),
+		Callsign: JoinModexDigits(cs),
 		Airframe: extractAirframe(lower),
 	}
 	// "request for taxi" / "requesting for takeoff" — the extra "for" broke

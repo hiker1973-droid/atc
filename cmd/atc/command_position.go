@@ -5,6 +5,7 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/paulmach/orb"
 
@@ -55,7 +56,13 @@ func isTankerRequest(lower string) bool {
 // bullseye / tanker replies first, then the tasking exchange, then the
 // text-only intents.
 func commandReply(text, callsign, channelName string, store *tacviewPositions) string {
+	if towerAddressedCall(text) {
+		return ""
+	}
 	if resp := wrongRadioMarshal(text, callsign, channelName); resp != "" {
+		return resp
+	}
+	if resp := commandPictureRedirect(text, callsign, channelName); resp != "" {
 		return resp
 	}
 	// "302 ejecting", "Raider 301, 302 is down" (combat_calls.go).
@@ -333,6 +340,31 @@ var marshalAddresses = []string{"union marshall", "union marshal", "unit marshal
 // Command's frequency with where Marshal is (operator ruling 2026-10-15, after
 // Raider 302 called "Union Marshall" on 282 at 14:56). "" when the call is
 // not addressed to Marshal, or Command has no Marshal frequency.
+// towerAddressedCall: a call opening with a tower, Ground or traffic address
+// is the tower's, not Command's. Foothold 2026-10-28 01:57: "Tower, Venom 212
+// inbound" on 282 was answered "Tower, vSFG-7-Command, copy, continue".
+func towerAddressedCall(text string) bool {
+	w := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	if len(w) == 0 {
+		return false
+	}
+	addr := map[string]bool{"tower": true, "ground": true, "traffic": true}
+	return addr[w[0]] || (len(w) > 1 && addr[w[1]] && w[0] != "command")
+}
+
+// commandPictureRedirect sends a picture or bogey dope request to the AWACS.
+// Night 2026-10-27 09:36: "Commander 303, request picture" went unanswered.
+func commandPictureRedirect(text, callsign, channelName string) string {
+	if flagCommandGCIName == "" || flagCommandGCIFreq <= 0 || callsign == "" {
+		return ""
+	}
+	lower := strings.ToLower(text)
+	if !containsAny(lower, "picture", "bogey dope", "bogie dope") || containsAny(lower, "fence", "fencing") {
+		return ""
+	}
+	return fmt.Sprintf("%s, %s, picture is with %s, %s.", callsign, channelName, flagCommandGCIName, spokenFreq1(flagCommandGCIFreq))
+}
+
 func wrongRadioMarshal(text, callsign, channelName string) string {
 	if flagHandoffMarshalFreq <= 0 {
 		return ""
