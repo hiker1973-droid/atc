@@ -3,7 +3,7 @@
 
 Reads Paddles' log lines (atc-lso.log, JSON per line; a "Role :: {json}" prefix is
 skipped) from one or more rigs and builds a PDF for a day: every pass with Paddles'
-grade and wire, DCS's own grade beside it, the groove (glideslope and lineup at
+grade and wire, the groove (glideslope and lineup at
 X / IM / IC / AR) as a small plot, a pilot table, what Paddles heard and said, and
 the month's greenie board (every pass so far this month, from --board-dir).
 Each pass's Case I pattern (pkg/lso pattern.go: initial, break, abeam, the
@@ -520,23 +520,21 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None)
         g = p["grade"] or "-"
         if p["comments"]:
             g += "<br/><font size=6.4 color='#555555'>%s</font>" % p["comments"]
-        dg, dw = dcs_for(p, ev)
-        dcs = "%s%s" % (dg, " &middot; %d wire" % dw if dw else "") if dg else "<font color='#888888'>none</font>"
         touch = "%+d m, %+d m R" % p["touch"] if p["touch"] else "-"
         said = ", ".join(re.sub(r" \d+\.\ds$", "", c) for c in p["said"]) or "-"
         rows.append(["%s<br/><font size=6.4 color='#555555'>%s</font>" % (p["t"].strftime("%H:%M"), p["rig"]),
                      "<b>%s</b><br/><font size=6.4 color='#555555'>%s</font>" % (p["callsign"], p["model"]),
-                     outcome_text(p), g, str(p["wire"]) if p["wire"] else "-", dcs, touch,
+                     outcome_text(p), g, str(p["wire"]) if p["wire"] else "-", touch,
                      groove_plot(p["segs"]), "<font size=6.6>%s</font>" % said])
     if rows:
         S.append(KeepTogether([Paragraph("Passes", h), table(
-            ["Time", "Pilot", "Result", "Paddles grade", "Wire", "DCS LSO", "Hook down", "Groove: GS / lineup", "Paddles said"],
-            rows, [0.5, 0.95, 0.55, 1.05, 0.42, 0.72, 0.74, 1.65, 0.82])]))
+            ["Time", "Pilot", "Result", "Paddles grade", "Wire", "Hook down", "Groove: GS / lineup", "Paddles said"],
+            rows, [0.5, 0.95, 0.55, 1.15, 0.45, 0.8, 1.9, 1.0])]))
         S.append(Paragraph("<b>Groove plot:</b> <font color='#1f3350'><b>glideslope</b></font> and "
                            "<font color='#d9822b'><b>lineup</b></font> error in degrees at X (start), IM (middle), "
                            "IC (in close) and AR (at the ramp); above the centre line is high / right. Dotted lines "
                            "are &plusmn;1&deg;. <b>Hook down</b> is metres past the aim point and right of the "
-                           "landing line. Wire is Paddles' estimate; DCS LSO is DCS's own grade from DCS-gRPC.", note))
+                           "landing line. Wire is Paddles' estimate.", note))
     else:
         S.append(Paragraph("Passes", h))
         S.append(Paragraph("No passes flown.", note))
@@ -566,20 +564,6 @@ def build(ev, start, end, rigs, out_path, sample=False, problems=(), board=None)
         S += greenie_board(board, end.replace(day=1), end)
 
     S += field_section(ev["field"])
-
-    # DCS's own grades (AI included) and the comparison
-    if ev["dcs"]:
-        drow = [[d["_t"].strftime("%H:%M"), d["_rig"], d.get("callsign", ""), d.get("type", ""), d.get("grade", ""),
-                 str(d.get("wire", "") or "-"), "player" if any(p["callsign"] == d.get("callsign") for p in passes)
-                 else "AI / no Paddles pass"] for d in ev["dcs"]]
-        S.append(KeepTogether([Paragraph("DCS LSO grades (DCS-gRPC)", h), table(
-            ["Time", "Rig", "Callsign", "Type", "Grade", "Wire", "Paddles pass?"], drow,
-            [0.5, 0.6, 1.5, 1.2, 0.7, 0.5, 2.4])]))
-    vs = len(ev["vs"])
-    S.append(Paragraph("<b>Paddles vs DCS:</b> %s" % (
-        "%d pass(es) graded by both." % vs if vs else
-        "no pass graded by both yet. DCS sends grades for AI jets and for players it scores; a matched pass "
-        "logs \"vs DCS LSO\" and lands in this table."), note))
 
     # Radio and health
     abeam = len(ev["abeam"])

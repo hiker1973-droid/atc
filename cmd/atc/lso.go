@@ -255,6 +255,29 @@ var (
 	lsoGreenDeckRe = regexp.MustCompile(`(?i)\bgreen[\s-]?(?:deck|dec|dek)\b|\bdeck (?:is )?green\b`)
 )
 
+var (
+	lsoDigitWords = `zero|oh|one|two|three|four|five|six|seven|eight|nine|niner`
+	lsoWordModex  = regexp.MustCompile(`(?i)\b(` + lsoDigitWords + `)[\s,-]+(` + lsoDigitWords + `)[\s,-]+(` + lsoDigitWords + `)\b`)
+	// lsoOfModex: Whisper hears "4-0-5" as "4 of 5" (Night 2026-10-29 20:01).
+	lsoOfModex = regexp.MustCompile(`(?i)\b(\d) of (\d)\b`)
+	lsoWordVal = map[string]string{"zero": "0", "oh": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+		"five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "niner": "9"}
+)
+
+// lsoSpokenModex turns a spoken modex into digits so the rest of the parser
+// sees one form: "three-one-nine" (Night 2026-10-29 19:57, an intent miss)
+// becomes "319" and "4 of 5" becomes "405".
+func lsoSpokenModex(text string) string {
+	text = lsoWordModex.ReplaceAllStringFunc(text, func(m string) string {
+		var b strings.Builder
+		for _, w := range lsoWordModex.FindStringSubmatch(m)[1:] {
+			b.WriteString(lsoWordVal[strings.ToLower(w)])
+		}
+		return b.String()
+	})
+	return lsoOfModex.ReplaceAllString(text, "${1}0${2}")
+}
+
 // lsoFeed is the shared state: the tracker (Tacview goroutine) and the radio
 // (voiceNetLoop goroutine) both touch it.
 type lsoFeed struct {
@@ -279,6 +302,7 @@ func (f *lsoFeed) unlock() { f.mu.Unlock() }
 // heard handles a transmission on the Paddles net. Ball calls go to the TX
 // queue (one radio, no overlap with the groove calls) and return netHandled.
 func (f *lsoFeed) heard(text string) (string, string) {
+	text = lsoSpokenModex(text)
 	modex := ""
 	if m := lsoModexRe.FindStringSubmatch(text); m != nil {
 		modex = m[1] + m[2] + m[3]

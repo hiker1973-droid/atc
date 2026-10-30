@@ -124,15 +124,14 @@ def paddles_summary(root, date):
     ev = paddles.collect(logs, day, day)
     passes = []
     for p in ev["pass"]:
-        g, w = paddles.dcs_for(p, ev)
         passes.append({"t": p["t"].isoformat(), "rig": p["rig"], "callsign": p["callsign"], "model": p["model"],
                        "outcome": p["outcome"], "grade": p["grade"], "wire": p["wire"],
-                       "points": paddles.grade_points(p), "dcsGrade": g, "dcsWire": w})
+                       "points": paddles.grade_points(p)})
     landed = []
     for f in paddles.collect(fields, day, day)["field"] if fields else []:
         landed.append({"t": f["t"].isoformat(), "rig": f["rig"], "callsign": f["callsign"], "model": f["model"],
                        "runway": f["runway"], "outcome": f["outcome"], "grade": f["grade"]})
-    return {"passes": passes, "fields": landed, "dcsGrades": len(ev["dcs"]), "misses": len(ev["miss"])}
+    return {"passes": passes, "fields": landed, "misses": len(ev["miss"])}
 
 
 def pilots_summary(root, date):
