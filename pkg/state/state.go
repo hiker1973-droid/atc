@@ -745,10 +745,32 @@ func StackAngels(position int) int {
 	return angels
 }
 
+// MarshalStackStale is how long a stack entry can go untouched, with no
+// approach time still to come, before it is treated as a jet that left (landed
+// elsewhere, disconnected, diverted). Entries only ever left on "commencing", so
+// each ghost added a slot - and ten minutes in Case III - to every later jet's
+// position and approach time ("40 min push time when it should be 10").
+const MarshalStackStale = 30 * time.Minute
+
+// pruneStaleLocked drops entries untouched for MarshalStackStale whose approach
+// time (if any) is more than five minutes past. Caller holds s.mu.
+func (s *MarshalStack) pruneStaleLocked(now time.Time) {
+	for cs, ac := range s.aircraft {
+		if now.Sub(ac.UpdatedAt) < MarshalStackStale {
+			continue
+		}
+		if !ac.EAT.IsZero() && now.Sub(ac.EAT) < 5*time.Minute {
+			continue
+		}
+		delete(s.aircraft, cs)
+	}
+}
+
 // Enqueue adds or updates an aircraft in the stack and returns their position and angels.
 func (s *MarshalStack) Enqueue(callsign string, fuelState float64) (position, angels int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.pruneStaleLocked(time.Now())
 	if ac, ok := s.aircraft[callsign]; ok {
 		// Already in stack — just update fuel
 		ac.FuelState = fuelState
