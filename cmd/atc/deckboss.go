@@ -327,7 +327,7 @@ func deckbossLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, 
 				transmit(fmt.Sprintf("%s, Deckboss, copy under tension.", callsign))
 			}
 
-		case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing", "current brc", "current bearing", "current vrc", "say vrc", "check vrc"):
+		case containsAny(lower, "requesting brc", "request the brc", "requesting the brc", "need brc", "need the brc", "give me the brc", "say the brc", "requesting bearing", "say brc", "request brc", "brc check", "check brc", "what's brc", "what is brc", "say bearing", "current brc", "current bearing", "current vrc", "say vrc", "check vrc"):
 			if !addressed {
 				log.Debug().Str("text", text).Msg("Deckboss: BRC dropped — not address-led")
 				return

@@ -294,7 +294,7 @@ func classifyMarshalCall(lower string, fuelState float64) marshalIntent {
 		return marshalRadioCheck
 	case containsAny(lower, "radar check", "radar contact", "request radar", "radar service"):
 		return marshalRadarCheck
-	case containsAny(lower, "say brc", "request brc", "brc check", "check brc", "confirm brc", "current brc",
+	case containsAny(lower, "requesting brc", "request the brc", "requesting the brc", "need brc", "need the brc", "give me the brc", "say the brc", "requesting bearing", "say brc", "request brc", "brc check", "check brc", "confirm brc", "current brc",
 		"what's brc", "what is brc", "say bearing", "say mother's heading", "mother's heading", "mothers heading",
 		"say heading of mother", "base recovery course"):
 		return marshalBRCRequest

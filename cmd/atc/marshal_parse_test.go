@@ -18,6 +18,7 @@ func TestMarshalCallsFlown20260914(t *testing.T) {
 		{"Marshall, Raider 331 checking in.", "Raider 331", marshalCheckIn, "silence — no check-in intent"},
 		{"Marshal, Raider 331, clear mothers.", "Raider 331", marshalDepartureClear, "silence — needed 'clear of'"},
 		{"Union Marshal, Raider 331, marking moms 350, for 43, angels 16, state 3.5.", "Raider 331", marshalMarkingMom, "ok"},
+		{"Union Marshal, Raider 319 requesting BRC.", "Raider 319", marshalBRCRequest, "Night 2026-10-31 10:07 ignored (Deckboss too)"},
 		{"Here Marshall Raider 331, request BRC.", "Raider 331", marshalBRCRequest, "dropped as self-echo"},
 		{"Leader, Marshal, Raider 331, marking mom's 360 for 35, state 3.3, angels 17.", "Raider 331", marshalMarkingMom, "dropped as self-echo"},
 		{"Unit Marshall, Raider 331, marking moms 360 for 31, angels 17, state 3.3.", "Raider 331", marshalMarkingMom, "callsign 'Unit Marshall', phantom 2nd stack slot"},

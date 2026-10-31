@@ -1549,14 +1549,14 @@ func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool, fue
 	if radar {
 		return pick([]string{
 			fmt.Sprintf("%s, " + c.towerCallsign + ", radar contact, %s DME, continue.", callsign, d),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", paint you at %s DME, continue inbound.", callsign, d),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", paint you at %s DME, continue.", callsign, d),
 			fmt.Sprintf("%s, " + c.towerCallsign + ", contact %s DME, continue.", callsign, d),
 		})
 	}
 	return pick([]string{
 		fmt.Sprintf("%s, " + c.towerCallsign + ", roger, %s DME, continue.", callsign, d),
 		fmt.Sprintf("%s, " + c.towerCallsign + ", copy %s DME.", callsign, d),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", %s DME, continue inbound.", callsign, d),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", %s DME, continue.", callsign, d),
 	})
 }
 
