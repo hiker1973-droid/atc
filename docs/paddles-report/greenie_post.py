@@ -39,7 +39,7 @@ OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides
 MANUAL_FILE = os.path.join(os.path.expanduser("~"), "readback-manual-passes.csv")
 MESSAGE_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-message.txt")
 RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
-SHOWN = 15  # squares per pilot, newest on the right
+SHOWN = 15  # squares per pilot, newest on the left
 
 # fill, ink, label - the DCS greenie board's colours
 COLOURS = {
@@ -165,7 +165,7 @@ def page(passes, now):
         ago = "%d hours ago" % h if h < 48 else "%d days ago" % (h // 24)
     body = []
     for avg, lt, cs, ps in rows:
-        cells = "".join(square(p) for p in ps[-SHOWN:]) + '<td class="e"></td>' * (SHOWN - len(ps[-SHOWN:]))
+        cells = "".join(square(p) for p in reversed(ps[-SHOWN:])) + '<td class="e"></td>' * (SHOWN - len(ps[-SHOWN:]))
         body.append('<tr><td class="n">%s</td><td class="a">%s</td><td class="d">%s</td>%s</tr>' % (
             html.escape(names.get(cs.lower()) or shown.get(cs, cs)), "%.1f" % avg if avg >= 0 else "-",
             lt.strftime("%d-%m") if ps else "-", cells))
