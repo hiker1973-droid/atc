@@ -132,6 +132,9 @@ def page(passes, now):
     names = {cs: label for cs, label, _, _ in roster()}
     # Another way Paddles hears a pilot (their bare name) counts as their callsign.
     canon = {a: cs for cs, _, _, al in roster() for a in al if cs}
+    # Only pilots in readback-pilots.csv are on the board (flight callsigns like "Raider 1-1" are not pilots).
+    if names:
+        passes = [p for p in passes if canon.get(p["callsign"].lower(), p["callsign"].lower()) in names]
     by, shown = defaultdict(list), {}
     for p in sorted(passes, key=lambda p: p["t"]):
         cs = p["callsign"]
@@ -218,7 +221,9 @@ def main():
     if not passes:
         print("no graded passes yet")
         return 0
-    pilots = len({p["callsign"].lower() for p in passes} | {c for c, _, r, _ in roster() if not r})
+    known = {c for c, _, _, _ in roster()}
+    pilots = len({canon_cs for canon_cs in (p["callsign"].lower() for p in passes) if canon_cs in known or not known}
+                 | {c for c, _, r, _ in roster() if not r})
     png = screenshot(page(passes, dt.datetime.now()), 230 + 54 * pilots)
     out = os.path.join(REPORTS, "_data", "paddles", "greenieboard.png")
     open(out, "wb").write(png)
