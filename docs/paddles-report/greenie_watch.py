@@ -13,7 +13,7 @@ Two more jobs ride on the same loop: twenty minutes after the last pass of a rec
 recovery summary (recovery_summary.py --post), and on Sunday after 20:00 it posts the weekly report
 (weekly_report.py --post) once, as a new message in the greenie board's channel, and refreshes the
 rolling 30-day monthly report (weekly_report.py --monthly --post), one message edited in place, and
-posts the Marshal report (marshal_report.py --post).
+posts the Marshal report (marshal_report.py --post) and the pattern report (pattern_report.py --post).
 
 Run:  pythonw -I docs/paddles-report/greenie_watch.py
 """
@@ -105,6 +105,7 @@ def main():
             run("weekly_report.py", "--post")
             run("weekly_report.py", "--monthly", "--post")  # the rolling 30 days, edited in place
             run("marshal_report.py", "--post")  # how Marshal worked this week
+            run("pattern_report.py", "--post")  # how the squadron flew the pattern (past 30 days)
         time.sleep(POLL_S)
 
 
