@@ -35,6 +35,7 @@ from build_paddles_report import POINTS, board_key, collect  # noqa: E402
 
 REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-webhook.txt")
+REPORTS_WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-reports-webhook.txt")  # the weekly / monthly / Marshal / pattern reports' channel; the board's if absent
 CARDS_WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-cards-webhook.txt")  # the pass cards' channel; the board's if absent
 PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
 OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides.csv")
@@ -265,6 +266,12 @@ def post(webhook, png, text, message_file=None):
     return "posted"
 
 
+def reports_hook():
+    """The webhook the weekly, monthly, Marshal and pattern reports post to."""
+    f = REPORTS_WEBHOOK_FILE if os.path.exists(REPORTS_WEBHOOK_FILE) else WEBHOOK_FILE
+    return open(f, encoding="utf-8").read().strip()
+
+
 def fetch_today(day):
     """Today's Paddles logs from every rig, saved like the nightly run saves them (a later fetch of the same day overwrites)."""
     data = os.path.join(REPORTS, "_data", "paddles")
@@ -288,7 +295,7 @@ def backup():
     """Copy the board's data files off the home folder: the latest set, and one dated set a day
     (30 kept). The webhook (a secret) goes to G: only, never into OneDrive."""
     home = os.path.expanduser("~")
-    files = [PILOTS_FILE, MANUAL_FILE, OVERRIDES_FILE, MESSAGE_FILE, WEBHOOK_FILE, CARDS_WEBHOOK_FILE]
+    files = [PILOTS_FILE, MANUAL_FILE, OVERRIDES_FILE, MESSAGE_FILE, WEBHOOK_FILE, CARDS_WEBHOOK_FILE, REPORTS_WEBHOOK_FILE]
     today = dt.date.today().isoformat()
     for i, root in enumerate(BACKUP_DIRS):
         try:
@@ -298,7 +305,7 @@ def backup():
                 d = os.path.join(root, sub_dir)
                 os.makedirs(d, exist_ok=True)
                 for f in files:
-                    if os.path.exists(f) and (i == 0 or f not in (WEBHOOK_FILE, CARDS_WEBHOOK_FILE)):
+                    if os.path.exists(f) and (i == 0 or f not in (WEBHOOK_FILE, CARDS_WEBHOOK_FILE, REPORTS_WEBHOOK_FILE)):
                         shutil.copy2(f, os.path.join(d, os.path.basename(f)))
             old = sorted(x for x in os.listdir(root) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", x))
             for x in old[:-30]:

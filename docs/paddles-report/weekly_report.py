@@ -145,7 +145,7 @@ def main():
     open(out, "wb").write(png)
     print(summary, "->", out)
     if "--post" in sys.argv:
-        hook = open(gp.WEBHOOK_FILE, encoding="utf-8").read().strip()
+        hook = gp.reports_hook()
         if monthly:  # one message, edited each week
             print(gp.post(hook, png, summary, MONTHLY_FILE))
         else:
