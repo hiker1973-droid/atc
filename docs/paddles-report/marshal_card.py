@@ -504,8 +504,8 @@ def build(rec, c3, events, passes, carrier=None):
 
 
 def post_cards(pngs):
-    """Post each card as a new message to the pass cards' channel (the reports channel if there is none)."""
-    f = gp.CARDS_WEBHOOK_FILE if os.path.exists(gp.CARDS_WEBHOOK_FILE) else gp.WEBHOOK_FILE
+    """Post each card as a new message to the Marshal cards' own channel (the pass cards' channel if there is none)."""
+    f = next((x for x in (gp.MARSHAL_WEBHOOK_FILE, gp.CARDS_WEBHOOK_FILE) if os.path.exists(x)), gp.WEBHOOK_FILE)
     hook = open(f, encoding="utf-8").read().strip()
     for text, png in pngs:
         gp.send(hook + "?wait=true", "POST", png, text)
