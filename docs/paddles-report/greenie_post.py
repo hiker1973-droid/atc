@@ -35,6 +35,7 @@ from build_paddles_report import POINTS, board_key, collect  # noqa: E402
 
 REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-webhook.txt")
+CARDS_WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-cards-webhook.txt")  # the pass cards' channel; the board's if absent
 PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
 OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides.csv")
 MANUAL_FILE = os.path.join(os.path.expanduser("~"), "readback-manual-passes.csv")
@@ -286,7 +287,7 @@ def backup():
     """Copy the board's data files off the home folder: the latest set, and one dated set a day
     (30 kept). The webhook (a secret) goes to G: only, never into OneDrive."""
     home = os.path.expanduser("~")
-    files = [PILOTS_FILE, MANUAL_FILE, OVERRIDES_FILE, MESSAGE_FILE, WEBHOOK_FILE]
+    files = [PILOTS_FILE, MANUAL_FILE, OVERRIDES_FILE, MESSAGE_FILE, WEBHOOK_FILE, CARDS_WEBHOOK_FILE]
     today = dt.date.today().isoformat()
     for i, root in enumerate(BACKUP_DIRS):
         try:
@@ -296,7 +297,7 @@ def backup():
                 d = os.path.join(root, sub_dir)
                 os.makedirs(d, exist_ok=True)
                 for f in files:
-                    if os.path.exists(f) and (i == 0 or f != WEBHOOK_FILE):
+                    if os.path.exists(f) and (i == 0 or f not in (WEBHOOK_FILE, CARDS_WEBHOOK_FILE)):
                         shutil.copy2(f, os.path.join(d, os.path.basename(f)))
             old = sorted(x for x in os.listdir(root) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", x))
             for x in old[:-30]:
@@ -347,7 +348,8 @@ def main():
         import pass_cards
         yesterday = dt.date.today() - dt.timedelta(days=1)
         recent = [p for p in passes if p.get("rig") and p["t"].date() >= yesterday]
-        n = pass_cards.post_cards(hook, recent, {yesterday.isoformat(), dt.date.today().isoformat()})
+        cards_hook = open(CARDS_WEBHOOK_FILE, encoding="utf-8").read().strip() if os.path.exists(CARDS_WEBHOOK_FILE) else hook
+        n = pass_cards.post_cards(cards_hook, recent, {yesterday.isoformat(), dt.date.today().isoformat()})
         if n:
             print("pass cards posted:", n)
     except Exception as e:  # noqa: BLE001
