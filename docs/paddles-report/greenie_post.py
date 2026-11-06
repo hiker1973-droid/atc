@@ -171,11 +171,11 @@ def page(passes, now):
                   for f, _, l in COLOURS.values())
     logo = "file:///" + os.path.join(os.path.dirname(HERE), "vsfg7_patch.png").replace("\\", "/")
     return """<!doctype html><html><head><meta charset="utf-8"><style>
-body{margin:0;background:#0d1117;font-family:Consolas,'Courier New',monospace;color:#c9d1d9}
+body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9}
 .w{margin:8px;border:1px solid #30363d;background:#161b22;padding:10px 12px;border-radius:6px}
 .h{position:relative;height:150px}
 .h img{position:absolute;left:4px;top:0;width:140px;height:140px;border-radius:50%%;box-shadow:0 0 0 2px #30363d,0 0 14px rgba(88,166,255,.3)}
-h1{margin:0;position:absolute;left:0;right:0;top:44px;text-align:center;font:700 44px 'Segoe UI',Arial,sans-serif;color:#58a6ff}
+h1{margin:0;position:absolute;left:0;right:0;top:44px;text-align:center;font:700 44px Arial,Helvetica,sans-serif;color:#58a6ff}
 .i{position:absolute;right:4px;top:6px;border:1px solid #30363d;background:#1c2330;border-radius:5px;padding:8px 36px;text-align:center;font-size:22px;line-height:1.5}
 table{border-collapse:collapse;width:100%%}td{border:1px solid #30363d;height:52px;text-align:center;font-size:26px}
 tr:nth-child(even){background:#1c2330}
