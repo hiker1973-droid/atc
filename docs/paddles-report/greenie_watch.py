@@ -12,7 +12,8 @@ posts a card for each new pass. The hourly task stays as the backstop.
 Two more jobs ride on the same loop: twenty minutes after the last pass of a recovery it posts the
 recovery summary (recovery_summary.py --post), and on Sunday after 20:00 it posts the weekly report
 (weekly_report.py --post) once, as a new message in the greenie board's channel, and refreshes the
-rolling 30-day monthly report (weekly_report.py --monthly --post), one message edited in place.
+rolling 30-day monthly report (weekly_report.py --monthly --post), one message edited in place, and
+posts the Marshal report (marshal_report.py --post).
 
 Run:  pythonw -I docs/paddles-report/greenie_watch.py
 """
@@ -103,6 +104,7 @@ def main():
             json.dump({"last": week}, open(WEEK_FILE, "w", encoding="utf-8"))  # first, so a failed post is not retried every 15 s
             run("weekly_report.py", "--post")
             run("weekly_report.py", "--monthly", "--post")  # the rolling 30 days, edited in place
+            run("marshal_report.py", "--post")  # how Marshal worked this week
         time.sleep(POLL_S)
 
 
