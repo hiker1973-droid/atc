@@ -31,6 +31,7 @@ PW, PH = 840, 520
 RANGE = 30  # NM the views reach
 YEL, GRN, RED, WHITE, MUTED = pc.YEL, pc.GRN, pc.RED, pc.WHITE, pc.MUTED
 PLATFORM_FT = 5000
+PLANNED = False  # operator 2026-11-06: the cards show what the pilot actually did, not the Case I / III instructions
 GS_DEG = 3.5
 
 
@@ -124,41 +125,30 @@ def stack_view(rec, mates, brc, name, carrier=None):
     s.append('<g transform="rotate(%.1f %d %d)">%s</g>' % (rot, cx, cy, pc.carrier_top(cx, cy, None)))
     if brc is not None:
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
-    # the stack: every jet at its hold, with the racetrack it flies (about 4 NM long, 2 NM wide, on the radial)
+    # every jet's logged hold fix, and this jet's flown track (green until it commenced, yellow after) with its logged fixes
     for m in mates:
-        ang = m["angels"] or 6
-        mine = m is rec
-        real = [f for f in m["fixes"] if f[3] is not None]
-        hold = next((f for f in real if f[0] == "hold"), None)
-        x, y = pt(hold[3], hold[2]) if hold else pt(m["radial"], ang + 15)
-        d = (hold[2] if hold else ang + 15)
-        r1, r2 = pt(m["radial"], d - 2.5), pt(m["radial"], d + 2.5)
-        width = 1.0 * k
-        s.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="none" stroke="%s" stroke-width="1.3" stroke-dasharray="4 4" opacity=".8"/>' % (
-            min(r1[0], r2[0]), cy - width - (cy - y) * 0 if False else y - width, abs(r1[0] - r2[0]), 2 * width, width, "#58a6ff" if mine else "#484f58"))
-        s.append('<circle cx="%.1f" cy="%.1f" r="%d" fill="%s" stroke="%s" stroke-width="2"/>' % (x, y, 11 if mine else 7, "#1f6feb" if mine else "#30363d", YEL if mine else "#8b949e"))
-        s.append(pc.text(x, y - 24 if mine else y - 18, "A%d %s" % (ang, name(m)), 15 if mine else 12, "#e6edf3" if mine else MUTED, "middle"))
-        if mine:
-            s.append(pc.note(x, y + 46, "%d DME" % d, 15, "middle") + pc.arrow(x, y + 32, x, y + 13))
-            if m["eat"]:
-                s.append(pc.text(x, y + 66, "approach time %s%s" % (m["eat"].strftime("%H:%M"), " (re-issued)" if m["eat_missed"] else ""), 12, MUTED, "middle"))
-    # the way in for this jet, with the minutes between the steps
-    hold_nm = (rec["angels"] or 6) + 15
-    real = [f for f in rec["fixes"] if f[3] is not None]
-    if len(real) > 1:
-        s.append(pc.poly([pt(f[3], f[2]) for f in real], WHITE, 2.4))
-    steps = [(hold_nm - 1, "commence", rec["commence"]), (14, "platform", rec["platform"]), (8, "dirty up", rec["dirty"]), (3, "Paddles", rec["handoff"])]
-    prev = None
-    for i, (nm, lab, t) in enumerate(steps):
-        x, y = pt(radial, nm)
-        s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x, y, YEL))
-        label = "%s %s" % (lab, t.strftime("%H:%M") if t else "%d NM" % nm)
-        up = i % 2 == 0
-        s.append(pc.note(x, y + (-44 if up else 58), label, 15, "middle") + pc.arrow(x, y + (-34 if up else 44), x, y + (-7 if up else 8)))
-        if prev and prev[2] and t and mins(prev[2], t) is not None:
-            px_, py_ = pt(radial, (prev[0] + nm) / 2.0)
-            s.append(pc.text(px_, py_ + 18, "+%d min" % round(mins(prev[2], t)), 12, MUTED, "middle"))
-        prev = (nm, lab, t)
+        hold = next((f for f in m["fixes"] if f[0] == "hold" and f[3] is not None), None)
+        if hold and m is not rec:
+            x, y = pt(hold[3], hold[2])
+            s.append('<circle cx="%.1f" cy="%.1f" r="6" fill="#30363d" stroke="#8b949e" stroke-width="2"/>' % (x, y) + pc.text(x, y - 14, "A%d %s" % (m["angels"] or 6, name(m)), 12, MUTED, "middle"))
+    com_t = rec["commence"].timestamp() if rec.get("commence") else None
+    legs = ([], [])
+    for ut, dist, brg, alt in rec.get("track") or []:
+        legs[1 if (com_t and ut >= com_t) else 0].append(pt(brg, dist))
+    if legs[0] and legs[1]:
+        legs[0].append(legs[1][0])
+    for pts_, col in ((legs[0], GRN), (legs[1], YEL)):
+        if len(pts_) > 1:
+            s.append(pc.poly(pts_, col, 2.6))
+    if not (rec.get("track") or []) and len([f for f in rec["fixes"] if f[3] is not None]) > 1:
+        s.append(pc.poly([pt(f[3], f[2]) for f in rec["fixes"] if f[3] is not None], WHITE, 2.4, "6 5"))
+    for n, (kind, when, d, brg, ang) in enumerate(f for f in rec["fixes"] if f[3] is not None):
+        x, y = pt(brg, d)
+        s.append('<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="%s" stroke-width="2"/>' % (x, y, "#1f6feb" if kind == "hold" else YEL, YEL))
+        up = n % 2 == 0
+        s.append(pc.note(x, y + (-30 if up else 46), "%s A%s %s" % (kind, ang if ang is not None else "?", when.strftime("%H:%M")), 14, "middle") + pc.arrow(x, y + (-22 if up else 32), x, y + (-8 if up else 8)))
+    if not rec["fixes"] and not rec.get("track"):
+        s.append(pc.text(cx - 200, cy - 80, "no radar positions recorded for this approach", 15, MUTED, "middle"))
     s.append(pc.text(PW - 8, 18, "from above, turned so the radial runs left", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
@@ -179,33 +169,26 @@ def commence_view(rec, mates, name):
     for nm in (5, 10, 15, 20, 25, 30):
         s.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s"/>' % (px(nm), 40, px(nm), base, "#262d36" if nm % 10 == 0 else "#1c2128"))
         s.append(pc.text(px(nm), base + 18, "%d NM" % nm, 12, "#8b949e" if nm % 10 == 0 else "#58616b", "middle"))
-    for off, col in ((0.5, YEL), (0.0, GRN), (-0.7, RED)):  # the glideslope and its tolerance lines, like the groove view
-        s.append(pc.poly([(px(0), py(0)), (px(17), py(gs_at(17, off)))], col, 1.5, "5 4"))
-    s.append(pc.text(px(16.5), py(gs_at(17)) - 10, "3.5 deg glideslope", 12, GRN, "end"))
-    for m in mates:  # the stack levels
-        ang = m["angels"] or 6
-        mine = m is rec
-        x, y = px(ang + 15), py(ang * 1000)
-        s.append('<rect x="%.1f" y="%.1f" width="%d" height="5" fill="%s"/>' % (x - 20, y - 2, 40, "#58a6ff" if mine else "#484f58"))
-        if not mine:
-            s.append(pc.text(x, y - 10, "A%d %s" % (ang, name(m)), 11, MUTED, "middle"))
-    hold_nm, ang = (rec["angels"] or 6) + 15, rec["angels"] or 6
-    cross = PLATFORM_FT / gs_at(1.0)  # where the glideslope reaches the platform altitude
-    prof = [(px(hold_nm), py(ang * 1000)), (px(hold_nm - 1), py(PLATFORM_FT)), (px(cross), py(PLATFORM_FT))] + [(px(d), py(gs_at(d))) for d in (12, 8, 3, 0)]
-    s.append(pc.poly(prof, WHITE, 2.8))
+    tr = rec.get("track") or []
+    com_t = rec["commence"].timestamp() if rec.get("commence") else None
+    legs = ([], [])
+    for ut, dist, brg, alt in tr:
+        legs[1 if (com_t and ut >= com_t) else 0].append((px(dist), py(alt)))
+    if legs[0] and legs[1]:
+        legs[0].append(legs[1][0])
+    for pts_, col in ((legs[0], GRN), (legs[1], YEL)):
+        if len(pts_) > 1:
+            s.append(pc.poly(pts_, col, 2.8))
     t = lambda x: x.strftime("%H:%M") if x else ""
-    marks = [(hold_nm, ang * 1000, "hold A%d, %d DME" % (ang, hold_nm), rec["hold"], 16, -34, "start"),
-             (hold_nm - 1, PLATFORM_FT, "commence", rec["commence"], 6, 52, "middle"),
-             (cross + 0.4, PLATFORM_FT, "platform 5,000 ft", rec["platform"], 0, 52, "middle"),
-             (8, gs_at(8), "dirty up 8 NM, %s ft" % format(int(round(gs_at(8), -1)), ","), rec["dirty"], 20, 40, "start"),
-             (3, gs_at(3), "Paddles 3 NM, %s ft" % format(int(round(gs_at(3), -1)), ","), rec["handoff"], 20, 40, "start")]
-    for nm, alt, lab, when, dx, dy, anchor in marks:
-        x, y = px(nm), py(alt)
+    real = [f for f in rec["fixes"] if f[3] is not None and f[4] is not None]
+    for n, (kind, when, d, brg, ang) in enumerate(real):
+        x, y = px(d), py(ang * 1000)
         s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x, y, YEL))
-        s.append(pc.note(x + dx, y + dy, lab + (" " + t(when) if when else ""), 14, anchor) + pc.arrow(x + dx * 0.6, y + dy + (6 if dy < 0 else -16), x + (3 if dy > 0 else 4), y + (7 if dy > 0 else -6)))
-    if rec["commence"] and rec["dirty"]:
-        s.append(pc.text(px(5.5), py(gs_at(5.5)) + 30, "%d min from commence to dirty up" % round(mins(rec["commence"], rec["dirty"])), 12, MUTED, "start"))
-    s.append(pc.text(PW - 8, 18, "from the side, planned profile", 12, MUTED, "end"))
+        dy = -30 if n % 2 == 0 else 40
+        s.append(pc.note(x + 10, y + dy, "%s A%d %s" % (kind, ang, t(when)), 14, "start") + pc.arrow(x + 12, y + dy + (6 if dy < 0 else -16), x + 3, y + (-6 if dy < 0 else 6)))
+    if not tr and not real:
+        s.append(pc.text(PW / 2, PH / 2, "no radar positions recorded for this approach", 15, MUTED, "middle"))
+    s.append(pc.text(PW - 8, 18, "from the side, flown (Tacview)" if tr else "from the side, logged radar fixes", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
 
@@ -240,13 +223,11 @@ def case1_stack_view(rec, brc, name, carrier=None):
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
     if fix:
         x, y = pt(fix[3], fix[2])
-        s.append(pc.poly([(x, y), (cx, cy)], WHITE, 2.2))
+        if rec.get("track"):
+            s.append(pc.poly([pt(brg_, d_) for _, d_, brg_, _ in rec["track"]], WHITE, 2.2))
         s.append('<circle cx="%.1f" cy="%.1f" r="6" fill="#1f6feb" stroke="%s" stroke-width="2"/>' % (x, y, YEL))
         s.append(pc.note(x, y - 30, "checked in %d NM, angels %d" % (fix[2], fix[4] or 0), 15, "middle") + pc.arrow(x, y - 20, x, y - 8))
         s.append(pc.text(x, y + 26, "%s %s" % (name(rec), rec["checkin"].strftime("%H:%M")), 13, "#e6edf3", "middle"))
-    x10, y10 = pt(bearing, 10)
-    s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x10, y10, YEL) + pc.note(x10, y10 + 50, "see me at ten", 15, "middle") + pc.arrow(x10, y10 + 38, x10, y10 + 8))
-    s.append(pc.note(cx - 40, cy - 70, "stack overhead, angels %d" % (rec["angels"] or 2), 15, "end") + pc.arrow(cx - 36, cy - 60, cx - 14, cy - 12))
     s.append(pc.text(PW - 8, 18, "from above, turned so the way in runs from the left", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
@@ -261,11 +242,11 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     def xy(right_nm, ahead_nm):  # ship-relative: right of the BRC, ahead along the BRC
         return cx + right_nm * k, cy - ahead_nm * k
     s = []
-    for nm in ((3, 5, 10) if far > 8 else (1, 2, 3, 4)):
+    for nm in ((3, 5, 10) if far > 8 else [n for n in (0.5, 1, 2, 3, 4) if n < far]):
         s.append('<circle cx="%d" cy="%d" r="%.1f" fill="none" stroke="#3b434d" stroke-width="1.2"%s/>' % (cx, cy, nm * k, ' stroke-dasharray="3 5"' if nm == 3 else ""))
-        s.append(pc.text(cx + nm * k * 0.72 + 4, cy - nm * k * 0.69, "%d NM" % nm, 12, "#8b949e", "start"))
+        s.append(pc.text(cx + nm * k * 0.72 + 4, cy - nm * k * 0.69, "%g NM" % nm, 12, "#8b949e", "start"))
     if far > 8:
-        s.append('<circle cx="%d" cy="%d" r="%.1f" fill="none" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="3 3"/>' % (cx, cy, 4.2 * k))
+        s.append('<circle cx="%d" cy="%d" r="%.1f" fill="none" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="3 3"/>' % (cx, cy, rec["zoom"] * k))
     s.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="6 5" opacity=".6"/>' % (cx, cy + far * k, cx, cy - far * k))
     # north arrow: north is (360 - BRC) degrees from up
     a = math.radians(-b)
@@ -286,7 +267,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     CC, RX, RY = (-1.6, 0.0), 1.6, 2.5  # oval: 5 NM long on the BRC, 3.2 NM wide, ship at position 1
     # 1) the marshal stack (green dots), wide view only
     has_track, has_pat = bool(rec.get("track")), bool(rec.get("pattern"))
-    if not detail:
+    if not detail and PLANNED:
         s.append('<g opacity="%s">' % (".3" if has_track else "1"))
         s.append(pc.poly([xy(CC[0] + RX * math.cos(math.radians(n * 5)), CC[1] + RY * math.sin(math.radians(n * 5))) for n in range(0, 73)], GREEN, 2.2, "7 5"))
         s.append("</g>")
@@ -303,7 +284,8 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
         s.append(pc.text(x3 - 4, y3 + 22, "3: commence", 12, YEL, "end") + pc.text(x3 - 4, y3 + 36, "BRC+210", 12, YEL, "end"))
     # 2) commence (yellow): from position 3 on BRC+210 round to the Initial 3 NM astern, then inbound up the BRC
     com = bez((-3.2, 0.0), (-4.2, -2.5), (0.0, -4.5), (0.0, -3.0)) + [(0.0, 0.35)]
-    s.append('<g opacity="%s">' % (".3" if (has_track and not detail) else "1") + pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5") + "</g>")
+    if PLANNED:
+        s.append('<g opacity="%s">' % (".3" if (has_track and not detail) else "1") + pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5") + "</g>")
     # 3) Paddles (white dashes): break (level turn) to port, downwind 1.25 NM abeam, the 180, the 90, the 45, the groove
     r1 = 0.625
     paddles = []
@@ -313,7 +295,8 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     A, G = (-1.25, -0.3), (0.12, -0.5)
     turn = bez(A, (-1.25, -1.35), (0.15, -1.3), G, 40)
     paddles += [A] + turn[1:] + [(0.0, 0.0)]
-    s.append('<g opacity="%s">' % (".3" if has_pat and detail else "1") + pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5") + "</g>")
+    if PLANNED:
+        s.append('<g opacity="%s">' % (".3" if has_pat and detail else "1") + pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5") + "</g>")
     # the real tracks: the Marshal stack track (Tacview, range / bearing from the carrier) on the wide view, green until the
     # commence and yellow after; the Paddles pass pattern (ship frame, metres) on the magnified view in solid white
     if not detail and has_track:
@@ -335,48 +318,38 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
     if detail:
         s.append(pc.text(W - 10, 52, "ABE  BRC %03d" % (round(b) % 360 or 360), 14, "#e6edf3", "end", 'font-weight="bold"'))
-        T = 12
-        x, y = xy(0, -3.0)
-        s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x, y, YEL) + pc.note(x - 12, y - 2, "Initial 3 NM, on BRC", T + 2, "end") + pc.text(x - 12, y + 14, "800 ft, 350 kts", T, "#c9d1d9", "end"))
-        x, y = xy(-0.5, 1.45)
-        s.append(pc.note(x, y, "F  Break: level turn", T + 2, "end"))
-        x, y = xy(-1.25, 0.8)
-        s.append(pc.text(x - 8, y - 14, "Downwind BRC+180", T + 1, "#e6edf3", "end") + pc.text(x - 8, y, "1-1.5 NM abeam", T, "#c9d1d9", "end") + pc.text(x - 8, y + 14, "descend to 600 ft", T, "#c9d1d9", "end") + pc.text(x - 8, y + 28, "<250 kts, gear + flaps", T, "#c9d1d9", "end"))
-        x, y = xy(*A)
-        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (x, y) + pc.text(x - 8, y + 6, "The 180: 600 ft", T, "#e6edf3", "end") + pc.text(x - 8, y + 20, "on-speed, 30 deg bank", T, "#c9d1d9", "end") + pc.text(x - 8, y + 34, "100-200 fpm", T, "#c9d1d9", "end"))
-        x, y = xy(*turn[20])
-        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (x, y) + pc.text(x + 14, y + 20, "The 90: 450-500 ft", T, "#e6edf3", "end"))
-        x, y = xy(*turn[32])
-        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (x, y) + pc.text(x + 14, y + 18, "The 45: 370-400 ft", T, "#e6edf3", "start"))
-        x, y = xy(*G)
-        s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="#a371f7"/>' % (x, y) + pc.text(x + 14, y - 6, "Groove 15-18 s", T + 1, "#a371f7", "start") + pc.text(x + 14, y + 8, "400-500 fpm, final BRC-9", T, "#c9d1d9", "start"))
-        # key
-        kx, ky = 20, H - 50
-        for n, (col, dash, lab) in enumerate(((GREEN, "dash", "flying the stack (wide view)"), (YEL, "dash", "commencing"), ("#ffffff", "dash", "Paddles: break, downwind, groove"))):
-            yy = ky + n * 20
-            if dash == "dots":
-                s.append("".join('<circle cx="%d" cy="%d" r="2.6" fill="%s"/>' % (kx + d * 9, yy, col) for d in range(4)))
-            else:
-                s.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="2.4"%s/>' % (kx, yy, kx + 34, yy, col, ' stroke-dasharray="7 5"' if dash == "dash" else ""))
-            s.append(pc.text(kx + 46, yy + 4, lab, 12, "#c9d1d9", "start"))
+        if has_pat:  # the numbers the pilot actually flew: speed and height over the ship, the break, downwind, abeam, roll-out
+            pat = rec["pattern"]
+            pts_ = [(*xy(-row[1] / M_NM, -row[0] / M_NM), row[2]) for row in pat]
+            rings_ = [(cx + n * k * 0.72 + 2, cy - n * k * 0.69 - 14, cx + n * k * 0.72 + 52, cy - n * k * 0.69 + 5) for n in (0.5, 1, 2, 3, 4) if n < far]
+            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_)  # the last two keep notes on the panel
+        else:
+            s.append(pc.text(W / 2, H / 2, "no pattern track recorded", 15, MUTED, "middle"))
     else:
-        x, y = xy(0, -3.0)
-        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s"/>' % (x, y, YEL))
-        x, y = xy(0, -10.0)
-        s.append('<circle cx="%.1f" cy="%.1f" r="5" fill="%s"/>' % (x, y, YEL) + pc.note(x + 14, y + 5, "see you at 10", 15, "start"))
+        for nm in (3,):
+            pass
+        if not has_track:
+            s.append(pc.text(W / 2, H - 40, "no stack track recorded", 13, MUTED, "middle"))
+    kx, ky = 20, H - 50
+    for n, (col, lab) in enumerate(((GREEN, "in the stack (Tacview)"), (YEL, "commencing"), ("#ffffff", "Paddles pattern"))):
+        if detail:
+            yy = ky + n * 20
+            s.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="2.6"/>' % (kx, yy, kx + 34, yy, col) + pc.text(kx + 46, yy + 4, lab, 12, "#c9d1d9", "start"))
     return "".join(s)
 
 
 def case1_pattern_view(rec, mates, brc, name):
     """Case I Stack View: left, 10 NM around the ship (BRC up); right, the close-in pattern magnified (4 NM)."""
     lw = 330
+    pat = rec.get("pattern") or []
+    rec["zoom"] = min(4.2, max(2.0, max([max(abs(r[0]), abs(r[1])) for r in pat] + [0]) / M_NM + 0.6))
     s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, PH)]
     s.append('<svg x="0" y="0" width="%d" height="%d">%s</svg>' % (lw, PH, _case1_pattern(rec, mates, brc, name, lw, PH, 11, False)))
     s.append('<line x1="%d" y1="34" x2="%d" y2="%d" stroke="#30363d"/>' % (lw, lw, PH - 6))
-    s.append('<svg x="%d" y="0" width="%d" height="%d">%s</svg>' % (lw, PW - lw, PH, _case1_pattern(rec, mates, brc, name, PW - lw, PH, 4.2, True)))
+    s.append('<svg x="%d" y="0" width="%d" height="%d">%s</svg>' % (lw, PW - lw, PH, _case1_pattern(rec, mates, brc, name, PW - lw, PH, rec["zoom"], True)))
     s.append(pc.text(lw / 2, PH - 8, "10 NM around ABE", 12, MUTED, "middle"))
-    s.append(pc.text(PW - 14, PH - 8, "magnified: 4 NM around ABE", 12, MUTED, "end"))
-    s.append(pc.text(PW - 8, 18, "from above, ABE centred, BRC up - %s" % ("solid = flown (Tacview)" if rec.get("track") or rec.get("pattern") else "planned until tracks are logged"), 12, MUTED, "end"))
+    s.append(pc.text(PW - 14, PH - 8, "magnified: %g NM around ABE" % round(rec["zoom"], 1), 12, MUTED, "end"))
+    s.append(pc.text(PW - 8, 18, "from above, ABE centred, BRC up - %s" % ("flown track (Tacview)" if rec.get("track") or rec.get("pattern") else "no track recorded"), 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
 
@@ -428,7 +401,7 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
         lines = ['Nimitz Class "ABE" | Marshal | %s server' % rec["rig"], rec["checkin"].strftime("%A %B %d, %Y %H:%M"), *([weather] if weather else []),
                  "BRC %s | Case %s" % ("%03d" % (round(brc) % 360 or 360) if brc is not None else "-", rec["case"] or "I"), "",
                  *(["No Marshal check-in on this approach", "Pattern flown from the Paddles track (Tacview), landing %s" % t(rec["checkin"])] if rec.get("no_marshal") else
-                   ["Marshal at angels %d, report see me at ten" % (rec["angels"] or 2),
+                   ["Marshal assigned angels %d" % (rec["angels"] or 2),
                     "Checked in %s%s" % (t(rec["checkin"]), " at %d NM on the %03d bearing, angels %d" % (fix[2], fix[3], fix[4] or 0) if fix else "")]), "",
                  result or "", "(example position: the carrier is placed off the coast until Marshal logs its real position)" if carrier == EXAMPLE_CARRIER else ""]
         body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
@@ -438,7 +411,7 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
              "Marshal radial %03d, %d DME, angels %d, %s" % (round(rec["radial"]) % 360 or 360, (rec["angels"] or 6) + 15, rec["angels"] or 6, eat_line),
              "Checked in %s | in the hold %s | commenced %s | platform %s | dirty up %s | Paddles %s" % (
                  t(rec["checkin"]), t(rec["hold"]), t(rec["commence"]), t(rec["platform"]), t(rec["dirty"]), t(rec["handoff"])), "",
-             result or "", "(positions: the assigned radial and DME, and the planned profile - real radar fixes appear once Marshal logs them)" if not rec["fixes"] else "",
+             result or "", "(no radar positions were logged for this approach)" if not rec["fixes"] and not rec.get("track") else "",
              "(example position: the carrier is placed off the coast until Marshal logs its real position)" if carrier == EXAMPLE_CARRIER else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
     return _page(badge, label, body, "Stack View", "Commence View", stack_view(rec, mates, brc, name, carrier), commence_view(rec, mates, name))
