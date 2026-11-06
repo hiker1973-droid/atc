@@ -921,8 +921,8 @@ func passTrack(p *Pass) string {
 }
 
 // patternTrack is the jet's last minutes in the ship's frame for a pass card:
-// up to 120 points of "metres astern of the ship:metres to port:feet" joined
-// by "|".
+// up to 120 points of "metres astern of the ship:metres to port:feet:knots"
+// joined by "|" (knots = ground speed since the previous point).
 func patternTrack(h []patSample) string {
 	if len(h) < 5 {
 		return ""
@@ -932,11 +932,19 @@ func patternTrack(h []patSample) string {
 		step = (len(h) + 119) / 120
 	}
 	var b strings.Builder
+	prev := -1
 	for i := 0; i < len(h); i += step {
 		if b.Len() > 0 {
 			b.WriteByte('|')
 		}
-		fmt.Fprintf(&b, "%.0f:%.0f:%.0f", h[i].aft, h[i].port, h[i].ft)
+		kts := 0.0
+		if prev >= 0 {
+			if dt := h[i].at.Sub(h[prev].at).Seconds(); dt > 0 {
+				kts = math.Hypot(h[i].aft-h[prev].aft, h[i].port-h[prev].port) / dt / mpsPerKt
+			}
+		}
+		fmt.Fprintf(&b, "%.0f:%.0f:%.0f:%.0f", h[i].aft, h[i].port, h[i].ft, kts)
+		prev = i
 	}
 	return b.String()
 }

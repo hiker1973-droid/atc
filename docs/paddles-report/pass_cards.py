@@ -100,6 +100,40 @@ def ship_top(x, y):
     return '<path d="M%d %d l62 -9 l14 0 l0 18 l-14 0 z" fill="#6e7681"/>' % (x, y)
 
 
+
+HAND = 'font-family="Segoe Print, Bradley Hand ITC, Comic Sans MS, cursive" font-style="italic"'
+WORDS = {"H": "high", "LO": "low", "LUL": "lined up left", "LUR": "lined up right", "SLO": "slow", "F": "fast"}
+WHERE = {"X": "at the start (first third)", "IM": "in the middle", "IC": "in close (last third)", "AR": "at the ramp"}
+REMARK_RE = re.compile(r"(__)?(\()?(LUL|LUR|SLO|LO|H|F)(\))?(__)?(X|IM|IC|AR)\b")
+
+
+def remark(comment):
+    """The LSO comment codes in words, the way the DCS card says them: "(LUL)X" is "a little lined up left at the
+    start", "__LO__AR" is "VERY low at the ramp"."""
+    out = []
+    for m in REMARK_RE.finditer(comment or ""):
+        amount = "VERY " if m.group(1) or m.group(5) else "a little " if m.group(2) else ""
+        out.append("%s%s %s" % (amount, WORDS[m.group(3)], WHERE[m.group(6)]))
+    if "[BC]" in (comment or ""):
+        out.append("(no ball call)")
+    return " ".join(out)
+
+
+def arrow(x1, y1, x2, y2):
+    """A hand-drawn style arrow from a label to the point it names."""
+    dx, dy = x2 - x1, y2 - y1
+    cx, cy = (x1 + x2) / 2 - dy * 0.18, (y1 + y2) / 2 + dx * 0.18
+    ang = math.atan2(y2 - cy, x2 - cx)
+    a = (x2 - 9 * math.cos(ang + 0.45), y2 - 9 * math.sin(ang + 0.45))
+    b = (x2 - 9 * math.cos(ang - 0.45), y2 - 9 * math.sin(ang - 0.45))
+    return ('<path d="M%.1f %.1f Q%.1f %.1f %.1f %.1f" fill="none" stroke="%s" stroke-width="1.6"/>'
+            '<polyline points="%.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="none" stroke="%s" stroke-width="1.6"/>'
+            % (x1, y1, cx, cy, x2, y2, YEL, a[0], a[1], x2, y2, b[0], b[1], YEL))
+
+
+def note(x, y, s, size=17, anchor="start"):
+    return '<text x="%.1f" y="%.1f" fill="%s" font-size="%d" text-anchor="%s" %s>%s</text>' % (x, y, YEL, size, anchor, HAND, html.escape(s))
+
 def groove_side(pts):
     """The glideslope from the side: height above the deck against distance astern."""
     base, x0 = SH - 16, 84
@@ -114,7 +148,7 @@ def groove_side(pts):
     return "".join(s) + "</svg>"
 
 
-def groove_top(pts):
+def groove_top(pts, groove_s=None):
     """The lineup from above: the centreline, the lineup lines and the 1/4 .. 1 nm rings."""
     y0, x0 = TH / 2 + 4, 84
     def px(d): return x0 + d * 0.36
@@ -130,6 +164,15 @@ def groove_top(pts):
         s.append(text(x, TH - 8, lab, 12, MUTED, "middle"))
     track = [(px(a), py(a, l)) for a, _, l in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
     s.append(poly(track, WHITE, 2.6) or dots(track))
+    if groove_s:  # T-19: seconds in the groove, pointed at the half-mile point
+        x, y = px(0.5 * M_NM), y0 - 1.4 * 0.5 * M_NM * math.tan(math.radians(0.3))
+        s.append(note(x - 70, y0 - 110, "T-%d" % round(groove_s)) + arrow(x - 56, y0 - 100, x, y - 6))
+    near = min(((abs(a - M_NM), a, g) for a, g, _ in pts if 0 < a <= 2000), default=None)
+    if near and near[0] < 450:  # Wake Alt: the height over the water at one mile
+        a, g = near[1], near[2]
+        ft = (a * math.tan(math.radians(GS_DEG + g)) + 19.5) * 3.28084
+        x, y = px(a), py(a, next(l for aa, _, l in pts if aa == a))
+        s.append(note(x - 170, TH - 36, "Alt at 1 NM: %d ft" % round(ft)) + arrow(x - 60, TH - 50, x - 3, y + 6))
     s.append(text(PW - 8, 18, "from above, lineup", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
@@ -147,18 +190,44 @@ def approach_view(pat):
         s.append('<circle cx="%d" cy="%.0f" r="%.1f" fill="none" stroke="#30363d" stroke-width="1.2"/>' % (sx, sy, r))
         s.append(text(sx + r * math.cos(math.radians(25)) + 4, sy - r * math.sin(math.radians(25)) - 4, "%g NM" % nm, 12, "#6e7681"))
     s.append(ship_top(sx - 76, sy))  # the stern (the aft = 0 point) at the rings' centre
-    pts = [(sx + a * k, sy + p_ * k, ft) for a, p_, ft in pat]
+    pts = [(sx + row[0] * k, sy + row[1] * k, row[2]) for row in pat]
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
-    start = next((q for q, row in zip(pts, pat) if row[0] <= 2400), None)
-    if start:
-        s.append('<circle cx="%.1f" cy="%.1f" r="5" fill="none" stroke="%s" stroke-width="2"/>' % (start[0], start[1], YEL))
-        s.append(text(start[0] + 8, start[1] - 10, "groove start %.1f NM" % (2400 / M_NM), 14, YEL, "start", 'font-style="italic"'))
-    abeam = min(((abs(row[0]), q, row) for q, row in zip(pts, pat) if row[1] > 0 and row[0] < 3000), key=lambda t: t[0], default=None)
-    if abeam and abeam[0] < 400:
-        s.append('<circle cx="%.1f" cy="%.1f" r="5" fill="none" stroke="%s" stroke-width="2"/>' % (abeam[1][0], abeam[1][1], YEL))
-        s.append(text(abeam[1][0] + 8, abeam[1][1] + 22, "%d ft abeam" % abeam[2][2], 14, YEL, "start", 'font-style="italic"'))
+    s += callouts(pat, pts)
     s.append(text(PW - 8, 18, "approach, from above", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
+
+
+def callouts(pat, pts):
+    """The DCS card's hand-written numbers: speed and height over the ship, the apex of the break, downwind,
+    the height abeam and where the jet rolled out."""
+    out = []
+    n = len(pat)
+    kts = lambda i: pat[i][3] if len(pat[i]) > 3 and pat[i][3] > 40 else None
+    label = lambda i: ("%d kts " % kts(i) if kts(i) else "") + "%d ft" % pat[i][2]
+    brk = next((i for i in range(n) if pat[i][1] > 600), n)   # the break: first well to port
+    over = min(range(0, min(brk, n)), key=lambda i: abs(pat[i][0]), default=None)
+    if over is not None and abs(pat[over][0]) < 600 and over > 2:
+        x, y, _ = pts[over]
+        out.append(note(x - 10, y - 46, label(over), 15, "end") + arrow(x - 22, y - 38, x - 2, y - 6))
+    ahead = [i for i in range(brk, n) if pat[i][0] < 0]
+    if ahead:
+        i = min(ahead, key=lambda i: pat[i][0])
+        x, y, _ = pts[i]
+        out.append(note(x - 14, y - 24, "%d ft" % pat[i][2], 15, "end") + arrow(x - 10, y - 18, x, y - 3))
+    far = max((row[1] for row in pat), default=0)
+    down = next((i for i in range(brk, n) if pat[i][1] > 0.8 * far), None)
+    if down is not None and far > 800:
+        x, y, _ = pts[down]
+        out.append(note(x + 14, y - 34, label(down), 15) + arrow(x + 24, y - 24, x + 3, y - 4))
+        ab = min((i for i in range(down, n) if pat[i][1] > 0.6 * far), key=lambda i: abs(pat[i][0]), default=None)
+        if ab is not None and abs(pat[ab][0]) < 700:
+            x, y, _ = pts[ab]
+            out.append(note(x - 20, y + 60, "%d ft" % pat[ab][2], 17, "end") + text(x - 20, y + 74, "contact abeam", 10, MUTED, "end") + arrow(x - 18, y + 46, x - 3, y + 6))
+        roll = next((i for i in range((ab or down) + 1, n) if abs(pat[i][1]) < 250 and pat[i][0] > 0), None)
+        if roll is not None:
+            x, y, _ = pts[roll]
+            out.append(note(x + 20, y - 40, "%.1f NM" % (pat[roll][0] / M_NM), 17) + text(x + 22, y - 28, "rolled out point", 10, MUTED) + arrow(x + 24, y - 34, x + 2, y - 5))
+    return out
 
 
 def card_html(p, label, pts, coarse, pat=None):
@@ -171,8 +240,9 @@ def card_html(p, label, pts, coarse, pat=None):
     model = (p.get("model") or "").replace("FA-18C_hornet", "F/A-18C").replace("_", " ")
     case = ("Case " + p["case"]) if p.get("case") else ""
     when = p["t"].strftime("%A %B %d, %Y %H:%M:%S")
-    lines = [when, 'Nimitz Class "ABE"', " | ".join(b for b in (model, case) if b), "",
-             name if key in ("WOFD", "WO") else badge, comment, "",
+    region = "Syria" if p.get("rig") == "Foothold" else "Caucasus"
+    lines = [when, 'Nimitz Class "ABE" somewhere in the %s region' % region, " | ".join(b for b in (model, case) if b), "",
+             name if key in ("WOFD", "WO") else badge, comment, "", remark(p.get("comments")),
              "(segment averages only: this pass was logged before tracks)" if coarse else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
     return """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -188,7 +258,7 @@ body{margin:0;background:#0d1117;font-family:Consolas,'Courier New',monospace;co
 </style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
 <div class="info"><img src="%s"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts), approach_view(pat), LOGO, body,
+        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0]), approach_view(pat), LOGO, body,
         "track from Paddles" if not coarse else "coarse card")
 
 

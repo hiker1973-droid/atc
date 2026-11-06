@@ -149,13 +149,13 @@ func TestPassTrackIsLogged(t *testing.T) {
 func TestPatternTrackFormat(t *testing.T) {
 	var h []patSample
 	for i := 0; i < 300; i++ {
-		h = append(h, patSample{aft: float64(i * 20), port: -3, ft: 600})
+		h = append(h, patSample{at: time.Unix(int64(i), 0), aft: float64(i * 20), port: -3, ft: 600})
 	}
 	got := patternTrack(h)
 	if n := strings.Count(got, "|") + 1; n > 120 || n < 60 {
 		t.Errorf("%d points, want 60-120", n)
 	}
-	if !strings.HasPrefix(got, "0:-3:600|") {
+	if !strings.HasPrefix(got, "0:-3:600:0|") {
 		t.Errorf("track = %.40s", got)
 	}
 	if patternTrack(h[:2]) != "" {
