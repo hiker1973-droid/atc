@@ -251,6 +251,115 @@ def case1_stack_view(rec, brc, name, carrier=None):
     return "".join(s) + "</svg>"
 
 
+def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
+    """Case I Stack View, from above and centred on the ship (BRC up): the stack overhead, the initial 3 NM astern, the
+    break, downwind to port and the turn to the groove. Planned until real tracks are logged; rings every 1 NM."""
+    cx, cy = W / 2, H / 2 + (10 if detail else 0)
+    k = (min(W, H) / 2 - 14) / far
+    b = brc if brc is not None else 0
+
+    def xy(right_nm, ahead_nm):  # ship-relative: right of the BRC, ahead along the BRC
+        return cx + right_nm * k, cy - ahead_nm * k
+    s = []
+    for nm in ((3, 5, 10) if far > 8 else (1, 2, 3, 4)):
+        s.append('<circle cx="%d" cy="%d" r="%.1f" fill="none" stroke="#3b434d" stroke-width="1.2"%s/>' % (cx, cy, nm * k, ' stroke-dasharray="3 5"' if nm == 3 else ""))
+        s.append(pc.text(cx + nm * k * 0.72 + 4, cy - nm * k * 0.69, "%d NM" % nm, 12, "#8b949e", "start"))
+    if far > 8:
+        s.append('<circle cx="%d" cy="%d" r="%.1f" fill="none" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="3 3"/>' % (cx, cy, 4.2 * k))
+    s.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="6 5" opacity=".6"/>' % (cx, cy + far * k, cx, cy - far * k))
+    # north arrow: north is (360 - BRC) degrees from up
+    a = math.radians(-b)
+    nx, ny = 52, 118
+    s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#8b949e" stroke-width="2"/>' % (nx, ny, nx + 26 * math.sin(a), ny - 26 * math.cos(a)))
+    s.append(pc.text(nx + 36 * math.sin(a), ny - 36 * math.cos(a) + 5, "N", 14, MUTED, "middle"))
+    GREEN = "#3fb950"
+
+    def bez(p0, p1, p2, p3, n=40):
+        out = []
+        for q in range(n + 1):
+            t = q / float(n)
+            u = 1 - t
+            out.append(tuple(u**3 * p0[m] + 3 * u * u * t * p1[m] + 3 * u * t * t * p2[m] + t**3 * p3[m] for m in (0, 1)))
+        return out
+    # DimOn Case I card: port holding pattern, 5 NM max across, ship at position 1 on the circle (centre 2.5 NM to port),
+    # min 2,000 ft, 1,000 ft separation; commence from position 3 on BRC+210 deg, then Initial 3 NM astern at 800 ft, 350 kts.
+    CC, RX, RY = (-1.6, 0.0), 1.6, 2.5  # oval: 5 NM long on the BRC, 3.2 NM wide, ship at position 1
+    # 1) the marshal stack (green dots), wide view only
+    if not detail:
+        s.append(pc.poly([xy(CC[0] + RX * math.cos(math.radians(n * 5)), CC[1] + RY * math.sin(math.radians(n * 5))) for n in range(0, 73)], GREEN, 2.2, "7 5"))
+        for i, m in enumerate(sorted(mates, key=lambda m: m["angels"] or 2)):
+            mine = m is rec
+            t = math.radians(180 + 35 * i) if mine or True else 0
+            x, y = xy(CC[0] + RX * math.cos(t), CC[1] + RY * math.sin(t))
+            s.append('<circle cx="%.1f" cy="%.1f" r="%d" fill="%s" stroke="%s" stroke-width="1.5"/>' % (x, y, 5 if mine else 3.5, GREEN, YEL if mine else "#8b949e"))
+            if mine:
+                s.append(pc.text(x - 8, y - 8, "A%d %s" % (m["angels"] or 2, name(m)), 12, "#e6edf3", "end"))
+        s.append(pc.note(W / 2, 36, "MARSHAL STACK: port holding, 5 NM max", 14, "middle"))
+        s.append(pc.text(W / 2, 54, "angels 2-9, 1,000 ft apart, min 2,000 ft", 12, MUTED, "middle"))
+        x3, y3 = xy(-3.2, 0.0)
+        s.append(pc.text(x3 - 4, y3 + 22, "3: commence", 12, YEL, "end") + pc.text(x3 - 4, y3 + 36, "BRC+210", 12, YEL, "end"))
+    # 2) commence (yellow): from position 3 on BRC+210 round to the Initial 3 NM astern, then inbound up the BRC
+    com = bez((-3.2, 0.0), (-4.2, -2.5), (0.0, -4.5), (0.0, -3.0)) + [(0.0, 0.35)]
+    s.append(pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5"))
+    # 3) Paddles (white dashes): break (level turn) to port, downwind 1.25 NM abeam, the 180, the 90, the 45, the groove
+    r1 = 0.625
+    paddles = []
+    for i in range(0, 19):
+        t = math.radians(i * 10)
+        paddles.append((-r1 + r1 * math.cos(t), 0.35 + r1 * math.sin(t)))
+    A, G = (-1.25, -0.3), (0.12, -0.5)
+    turn = bez(A, (-1.25, -1.35), (0.15, -1.3), G, 40)
+    paddles += [A] + turn[1:] + [(0.0, 0.0)]
+    s.append(pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5"))
+    sc = 0.3 if detail else 0.12
+    s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
+    if detail:
+        s.append(pc.text(W - 10, 52, "ABE  BRC %03d" % (round(b) % 360 or 360), 14, "#e6edf3", "end", 'font-weight="bold"'))
+        T = 12
+        x, y = xy(0, -3.0)
+        s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x, y, YEL) + pc.note(x - 12, y - 2, "Initial 3 NM, on BRC", T + 2, "end") + pc.text(x - 12, y + 14, "800 ft, 350 kts", T, "#c9d1d9", "end"))
+        x, y = xy(-0.5, 1.45)
+        s.append(pc.note(x, y, "F  Break: level turn", T + 2, "end"))
+        x, y = xy(-1.25, 0.8)
+        s.append(pc.text(x - 8, y - 14, "Downwind BRC+180", T + 1, "#e6edf3", "end") + pc.text(x - 8, y, "1-1.5 NM abeam", T, "#c9d1d9", "end") + pc.text(x - 8, y + 14, "descend to 600 ft", T, "#c9d1d9", "end") + pc.text(x - 8, y + 28, "<250 kts, gear + flaps", T, "#c9d1d9", "end"))
+        x, y = xy(*A)
+        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (x, y) + pc.text(x - 8, y + 6, "The 180: 600 ft", T, "#e6edf3", "end") + pc.text(x - 8, y + 20, "on-speed, 30 deg bank", T, "#c9d1d9", "end") + pc.text(x - 8, y + 34, "100-200 fpm", T, "#c9d1d9", "end"))
+        x, y = xy(*turn[20])
+        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (x, y) + pc.text(x + 14, y + 20, "The 90: 450-500 ft", T, "#e6edf3", "end"))
+        x, y = xy(*turn[32])
+        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (x, y) + pc.text(x + 14, y + 18, "The 45: 370-400 ft", T, "#e6edf3", "start"))
+        x, y = xy(*G)
+        s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="#a371f7"/>' % (x, y) + pc.text(x + 14, y - 6, "Groove 15-18 s", T + 1, "#a371f7", "start") + pc.text(x + 14, y + 8, "400-500 fpm, final BRC-9", T, "#c9d1d9", "start"))
+        # key
+        kx, ky = 20, H - 50
+        for n, (col, dash, lab) in enumerate(((GREEN, "dash", "flying the stack (wide view)"), (YEL, "dash", "commencing"), ("#ffffff", "dash", "Paddles: break, downwind, groove"))):
+            yy = ky + n * 20
+            if dash == "dots":
+                s.append("".join('<circle cx="%d" cy="%d" r="2.6" fill="%s"/>' % (kx + d * 9, yy, col) for d in range(4)))
+            else:
+                s.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="2.4"%s/>' % (kx, yy, kx + 34, yy, col, ' stroke-dasharray="7 5"' if dash == "dash" else ""))
+            s.append(pc.text(kx + 46, yy + 4, lab, 12, "#c9d1d9", "start"))
+    else:
+        x, y = xy(0, -3.0)
+        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s"/>' % (x, y, YEL))
+        x, y = xy(0, -10.0)
+        s.append('<circle cx="%.1f" cy="%.1f" r="5" fill="%s"/>' % (x, y, YEL) + pc.note(x + 14, y + 5, "see you at 10", 15, "start"))
+    return "".join(s)
+
+
+def case1_pattern_view(rec, mates, brc, name):
+    """Case I Stack View: left, 10 NM around the ship (BRC up); right, the close-in pattern magnified (4 NM)."""
+    lw = 330
+    s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, PH)]
+    s.append('<svg x="0" y="0" width="%d" height="%d">%s</svg>' % (lw, PH, _case1_pattern(rec, mates, brc, name, lw, PH, 11, False)))
+    s.append('<line x1="%d" y1="34" x2="%d" y2="%d" stroke="#30363d"/>' % (lw, lw, PH - 6))
+    s.append('<svg x="%d" y="0" width="%d" height="%d">%s</svg>' % (lw, PW - lw, PH, _case1_pattern(rec, mates, brc, name, PW - lw, PH, 4.2, True)))
+    s.append(pc.text(lw / 2, PH - 8, "10 NM around ABE", 12, MUTED, "middle"))
+    s.append(pc.text(PW - 14, PH - 8, "magnified: 4 NM around ABE", 12, MUTED, "end"))
+    s.append(pc.text(PW - 8, 18, "from above, ABE centred, BRC up - planned until tracks are logged", 12, MUTED, "end"))
+    return "".join(s) + "</svg>"
+
+
 def case1_side_view(rec, mates, name):
     """Case I, from the side: the stack overhead the ship (angels 2 up), 'see me at ten', and, after Charlie, the way out to
     the initial 3 NM astern at 800 ft and the break over the ship."""
@@ -302,7 +411,7 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
                  "Checked in %s%s" % (t(rec["checkin"]), " at %d NM on the %03d bearing, angels %d" % (fix[2], fix[3], fix[4] or 0) if fix else ""), "",
                  result or "", "(example position: the carrier is placed off the coast until Marshal logs its real position)" if carrier == EXAMPLE_CARRIER else ""]
         body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
-        return _page(badge, label, body, "Marshal View", "Stack View", case1_stack_view(rec, brc, name, carrier), case1_side_view(rec, mates, name))
+        return _page(badge, label, body, "Marshal View", "Stack View", case1_stack_view(rec, brc, name, carrier), case1_pattern_view(rec, mates, brc, name))
     lines = ['Nimitz Class "ABE" | Marshal | %s server' % rec["rig"], rec["checkin"].strftime("%A %B %d, %Y"),
              *([weather] if weather else []), "BRC %s | Case %s" % ("%03d" % (round(brc) % 360 or 360) if brc is not None else "-", rec["case"] or "III"), "",
              "Marshal radial %03d, %d DME, angels %d, %s" % (round(rec["radial"]) % 360 or 360, (rec["angels"] or 6) + 15, rec["angels"] or 6, eat_line),
