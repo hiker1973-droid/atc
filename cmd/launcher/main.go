@@ -174,6 +174,9 @@ func main() {
 	mux.HandleFunc("/api/reports/png", handleAARPNG) // the first page as a picture, for Discord
 	mux.HandleFunc("/api/stats", handleStats)
 	mux.HandleFunc("/api/greenie.png", handleGreenieBoard) // dev box only: the nightly greenie board picture (stats.go)
+	mux.HandleFunc("/api/greenie/data", handleGreenieData) // dev box only: the board's roster / hand-added passes / corrections (stats_greenie.go)
+	mux.HandleFunc("/api/greenie/save", requireControl(handleGreenieSave))
+	mux.HandleFunc("/api/greenie/refresh", requireControl(handleGreenieRefresh)) // redraw the board and update Discord now
 	mux.HandleFunc("/api/costs", handleCosts) // dev box only: running costs (stats.go)
 	mux.HandleFunc("/api/stats/csv", handleStatsCSV)
 	mux.HandleFunc("/api/stats/pdf", handleStatsPDF)

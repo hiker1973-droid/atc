@@ -115,6 +115,19 @@
     <p class="sub">The squadron board as posted to Discord: last 15 passes per pilot, from the Paddles logs of every rig. Made nightly after the Paddles report. Only on this machine.</p>
     <img id="greenieImg" alt="Greenie board" style="max-width:100%;border-radius:6px">
   </section>
+  <section id="greenieEdit" style="display:none">
+    <h2>Edit greenie board data</h2>
+    <p class="sub">The roster (who is on the board), the passes added by hand and the grade corrections. Change a row, Save, then Save and update the board to redraw it and refresh the Discord message. Grades: _OK_, OK, (OK), ---, C, B, WO, WO (foul deck). Case: III or blank. Group: Command, Active, FRS, Reserve or ignore.</p>
+    <div class="bar">
+      <select id="geFile" onchange="geLoad()"><option value="passes">Passes added by hand</option><option value="pilots">Roster</option><option value="overrides">Grade corrections</option></select>
+      <input id="geFilter" placeholder="filter rows" oninput="geDraw()" style="width:10rem">
+      <button onclick="geAdd()">Add a row</button>
+      <button class="primary" onclick="geSave(false)">Save</button>
+      <button onclick="geSave(true)">Save and update the board</button>
+      <span class="msg muted" id="geMsg"></span>
+    </div>
+    <div class="tablewrap" style="max-height:380px;overflow:auto;margin-top:0.6rem"><table id="geTable"></table></div>
+  </section>
   <section id="costSection" style="display:none">
     <h2>Running costs <span class="muted" style="font-weight:400;font-size:0.82rem" id="costSub"></span></h2>
     <p class="sub">What Readback costs us to run: OpenAI, AWS and the Claude API from their billing, ElevenLabs and Claude the plan fees, power an estimate. Only on this machine; updated nightly.</p>
@@ -336,6 +349,41 @@ async function showGreenie() {
   $('greenieSection').style.display = '';
 }
 showGreenie();
+
+// Greenie board data editor (stats_greenie.go): dev box only.
+let geHeader = [], geRows = [];
+async function geLoad() {
+  let r;
+  try { r = await fetch('/api/greenie/data?file=' + $('geFile').value, { cache: 'no-store' }); } catch (e) { return; }
+  if (!r.ok) return;
+  const d = await r.json();
+  geHeader = d.header; geRows = d.rows;
+  $('greenieEdit').style.display = '';
+  geDraw();
+}
+function geDraw() {
+  const f = $('geFilter').value.toLowerCase();
+  $('geTable').innerHTML = '<tr>' + geHeader.map(h => `<th>${esc(h)}</th>`).join('') + '<th></th></tr>' +
+    geRows.map((row, i) => [row, i]).filter(([row]) => !f || row.join(' ').toLowerCase().includes(f)).map(([row, i]) =>
+      '<tr>' + row.map((c, j) => `<td><input value="${esc(c)}" oninput="geRows[${i}][${j}] = this.value" style="width:${j === geHeader.length - 1 && geHeader.length > 4 ? 22 : j === 2 ? 11 : 7}rem"></td>`).join('') +
+      `<td><button onclick="geRows.splice(${i}, 1); geDraw()">Delete</button></td></tr>`).join('');
+}
+function geAdd() { geRows.unshift(geHeader.map(() => '')); $('geFilter').value = ''; geDraw(); }
+async function geSave(update) {
+  $('geMsg').textContent = 'saving...';
+  let r = await fetch('/api/greenie/save?file=' + $('geFile').value, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: geRows }) });
+  if (!r.ok) { $('geMsg').textContent = 'could not save: ' + await r.text(); return; }
+  $('geMsg').textContent = 'saved';
+  if (update) {
+    $('geMsg').textContent = 'saved, updating the board...';
+    r = await fetch('/api/greenie/refresh', { method: 'POST' });
+    const d = r.ok ? await r.json() : { ok: false, error: await r.text() };
+    $('geMsg').textContent = d.ok ? 'saved and the board is updated' : 'saved, but the update failed: ' + (d.error || d.output);
+    showGreenie();
+  }
+  geLoad();
+}
+geLoad();
 setInterval(() => { if ($('elSection').style.display !== 'none') refreshEleven(); }, 60000);
 </script>
 <script src="/branding.js"></script>
