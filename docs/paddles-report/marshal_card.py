@@ -512,7 +512,48 @@ def post_cards(pngs):
         print("posted", text)
 
 
+POSTED = os.path.join(gp.REPORTS, "_data", "paddles", "marshal-cards-posted.json")
+SETTLE = dt.timedelta(minutes=10)  # an approach is carded once its hand-off (or last call) is this old, so the Paddles pass is in
+
+
+def post_new():
+    """Post a card for every finished approach not posted yet (greenie_watch runs this after a recovery goes quiet).
+    The first run only records what already exists, so the backlog is not posted."""
+    mr.fetch(3)
+    for back in (0, 1):
+        gp.fetch_today((dt.date.today() - dt.timedelta(days=back)).isoformat())
+    events = mr.read_events(3)
+    recs = mr.approaches(events)
+    mr.link_passes(recs, gp.load_passes(dt.date.today()))
+    done_ = {}
+    first = not os.path.exists(POSTED)
+    if not first:
+        done_ = json.load(open(POSTED, encoding="utf-8"))
+    now = dt.datetime.now(recs[0]["checkin"].tzinfo) if recs else dt.datetime.now()
+    c3 = [r for r in recs if r["case"] == "III" and r.get("radial") is not None]
+    c1 = [r for r in recs if r["case"] in ("I", "II") and r["fixes"]]
+    out = []
+    for group in (c3, c1):
+        for rec in group:
+            key = "%s|%s|%s" % (rec["rig"], rec["callsign"].lower(), rec["checkin"].isoformat())
+            last = rec["handoff"] or rec["commence"] or rec["checkin"]
+            if key in done_ or now - last < SETTLE:
+                continue
+            done_[key] = rec["checkin"].isoformat()
+            if first:
+                continue
+            png = gp.screenshot(build(rec, group, events, gp.load_passes(dt.date.today())), 1010, 1760)
+            out.append(("Marshal | %s | %s | Case %s" % (rec["callsign"], rec["checkin"].strftime("%Y-%m-%d %H:%M"), rec["case"]), png))
+    if out:
+        post_cards(out)
+    json.dump(done_, open(POSTED, "w", encoding="utf-8"))
+    print("marshal cards: %d posted%s" % (len(out), " (first run: recorded the backlog only)" if first else ""))
+    return 0
+
+
 def main():
+    if "--post-new" in sys.argv:
+        return post_new()
     mr.fetch(10)
     for back in (0, 1):  # the Paddles logs (pass pattern lines) for today and yesterday, from every rig
         gp.fetch_today((dt.date.today() - dt.timedelta(days=back)).isoformat())
