@@ -436,6 +436,13 @@ func magneticDeg(atcCtrl *controller.ATCController, trueDeg int) int {
 	return int(math.Round(atcCtrl.ToMagnetic(float64(trueDeg)))) % 360
 }
 
+// callerFix is the caller's radar position from the carrier for the log (the Marshal report's map): altitude in
+// angels, range in nautical miles and magnetic bearing from the carrier; found false when it is not on the scope.
+func callerFix(atcCtrl *controller.ATCController, callsign string) (angels, distNm, bearingMag int, found bool) {
+	angels, distNm, bearing, found := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+	return angels, distNm, magneticDeg(atcCtrl, bearing), found
+}
+
 // marshalLoop handles the carrier marshal stack on a dedicated SRS frequency.
 func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, eamPassword, voice string,
 	txCooldown *int64, atcCtrl *controller.ATCController, stack *state.MarshalStack) {
@@ -820,7 +827,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			eat := case3EAT(stack, callsign, time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin)*time.Minute))
 			stack.SetAssignedRadial(callsign, radial)
 			stack.SetEAT(callsign, eat)
-			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Msg("Marshal: Case 3 aircraft checking in")
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Int("fixAngels", rAng).Int("fixDistNm", rDist).Int("fixBearingMag", rBrg).Bool("fixFound", rFound).Msg("Marshal: Case 3 aircraft checking in")
 			transmit(comp.MarshalMarkingMomCase3(say, stackAngels, radial, eat.Minute(), altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
 		} else {
 			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
@@ -907,7 +914,8 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			// (Case 3 transition mid-recovery, pilot never got a Case 3
 			// marking-mom), compute one now from current stack position.
 			eat = case3HoldEAT(stack, callsign, position, eat, time.Now()) // marshal_case3.go
-			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Msg("Marshal: Case 3 established in hold")
+			fa, fd, fb, ff := callerFix(atcCtrl, callsign)
+			log.Info().Str("callsign", callsign).Int("angels", angels).Int("position", position).Int("radial", radial).Time("eat", eat).Int("fixAngels", fa).Int("fixDistNm", fd).Int("fixBearingMag", fb).Bool("fixFound", ff).Msg("Marshal: Case 3 established in hold")
 			transmit(comp.MarshalEstablishedAckCase3(say, angels, radial, eat.Minute()))
 		} else if atcCtrl.IsDeckClear() && marshalCharlie.nextCharlie(stack.GetAll(), time.Now()) == callsign {
 			stack.SetPhase(callsign, "charlie")
@@ -928,8 +936,8 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 				brcDeg = int(math.Round(brc)) % 360
 				finalBearing = (brcDeg - marshalFinalBearingOffset + 360) % 360
 			}
-			_, _, _, onRadar := atcCtrl.LookupCallerRelativeToCarrier(callsign)
-			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Bool("radarContact", onRadar).Msg("Marshal: Case 3 commencing, descend to platform")
+			fa, fd, fb, onRadar := callerFix(atcCtrl, callsign)
+			log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Float64("fuelState", fuelState).Bool("radarContact", onRadar).Int("fixAngels", fa).Int("fixDistNm", fd).Int("fixBearingMag", fb).Bool("fixFound", onRadar).Msg("Marshal: Case 3 commencing, descend to platform")
 			transmit(comp.MarshalCopyCommencingCase3(say, fuelState, finalBearing, brcDeg, onRadar))
 			trackCase3Approach(callsign, say, time.Now()) // Paddles at three miles (marshal_case3.go)
 		} else {
@@ -956,8 +964,8 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			finalBearing = (int(math.Round(brc)) - marshalFinalBearingOffset + 360) % 360
 		}
 		stack.SetPhase(callsign, "platform")
-		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Msg("Marshal: platform call")
-		_, _, _, onRadar := atcCtrl.LookupCallerRelativeToCarrier(callsign)
+		fa, fd, fb, onRadar := callerFix(atcCtrl, callsign)
+		log.Info().Str("callsign", callsign).Float64("brcMag", brc).Int("finalBearing", finalBearing).Str("case", composer.CaseLabel(int(atcCtrl.GetRecoveryCase()))).Int("fixAngels", fa).Int("fixDistNm", fd).Int("fixBearingMag", fb).Bool("fixFound", onRadar).Msg("Marshal: platform call")
 		transmit(comp.MarshalAtPlatform(say, finalBearing, !onRadar))
 
 	case marshalNeedles:

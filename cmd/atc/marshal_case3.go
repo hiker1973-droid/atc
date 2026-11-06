@@ -292,7 +292,7 @@ func watchCase3Paddles(ctx context.Context, comp *composer.ATCComposer, transmit
 			}
 			switch j.step(angels, dist, brg, now) {
 			case case3SayDirty:
-				log.Info().Str("callsign", cs).Int("distNm", dist).Msg("Marshal: Case 3 at eight miles - dirty up")
+				log.Info().Str("callsign", cs).Int("distNm", dist).Int("bearingTrue", brg).Msg("Marshal: Case 3 at eight miles - dirty up")
 				calls = append(calls, comp.MarshalCase3DirtyUp(j.say))
 			case case3SayPaddles:
 				log.Info().Str("callsign", cs).Int("distNm", dist).Int("bearingTrue", brg).Msg("Marshal: Case 3 at three miles - handing to Paddles")

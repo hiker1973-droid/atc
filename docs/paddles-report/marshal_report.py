@@ -14,6 +14,7 @@ import collections
 import datetime as dt
 import html
 import json
+import math
 import os
 import statistics
 import sys
@@ -91,6 +92,12 @@ def read_events(days):
     return sorted(out, key=lambda e: e[0])
 
 
+def add_fix(rec, kind, t, o):
+    """A real radar position from Marshal's log: range (NM) and magnetic bearing from the carrier, and angels."""
+    if o.get("fixFound") and o.get("fixDistNm"):
+        rec["fixes"].append((kind, t, o["fixDistNm"], o.get("fixBearingMag"), o.get("fixAngels")))
+
+
 def approaches(events):
     """Each jet's trip through Marshal: a record per check-in, filled in as its later calls arrive."""
     recs, open_rec = [], {}
@@ -99,7 +106,8 @@ def approaches(events):
         if "aircraft checking in" in msg and cs:
             rec = {"rig": rig, "callsign": cs, "checkin": t, "position": o.get("position"), "angels": o.get("stackAngels"),
                    "eat": dt.datetime.fromisoformat(o["eat"]) if o.get("eat") else None, "case": CASE_WORDS.get((o.get("case") or "").replace("Case ", ""), (o.get("case") or "").replace("Case ", "")),
-                   "hold": None, "commence": None, "platform": None, "dirty": None, "handoff": None, "eat_missed": 0, "misses": 0}
+                   "radial": o.get("radial"), "brc": o.get("brcMag"), "fixes": [], "hold": None, "commence": None, "platform": None, "dirty": None, "handoff": None, "eat_missed": 0, "misses": 0}
+            add_fix(rec, "check-in", t, o)
             recs.append(rec)
             open_rec[(rig, cs.lower())] = rec
             continue
@@ -108,10 +116,13 @@ def approaches(events):
             continue
         if "established in hold" in msg:
             rec["hold"] = t
+            add_fix(rec, "hold", t, o)
         elif "commencing" in msg:
             rec["commence"] = t
+            add_fix(rec, "commence", t, o)
         elif "platform call" in msg:
             rec["platform"] = t
+            add_fix(rec, "platform", t, o)
         elif "dirty up" in msg:
             rec["dirty"] = t
         elif "handing to Paddles" in msg or "handing off to LSO" in msg:
@@ -166,6 +177,69 @@ def mins(a, b):
     return (b - a).total_seconds() / 60 if a and b else None
 
 
+def stack_map(recs, names, canon):
+    """An overview map (north up, carrier in the middle): each Case III approach's hold fix on its marshal radial
+    (angels + 15 DME, as Marshal gives it), the way in along the radial, and the dirty-up and hand-off points; the
+    marker is coloured by the grade of the pass that followed. Returns (svg, lines of text beside it)."""
+    c3 = [r for r in recs if r["case"] == "III" and r.get("radial") is not None]
+    size, cx, cy = 600, 300, 300
+    far = max([(r["angels"] or 6) + 15 for r in c3] + [f[2] for r in c3 for f in r["fixes"]] + [20]) + 8
+    far = int(math.ceil(far / 10.0) * 10)
+    k = 270.0 / far  # pixels per nautical mile
+
+    def pt(brg, nm):
+        a = math.radians(brg)
+        return cx + nm * k * math.sin(a), cy - nm * k * math.cos(a)
+    s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (size, size)]
+    for nm in range(10, far + 1, 10):
+        s.append('<circle cx="%d" cy="%d" r="%.1f" fill="none" stroke="#30363d" stroke-width="1.2"/>' % (cx, cy, nm * k))
+        s.append('<text x="%.1f" y="%.1f" fill="#6e7681" font-size="12">%d NM</text>' % (cx + 4, cy - nm * k - 3, nm))
+    for brg, lab in ((0, "N"), (90, "E"), (180, "S"), (270, "W")):
+        x, y = pt(brg, far + 2.2)
+        s.append('<text x="%.1f" y="%.1f" fill="#8b949e" font-size="14" text-anchor="middle">%s</text>' % (x, y + 5, lab))
+    text, seen = [], {}
+    for r in c3:
+        ang = r["angels"] or 6
+        d = ang + 15
+        hx, hy = pt(r["radial"], d)
+        real = [f for f in r["fixes"] if f[3] is not None]
+        hold = next((f for f in real if f[0] == "hold"), None) or next((f for f in real if f[0] == "check-in"), None)
+        if hold:  # a real position beats the formula: where the jet was when it was in the hold
+            hx, hy = pt(hold[3], hold[2])
+        grade = gp.board_key(r["pass"]) if r.get("pass") else None
+        fill = gp.COLOURS[grade][0] if grade else "#6e7681"
+        if len(real) > 1:  # the jet's own track through Marshal: check-in, hold, commence, platform
+            s.append('<polyline fill="none" stroke="#58a6ff" stroke-width="2" points="%s"/>' % " ".join("%.1f,%.1f" % pt(f[3], f[2]) for f in real))
+            for f in real:
+                x, y = pt(f[3], f[2])
+                s.append('<circle cx="%.1f" cy="%.1f" r="4" fill="#0d1117" stroke="#58a6ff" stroke-width="1.6"/>' % (x, y))
+        s.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#58a6ff" stroke-width="1.6" stroke-dasharray="6 5" opacity=".6"/>' % (hx, hy, cx, cy))
+        for nm, lab in ((8, "dirty up"), (3, "Paddles")):
+            x, y = pt(r["radial"], nm)
+            s.append('<circle cx="%.1f" cy="%.1f" r="3.2" fill="#e8b400"/>' % (x, y))
+            if (round(r["radial"]), nm) not in seen:
+                seen[(round(r["radial"]), nm)] = 1
+                s.append('<text x="%.1f" y="%.1f" fill="#e8b400" font-size="11">%s</text>' % (x + 4, y - 7, lab))
+        s.append('<circle cx="%.1f" cy="%.1f" r="9" fill="%s" stroke="#e6edf3" stroke-width="1.6"/>' % (hx, hy, fill))
+        who = names.get(canon.get(r["callsign"].lower(), r["callsign"].lower()), r["callsign"]).split(" | ")[-1]
+        s.append('<text x="%.1f" y="%.1f" fill="#e6edf3" font-size="13" text-anchor="middle">A%d %s</text>' % (hx, hy - 14, ang, html.escape(who)))
+        p = r.get("pass")
+        text.append("%s - %s: %03d radial, %d DME, angels %d%s%s%s" % (
+            r["checkin"].strftime("%a %d %b %H:%M"), who, round(r["radial"]) % 360 or 360, d, ang,
+            ", held at %d NM on %03d" % (hold[2], hold[3]) if hold else "",
+            ", pushed %s" % r["commence"].strftime("%H:%M") if r["commence"] else "",
+            ", %s%s" % (p["grade"], " %d wire" % p["wire"] if p.get("wire") else "") if p else ""))
+    # the carrier: a ship symbol along the BRC of the last approach, at the centre
+    brc = next((r["brc"] for r in reversed(c3) if r.get("brc") is not None), None)
+    rot = -90 if brc is None else brc - 90  # the symbol is drawn pointing east (right)
+    s.append('<g transform="translate(%d %d) rotate(%.1f)"><path d="M14 0 L-8 -6 L-12 -6 L-12 6 L-8 6 Z" fill="#8b949e"/></g>' % (cx, cy, rot))
+    s.append('<text x="%d" y="%d" fill="#e6edf3" font-size="13" text-anchor="middle">ABE%s</text>' % (cx, cy + 40, " BRC %03d" % (round(brc) % 360 or 360) if brc is not None else ""))
+    if not c3:
+        s.append('<text x="%d" y="%d" fill="#8b949e" font-size="16" text-anchor="middle">No Case III approaches in this period</text>' % (cx, cy - 60))
+    s.append("</svg>")
+    return "".join(s), text
+
+
 def build(days=7):
     now = dt.datetime.now().astimezone()
     events = read_events(days)
@@ -211,6 +285,7 @@ def build(days=7):
             r["checkin"].strftime("%a %d %b %H:%M"), html.escape(names.get(canon.get(r["callsign"].lower(), r["callsign"].lower()), r["callsign"])),
             ("Case " + r["case"]) if r["case"] else "-", ticks(r),
             html.escape("%s%s" % (p["grade"], " %d wire" % p["wire"] if p.get("wire") else "")) if p else "<span class='m'>no pass seen</span>"))
+    map_svg, map_text = stack_map(recs, names, canon)
     logo = "file:///" + os.path.join(os.path.dirname(gp.HERE), "viking_head_white.png").replace("\\", "/")
     title = "%s - %s" % ((now - dt.timedelta(days=days)).strftime("%d %b"), now.strftime("%d %b %Y"))
     page = """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -222,16 +297,19 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
 h2{font-size:18px;margin:14px 0 6px;color:#e6edf3;border-bottom:1px solid #30363d;padding-bottom:4px}
 table{border-collapse:collapse;width:100%%}th{color:#8b949e;font-size:13px;text-align:left;padding:5px 8px;border-bottom:1px solid #30363d}td{padding:6px 8px;border-bottom:1px solid #21262d;font-size:16px}
 td.n{color:#e6edf3;font-weight:700}.y{background:#1f6b00;color:#fff;border-radius:3px;padding:1px 7px;margin-right:4px;font-size:13px}.n{}span.n{background:#30363d;color:#8b949e;border-radius:3px;padding:1px 7px;margin-right:4px;font-size:13px}.m{color:#8b949e}
+.mp{display:flex;gap:20px;align-items:flex-start}.mp ul{margin:6px 0 0 16px;padding:0;font-size:16px;line-height:1.7}
 .ft{color:#8b949e;font-size:12px;margin-top:10px}
 </style></head><body><div class="w"><div class="top"><div><h1>VMFA-225 Marshal Report</h1><div class="sub">%s</div></div><img class="logo" src="%s"></div>
 <div class="tiles">%s</div><div class="tm">%s</div>
 <h2>Pilots through Marshal</h2><table><tr><th>Pilot</th><th>Check-ins</th><th>Case III completed (hold, commence, hand-off)</th><th>Median check-in to commence</th><th>Approach times passed</th><th>Intent misses</th><th>Average grade after (passes)</th></tr>%s</table>
+<h2>Stack map - Case III holds (the jet's real position where Marshal logged it, otherwise its assigned radial and DME)</h2><div class="mp"><div>%s</div><ul>%s</ul></div>
 <h2>Latest approaches</h2><table><tr><th>Checked in</th><th>Pilot</th><th>Case</th><th>Steps Marshal logged</th><th>Paddles pass that followed</th></tr>%s</table>
 <div class="ft">From the Marshal logs of every rig. An intent miss is a call Marshal heard but could not act on. "Ignored" calls were not addressed to Marshal (often heard as Deckboss or another name). A pass counts for an approach if it came within 25 minutes of the hand-off.</div></div></body></html>""" % (
         html.escape(title), logo,
         "".join("<div class='tile'><b>%s</b><span>%s</span></div>" % (v, html.escape(k)) for k, v in tiles),
         "".join("<div><small>%s</small>%s</div>" % (html.escape(k), v) for k, v in timing),
-        "".join(rows) or "<tr><td colspan='7'>No check-ins in this period.</td></tr>",
+        "".join(rows) or "<tr><td colspan='7'>No check-ins in this period.</td></tr>", map_svg,
+        "".join("<li>%s</li>" % html.escape(t) for t in map_text) or "<li>No Case III approaches in this period.</li>",
         "".join(last) or "<tr><td colspan='5'>No approaches in this period.</td></tr>")
     summary = "**Marshal report** - %s: %d check-ins, %d calls heard, %d intent misses" % (title, len(recs), acc["heard"], acc["miss"])
     return page, summary, len(rows), min(len(recs), 12)
@@ -241,7 +319,7 @@ def main():
     days = int(sys.argv[sys.argv.index("--days") + 1]) if "--days" in sys.argv else 7
     fetch(days)
     page, summary, pilots, last = build(days)
-    png = gp.screenshot(page, 450 + 36 * pilots + 40 * last, 1500)
+    png = gp.screenshot(page, 1090 + 36 * pilots + 40 * last, 1500)
     out = os.path.join(gp.REPORTS, "_data", "paddles", "marshal-report.png")
     open(out, "wb").write(png)
     print(summary, "->", out)
