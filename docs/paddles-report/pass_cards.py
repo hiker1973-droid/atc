@@ -156,7 +156,19 @@ def groove_side(pts):
     return "".join(s) + "</svg>"
 
 
-def groove_top(pts, groove_s=None):
+def wind_arrow(x, y, wind_dir, wind_kts, brc):
+    """The wind as the DCS card draws it: an arrow (where the wind is going, in the ship's frame - bow to the left)
+    and "270 at 12 kn" under it."""
+    rel = math.radians(wind_dir + 180 - brc)  # the direction it blows toward, from the ship's heading
+    dx, dy = -math.cos(rel) * 22, -math.sin(rel) * 22  # bow left, starboard up
+    a = math.atan2(dy, dx)
+    head = "%.1f,%.1f %.1f,%.1f %.1f,%.1f" % (x + dx - 9 * math.cos(a - 0.5), y + dy - 9 * math.sin(a - 0.5), x + dx, y + dy,
+                                              x + dx - 9 * math.cos(a + 0.5), y + dy - 9 * math.sin(a + 0.5))
+    return ('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#c9d1d9" stroke-width="2.4"/><polyline points="%s" fill="none" stroke="#c9d1d9" stroke-width="2.4"/>'
+            % (x - dx, y - dy, x + dx, y + dy, head)) + text(x, y + 42, "%03d at %d kn" % (round(wind_dir) % 360 or 360, round(wind_kts)), 13, "#c9d1d9", "middle")
+
+
+def groove_top(pts, groove_s=None, wind=None):
     """The lineup from above: the centreline, the lineup lines and the 1/4 .. 1 nm rings."""
     y0, x0 = TH / 2 + 4, 84
     def px(d): return x0 + d * 0.36
@@ -181,6 +193,8 @@ def groove_top(pts, groove_s=None):
         ft = (a * math.tan(math.radians(GS_DEG + g)) + 19.5) * 3.28084
         x, y = px(a), py(a, next(l for aa, _, l in pts if aa == a))
         s.append(note(x - 170, TH - 36, "Alt at 1 NM: %d ft" % round(ft)) + arrow(x - 60, TH - 50, x - 3, y + 6))
+    if wind:
+        s.append(wind_arrow(52, TH - 72, *wind))
     s.append(text(PW - 8, 18, "from above, lineup", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
@@ -350,6 +364,7 @@ def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None):
         comment = (comment + " WIRE# %d" % p["wire"]).strip()
     model = (p.get("model") or "").replace("FA-18C_hornet", "F/A-18C").replace("_", " ")
     case = ("Case " + p["case"]) if p.get("case") else ""
+    wind = (ctx["windDir"], ctx.get("windKts") or 0, brc) if ctx and ctx.get("windDir") is not None and brc is not None else None
     when = mission_time(ctx) or p["t"].strftime("%A %B %d, %Y %H:%M:%S") + " (real time)"
     daynight = ("Night" if ctx.get("isNight") else "Day") if ctx and "isNight" in ctx else ""
     lines = ['Nimitz Class "ABE" | %s' % map_name(ctx, p.get("rig")), when, *([weather_line(ctx)] if weather_line(ctx) else []),
@@ -370,7 +385,7 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
 </style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
 <div class="info"><img src="%s"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0]), approach_view(pat, brc), LOGO, body,
+        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind), approach_view(pat, brc), LOGO, body,
         "track from Paddles" if not coarse else "coarse card")
 
 
