@@ -216,8 +216,9 @@ def screenshot(src_html, height):
 def multipart(png, text):
     b = uuid.uuid4().hex
     head = ('--%s\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n%s\r\n'
-            '--%s\r\nContent-Disposition: form-data; name="files[0]"; filename="greenieboard.png"\r\n'
-            'Content-Type: image/png\r\n\r\n') % (b, json.dumps({"content": text, "attachments": []}), b)
+            '--%s\r\nContent-Disposition: form-data; name="files[0]"; filename="greenieboard-%s.png"\r\n'
+            'Content-Type: image/png\r\n\r\n') % (b, json.dumps({"content": text, "attachments": []}), b,
+            dt.datetime.now().strftime("%Y%m%d-%H%M"))
     return head.encode() + png + ("\r\n--%s--\r\n" % b).encode(), "multipart/form-data; boundary=" + b
 
 
