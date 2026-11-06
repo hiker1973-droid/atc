@@ -15,6 +15,7 @@ Run:  python -I docs/paddles-report/greenie_post.py [--date YYYY-MM-DD] [--no-po
 """
 import argparse
 import datetime as dt
+import csv
 import html
 import json
 import os
@@ -32,6 +33,7 @@ from build_paddles_report import POINTS, board_key, collect  # noqa: E402
 
 REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-webhook.txt")
+PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
 SHOWN = 15  # squares per pilot, newest on the right
 
 # fill, ink, label - the DCS greenie board's colours
@@ -45,6 +47,18 @@ COLOURS = {
     "WO": ("#000000", "#ffffff", "Wave-off"),
     "WOFD": ("#8a93a6", "#ffffff", "Foul deck (not scored)"),
 }
+
+
+def roster():
+    """callsign (lower case) -> the board label, from readback-pilots.csv
+    (columns: callsign, pilot, board label; the label defaults to "callsign | pilot")."""
+    out = {}
+    if os.path.exists(PILOTS_FILE):
+        for r in csv.reader(open(PILOTS_FILE, encoding="utf-8-sig", newline="")):
+            if len(r) >= 2 and r[0].strip() and r[0].strip().lower() != "callsign":
+                out[r[0].strip().lower()] = (r[2].strip() if len(r) > 2 and r[2].strip()
+                                             else "%s | %s" % (r[0].strip(), r[1].strip()))
+    return out
 
 
 def points(p):
@@ -102,11 +116,12 @@ def page(passes, now):
     if last:
         h = (now - last.replace(tzinfo=None) if last.tzinfo else now - last).total_seconds() / 3600
         ago = "%d hours ago" % h if h < 48 else "%d days ago" % (h // 24)
+    names = roster()
     body = []
     for avg, lt, cs, ps in rows:
         cells = "".join(square(p) for p in ps[-SHOWN:]) + '<td class="e"></td>' * (SHOWN - len(ps[-SHOWN:]))
         body.append('<tr><td class="n">%s</td><td class="a">%s</td><td class="d">%s</td>%s</tr>' % (
-            html.escape(cs), "%.1f" % avg if avg >= 0 else "-", lt.strftime("%d-%m"), cells))
+            html.escape(names.get(cs.lower(), cs)), "%.1f" % avg if avg >= 0 else "-", lt.strftime("%d-%m"), cells))
     key = "".join('<span class="k" style="background:%s">%s</span>' % (f, html.escape(l))
                   for f, _, l in COLOURS.values())
     return """<!doctype html><html><head><meta charset="utf-8"><style>
