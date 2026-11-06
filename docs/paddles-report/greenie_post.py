@@ -126,11 +126,13 @@ def square(p):
     if p["outcome"] == "trap" and p.get("wire"):
         txt = str(p["wire"])
     else:
-        txt = {"B": "B", "WO": "WO", "WOFD": "WO", "---": "---"}.get(key, "")
+        # No wire number (a pass entered by hand without one): show the grade itself.
+        txt = {"B": "B", "WO": "WO", "WOFD": "WO"}.get(key, key)
+    small = ' style="font-size:17px"' if len(txt) > 2 else ""
     if p.get("case3"):
-        txt = '<span class="c3">%s</span>' % html.escape(txt)
+        txt = '<span class="c3"%s>%s</span>' % (small, html.escape(txt))
     else:
-        txt = html.escape(txt)
+        txt = '<span%s>%s</span>' % (small, html.escape(txt)) if small else html.escape(txt)
     return '<td class="s" style="background:%s;color:%s">%s</td>' % (fill, ink, txt)
 
 
