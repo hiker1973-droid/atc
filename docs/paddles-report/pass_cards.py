@@ -228,6 +228,21 @@ def approach_view(pat, brc=None):
     return "".join(s) + "</svg>"
 
 
+def break_index(pat):
+    """Where the break began: the first point, after a straight run in, where the jet's course turns more than 15
+    degrees off that run for three samples in a row. None when it never turns (a straight-in)."""
+    n = len(pat)
+    if n < 12:
+        return None
+    course = lambda i: math.degrees(math.atan2(pat[i + 1][1] - pat[i][1], pat[i + 1][0] - pat[i][0]))
+    base = course(2)
+    off = lambda i: abs((course(i) - base + 180) % 360 - 180)
+    for i in range(3, n - 4):
+        if all(off(i + j) > 15 for j in range(3)) and abs(pat[i][0]) < 3 * M_NM:
+            return i
+    return None
+
+
 def callouts(pat, pts):
     """The DCS card's hand-written numbers: speed and height over the ship, the apex of the break, downwind,
     the height abeam and where the jet rolled out."""
@@ -236,6 +251,12 @@ def callouts(pat, pts):
     kts = lambda i: pat[i][3] if len(pat[i]) > 3 and pat[i][3] > 40 else None
     label = lambda i: ("%d kts " % kts(i) if kts(i) else "") + "%d ft" % pat[i][2]
     brk = next((i for i in range(n) if pat[i][1] > 600), n)   # the break: first well to port
+    bi = break_index(pat)
+    if bi is not None:  # "in the break": where the turn began and how far from the boat that was
+        x, y, _ = pts[bi]
+        d = abs(pat[bi][0]) / M_NM  # along the ship's heading: ahead of the ship is "past ABE"
+        out.append('<circle cx="%.1f" cy="%.1f" r="6" fill="none" stroke="%s" stroke-width="2"/>' % (x, y, YEL))
+        out.append(note(x + 36, y - 100, "in the break: %.1f NM %s ABE" % (d, "past" if pat[bi][0] < 0 else "short of")) + arrow(x + 32, y - 94, x + 3, y - 8))
     over = min(range(0, min(brk, n)), key=lambda i: abs(pat[i][0]), default=None)
     if over is not None and abs(pat[over][0]) < 600 and over > 2:
         x, y, _ = pts[over]
