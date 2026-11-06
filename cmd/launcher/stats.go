@@ -409,3 +409,26 @@ func handleCosts(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(b)
 }
+
+// handleGreenieBoard: GET -> the picture docs/paddles-report/greenie_post.py
+// draws each night (%USERPROFILE%\readback-greenieboard.png), the same one posted to
+// Discord. 404 anywhere else, so the Stats panel only shows on the dev box.
+func handleGreenieBoard(w http.ResponseWriter, _ *http.Request) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		http.NotFound(w, nil)
+		return
+	}
+	p := filepath.Join(home, "readback-greenieboard.png")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		http.NotFound(w, nil)
+		return
+	}
+	if st, err := os.Stat(p); err == nil {
+		w.Header().Set("X-Made", st.ModTime().Format("2 Jan 2006 15:04"))
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(b)
+}

@@ -110,6 +110,11 @@
     <div id="elBody"></div>
   </section>
 
+  <section id="greenieSection" style="display:none">
+    <h2>Greenie board <span class="muted" style="font-weight:400;font-size:0.82rem" id="greenieSub"></span></h2>
+    <p class="sub">The squadron board as posted to Discord: last 15 passes per pilot, from the Paddles logs of every rig. Made nightly after the Paddles report. Only on this machine.</p>
+    <img id="greenieImg" alt="Greenie board" style="max-width:100%;border-radius:6px">
+  </section>
   <section id="costSection" style="display:none">
     <h2>Running costs <span class="muted" style="font-weight:400;font-size:0.82rem" id="costSub"></span></h2>
     <p class="sub">What Readback costs us to run: OpenAI, AWS and the Claude API from their billing, ElevenLabs and Claude the plan fees, power an estimate. Only on this machine; updated nightly.</p>
@@ -321,6 +326,16 @@ async function showCosts() {
 load();
 showEleven();
 showCosts();
+
+async function showGreenie() {
+  let r;
+  try { r = await fetch('/api/greenie.png', { cache: 'no-store' }); } catch (e) { return; }
+  if (!r.ok) return;
+  $('greenieSub').textContent = 'updated ' + (r.headers.get('X-Made') || '');
+  $('greenieImg').src = URL.createObjectURL(await r.blob());
+  $('greenieSection').style.display = '';
+}
+showGreenie();
 setInterval(() => { if ($('elSection').style.display !== 'none') refreshEleven(); }, 60000);
 </script>
 <script src="/branding.js"></script>

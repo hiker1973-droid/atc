@@ -168,6 +168,8 @@ def main():
     png = screenshot(page(passes, dt.datetime.now()), 230 + 54 * pilots)
     out = os.path.join(REPORTS, "_data", "paddles", "greenieboard.png")
     open(out, "wb").write(png)
+    # A copy beside the costs file: the launcher's Stats page shows it (/api/greenie.png).
+    open(os.path.join(os.path.expanduser("~"), "readback-greenieboard.png"), "wb").write(png)
     print("ok", out, "pilots:", pilots, "passes:", len(passes))
     if a.no_post or not os.path.exists(WEBHOOK_FILE):
         if not a.no_post:
