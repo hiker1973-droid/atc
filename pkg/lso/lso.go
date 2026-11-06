@@ -317,6 +317,8 @@ type Tracker struct {
 	// shipHeading is the carrier's heading (true) at the last sample: the BRC the
 	// pass cards show.
 	shipHeading float64
+	// shipKts is the carrier's speed (knots) at the last sample: with the wind it gives the wind over the deck.
+	shipKts float64
 	// hist is every jet's last few minutes relative to the ship, for the
 	// Case I pattern (pattern.go).
 	hist map[string][]patSample
@@ -385,6 +387,7 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 	g := t.P.toGroove(s, smp)
 	gs, lineup := t.P.deviations(g)
 	t.shipHeading = s.HeadingDeg
+	t.shipKts = s.SpeedMps / mpsPerKt
 
 	ps := passSample{at: smp.At, g: g, gs: gs, lineup: lineup}
 	var trackDeg float64
@@ -898,7 +901,8 @@ func (t *Tracker) finish(p *Pass) {
 
 // passTrack is the pass's groove for a pass card: up to 70 points of
 // "metres astern:glideslope error:lineup error" (degrees, one decimal, kept
-// within +/-9) joined by "|", from 2,400 m out to the ramp.
+// within +/-9) then the speed over the deck (knots, relative to the ship) and the angle of attack
+// (0 when Tacview has none), joined by "|", from 2,400 m out to the ramp.
 func passTrack(p *Pass) string {
 	var pts []passSample
 	for _, s := range p.samples {
@@ -919,10 +923,17 @@ func passTrack(p *Pass) string {
 		if b.Len() > 0 {
 			b.WriteByte('|')
 		}
-		fmt.Fprintf(&b, "%.0f:%.1f:%.1f", pts[i].g.astern, clip(pts[i].gs), clip(pts[i].lineup))
+		aoa := 0.0
+		if pts[i].hasAoA {
+			aoa = pts[i].aoa
+		}
+		fmt.Fprintf(&b, "%.0f:%.1f:%.1f:%.0f:%.1f", pts[i].g.astern, clip(pts[i].gs), clip(pts[i].lineup), pts[i].relSpeedKts, aoa)
 	}
 	return b.String()
 }
+
+// ShipKts is the carrier's speed in knots at the last sample, 0 before any.
+func (t *Tracker) ShipKts() float64 { return t.shipKts }
 
 // ShipHeading is the carrier's heading (degrees true) at the last sample, 0 before any.
 func (t *Tracker) ShipHeading() float64 { return t.shipHeading }

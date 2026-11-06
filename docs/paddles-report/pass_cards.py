@@ -27,6 +27,7 @@ import re
 import time
 
 import greenie_post as gp
+import pilot_stats as ps
 
 STATE_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-cards.json")
 LOGO = "file:///" + os.path.join(os.path.dirname(gp.HERE), "viking_head_white.png").replace("\\", "/")  # the squadron's Viking head, white; once per card
@@ -150,7 +151,7 @@ def groove_side(pts):
     s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, SH), ship_side(8, base)]
     for off, col in ((0.5, YEL), (0.0, GRN), (-0.7, RED)):
         s.append(poly([(px(0), py(0, GS_DEG + off)), (px(2000), py(2000, GS_DEG + off))], col, 1.6, "5 4"))
-    track = [(px(a), py(a, GS_DEG + g)) for a, g, _ in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
+    track = [(px(a), py(a, GS_DEG + g)) for a, g, *_ in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
     s.append(poly(track, WHITE, 2.6) or dots(track))
     s.append(text(PW - 8, 18, "side view, glideslope %.1f degrees" % GS_DEG, 12, MUTED, "end"))
     return "".join(s) + "</svg>"
@@ -182,16 +183,16 @@ def groove_top(pts, groove_s=None, wind=None):
         x = px(nm * M_NM)
         s.append('<path d="M%.1f %d q%d %d 0 %d" fill="none" stroke="#484f58" stroke-width="1"/>' % (x - 5, 24, 8, (TH - 48) / 2, TH - 48))
         s.append(text(x, TH - 8, lab, 12, MUTED, "middle"))
-    track = [(px(a), py(a, l)) for a, _, l in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
+    track = [(px(a), py(a, l)) for a, _, l, *__ in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
     s.append(poly(track, WHITE, 2.6) or dots(track))
     if groove_s:  # T-19: seconds in the groove, pointed at the half-mile point
         x, y = px(0.5 * M_NM), y0 - 1.4 * 0.5 * M_NM * math.tan(math.radians(0.3))
         s.append(note(x - 70, y0 - 110, "T-%d" % round(groove_s)) + arrow(x - 56, y0 - 100, x, y - 6))
-    near = min(((abs(a - M_NM), a, g) for a, g, _ in pts if 0 < a <= 2000), default=None)
+    near = min(((abs(a - M_NM), a, g) for a, g, *_ in pts if 0 < a <= 2000), default=None)
     if near and near[0] < 450:  # Wake Alt: the height over the water at one mile
         a, g = near[1], near[2]
         ft = (a * math.tan(math.radians(GS_DEG + g)) + 19.5) * 3.28084
-        x, y = px(a), py(a, next(l for aa, _, l in pts if aa == a))
+        x, y = px(a), py(a, next(r[2] for r in pts if r[0] == a))
         s.append(note(x - 170, TH - 36, "Alt at 1 NM: %d ft" % round(ft)) + arrow(x - 60, TH - 50, x - 3, y + 6))
     if wind:
         s.append(wind_arrow(84, TH - 72, *wind))
@@ -360,7 +361,20 @@ def mission_time(ctx):
         return ""
 
 
-def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None):
+def groove_line(pts):
+    """The speed and angle of attack down the groove, from the track Paddles logged (speed:AoA are the 4th and 5th numbers)."""
+    rows = [r for r in pts if len(r) >= 5 and r[3] > 40]
+    if not rows:
+        return ""
+    near = min(rows, key=lambda r: abs(r[0] - M_NM))
+    aoas = [r[4] for r in rows if r[4] > 0]
+    out = "Groove: %d kts at %.1f NM" % (round(near[3]), near[0] / M_NM)
+    if aoas:
+        out += ", AoA %.1f avg (on speed %.1f)" % (sum(aoas) / len(aoas), ps.HORNET_ON_SPEED_AOA)
+    return out
+
+
+def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None, stats_line=""):
     key = gp.board_key(p)
     fill, ink, name = gp.COLOURS[key]
     badge = "WO" if key in ("WOFD", "WO") else ("B" if key == "B" else p["grade"] or key)
@@ -376,9 +390,14 @@ def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None):
     else:
         when = mission_time(ctx) or p["t"].strftime("%A %B %d, %Y %H:%M:%S") + " (real time)"
     daynight = ("Night" if ctx.get("isNight") else "Day") if ctx and "isNight" in ctx else ""
+    wod = ps.wind_over_deck(ctx, brc)
+    wod_line = ("Wind over deck %d kts (ship %d, headwind %d, crosswind %d)" % (round(wod[0]), round((ctx or {}).get("shipKts") or 0),
+                                                                              round(wod[1]), round(abs(wod[2])))) if wod and (ctx or {}).get("shipKts") else ""
     lines = ['Nimitz Class "ABE" | %s' % map_name(ctx, p.get("rig")), when, *([weather_line(ctx)] if weather_line(ctx) else []),
+             *([wod_line] if wod_line else []), *([groove_line(pts)] if not coarse and groove_line(pts) else []),
              " | ".join(b for b in (model, case, daynight) if b), "",
              name if key in ("WOFD", "WO") else badge, comment, "", remark(p.get("comments")),
+             *([stats_line] if stats_line else []),
              "(added by hand: no track was recorded)" if p.get("manual") else
              "(segment averages only: this pass was logged before tracks)" if coarse else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
@@ -413,6 +432,7 @@ def post_cards(hook, log_passes, days):
     tracks = read_logged(days, "Paddles: pass track", "track") if todo else []
     patterns = read_logged(days, "Paddles: pass pattern", "pattern") if todo else []
     contexts = read_context(days) if todo else []
+    everyone, _ = ps.grouped(gp.load_passes(dt.date.today())) if todo else ({}, None)
     n = 0
     for p in todo:
         key = canon.get(p["callsign"].lower(), p["callsign"].lower())
@@ -423,7 +443,8 @@ def post_cards(hook, log_passes, days):
         coarse = not pts
         if coarse:
             pts = segment_points(p)
-        png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns), brc_for(p, patterns), context_for(p, contexts)), 980, 1760)
+        png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns), brc_for(p, patterns), context_for(p, contexts),
+                                      ps.pilot_line(names.get(key, p["callsign"]), everyone.get(key, []))), 1080, 1760)
         gp.send(hook + "?wait=true", "POST", png, "")
         posted.add(pass_key(p))
         n += 1

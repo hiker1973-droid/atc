@@ -317,7 +317,7 @@ func newLSOFeed(p lso.Params, say func(lso.Call)) *lsoFeed {
 // logContext writes the mission time and the weather beside a pass's summary, for the pass card.
 func (f *lsoFeed) logContext(summary string) {
 	cs, _, _ := strings.Cut(summary, " (")
-	ev := log.Info().Str("callsign", cs)
+	ev := log.Info().Str("callsign", cs).Float64("shipKts", f.tr.ShipKts())
 	any := false
 	if f.missionClock != nil {
 		if mt := f.missionClock(); !mt.IsZero() {

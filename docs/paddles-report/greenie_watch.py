@@ -9,6 +9,10 @@ pass's track, pattern and context lines are written too, then runs
 greenie_post.py --refresh, which redraws the board, edits the Discord message and
 posts a card for each new pass. The hourly task stays as the backstop.
 
+Two more jobs ride on the same loop: twenty minutes after the last pass of a recovery it posts the
+recovery summary (recovery_summary.py --post), and on Sunday after 20:00 it posts the weekly report
+(weekly_report.py --post) once, as a new message in the greenie board's channel.
+
 Run:  pythonw -I docs/paddles-report/greenie_watch.py
 """
 import datetime as dt
@@ -22,6 +26,8 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
 POLL_S = 15
+QUIET_S = 20 * 60 + 30  # a recovery is over when no pass has come for this long
+WEEK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-weekly.json")
 SETTLE_S = 8  # the pass line is the last of the pass's log lines; give the rest a moment to be written
 MARK = b'"message":"Paddles: pass"'
 
@@ -43,8 +49,30 @@ def refresh():
                    timeout=300, capture_output=True)
 
 
+def run(script, *args):
+    try:
+        subprocess.run([sys.executable, "-I", "-B", os.path.join(HERE, script), *args], timeout=300, capture_output=True)
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+
+def weekly_due(now):
+    """Sunday from 20:00, once per ISO week."""
+    week = now.strftime("%G-W%V")
+    if now.weekday() != 6 or now.hour < 20:
+        return None
+    try:
+        import json
+        if json.load(open(WEEK_FILE, encoding="utf-8")).get("last") == week:
+            return None
+    except (OSError, ValueError):
+        pass
+    return week
+
+
 def main():
     seen = {}
+    last_pass, pending = 0.0, False
     day = dt.date.today().isoformat()
     while True:
         today = dt.date.today().isoformat()
@@ -64,6 +92,15 @@ def main():
                 refresh()
             except (subprocess.SubprocessError, OSError):
                 pass
+            last_pass, pending = time.time(), True
+        if pending and time.time() - last_pass >= QUIET_S:
+            run("recovery_summary.py", "--post")
+            pending = False
+        week = weekly_due(dt.datetime.now())
+        if week:
+            import json
+            json.dump({"last": week}, open(WEEK_FILE, "w", encoding="utf-8"))  # first, so a failed post is not retried every 15 s
+            run("weekly_report.py", "--post")
         time.sleep(POLL_S)
 
 
