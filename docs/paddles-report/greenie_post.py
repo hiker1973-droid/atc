@@ -122,7 +122,7 @@ def load_passes(end):
             passes.append({"t": dt.datetime.fromisoformat("%sT%s:00" % (r[0], r[1] or "12:00")).astimezone(), "callsign": r[2],
                            "outcome": "wave off" if r[4].upper().startswith("WO") else "bolter" if r[4] == "B" else "trap",
                            "grade": r[4], "wire": int(r[3]) if r[3] else None,
-                           "case3": r[5].upper() in ("III", "3"), "comments": r[6]})
+                           "case3": r[5].upper() in ("III", "3"), "comments": r[6], "manual": True})
     # LSO corrections: readback-grade-overrides.csv (date, callsign, wire, grade, note).
     if os.path.exists(OVERRIDES_FILE):
         for r in csv.reader(open(OVERRIDES_FILE, encoding="utf-8-sig", newline="")):

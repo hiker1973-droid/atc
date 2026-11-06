@@ -223,7 +223,7 @@ def approach_view(pat, brc=None, wind=None):
     sx, sy, k = 330, h / 2, 0.08
     s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, h)]
     if not pat:
-        s.append(text(PW / 2, h / 2, "no approach track for this pass (logged before tracks)", 15, MUTED, "middle"))
+        s.append(text(PW / 2, h / 2, "no approach track recorded for this pass", 15, MUTED, "middle"))
         return "".join(s) + "</svg>"
     for nm in (0.5, 1, 2, 3):
         r = nm * M_NM * k
@@ -367,11 +367,16 @@ def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None):
     model = (p.get("model") or "").replace("FA-18C_hornet", "F/A-18C").replace("_", " ")
     case = ("Case " + p["case"]) if p.get("case") else ""
     wind = (ctx["windDir"], ctx.get("windKts") or 0, brc) if ctx and ctx.get("windDir") is not None and brc is not None else None
-    when = mission_time(ctx) or p["t"].strftime("%A %B %d, %Y %H:%M:%S") + " (real time)"
+    if p.get("manual"):  # added by hand: the time of day is only a place in the order, so show the date alone
+        when = p["t"].strftime("%A %B %d, %Y")
+        comment = ""
+    else:
+        when = mission_time(ctx) or p["t"].strftime("%A %B %d, %Y %H:%M:%S") + " (real time)"
     daynight = ("Night" if ctx.get("isNight") else "Day") if ctx and "isNight" in ctx else ""
     lines = ['Nimitz Class "ABE" | %s' % map_name(ctx, p.get("rig")), when, *([weather_line(ctx)] if weather_line(ctx) else []),
              " | ".join(b for b in (model, case, daynight) if b), "",
              name if key in ("WOFD", "WO") else badge, comment, "", remark(p.get("comments")),
+             "(added by hand: no track was recorded)" if p.get("manual") else
              "(segment averages only: this pass was logged before tracks)" if coarse else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
     return """<!doctype html><html><head><meta charset="utf-8"><style>
