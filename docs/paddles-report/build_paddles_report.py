@@ -141,6 +141,8 @@ def parse_pass(s):
         else:
             p["grade"], _, p["comments"] = gr.partition(": ")
             p["comments"] = re.sub(r"\s*\d wire$", "", p["comments"]).strip()
+    cs = re.search(r"^[^;]*?, case (I{1,3})\b", s)
+    p["case"] = cs.group(1) if cs else ""
     if not p["grade"] and p["outcome"] == "wave off":
         p["grade"] = "WO"
     w = re.search(r"est\. (\d) wire", s)

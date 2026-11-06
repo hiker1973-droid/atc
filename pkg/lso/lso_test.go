@@ -22,6 +22,8 @@ type flight struct {
 	// greenAt, when set, is where (m astern) he calls "green deck".
 	redDeck bool
 	greenAt float64
+	// caseNo, when set, is the recovery case the tracker is told.
+	caseNo int
 }
 
 func world(p Params, s Ship, astern, right, height float64) (lat, lon, altM float64) {
@@ -39,6 +41,9 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 	p.TouchdownCalM = 0 // corrects real Tacview tracks; these are exact
 	tr := NewTracker(p)
 	tr.Done = func(s string) { summary = s }
+	if f.caseNo > 0 {
+		tr.Case = func() int { return f.caseNo }
+	}
 	t0 := time.Date(2026, 10, 17, 14, 0, 0, 0, time.UTC)
 	ship0 := Ship{Lat: 42.0, Lon: 41.0, HeadingDeg: 100, SpeedMps: 15}
 	astern := 2300.0
@@ -119,6 +124,17 @@ func TestOnGlideslopeTrap(t *testing.T) {
 	}
 	if !strings.Contains(sum, ": trap") || !strings.Contains(sum, "est. 3 wire") || !strings.Contains(sum, "grade _OK_: 3 wire") {
 		t.Errorf("summary = %q, want a 3-wire trap", sum)
+	}
+}
+
+func TestSummaryNamesTheCase(t *testing.T) {
+	_, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, caseNo: 3}.run(t)
+	if !strings.Contains(sum, ": trap, case III, grade ") {
+		t.Errorf("summary = %q, want \", case III\" after the outcome", sum)
+	}
+	_, none := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true}.run(t)
+	if strings.Contains(none, "case") {
+		t.Errorf("summary = %q, no case was set", none)
 	}
 }
 

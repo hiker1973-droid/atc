@@ -83,6 +83,8 @@ def load_passes(end):
             logs.append((m.group(2), os.path.join(data, f)))
             have.add(m.group(1))
     passes = collect(logs, dt.date(2000, 1, 1), end)["pass"]
+    for p in passes:
+        p["case3"] = p.get("case") == "III"  # Paddles writes ", case III" in the pass line (2026-11-06 on)
     summ = os.path.join(REPORTS, "_summary")
     for f in sorted(os.listdir(summ)) if os.path.isdir(summ) else []:
         d = f[:-5]

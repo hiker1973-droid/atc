@@ -23,6 +23,9 @@ import (
 
 var flagLSOGrpcAddr string
 
+// flagLSOMarshalDash: see lso_case.go.
+var flagLSOMarshalDash string
+
 var (
 	dcsGradeRe = regexp.MustCompile(`GRADE:\s*(\S+)`)
 	dcsWireRe  = regexp.MustCompile(`WIRE#?\s*(\d)`)

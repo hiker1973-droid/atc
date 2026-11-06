@@ -305,6 +305,9 @@ type Tracker struct {
 	lastTrapAt time.Time
 	// Done receives each finished pass's summary line.
 	Done func(summary string)
+	// Case, if set, is the recovery case now (1, 2 or 3; 0 = not known): the
+	// summary says ", case III" so the greenie board can mark night passes.
+	Case func() int
 	// hist is every jet's last few minutes relative to the ship, for the
 	// Case I pattern (pattern.go).
 	hist map[string][]patSample
@@ -803,6 +806,11 @@ func (t *Tracker) finish(p *Pass) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s (%s): %s", p.Callsign, p.Model, p.outcome)
+	if t.Case != nil {
+		if n := t.Case(); n >= 1 && n <= 3 {
+			fmt.Fprintf(&b, ", case %s", strings.Repeat("I", n))
+		}
+	}
 	if g := t.Grade(p); g != "" {
 		fmt.Fprintf(&b, ", grade %s", g)
 	}

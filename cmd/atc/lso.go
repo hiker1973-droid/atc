@@ -54,6 +54,8 @@ func registerLSOFlags(f *flag.FlagSet) {
 		"Landing point offset from the carrier centreline in metres, starboard positive (calibrate from logged traps)")
 	f.Float64Var(&flagLSODeckbossFreq, "lso-deckboss-freq", 128.6,
 		`Deckboss frequency in MHz that Paddles hands a landed jet to on "green deck" (0 = name only)`)
+	f.StringVar(&flagLSOMarshalDash, "lso-marshal-dash", "localhost:6004",
+		`Marshal dashboard host:port Paddles asks which recovery case is active ("" = tower weather only)`)
 	f.StringVar(&flagLSOGrpcAddr, "lso-grpc-addr", "localhost:50051",
 		`DCS-gRPC for DCS's own LSO grades and wires, logged beside Paddles' ("" = off; Night is :50053)`)
 }
@@ -207,6 +209,9 @@ func runLSO(ctx context.Context, apiKey string) {
 	p := lso.NimitzParams()
 	p.LandingLateralM = flagLSOLateral
 	feed := newLSOFeed(p, say)
+	caseSrc := &lsoCaseSource{marshal: flagLSOMarshalDash}
+	feed.tr.Case = caseSrc.get
+	go caseSrc.run(ctx)
 	// The foul-deck wave-off carries his callsign, so render it as his pass
 	// starts: at a quarter mile there is no time to wait for TTS.
 	feed.tr.OnPass = func(cs string) {
