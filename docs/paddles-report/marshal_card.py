@@ -49,7 +49,7 @@ def stack_view(rec, mates, brc, name):
     s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#58a6ff" stroke-width="1.4" stroke-dasharray="6 5" opacity=".7"/>' % (cx, cy, x30, y30))
     s.append(pc.text(x30 + 6, y30 - 8, "%03d radial" % (round(radial) % 360 or 360), 13, "#58a6ff", "start"))
     # north arrow
-    nx, ny = 50, 70
+    nx, ny = 52, 118
     a = math.radians(off)
     s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#8b949e" stroke-width="2"/>' % (nx, ny, nx + 26 * math.sin(a), ny - 26 * math.cos(a)))
     s.append(pc.text(nx + 36 * math.sin(a), ny - 36 * math.cos(a) + 5, "N", 14, MUTED, "middle"))
