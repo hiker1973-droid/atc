@@ -916,6 +916,15 @@ func (t *Tracker) segMeans(p *Pass) []segMeans {
 // grade, errors with where they were (X, IM, IC, AR; "(H)" = a little high,
 // "[BC]" = no ball call) and the wire. "" for a pass that never got to a
 // trap, bolter or wave-off.
+// Grade thresholds (operator 2026-11-06, "loosen the grading up a bit so it's
+// easier to get a green OK"): this many big errors still earns an OK, one more
+// is "(OK)", and this many or more is "---". Was 0 / 3 (any big error was
+// "(OK)", three was "---"), matched to seven DCS grades on 2026-10-17/18.
+const (
+	majorsStillOK = 1
+	majorsNoGrade = 4
+)
+
 func (t *Tracker) Grade(p *Pass) string {
 	var errs []string
 	// majors counts the big errors. Seven passes with DCS's grade
@@ -1009,9 +1018,9 @@ func (t *Tracker) Grade(p *Pass) string {
 	switch {
 	case p.hasRamp && p.rampLow < rampCutM:
 		g = "C" // far below the glide path at the ramp: unsafe
-	case majors >= 3 || wire == 1:
+	case majors >= majorsNoGrade || wire == 1:
 		g = "---"
-	case majors > 0:
+	case majors > majorsStillOK:
 		g = "(OK)"
 	case len(errs) == 0 && wire == 3:
 		g = "_OK_"
