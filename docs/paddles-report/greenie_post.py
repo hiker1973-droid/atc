@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import shutil
 import urllib.error
 import urllib.request
 import uuid
@@ -61,11 +62,25 @@ def roster():
     if os.path.exists(PILOTS_FILE):
         for r in csv.reader(open(PILOTS_FILE, encoding="utf-8-sig", newline="")):
             r = [x.strip() for x in r] + ["", "", "", "", ""]
-            if r[0].lower() == "callsign" or not (r[0] or r[1] or r[2]):
+            if r[0].lower() == "callsign" or not (r[0] or r[1] or r[2]) or r[3].lower() == "ignore":
                 continue
             out.append((r[0].lower(), r[2] or " | ".join(x for x in (r[0], r[1]) if x),
                         r[3].lower() == "reserve", [a.strip().lower() for a in r[4].split(";") if a.strip()]))
     return out
+
+
+def ignored():
+    """Callsigns marked group "ignore" in the roster (flight callsigns like "Raider 1-1", not pilots)."""
+    out = set()
+    if os.path.exists(PILOTS_FILE):
+        for r in csv.reader(open(PILOTS_FILE, encoding="utf-8-sig", newline="")):
+            r = [x.strip() for x in r] + ["", "", "", "", ""]
+            if r[3].lower() == "ignore" and r[0]:
+                out.add(r[0].lower())
+    return out
+
+
+UNMATCHED = []  # callsigns heard with passes but not in the roster (set by page())
 
 
 def points(p):
@@ -144,6 +159,10 @@ def page(passes, now):
     canon = {a: cs for cs, _, _, al in roster() for a in al if cs}
     # Only pilots in readback-pilots.csv are on the board (flight callsigns like "Raider 1-1" are not pilots).
     if names:
+        skip = ignored()
+        UNMATCHED[:] = sorted({p["callsign"] for p in passes
+                               if canon.get(p["callsign"].lower(), p["callsign"].lower()) not in names
+                               and p["callsign"].lower() not in skip})
         passes = [p for p in passes if canon.get(p["callsign"].lower(), p["callsign"].lower()) in names]
     by, shown = defaultdict(list), {}
     for p in sorted(passes, key=lambda p: p["t"]):
@@ -259,6 +278,33 @@ def fetch_today(day):
                 f.write(body)
 
 
+BACKUP_DIRS = [r"G:\Readback-greenie-backup",
+               os.path.join(REPORTS, "_data", "greenie-backup")]  # G: = second disk; the Reports folder syncs with OneDrive
+
+
+def backup():
+    """Copy the board's data files off the home folder: the latest set, and one dated set a day
+    (30 kept). The webhook (a secret) goes to G: only, never into OneDrive."""
+    home = os.path.expanduser("~")
+    files = [PILOTS_FILE, MANUAL_FILE, OVERRIDES_FILE, MESSAGE_FILE, WEBHOOK_FILE]
+    today = dt.date.today().isoformat()
+    for i, root in enumerate(BACKUP_DIRS):
+        try:
+            if not os.path.isdir(os.path.dirname(root)) and i == 0:
+                continue  # no G: on this machine
+            for sub_dir in ("latest", today):
+                d = os.path.join(root, sub_dir)
+                os.makedirs(d, exist_ok=True)
+                for f in files:
+                    if os.path.exists(f) and (i == 0 or f != WEBHOOK_FILE):
+                        shutil.copy2(f, os.path.join(d, os.path.basename(f)))
+            old = sorted(x for x in os.listdir(root) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", x))
+            for x in old[:-30]:
+                shutil.rmtree(os.path.join(root, x), ignore_errors=True)
+        except OSError as e:
+            print("backup to %s failed: %s" % (root, e))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=(dt.date.today() - dt.timedelta(days=1)).isoformat())
@@ -282,12 +328,19 @@ def main():
     # A copy beside the costs file: the launcher's Stats page shows it (/api/greenie.png).
     open(os.path.join(os.path.expanduser("~"), "readback-greenieboard.png"), "wb").write(png)
     print("ok", out, "pilots:", pilots, "passes:", len(passes))
+    backup()
+    if UNMATCHED:
+        print("not on the board (add to the roster, or mark ignore):", ", ".join(UNMATCHED))
+    open(os.path.join(REPORTS, "_data", "paddles", "greenie-unmatched.txt"), "w", encoding="utf-8").write("\n".join(UNMATCHED))
     if a.no_post or not os.path.exists(WEBHOOK_FILE):
         if not a.no_post:
             print("no webhook file at", WEBHOOK_FILE, "- picture made, not posted")
         return 0
     hook = open(WEBHOOK_FILE, encoding="utf-8").read().strip()
-    what = post(hook, png, "**Greenieboard** - updated %s" % dt.datetime.now().strftime("%d %b %H:%M"))
+    text = "**Greenieboard** - updated %s" % dt.datetime.now().strftime("%d %b %H:%M")
+    if UNMATCHED:
+        text += "\nNot on the board - add to the roster: " + ", ".join(UNMATCHED)
+    what = post(hook, png, text)
     print(what)
     return 0
 
