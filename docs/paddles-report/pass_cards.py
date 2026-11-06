@@ -29,7 +29,7 @@ import time
 import greenie_post as gp
 
 STATE_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-cards.json")
-LOGO = "file:///" + os.path.join(os.path.dirname(gp.HERE), "vsfg7_patch.png").replace("\\", "/")
+LOGO = "file:///" + os.path.join(os.path.dirname(gp.HERE), "viking_head_white.png").replace("\\", "/")  # the squadron's Viking head, white; once per card
 GS_DEG = 3.5  # the Nimitz glideslope (pkg/lso NimitzParams)
 M_NM = 1852.0
 PW, SH, TH = 840, 250, 290  # a panel's width; the side view's and the top-down view's height
@@ -379,15 +379,15 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
 .w{margin:8px;border:1px solid #30363d;background:#161b22;border-radius:6px;padding:14px 16px;width:1696px}
 .top{display:flex;align-items:center;gap:18px;margin-bottom:10px}
 .b{min-width:96px;height:58px;line-height:58px;text-align:center;border-radius:7px;font:700 32px Arial,sans-serif;background:%s;color:%s;padding:0 14px}
-.n{font:700 28px Arial,sans-serif;color:#e6edf3}.logo{margin-left:auto;width:72px;height:72px;border-radius:50%%;box-shadow:0 0 0 2px #30363d}
+.n{font:700 28px Arial,sans-serif;color:#e6edf3}.logo{margin-left:auto;height:92px;width:auto}
 .ps{display:flex;gap:16px}.pn{flex:none;width:840px;background:#0d1117;border:1px solid #30363d;border-radius:6px;overflow:hidden}
 .tab{background:#1f6feb;color:#fff;font:700 22px Arial,sans-serif;text-align:center;padding:9px 0}
-.info{display:flex;gap:18px;align-items:center;margin-top:14px;font-size:20px;line-height:1.35;color:#e6edf3}.info img{width:84px;height:84px;border-radius:50%%}
+.info{margin-top:14px;font-size:20px;line-height:1.35;color:#e6edf3}
 .ft{font:12px Arial,sans-serif;color:#8b949e;margin-top:8px}
 </style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
-<div class="info"><img src="%s"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind), approach_view(pat, brc, wind), LOGO, body,
+<div class="info"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
+        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind), approach_view(pat, brc, wind), body,
         "track from Paddles" if not coarse else "coarse card")
 
 
