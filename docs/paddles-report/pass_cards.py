@@ -145,8 +145,8 @@ def approach_view(pat):
     for nm in (0.5, 1, 2, 3):
         r = nm * M_NM * k
         s.append('<circle cx="%d" cy="%.0f" r="%.1f" fill="none" stroke="#30363d" stroke-width="1.2"/>' % (sx, sy, r))
-        s.append(text(sx + r + 4, sy - 5, "%g NM" % nm, 12, "#6e7681"))
-    s.append(ship_top(8, sy))
+        s.append(text(sx + r * math.cos(math.radians(25)) + 4, sy - r * math.sin(math.radians(25)) - 4, "%g NM" % nm, 12, "#6e7681"))
+    s.append(ship_top(sx - 76, sy))  # the stern (the aft = 0 point) at the rings' centre
     pts = [(sx + a * k, sy + p_ * k, ft) for a, p_, ft in pat]
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
     start = next((q for q, row in zip(pts, pat) if row[0] <= 2400), None)
