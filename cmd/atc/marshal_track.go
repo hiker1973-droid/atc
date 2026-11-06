@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -24,6 +25,40 @@ const (
 	marshalTrackEvery = 10 * time.Second
 	marshalTrackFlush = 6 // samples per log line (one minute)
 )
+
+// Marshal takes a jet out of its stack when it calls commencing, so the stack alone would lose the commence leg
+// (the part from the stack to the Initial). A jet that commenced is followed for marshalTrackAfter more.
+const marshalTrackAfter = 12 * time.Minute
+
+var (
+	trackMu    sync.Mutex
+	trackAfter = map[string]time.Time{} // callsign -> stop following at
+)
+
+// followAfterCommence keeps sampling a jet that has just left the stack.
+func followAfterCommence(callsign string, now time.Time) {
+	trackMu.Lock()
+	trackAfter[callsign] = now.Add(marshalTrackAfter)
+	trackMu.Unlock()
+}
+
+// trackedCallsigns is the stack plus the jets still being followed after commencing.
+func trackedCallsigns(stackCS []string, now time.Time) map[string]bool {
+	out := map[string]bool{}
+	for _, cs := range stackCS {
+		out[cs] = true
+	}
+	trackMu.Lock()
+	for cs, until := range trackAfter {
+		if now.After(until) {
+			delete(trackAfter, cs)
+		} else {
+			out[cs] = true
+		}
+	}
+	trackMu.Unlock()
+	return out
+}
 
 // marshalTrackSample is one "unix:rangeNm:bearingMag:altFt" sample.
 func marshalTrackSample(at time.Time, distNm, bearingMag, altFt float64) string {
@@ -45,16 +80,19 @@ func watchMarshalTracks(ctx context.Context, stack *state.MarshalStack, atcCtrl 
 		case <-ctx.Done():
 			return
 		case now := <-tk.C:
-			inStack := map[string]bool{}
+			var stackCS []string
 			for _, ac := range stack.GetAll() {
-				inStack[ac.Callsign] = true
-				alt, dist, brg, ok := atcCtrl.CallerCarrierFix(ac.Callsign)
+				stackCS = append(stackCS, ac.Callsign)
+			}
+			inStack := trackedCallsigns(stackCS, now)
+			for cs := range inStack {
+				alt, dist, brg, ok := atcCtrl.CallerCarrierFix(cs)
 				if !ok {
 					continue
 				}
-				buf[ac.Callsign] = append(buf[ac.Callsign], marshalTrackSample(now, dist, atcCtrl.ToMagnetic(brg), alt))
-				if len(buf[ac.Callsign]) >= marshalTrackFlush {
-					flush(ac.Callsign)
+				buf[cs] = append(buf[cs], marshalTrackSample(now, dist, atcCtrl.ToMagnetic(brg), alt))
+				if len(buf[cs]) >= marshalTrackFlush {
+					flush(cs)
 				}
 			}
 			for cs := range buf {

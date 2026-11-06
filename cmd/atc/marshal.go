@@ -929,6 +929,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 
 	case marshalCommencing:
 		stack.SetPhase(callsign, "commencing")
+		followAfterCommence(callsign, time.Now()) // marshal_track.go: keep the track going after the jet leaves the stack
 		stack.Remove(callsign)
 		if atcCtrl.GetRecoveryCase() == state.CaseThree {
 			brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
