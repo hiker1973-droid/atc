@@ -226,13 +226,16 @@ def approach_view(pat, brc=None, wind=None):
     if not pat:
         s.append(text(PW / 2, h / 2, "no approach track recorded for this pass", 15, MUTED, "middle"))
         return "".join(s) + "</svg>"
+    ring_boxes = []
     for nm in (0.5, 1, 2, 3):
         r = nm * M_NM * k
         s.append('<circle cx="%d" cy="%.0f" r="%.1f" fill="none" stroke="#30363d" stroke-width="1.2"/>' % (sx, sy, r))
         # the small rings are labelled above and to the right; the ship is near the top of the panel, so the 2 and 3 NM
         # rings are labelled below and to the right, where they are on the panel
         ang = math.radians(25 if nm <= 1 else -70 if nm == 2 else -40)
-        s.append(text(sx + r * math.cos(ang) + 4, sy - r * math.sin(ang) - 4 * (1 if nm <= 1 else -3), "%g NM" % nm, 13, "#8b949e"))
+        lx, ly = sx + r * math.cos(ang) + 4, sy - r * math.sin(ang) - 4 * (1 if nm <= 1 else -3)
+        s.append(text(lx, ly, "%g NM" % nm, 13, "#8b949e"))
+        ring_boxes.append((lx - 2, ly - 14, lx + len("%g NM" % nm) * 7 + 2, ly + 5))
     # the downwind corridor: 1.2 / 1.3 / 1.5 NM to port of the ship, parallel to its heading
     for nm, col in ((1.2, YEL), (1.3, GRN), (1.5, RED)):
         y = sy + nm * M_NM * k
@@ -243,7 +246,8 @@ def approach_view(pat, brc=None, wind=None):
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
     if wind:
         s.append(wind_arrow(100, 468, *wind))
-    s += callouts(pat, pts)
+    ring_boxes += [(sx - 130, sy - 52, sx + 4, sy + 20)]  # the ship and its BRC label
+    s += callouts(pat, pts, ring_boxes)
     s.append(text(PW - 8, 18, "approach, from above", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
@@ -263,10 +267,33 @@ def break_index(pat):
     return None
 
 
-def callouts(pat, pts):
+def _hit(a, b):
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def callouts(pat, pts, avoid=()):
     """The DCS card's hand-written numbers: speed and height over the ship, the apex of the break, downwind,
-    the height abeam and where the jet rolled out."""
+    the height abeam and where the jet rolled out. A note that would land on another note (or on a ring label in
+    `avoid`) is moved to the next free spot, so the words never overlap (Turbo's pass 2026-11-06)."""
     out = []
+    taken = list(avoid)
+
+    def put(px, py, s, size, cands, sub=None):
+        """A note for the point (px, py): the first of cands (dx, dy, anchor) whose box is free, then its arrow."""
+        w = max(len(s) * size * 0.5, len(sub) * 5.5 if sub else 0)
+
+        def box(dx, dy, anc):
+            lx = px + dx
+            x0 = lx if anc == "start" else lx - w if anc == "end" else lx - w / 2
+            return (x0 - 3, py + dy - size, x0 + w + 3, py + dy + (17 if sub else 6))
+        pick = next((c for c in cands if not any(_hit(box(*c), t) for t in taken)), cands[0])
+        taken.append(box(*pick))
+        dx, dy, anc = pick
+        lx, ly = px + dx, py + dy
+        out.append(note(lx, ly, s, size, anc) + (text(lx, ly + 14, sub, 10, MUTED, anc) if sub else ""))
+        ax, ay = lx + (-4 if anc == "start" else 4 if anc == "end" else 0), (ly + 8 + (14 if sub else 0) if dy < 0 else ly - size - 2)
+        d = math.hypot(ax - px, ay - py) or 1.0
+        out.append(arrow(ax, ay, px + (ax - px) / d * 7, py + (ay - py) / d * 7))
     n = len(pat)
     kts = lambda i: pat[i][3] if len(pat[i]) > 3 and pat[i][3] > 40 else None
     label = lambda i: ("%d kts " % kts(i) if kts(i) else "") + "%d ft" % pat[i][2]
@@ -276,29 +303,30 @@ def callouts(pat, pts):
         x, y, _ = pts[bi]
         d = abs(pat[bi][0]) / M_NM  # along the ship's heading: ahead of the ship is "past ABE"
         out.append('<circle cx="%.1f" cy="%.1f" r="6" fill="none" stroke="%s" stroke-width="2"/>' % (x, y, YEL))
-        out.append(note(x + 36, y - 74, "in the break: %.1f NM %s ABE" % (d, "past" if pat[bi][0] < 0 else "short of")) + arrow(x + 32, y - 68, x + 3, y - 8))
+        put(x, y, "in the break: %.1f NM %s ABE" % (d, "past" if pat[bi][0] < 0 else "short of"), 17,
+            [(36, -74, "start"), (-36, -74, "end"), (36, 80, "start"), (-36, 80, "end"), (36, -110, "start")])
     over = min(range(0, min(brk, n)), key=lambda i: abs(pat[i][0]), default=None)
     if over is not None and abs(pat[over][0]) < 600 and over > 2:
         x, y, _ = pts[over]
-        out.append(note(x - 10, y - 46, label(over), 15, "end") + arrow(x - 22, y - 38, x - 2, y - 6))
+        put(x, y, label(over), 15, [(-10, -46, "end"), (10, -46, "start"), (-10, 56, "end"), (10, 56, "start")])
     ahead = [i for i in range(brk, n) if pat[i][0] < 0]
     if ahead:
         i = min(ahead, key=lambda i: pat[i][0])
         x, y, _ = pts[i]
-        out.append(note(x - 14, y - 24, "%d ft" % pat[i][2], 15, "end") + arrow(x - 10, y - 18, x, y - 3))
+        put(x, y, "%d ft" % pat[i][2], 15, [(-14, -24, "end"), (14, -24, "start"), (-14, 40, "end"), (14, 40, "start")])
     far = max((row[1] for row in pat), default=0)
     down = next((i for i in range(brk, n) if pat[i][1] > 0.8 * far), None)
     if down is not None and far > 800:
         x, y, _ = pts[down]
-        out.append(note(x + 14, y - 34, label(down), 15) + arrow(x + 24, y - 24, x + 3, y - 4))
+        put(x, y, label(down), 15, [(14, -34, "start"), (-14, -34, "end"), (14, 44, "start"), (-14, 44, "end")])
         ab = min((i for i in range(down, n) if pat[i][1] > 0.6 * far), key=lambda i: abs(pat[i][0]), default=None)
         if ab is not None and abs(pat[ab][0]) < 700:
             x, y, _ = pts[ab]
-            out.append(note(x - 20, y + 60, "%d ft" % pat[ab][2], 17, "end") + text(x - 20, y + 74, "contact abeam", 10, MUTED, "end") + arrow(x - 18, y + 46, x - 3, y + 6))
+            put(x, y, "%d ft" % pat[ab][2], 17, [(-20, 60, "end"), (20, 60, "start"), (-20, -50, "end"), (20, -50, "start")], "contact abeam")
         roll = next((i for i in range((ab or down) + 1, n) if abs(pat[i][1]) < 250 and pat[i][0] > 0), None)
         if roll is not None:
             x, y, _ = pts[roll]
-            out.append(note(x + 20, y - 40, "%.1f NM" % (pat[roll][0] / M_NM), 17) + text(x + 22, y - 28, "rolled out point", 10, MUTED) + arrow(x + 24, y - 34, x + 2, y - 5))
+            put(x, y, "%.1f NM" % (pat[roll][0] / M_NM), 17, [(20, -40, "start"), (20, 56, "start"), (-20, -40, "end"), (-20, 56, "end")], "rolled out point")
     return out
 
 
