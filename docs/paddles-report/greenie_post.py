@@ -168,21 +168,25 @@ def page(passes, now):
             lt.strftime("%d-%m") if ps else "-", cells))
     key = "".join('<span class="k" style="background:%s">%s</span>' % (f, html.escape(l))
                   for f, _, l in COLOURS.values())
+    logo = "file:///" + os.path.join(os.path.dirname(HERE), "vsfg7_patch.png").replace("\\", "/")
     return """<!doctype html><html><head><meta charset="utf-8"><style>
-body{margin:0;background:#3b445a;font-family:Consolas,'Courier New',monospace;color:#fff}
-.w{margin:8px;border:1px solid #aab;padding:6px 8px}
-h1{margin:0;text-align:center;font:700 38px 'Segoe UI',Arial,sans-serif}
-.i{margin:6px 6px 8px auto;width:max-content;border:1px solid #ddd;padding:8px 40px;text-align:center;font-size:22px;line-height:1.5}
-table{border-collapse:collapse;width:100%%}td{border:1px solid #fff;height:52px;text-align:center;font-size:26px}
-td.n{text-align:left;width:480px;padding-left:12px;font-size:26px}td.a{width:118px}td.d{width:118px}
-td.s{width:54px;font-weight:700}
-.c3{display:inline-block;width:46px;height:46px;line-height:46px;border-radius:50%%;background:rgba(0,0,0,.45)}td.e{width:54px}
-.k{display:inline-block;padding:2px 10px;margin:0 8px;font-size:22px}
-.l{text-align:center;margin-top:14px;font-size:22px}
-</style></head><body><div class="w"><h1>Greenieboard</h1>
-<div class="i">Last landing: %s<br>Board Avg: %s</div>
+body{margin:0;background:#0d1117;font-family:Consolas,'Courier New',monospace;color:#c9d1d9}
+.w{margin:8px;border:1px solid #30363d;background:#161b22;padding:10px 12px;border-radius:6px}
+.h{position:relative;height:150px}
+.h img{position:absolute;left:4px;top:0;width:140px;height:140px;border-radius:50%%;box-shadow:0 0 0 2px #30363d,0 0 14px rgba(88,166,255,.3)}
+h1{margin:0;position:absolute;left:0;right:0;top:44px;text-align:center;font:700 44px 'Segoe UI',Arial,sans-serif;color:#58a6ff}
+.i{position:absolute;right:4px;top:6px;border:1px solid #30363d;background:#1c2330;border-radius:5px;padding:8px 36px;text-align:center;font-size:22px;line-height:1.5}
+table{border-collapse:collapse;width:100%%}td{border:1px solid #30363d;height:52px;text-align:center;font-size:26px}
+tr:nth-child(even){background:#1c2330}
+td.n{text-align:left;width:480px;padding-left:12px;font-size:26px;color:#e6edf3}td.a{width:118px}td.d{width:118px;color:#8b949e}
+td.s{width:54px;font-weight:700}td.e{width:54px}
+.c3{display:inline-block;width:46px;height:46px;line-height:46px;border-radius:50%%;background:rgba(0,0,0,.45)}
+.k{display:inline-block;padding:2px 10px;margin:0 8px;font-size:22px;color:#fff}
+.l{text-align:center;margin-top:14px;font-size:22px;color:#8b949e}
+</style></head><body><div class="w"><div class="h"><img src="%s" alt=""><h1>VMFA-225 Greenieboard</h1>
+<div class="i">Last landing: %s<br>Board Avg: %s</div></div>
 <table>%s</table><div class="l">Legend: %s</div></div></body></html>""" % (
-        ago or "-", board_avg, "".join(body), key)
+        logo, ago or "-", board_avg, "".join(body), key)
 
 
 def screenshot(src_html, height):
@@ -264,7 +268,7 @@ def main():
     known = {c for c, _, _, _ in roster()}
     pilots = len({canon_cs for canon_cs in (p["callsign"].lower() for p in passes) if canon_cs in known or not known}
                  | {c for c, _, r, _ in roster() if not r})
-    png = screenshot(page(passes, dt.datetime.now()), 230 + 54 * pilots)
+    png = screenshot(page(passes, dt.datetime.now()), 260 + 54 * pilots)
     out = os.path.join(REPORTS, "_data", "paddles", "greenieboard.png")
     open(out, "wb").write(png)
     # A copy beside the costs file: the launcher's Stats page shows it (/api/greenie.png).
