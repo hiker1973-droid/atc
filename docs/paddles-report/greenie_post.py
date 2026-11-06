@@ -34,6 +34,7 @@ from build_paddles_report import POINTS, board_key, collect  # noqa: E402
 REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-webhook.txt")
 PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
+OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides.csv")
 SHOWN = 15  # squares per pilot, newest on the right
 
 # fill, ink, label - the DCS greenie board's colours
@@ -88,7 +89,18 @@ def load_passes(end):
             continue
         for p in (s.get("paddles") or {}).get("passes") or []:
             passes.append(dict(p, t=dt.datetime.fromisoformat(p["t"])))
-    return [p for p in passes if p["outcome"] in ("trap", "bolter", "wave off")]
+    passes = [p for p in passes if p["outcome"] in ("trap", "bolter", "wave off")]
+    # LSO corrections: readback-grade-overrides.csv (date, callsign, wire, grade, note).
+    if os.path.exists(OVERRIDES_FILE):
+        for r in csv.reader(open(OVERRIDES_FILE, encoding="utf-8-sig", newline="")):
+            r = [x.strip() for x in r] + ["", "", "", ""]
+            if r[0].lower() == "date" or not r[0]:
+                continue
+            for p in passes:
+                if (p["t"].date().isoformat() == r[0] and p["callsign"].lower() == r[1].lower()
+                        and str(p.get("wire") or "") == r[2]):
+                    p["grade"] = r[3]
+    return passes
 
 
 def square(p):
