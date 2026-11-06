@@ -297,6 +297,9 @@ func newLSOFeed(p lso.Params, say func(lso.Call)) *lsoFeed {
 	f.tr.OnTrack = func(callsign, track string) {
 		log.Info().Str("callsign", callsign).Str("track", track).Msg("Paddles: pass track")
 	}
+	f.tr.OnPattern = func(callsign, pattern string) {
+		log.Info().Str("callsign", callsign).Str("pattern", pattern).Msg("Paddles: pass pattern")
+	}
 	f.tr.Done = func(summary string) {
 		log.Info().Str("pass", summary).Msg("Paddles: pass")
 		f.truth.pass(summary, time.Now())

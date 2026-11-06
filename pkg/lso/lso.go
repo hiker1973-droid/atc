@@ -308,6 +308,9 @@ type Tracker struct {
 	// OnTrack, if set, gets each finished pass's track (see passTrack) for the
 	// greenie board's pass cards.
 	OnTrack func(callsign, track string)
+	// OnPattern, if set, gets the jet's last minutes in the ship's frame (see
+	// patternTrack) for the pass card's approach view.
+	OnPattern func(callsign, pattern string)
 	// Case, if set, is the recovery case now (1, 2 or 3; 0 = not known): the
 	// summary says ", case III" so the greenie board can mark night passes.
 	Case func() int
@@ -877,6 +880,11 @@ func (t *Tracker) finish(p *Pass) {
 			fmt.Fprintf(&b, " [%s]", strings.Join(f, "; "))
 		}
 	}
+	if t.OnPattern != nil {
+		if s := patternTrack(t.hist[p.Callsign]); s != "" {
+			t.OnPattern(p.Callsign, s)
+		}
+	}
 	delete(t.hist, p.Callsign)
 	if len(p.calls) > 0 {
 		fmt.Fprintf(&b, "; said: %s", strings.Join(p.calls, ", "))
@@ -908,6 +916,27 @@ func passTrack(p *Pass) string {
 			b.WriteByte('|')
 		}
 		fmt.Fprintf(&b, "%.0f:%.1f:%.1f", pts[i].g.astern, clip(pts[i].gs), clip(pts[i].lineup))
+	}
+	return b.String()
+}
+
+// patternTrack is the jet's last minutes in the ship's frame for a pass card:
+// up to 120 points of "metres astern of the ship:metres to port:feet" joined
+// by "|".
+func patternTrack(h []patSample) string {
+	if len(h) < 5 {
+		return ""
+	}
+	step := 1
+	if len(h) > 120 {
+		step = (len(h) + 119) / 120
+	}
+	var b strings.Builder
+	for i := 0; i < len(h); i += step {
+		if b.Len() > 0 {
+			b.WriteByte('|')
+		}
+		fmt.Fprintf(&b, "%.0f:%.0f:%.0f", h[i].aft, h[i].port, h[i].ft)
 	}
 	return b.String()
 }

@@ -146,6 +146,23 @@ func TestPassTrackIsLogged(t *testing.T) {
 	}
 }
 
+func TestPatternTrackFormat(t *testing.T) {
+	var h []patSample
+	for i := 0; i < 300; i++ {
+		h = append(h, patSample{aft: float64(i * 20), port: -3, ft: 600})
+	}
+	got := patternTrack(h)
+	if n := strings.Count(got, "|") + 1; n > 120 || n < 60 {
+		t.Errorf("%d points, want 60-120", n)
+	}
+	if !strings.HasPrefix(got, "0:-3:600|") {
+		t.Errorf("track = %.40s", got)
+	}
+	if patternTrack(h[:2]) != "" {
+		t.Error("a two-sample history is not a pattern")
+	}
+}
+
 func TestSummaryNamesTheCase(t *testing.T) {
 	_, sum := flight{gsErr: zero, luErr: zero, finish: "trap", ball: true, caseNo: 3}.run(t)
 	if !strings.Contains(sum, ": trap, case III, grade ") {
