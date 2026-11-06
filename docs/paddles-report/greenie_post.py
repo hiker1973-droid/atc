@@ -248,10 +248,11 @@ def send(url, method, png, text):
     return json.loads(urllib.request.urlopen(req, timeout=60).read() or b"{}")
 
 
-def post(webhook, png, text):
+def post(webhook, png, text, message_file=None):
     """Edit the board's one message in place; make it (and remember its id) the first time,
     or when someone deleted it."""
-    mid = open(MESSAGE_FILE).read().strip() if os.path.exists(MESSAGE_FILE) else ""
+    message_file = message_file or MESSAGE_FILE
+    mid = open(message_file).read().strip() if os.path.exists(message_file) else ""
     if mid:
         try:
             send("%s/messages/%s" % (webhook, mid), "PATCH", png, text)
@@ -260,7 +261,7 @@ def post(webhook, png, text):
             if e.code != 404:
                 raise
     made = send(webhook + "?wait=true", "POST", png, text)
-    open(MESSAGE_FILE, "w").write(str(made["id"]))
+    open(message_file, "w").write(str(made["id"]))
     return "posted"
 
 
