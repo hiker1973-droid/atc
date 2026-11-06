@@ -35,6 +35,7 @@ REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
 WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-webhook.txt")
 PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
 OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides.csv")
+MANUAL_FILE = os.path.join(os.path.expanduser("~"), "readback-manual-passes.csv")
 SHOWN = 15  # squares per pilot, newest on the right
 
 # fill, ink, label - the DCS greenie board's colours
@@ -91,6 +92,15 @@ def load_passes(end):
         for p in (s.get("paddles") or {}).get("passes") or []:
             passes.append(dict(p, t=dt.datetime.fromisoformat(p["t"])))
     passes = [p for p in passes if p["outcome"] in ("trap", "bolter", "wave off")]
+    # Passes added by hand (date, time, callsign, wire, grade, case, note); case III draws the circle.
+    if os.path.exists(MANUAL_FILE):
+        for r in csv.reader(open(MANUAL_FILE, encoding="utf-8-sig", newline="")):
+            r = [x.strip() for x in r] + [""] * 7
+            if r[0].lower() == "date" or not r[0]:
+                continue
+            passes.append({"t": dt.datetime.fromisoformat("%sT%s:00" % (r[0], r[1] or "12:00")).astimezone(), "callsign": r[2],
+                           "outcome": "trap" if r[3] else "bolter", "grade": r[4], "wire": int(r[3]) if r[3] else None,
+                           "case3": r[5].upper() in ("III", "3"), "comments": r[6]})
     # LSO corrections: readback-grade-overrides.csv (date, callsign, wire, grade, note).
     if os.path.exists(OVERRIDES_FILE):
         for r in csv.reader(open(OVERRIDES_FILE, encoding="utf-8-sig", newline="")):
@@ -111,7 +121,11 @@ def square(p):
         txt = str(p["wire"])
     else:
         txt = {"B": "B", "WO": "WO", "WOFD": "WO", "---": "---"}.get(key, "")
-    return '<td class="s" style="background:%s;color:%s">%s</td>' % (fill, ink, html.escape(txt))
+    if p.get("case3"):
+        txt = '<span class="c3">%s</span>' % html.escape(txt)
+    else:
+        txt = html.escape(txt)
+    return '<td class="s" style="background:%s;color:%s">%s</td>' % (fill, ink, txt)
 
 
 def page(passes, now):
@@ -155,7 +169,8 @@ h1{margin:0;text-align:center;font:700 38px 'Segoe UI',Arial,sans-serif}
 .i{margin:6px 6px 8px auto;width:max-content;border:1px solid #ddd;padding:8px 40px;text-align:center;font-size:22px;line-height:1.5}
 table{border-collapse:collapse;width:100%%}td{border:1px solid #fff;height:52px;text-align:center;font-size:26px}
 td.n{text-align:left;width:480px;padding-left:12px;font-size:26px}td.a{width:118px}td.d{width:118px}
-td.s{width:54px;font-weight:700}td.e{width:54px}
+td.s{width:54px;font-weight:700}
+.c3{display:inline-block;width:46px;height:46px;line-height:46px;border-radius:50%%;background:rgba(0,0,0,.45)}td.e{width:54px}
 .k{display:inline-block;padding:2px 10px;margin:0 8px;font-size:22px}
 .l{text-align:center;margin-top:14px;font-size:22px}
 </style></head><body><div class="w"><h1>Greenieboard</h1>
