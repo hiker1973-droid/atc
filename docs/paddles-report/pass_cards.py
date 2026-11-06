@@ -57,15 +57,23 @@ def read_logged(days, message, field):
                 pts = [[float(x) for x in seg.split(":")] for seg in o[field].split("|")]
             except (ValueError, KeyError):
                 continue
-            out.append((o.get("callsign", "").lower(), t, pts))
+            out.append((o.get("callsign", "").lower(), t, pts, o))
     return out
 
 
 def match(p, rows):
     """The row for this pass: same callsign, logged within 8 s of the pass line."""
-    for cs, t, pts in rows:
+    for cs, t, pts, _ in rows:
         if cs == p["callsign"].lower() and abs((t - p["t"]).total_seconds()) < 8:
             return pts
+    return None
+
+
+def brc_for(p, rows):
+    """The carrier's heading logged with this pass's pattern (the BRC), or None."""
+    for cs, t, _, o in rows:
+        if cs == p["callsign"].lower() and abs((t - p["t"]).total_seconds()) < 8:
+            return o.get("brc") or None
     return None
 
 
@@ -177,7 +185,25 @@ def groove_top(pts, groove_s=None):
     return "".join(s) + "</svg>"
 
 
-def approach_view(pat):
+def carrier_top(sx, sy, brc=None):
+    """The carrier from above, bow to the left, stern at (sx, sy): hull, island, the angled landing area (9 degrees to
+    port) and its centreline running astern; the BRC (the ship's heading) written over it with an arrow."""
+    k = 0.085
+    s = ['<path d="M%d %d L%d %d L%d %d L%d %d L%d %d Z" fill="#6e7681"/>' % (sx, sy - 16, sx - 96, sy - 16, sx - 126, sy, sx - 96, sy + 16, sx, sy + 16)]
+    s.append('<rect x="%d" y="%d" width="22" height="8" fill="#495057"/>' % (sx - 70, sy - 16))  # the island, starboard side
+    dx = 100.0
+    s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#c9d1d9" stroke-width="7" stroke-linecap="round" opacity=".55"/>'
+             % (sx - 6, sy - 7, sx - 6 - dx, sy - 7 + dx * math.tan(math.radians(9.14))))  # the angled deck
+    s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#c9d1d9" stroke-width="1" stroke-dasharray="3 6" opacity=".6"/>'
+             % (sx - 6, sy - 7, sx - 6 + 2200 * k, sy - 7 - 2200 * k * math.tan(math.radians(9.14))))  # the landing axis, astern
+    if brc is not None:
+        s.append(text(sx - 63, sy - 30, "BRC %03d" % round(brc) if round(brc) < 360 else "BRC 000", 15, "#e6edf3", "middle", "font-weight=\"bold\""))
+        s.append('<polyline points="%d,%d %d,%d" stroke="#e6edf3" stroke-width="1.6" fill="none"/>' % (sx - 126, sy - 22, sx - 96, sy - 22))
+        s.append('<polyline points="%d,%d %d,%d %d,%d" stroke="#e6edf3" stroke-width="1.6" fill="none"/>' % (sx - 121, sy - 26, sx - 126, sy - 22, sx - 121, sy - 18))
+    return "".join(s)
+
+
+def approach_view(pat, brc=None):
     """The jet's last minutes round the ship, from above (ship at the left pointing left; port is down)."""
     h = SH + TH
     sx, sy, k = 230, h / 2, 0.085
@@ -189,7 +215,12 @@ def approach_view(pat):
         r = nm * M_NM * k
         s.append('<circle cx="%d" cy="%.0f" r="%.1f" fill="none" stroke="#30363d" stroke-width="1.2"/>' % (sx, sy, r))
         s.append(text(sx + r * math.cos(math.radians(25)) + 4, sy - r * math.sin(math.radians(25)) - 4, "%g NM" % nm, 12, "#6e7681"))
-    s.append(ship_top(sx - 76, sy))  # the stern (the aft = 0 point) at the rings' centre
+    # the downwind corridor: 1.2 / 1.3 / 1.5 NM to port of the ship, parallel to its heading
+    for nm, col in ((1.2, YEL), (1.3, GRN), (1.5, RED)):
+        y = sy + nm * M_NM * k
+        s.append(poly([(sx - 140, y), (sx + 3300 * k, y)], col, 1.3, "6 5"))
+        s.append(text(sx + 3300 * k + 6, y + 4, "%.1f NM" % nm, 12, col))
+    s.append(carrier_top(sx, sy, brc))  # the stern (the aft = 0 point) at the rings' centre
     pts = [(sx + row[0] * k, sy + row[1] * k, row[2]) for row in pat]
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
     s += callouts(pat, pts)
@@ -230,7 +261,7 @@ def callouts(pat, pts):
     return out
 
 
-def card_html(p, label, pts, coarse, pat=None):
+def card_html(p, label, pts, coarse, pat=None, brc=None):
     key = gp.board_key(p)
     fill, ink, name = gp.COLOURS[key]
     badge = "WO" if key in ("WOFD", "WO") else ("B" if key == "B" else p["grade"] or key)
@@ -258,7 +289,7 @@ body{margin:0;background:#0d1117;font-family:Consolas,'Courier New',monospace;co
 </style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
 <div class="info"><img src="%s"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0]), approach_view(pat), LOGO, body,
+        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0]), approach_view(pat, brc), LOGO, body,
         "track from Paddles" if not coarse else "coarse card")
 
 
@@ -285,7 +316,7 @@ def post_cards(hook, log_passes, days):
         coarse = not pts
         if coarse:
             pts = segment_points(p)
-        png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns)), 980, 1760)
+        png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns), brc_for(p, patterns)), 980, 1760)
         gp.send(hook + "?wait=true", "POST", png, "")
         posted.add(pass_key(p))
         n += 1

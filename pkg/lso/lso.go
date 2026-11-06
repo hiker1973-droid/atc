@@ -314,6 +314,9 @@ type Tracker struct {
 	// Case, if set, is the recovery case now (1, 2 or 3; 0 = not known): the
 	// summary says ", case III" so the greenie board can mark night passes.
 	Case func() int
+	// shipHeading is the carrier's heading (true) at the last sample: the BRC the
+	// pass cards show.
+	shipHeading float64
 	// hist is every jet's last few minutes relative to the ship, for the
 	// Case I pattern (pattern.go).
 	hist map[string][]patSample
@@ -381,6 +384,7 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 	t.prev[callsign] = smp
 	g := t.P.toGroove(s, smp)
 	gs, lineup := t.P.deviations(g)
+	t.shipHeading = s.HeadingDeg
 
 	ps := passSample{at: smp.At, g: g, gs: gs, lineup: lineup}
 	var trackDeg float64
@@ -919,6 +923,9 @@ func passTrack(p *Pass) string {
 	}
 	return b.String()
 }
+
+// ShipHeading is the carrier's heading (degrees true) at the last sample, 0 before any.
+func (t *Tracker) ShipHeading() float64 { return t.shipHeading }
 
 // patternTrack is the jet's last minutes in the ship's frame for a pass card:
 // up to 120 points of "metres astern of the ship:metres to port:feet:knots"
