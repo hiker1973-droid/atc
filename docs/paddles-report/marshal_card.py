@@ -285,9 +285,12 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     # min 2,000 ft, 1,000 ft separation; commence from position 3 on BRC+210 deg, then Initial 3 NM astern at 800 ft, 350 kts.
     CC, RX, RY = (-1.6, 0.0), 1.6, 2.5  # oval: 5 NM long on the BRC, 3.2 NM wide, ship at position 1
     # 1) the marshal stack (green dots), wide view only
+    has_track, has_pat = bool(rec.get("track")), bool(rec.get("pattern"))
     if not detail:
+        s.append('<g opacity="%s">' % (".3" if has_track else "1"))
         s.append(pc.poly([xy(CC[0] + RX * math.cos(math.radians(n * 5)), CC[1] + RY * math.sin(math.radians(n * 5))) for n in range(0, 73)], GREEN, 2.2, "7 5"))
-        for i, m in enumerate(sorted(mates, key=lambda m: m["angels"] or 2)):
+        s.append("</g>")
+        for i, m in enumerate(sorted(mates, key=lambda m: m["angels"] or 2) if not has_track else []):
             mine = m is rec
             t = math.radians(180 + 35 * i) if mine or True else 0
             x, y = xy(CC[0] + RX * math.cos(t), CC[1] + RY * math.sin(t))
@@ -300,7 +303,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
         s.append(pc.text(x3 - 4, y3 + 22, "3: commence", 12, YEL, "end") + pc.text(x3 - 4, y3 + 36, "BRC+210", 12, YEL, "end"))
     # 2) commence (yellow): from position 3 on BRC+210 round to the Initial 3 NM astern, then inbound up the BRC
     com = bez((-3.2, 0.0), (-4.2, -2.5), (0.0, -4.5), (0.0, -3.0)) + [(0.0, 0.35)]
-    s.append(pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5"))
+    s.append('<g opacity="%s">' % (".3" if (has_track and not detail) else "1") + pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5") + "</g>")
     # 3) Paddles (white dashes): break (level turn) to port, downwind 1.25 NM abeam, the 180, the 90, the 45, the groove
     r1 = 0.625
     paddles = []
@@ -310,7 +313,24 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     A, G = (-1.25, -0.3), (0.12, -0.5)
     turn = bez(A, (-1.25, -1.35), (0.15, -1.3), G, 40)
     paddles += [A] + turn[1:] + [(0.0, 0.0)]
-    s.append(pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5"))
+    s.append('<g opacity="%s">' % (".3" if has_pat and detail else "1") + pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5") + "</g>")
+    # the real tracks: the Marshal stack track (Tacview, range / bearing from the carrier) on the wide view, green until the
+    # commence and yellow after; the Paddles pass pattern (ship frame, metres) on the magnified view in solid white
+    if not detail and has_track:
+        com_t = rec["commence"].timestamp() if rec.get("commence") else None
+        legs = ([], [])
+        for ut, dist, brg, alt in rec["track"]:
+            ang = math.radians(brg - b)
+            legs[1 if (com_t and ut >= com_t) else 0].append((dist * math.sin(ang), dist * math.cos(ang)))
+        if legs[0] and legs[1]:
+            legs[0].append(legs[1][0])
+        for pts_, col in ((legs[0], GREEN), (legs[1], YEL)):
+            if len(pts_) > 1:
+                s.append(pc.poly([xy(*q) for q in pts_], col, 2.6))
+        ex, ey = xy(*(legs[1] or legs[0])[-1])
+        s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (ex, ey))
+    if detail and has_pat:
+        s.append(pc.poly([xy(-pt[1] / M_NM, -pt[0] / M_NM) for pt in rec["pattern"]], "#ffffff", 2.8))
     sc = 0.3 if detail else 0.12
     s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
     if detail:
@@ -356,7 +376,7 @@ def case1_pattern_view(rec, mates, brc, name):
     s.append('<svg x="%d" y="0" width="%d" height="%d">%s</svg>' % (lw, PW - lw, PH, _case1_pattern(rec, mates, brc, name, PW - lw, PH, 4.2, True)))
     s.append(pc.text(lw / 2, PH - 8, "10 NM around ABE", 12, MUTED, "middle"))
     s.append(pc.text(PW - 14, PH - 8, "magnified: 4 NM around ABE", 12, MUTED, "end"))
-    s.append(pc.text(PW - 8, 18, "from above, ABE centred, BRC up - planned until tracks are logged", 12, MUTED, "end"))
+    s.append(pc.text(PW - 8, 18, "from above, ABE centred, BRC up - %s" % ("solid = flown (Tacview)" if rec.get("track") or rec.get("pattern") else "planned until tracks are logged"), 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
 
@@ -440,20 +460,62 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
         html.escape(badge), html.escape(label + " | Marshal"), pc.LOGO, tab1, left, tab2, right, body)
 
 
+def stack_track(rec, events):
+    """[(unix, rangeNm, bearingMag, altFt)] this jet flew through Marshal, from the "Marshal: stack track" log lines
+    (Marshal samples every jet in the stack every 10 s from Tacview), from check-in to the hand-off."""
+    t0 = rec["checkin"].timestamp() - 60
+    t1 = (rec["handoff"] or rec["checkin"] + dt.timedelta(minutes=45)).timestamp() + 60
+    out = []
+    for t, rig, msg, o in events:
+        if rig != rec["rig"] or msg != "Marshal: stack track" or (o.get("callsign") or "").lower() != rec["callsign"].lower():
+            continue
+        for seg in (o.get("track") or "").split("|"):
+            try:
+                ut, d, brg, alt = (float(x) for x in seg.split(":"))
+            except ValueError:
+                continue
+            if t0 <= ut <= t1:
+                out.append((ut, d, brg, alt))
+    out.sort()
+    return out if len(out) >= 4 else []
+
+
+def pass_pattern(rec):
+    """[[metres astern, metres to port, ft, kts]] from the Paddles "pass pattern" log line for the pass that followed."""
+    p = rec.get("pass")
+    if not p or not p.get("rig"):
+        return None
+    rows = pc.read_logged({p["t"].date().isoformat()}, "Paddles: pass pattern", "pattern")
+    return pc.match(p, rows)
+
+
 def build(rec, c3, events, passes, carrier=None):
     names = {cs: label for cs, label, _, _ in gp.roster()}
     canon = {a: cs for cs, _, _, al in gp.roster() for a in al if cs}
     key = canon.get(rec["callsign"].lower(), rec["callsign"].lower())
     name = lambda r: names.get(canon.get(r["callsign"].lower(), r["callsign"].lower()), r["callsign"]).split(" | ")[-1]
     mates = [r for r in c3 if r["rig"] == rec["rig"] and abs((r["checkin"] - rec["checkin"]).total_seconds()) < 3600]
+    rec["track"] = stack_track(rec, events)
+    rec["pattern"] = pass_pattern(rec)
     p = rec.get("pass")
     result = ("Paddles: %s%s" % (p["grade"], ", %d wire" % p["wire"] if p.get("wire") and not p["grade"].startswith("WO") else "")) if p else "No Paddles pass seen"
     ctx = {"ceiling": rec.get("ceiling"), "vis": rec.get("vis")}
     return card_html(rec, mates, names.get(key, rec["callsign"]), name, rec["brc"], ctx, result, carrier or rec.get("carrier") or EXAMPLE_CARRIER)
 
 
+def post_cards(pngs):
+    """Post each card as a new message to the pass cards' channel (the reports channel if there is none)."""
+    f = gp.CARDS_WEBHOOK_FILE if os.path.exists(gp.CARDS_WEBHOOK_FILE) else gp.WEBHOOK_FILE
+    hook = open(f, encoding="utf-8").read().strip()
+    for text, png in pngs:
+        gp.send(hook + "?wait=true", "POST", png, text)
+        print("posted", text)
+
+
 def main():
     mr.fetch(10)
+    for back in (0, 1):  # the Paddles logs (pass pattern lines) for today and yesterday, from every rig
+        gp.fetch_today((dt.date.today() - dt.timedelta(days=back)).isoformat())
     events = mr.read_events(10)
     recs = mr.approaches(events)
     passes = gp.load_passes(dt.date.today())
@@ -461,7 +523,7 @@ def main():
     c3 = [r for r in recs if r["case"] == "III" and r.get("radial") is not None]
     c1 = [r for r in recs if r["case"] in ("I", "II") and r["fixes"]]
     out_dir = os.path.join(gp.REPORTS, "_data", "paddles")
-    done = 0
+    done, posts = 0, []
     for rec, group, fname in ((c3[-1] if c3 else None, c3, "sample-marshal-card.png"), (c1[-1] if c1 else None, c1, "sample-marshal-card-case1.png")):
         if not rec:
             continue
@@ -469,6 +531,9 @@ def main():
         open(os.path.join(out_dir, fname), "wb").write(png)
         print(os.path.join(out_dir, fname))
         done += 1
+        posts.append(("Marshal | %s | %s | Case %s" % (rec["callsign"], rec["checkin"].strftime("%Y-%m-%d %H:%M"), rec["case"]), png))
+    if "--post" in sys.argv and posts:
+        post_cards(posts)
     return 0 if done else 1
 
 

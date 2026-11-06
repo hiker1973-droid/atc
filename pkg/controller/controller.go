@@ -2586,6 +2586,26 @@ func (c *ATCController) LookupCallerRelativeToCarrier(callsign string) (angels, 
 	return angels, distNm, bearingDeg, true
 }
 
+// CallerCarrierFix is LookupCallerRelativeToCarrier without the rounding, for the Marshal stack track: altitude in
+// feet, range in nautical miles and true bearing from the carrier. found is false when the caller or carrier is not
+// on the scope (no Tacview position in the last 30 s).
+func (c *ATCController) CallerCarrierFix(callsign string) (altFt, distNm, bearingDeg float64, found bool) {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	contact := c.lookupContact(callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
+		return 0, 0, 0, false
+	}
+	_, carrier, carFound := c.findCarrierContactNear(contact)
+	if !carFound {
+		return 0, 0, 0, false
+	}
+	carrierPt := orb.Point{carrier.Lon, carrier.Lat}
+	callerPt := orb.Point{contact.Lon, contact.Lat}
+	b := math.Mod(bearingDegFromTo(carrierPt, callerPt)+360, 360)
+	return contact.AltFt, haversineNm(callerPt, carrierPt), b, true
+}
+
 // CallerCarrierPosition is the latitude and longitude of the carrier nearest the caller, for the Marshal report's map.
 func (c *ATCController) CallerCarrierPosition(callsign string) (lat, lon float64, ok bool) {
 	c.allPositionsMu.RLock()
