@@ -2586,6 +2586,21 @@ func (c *ATCController) LookupCallerRelativeToCarrier(callsign string) (angels, 
 	return angels, distNm, bearingDeg, true
 }
 
+// CallerCarrierPosition is the latitude and longitude of the carrier nearest the caller, for the Marshal report's map.
+func (c *ATCController) CallerCarrierPosition(callsign string) (lat, lon float64, ok bool) {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	contact := c.lookupContact(callsign)
+	if contact == nil || time.Since(contact.UpdatedAt) > 30*time.Second {
+		return 0, 0, false
+	}
+	_, carrier, found := c.findCarrierContactNear(contact)
+	if !found {
+		return 0, 0, false
+	}
+	return carrier.Lat, carrier.Lon, true
+}
+
 // AssignMarshalAngels picks the lowest unoccupied stack altitude in [minAngels, maxAngels].
 // A slot is "occupied" if it appears in reservedAngels (already-assigned stack slots,
 // passed in by the caller) or if Tacview shows any aircraft within 50nm of the carrier

@@ -806,6 +806,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
 		rBrg = magneticDeg(atcCtrl, rBrg)
 		caseLabel := composer.CaseLabel(int(recCase))
+		cLat, cLon, _ := atcCtrl.CallerCarrierPosition(callsign) // the Marshal report's map
 		// Build stack summary for response
 		stackInfo := ""
 		all := stack.GetAll()
@@ -827,10 +828,10 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 			eat := case3EAT(stack, callsign, time.Now().Add(time.Duration(marshalCase3LeadTimeMin+(pos-1)*marshalCase3IntervalMin)*time.Minute))
 			stack.SetAssignedRadial(callsign, radial)
 			stack.SetEAT(callsign, eat)
-			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Int("fixAngels", rAng).Int("fixDistNm", rDist).Int("fixBearingMag", rBrg).Bool("fixFound", rFound).Msg("Marshal: Case 3 aircraft checking in")
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Int("radial", radial).Time("eat", eat).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Str("case", caseLabel).Int("fixAngels", rAng).Int("fixDistNm", rDist).Int("fixBearingMag", rBrg).Bool("fixFound", rFound).Float64("carrierLat", cLat).Float64("carrierLon", cLon).Msg("Marshal: Case 3 aircraft checking in")
 			transmit(comp.MarshalMarkingMomCase3(say, stackAngels, radial, eat.Minute(), altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound) + stackInfo)
 		} else {
-			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Str("case", caseLabel).Msg("Marshal: aircraft checking in")
+			log.Info().Str("callsign", callsign).Int("position", pos).Int("stackAngels", stackAngels).Ints("reserved", reserved).Float64("brcMag", brc).Float64("ceiling", ceilingFt).Float64("vis", visNm).Bool("radarFound", rFound).Int("radarAngels", rAng).Int("radarDistNm", rDist).Int("radarBearingMag", rBrg).Str("case", caseLabel).Float64("carrierLat", cLat).Float64("carrierLon", cLon).Msg("Marshal: aircraft checking in")
 			transmit(comp.MarshalMarkingMom(say, pos, stackAngels, altimeter, ceilingFt, visNm, brc, rAng, rDist, rBrg, rFound, caseLabel) + stackInfo)
 		}
 

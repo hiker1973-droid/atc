@@ -96,6 +96,10 @@ def add_fix(rec, kind, t, o):
     """A real radar position from Marshal's log: range (NM) and magnetic bearing from the carrier, and angels."""
     if o.get("fixFound") and o.get("fixDistNm"):
         rec["fixes"].append((kind, t, o["fixDistNm"], o.get("fixBearingMag"), o.get("fixAngels")))
+    elif o.get("radarFound") and o.get("radarDistNm"):  # the check-in line has carried the radar fix all along
+        rec["fixes"].append((kind, t, o["radarDistNm"], o.get("radarBearingMag"), o.get("radarAngels")))
+    if o.get("carrierLat") and not rec.get("carrier"):
+        rec["carrier"] = (o["carrierLat"], o["carrierLon"])
 
 
 def approaches(events):
@@ -106,7 +110,7 @@ def approaches(events):
         if "aircraft checking in" in msg and cs:
             rec = {"rig": rig, "callsign": cs, "checkin": t, "position": o.get("position"), "angels": o.get("stackAngels"),
                    "eat": dt.datetime.fromisoformat(o["eat"]) if o.get("eat") else None, "case": CASE_WORDS.get((o.get("case") or "").replace("Case ", ""), (o.get("case") or "").replace("Case ", "")),
-                   "radial": o.get("radial"), "brc": o.get("brcMag"), "fixes": [], "hold": None, "commence": None, "platform": None, "dirty": None, "handoff": None, "eat_missed": 0, "misses": 0}
+                   "radial": o.get("radial"), "brc": o.get("brcMag"), "fixes": [], "carrier": None, "ceiling": o.get("ceiling"), "vis": o.get("vis"), "hold": None, "commence": None, "platform": None, "dirty": None, "handoff": None, "eat_missed": 0, "misses": 0}
             add_fix(rec, "check-in", t, o)
             recs.append(rec)
             open_rec[(rig, cs.lower())] = rec
