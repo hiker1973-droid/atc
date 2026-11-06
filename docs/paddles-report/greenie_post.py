@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 import uuid
 from collections import defaultdict
@@ -36,6 +37,8 @@ WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-webhook.t
 PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
 OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides.csv")
 MANUAL_FILE = os.path.join(os.path.expanduser("~"), "readback-manual-passes.csv")
+MESSAGE_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-message.txt")
+RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
 SHOWN = 15  # squares per pilot, newest on the right
 
 # fill, ink, label - the DCS greenie board's colours
@@ -199,23 +202,60 @@ def screenshot(src_html, height):
         return open(out, "rb").read()
 
 
-def post(webhook, png, text):
+def multipart(png, text):
     b = uuid.uuid4().hex
-    parts = ['--%s\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n%s\r\n'
-             % (b, json.dumps({"content": text})),
-             '--%s\r\nContent-Disposition: form-data; name="files[0]"; filename="greenieboard.png"\r\n'
-             'Content-Type: image/png\r\n\r\n' % b]
-    body = parts[0].encode() + parts[1].encode() + png + ("\r\n--%s--\r\n" % b).encode()
-    req = urllib.request.Request(webhook, body, {"Content-Type": "multipart/form-data; boundary=" + b,
-                                                 "User-Agent": "ReadbackGreenie/1"})
-    urllib.request.urlopen(req, timeout=60).read()
+    head = ('--%s\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n%s\r\n'
+            '--%s\r\nContent-Disposition: form-data; name="files[0]"; filename="greenieboard.png"\r\n'
+            'Content-Type: image/png\r\n\r\n') % (b, json.dumps({"content": text, "attachments": []}), b)
+    return head.encode() + png + ("\r\n--%s--\r\n" % b).encode(), "multipart/form-data; boundary=" + b
+
+
+def send(url, method, png, text):
+    body, ctype = multipart(png, text)
+    req = urllib.request.Request(url, body, {"Content-Type": ctype, "User-Agent": "ReadbackGreenie/1"}, method=method)
+    return json.loads(urllib.request.urlopen(req, timeout=60).read() or b"{}")
+
+
+def post(webhook, png, text):
+    """Edit the board's one message in place; make it (and remember its id) the first time,
+    or when someone deleted it."""
+    mid = open(MESSAGE_FILE).read().strip() if os.path.exists(MESSAGE_FILE) else ""
+    if mid:
+        try:
+            send("%s/messages/%s" % (webhook, mid), "PATCH", png, text)
+            return "edited"
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+    made = send(webhook + "?wait=true", "POST", png, text)
+    open(MESSAGE_FILE, "w").write(str(made["id"]))
+    return "posted"
+
+
+def fetch_today(day):
+    """Today's Paddles logs from every rig, saved like the nightly run saves them (a later fetch of the same day overwrites)."""
+    data = os.path.join(REPORTS, "_data", "paddles")
+    for rig, host in RIGS:
+        try:
+            with urllib.request.urlopen("http://%s:7000/api/lso-log?date=%s" % (host, day), timeout=60) as r:
+                body, ctype = r.read(), r.headers.get("Content-Type", "")
+        except (urllib.error.URLError, OSError) as e:
+            print("%s: %s" % (rig, e))
+            continue
+        if "html" not in ctype:
+            with open(os.path.join(data, "%s %s.log" % (day, rig)), "wb") as f:
+                f.write(body)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=(dt.date.today() - dt.timedelta(days=1)).isoformat())
     ap.add_argument("--no-post", action="store_true")
+    ap.add_argument("--refresh", action="store_true", help="hourly: fetch today's logs from the rigs first, board through today")
     a = ap.parse_args()
+    if a.refresh:
+        a.date = dt.date.today().isoformat()
+        fetch_today(a.date)
     end = dt.date.fromisoformat(a.date)
     passes = load_passes(end)
     if not passes:
@@ -235,8 +275,8 @@ def main():
             print("no webhook file at", WEBHOOK_FILE, "- picture made, not posted")
         return 0
     hook = open(WEBHOOK_FILE, encoding="utf-8").read().strip()
-    post(hook, png, "**Greenieboard** - through %s" % end.strftime("%d %b %Y"))
-    print("posted")
+    what = post(hook, png, "**Greenieboard** - updated %s" % dt.datetime.now().strftime("%d %b %H:%M"))
+    print(what)
     return 0
 
 
