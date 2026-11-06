@@ -98,7 +98,7 @@
 
   <section>
     <h2>Greenie board</h2>
-    <p class="sub">Every carrier pass the DCS LSO graded, oldest first; the number is the wire. Ranked by average grade points
+    <p class="sub">Every carrier pass the DCS LSO graded, newest first; the number is the wire. Ranked by average grade points
       (_OK_ 5, OK 4, (OK) 3, B 2.5, --- 2, WO 1, C 0; a foul-deck wave-off is not scored).</p>
     <div class="tablewrap"><table id="board"></table></div>
     <div class="key" id="key"></div>
@@ -191,9 +191,9 @@ function render() {
       : `<tr><td colspan="${COLS.length}" class="muted">No flying recorded in ${esc(data.period)}.</td></tr>`);
 
   const board = data.board || [];
-  $('board').innerHTML = '<tr><th>Pilot</th><th class="n">Avg</th><th class="n">Passes</th><th class="n">Traps</th><th>Passes, oldest first</th></tr>' +
+  $('board').innerHTML = '<tr><th>Pilot</th><th class="n">Avg</th><th class="n">Passes</th><th class="n">Traps</th><th>Passes, newest first</th></tr>' +
     (board.length ? board.map(b => `<tr><td><b>${esc(b.pilot)}</b></td><td class="n">${b.avg < 0 ? '-' : b.avg.toFixed(2)}</td><td class="n">${b.passes.length}</td><td class="n">${b.traps}</td><td style="white-space:normal">` +
-      b.passes.map(p => `<span class="sq" style="background:${p.fill};color:${p.ink}" title="${esc(new Date(p.at).toLocaleString())} · ${esc(p.place)} · ${esc(p.raw)}">${p.wire || ''}</span>`).join('') + '</td></tr>').join('')
+      b.passes.slice().reverse().map(p => `<span class="sq" style="background:${p.fill};color:${p.ink}" title="${esc(new Date(p.at).toLocaleString())} · ${esc(p.place)} · ${esc(p.raw)}">${p.wire || ''}</span>`).join('') + '</td></tr>').join('')
       : '<tr><td colspan="5" class="muted">No graded carrier passes in this period.</td></tr>');
   const KEY = [['_OK_', '#00843d', 'perfect'], ['OK', '#2fb34a', 'pass'], ['(OK)', '#f2c80f', 'fair'], ['---', '#8b5a2b', 'no grade'],
     ['B', '#2f6db5', 'bolter'], ['WO', '#222222', 'wave-off'], ['C', '#c62828', 'cut'], ['WOFD', '#c8d0db', 'foul-deck wave-off (not scored)']];

@@ -358,14 +358,15 @@ td { border-bottom: 1px solid #dde2e6; padding: 2px 4px; } td.n, th.n { text-ali
 	if len(board) == 0 {
 		b.WriteString(`<p>No graded carrier passes in this period.</p>`)
 	} else {
-		b.WriteString(`<table><tr><th>Pilot</th><th class="n">Avg</th><th class="n">Passes</th><th class="n">Traps</th><th>Passes, oldest first</th></tr>`)
+		b.WriteString(`<table><tr><th>Pilot</th><th class="n">Avg</th><th class="n">Passes</th><th class="n">Traps</th><th>Passes, newest first</th></tr>`)
 		for _, row := range board {
 			avg := "-"
 			if row.Avg >= 0 {
 				avg = fmt.Sprintf("%.2f", row.Avg)
 			}
 			var sq strings.Builder
-			for _, p := range row.Passes {
+			for i := len(row.Passes) - 1; i >= 0; i-- {
+				p := row.Passes[i]
 				fill, ink := debrief.BoardColours(p.Grade.Grade)
 				label := ""
 				if p.Wire > 0 {
