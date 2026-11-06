@@ -427,8 +427,9 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
                                                   "10+ NM" if (rec.get("vis") or 0) >= 10 else "%.0f NM" % (rec.get("vis") or 0)) if rec.get("ceiling") is not None else ""
         lines = ['Nimitz Class "ABE" | Marshal | %s server' % rec["rig"], rec["checkin"].strftime("%A %B %d, %Y %H:%M"), *([weather] if weather else []),
                  "BRC %s | Case %s" % ("%03d" % (round(brc) % 360 or 360) if brc is not None else "-", rec["case"] or "I"), "",
-                 "Marshal at angels %d, report see me at ten" % (rec["angels"] or 2),
-                 "Checked in %s%s" % (t(rec["checkin"]), " at %d NM on the %03d bearing, angels %d" % (fix[2], fix[3], fix[4] or 0) if fix else ""), "",
+                 *(["No Marshal check-in on this approach", "Pattern flown from the Paddles track (Tacview), landing %s" % t(rec["checkin"])] if rec.get("no_marshal") else
+                   ["Marshal at angels %d, report see me at ten" % (rec["angels"] or 2),
+                    "Checked in %s%s" % (t(rec["checkin"]), " at %d NM on the %03d bearing, angels %d" % (fix[2], fix[3], fix[4] or 0) if fix else "")]), "",
                  result or "", "(example position: the carrier is placed off the coast until Marshal logs its real position)" if carrier == EXAMPLE_CARRIER else ""]
         body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
         return _page(badge, label, body, "Marshal View", "Stack View", case1_stack_view(rec, brc, name, carrier), case1_pattern_view(rec, mates, brc, name))
