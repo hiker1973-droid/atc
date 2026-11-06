@@ -206,7 +206,7 @@ def carrier_top(sx, sy, brc=None):
 def approach_view(pat, brc=None):
     """The jet's last minutes round the ship, from above (ship at the left pointing left; port is down)."""
     h = SH + TH
-    sx, sy, k = 230, h / 2, 0.085
+    sx, sy, k = 330, h / 2, 0.08
     s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, h)]
     if not pat:
         s.append(text(PW / 2, h / 2, "no approach track for this pass (logged before tracks)", 15, MUTED, "middle"))
