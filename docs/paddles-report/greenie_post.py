@@ -52,12 +52,13 @@ COLOURS = {
 def roster():
     """callsign (lower case) -> the board label, from readback-pilots.csv
     (columns: callsign, pilot, board label; the label defaults to "callsign | pilot")."""
-    out = {}
+    out = []
     if os.path.exists(PILOTS_FILE):
         for r in csv.reader(open(PILOTS_FILE, encoding="utf-8-sig", newline="")):
-            if len(r) >= 2 and r[0].strip() and r[0].strip().lower() != "callsign":
-                out[r[0].strip().lower()] = (r[2].strip() if len(r) > 2 and r[2].strip()
-                                             else "%s | %s" % (r[0].strip(), r[1].strip()))
+            r = [x.strip() for x in r] + ["", "", ""]
+            if r[0].lower() == "callsign" or not (r[0] or r[1] or r[2]):
+                continue
+            out.append((r[0].lower(), r[2] or " | ".join(x for x in (r[0], r[1]) if x)))
     return out
 
 
@@ -108,7 +109,12 @@ def page(passes, now):
     for cs, ps in by.items():
         pts = [x for x in map(points, ps) if x is not None]
         rows.append((sum(pts) / len(pts) if pts else -1, ps[-1]["t"], cs, ps))
-    rows.sort(key=lambda r: (-r[0], -r[1].timestamp()))
+    names = dict(roster())
+    # Everyone in the CSV is on the board; no passes yet = an empty row at the bottom.
+    for cs, label in roster():
+        if not any(c.lower() == cs for c in by) :
+            rows.append((-2, dt.datetime.min.replace(tzinfo=None), label, []))
+    rows.sort(key=lambda r: (-r[0], -(r[1].timestamp() if r[3] else 0)))
     allpts = [x for p in passes for x in [points(p)] if x is not None]
     board_avg = "%.2f" % (sum(allpts) / len(allpts)) if allpts else "-"
     last = max((p["t"] for p in passes), default=None)
@@ -116,12 +122,12 @@ def page(passes, now):
     if last:
         h = (now - last.replace(tzinfo=None) if last.tzinfo else now - last).total_seconds() / 3600
         ago = "%d hours ago" % h if h < 48 else "%d days ago" % (h // 24)
-    names = roster()
     body = []
     for avg, lt, cs, ps in rows:
         cells = "".join(square(p) for p in ps[-SHOWN:]) + '<td class="e"></td>' * (SHOWN - len(ps[-SHOWN:]))
         body.append('<tr><td class="n">%s</td><td class="a">%s</td><td class="d">%s</td>%s</tr>' % (
-            html.escape(names.get(cs.lower(), cs)), "%.1f" % avg if avg >= 0 else "-", lt.strftime("%d-%m"), cells))
+            html.escape(names.get(cs.lower(), cs)), "%.1f" % avg if avg >= 0 else "-",
+            lt.strftime("%d-%m") if ps else "-", cells))
     key = "".join('<span class="k" style="background:%s">%s</span>' % (f, html.escape(l))
                   for f, _, l in COLOURS.values())
     return """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -179,7 +185,7 @@ def main():
     if not passes:
         print("no graded passes yet")
         return 0
-    pilots = len({p["callsign"] for p in passes})
+    pilots = len({p["callsign"].lower() for p in passes} | {c for c, _ in roster()})
     png = screenshot(page(passes, dt.datetime.now()), 230 + 54 * pilots)
     out = os.path.join(REPORTS, "_data", "paddles", "greenieboard.png")
     open(out, "wb").write(png)
