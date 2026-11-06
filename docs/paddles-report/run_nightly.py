@@ -89,6 +89,9 @@ def main():
     built = os.path.join(data, "Paddles Report %s.pdf" % a.date)
     if rc == 0 and os.path.exists(built):
         os.replace(built, report_pdf(a.out, a.date, "Paddles"))
+    if rc == 0:
+        # The greenie board picture for Discord (needs the webhook file; see greenie_post.py).
+        subprocess.call([sys.executable, "-I", os.path.join(HERE, "greenie_post.py"), "--date", a.date])
     return rc
 
 
