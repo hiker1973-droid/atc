@@ -164,8 +164,8 @@ def wind_arrow(x, y, wind_dir, wind_kts, brc):
     a = math.atan2(dy, dx)
     head = "%.1f,%.1f %.1f,%.1f %.1f,%.1f" % (x + dx - 9 * math.cos(a - 0.5), y + dy - 9 * math.sin(a - 0.5), x + dx, y + dy,
                                               x + dx - 9 * math.cos(a + 0.5), y + dy - 9 * math.sin(a + 0.5))
-    return ('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#c9d1d9" stroke-width="2.4"/><polyline points="%s" fill="none" stroke="#c9d1d9" stroke-width="2.4"/>'
-            % (x - dx, y - dy, x + dx, y + dy, head)) + text(x, y + 42, "%03d at %d kn" % (round(wind_dir) % 360 or 360, round(wind_kts)), 13, "#c9d1d9", "middle")
+    return ('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2.6"/><polyline points="%s" fill="none" stroke="%s" stroke-width="2.6"/>'
+            % (x - dx, y - dy, x + dx, y + dy, YEL, head, YEL)) + text(x, y + 44, "Wind %03d at %d kn" % (round(wind_dir) % 360 or 360, round(wind_kts)), 14, YEL, "middle")
 
 
 def groove_top(pts, groove_s=None, wind=None):
@@ -194,7 +194,7 @@ def groove_top(pts, groove_s=None, wind=None):
         x, y = px(a), py(a, next(l for aa, _, l in pts if aa == a))
         s.append(note(x - 170, TH - 36, "Alt at 1 NM: %d ft" % round(ft)) + arrow(x - 60, TH - 50, x - 3, y + 6))
     if wind:
-        s.append(wind_arrow(52, TH - 72, *wind))
+        s.append(wind_arrow(84, TH - 72, *wind))
     s.append(text(PW - 8, 18, "from above, lineup", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
@@ -217,7 +217,7 @@ def carrier_top(sx, sy, brc=None):
     return "".join(s)
 
 
-def approach_view(pat, brc=None):
+def approach_view(pat, brc=None, wind=None):
     """The jet's last minutes round the ship, from above (ship at the left pointing left; port is down)."""
     h = SH + TH
     sx, sy, k = 330, h / 2, 0.08
@@ -237,6 +237,8 @@ def approach_view(pat, brc=None):
     s.append(carrier_top(sx, sy, brc))  # the stern (the aft = 0 point) at the rings' centre
     pts = [(sx + row[0] * k, sy + row[1] * k, row[2]) for row in pat]
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
+    if wind:
+        s.append(wind_arrow(84, 78, *wind))
     s += callouts(pat, pts)
     s.append(text(PW - 8, 18, "approach, from above", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
@@ -385,7 +387,7 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
 </style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
 <div class="info"><img src="%s"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind), approach_view(pat, brc), LOGO, body,
+        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind), approach_view(pat, brc, wind), LOGO, body,
         "track from Paddles" if not coarse else "coarse card")
 
 
