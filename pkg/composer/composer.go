@@ -1332,11 +1332,11 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 	return pick([]string{
 		// The squadron's DimOn card 26: "marshal on the 287, 23 DME, angels 8,
 		// expected approach time is 36".
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, marshal on the %s, %s DME, angels %s, expected approach time is %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s mother's weather %s, Case Three recovery%s, altimeter %s, marshal on the %s, %s DME, angels %s, expect the Case Three CV-1 approach, expected approach time is %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, marshal on the %s radial, %s DME, angels %s, expected approach time %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three, mother %s%s, altimeter %s, marshal on the %s radial, %s DME, angels %s, expect the Case Three CV-1 approach, expected approach time %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
-		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your marshal is the %s radial, %s DME, angels %s, expected approach time is %s, report established.",
+		fmt.Sprintf("%s, "+c.towerCallsign+",%s Case Three recovery, %s%s, altimeter %s, your marshal is the %s radial, %s DME, angels %s, expect the Case Three CV-1 approach, expected approach time is %s, report established.",
 			callsign, radarStr, wx, brcStr, alt, rad, dme, ang, eat),
 	})
 }
