@@ -220,7 +220,7 @@ def carrier_top(sx, sy, brc=None):
 def approach_view(pat, brc=None, wind=None):
     """The jet's last minutes round the ship, from above (ship at the left pointing left; port is down)."""
     h = SH + TH
-    sx, sy, k = 330, h / 2, 0.08
+    sx, sy, k = 330, 118, 0.08
     s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, h)]
     if not pat:
         s.append(text(PW / 2, h / 2, "no approach track recorded for this pass", 15, MUTED, "middle"))
@@ -238,7 +238,7 @@ def approach_view(pat, brc=None, wind=None):
     pts = [(sx + row[0] * k, sy + row[1] * k, row[2]) for row in pat]
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
     if wind:
-        s.append(wind_arrow(84, 78, *wind))
+        s.append(wind_arrow(100, 468, *wind))
     s += callouts(pat, pts)
     s.append(text(PW - 8, 18, "approach, from above", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
@@ -272,7 +272,7 @@ def callouts(pat, pts):
         x, y, _ = pts[bi]
         d = abs(pat[bi][0]) / M_NM  # along the ship's heading: ahead of the ship is "past ABE"
         out.append('<circle cx="%.1f" cy="%.1f" r="6" fill="none" stroke="%s" stroke-width="2"/>' % (x, y, YEL))
-        out.append(note(x + 36, y - 100, "in the break: %.1f NM %s ABE" % (d, "past" if pat[bi][0] < 0 else "short of")) + arrow(x + 32, y - 94, x + 3, y - 8))
+        out.append(note(x + 36, y - 74, "in the break: %.1f NM %s ABE" % (d, "past" if pat[bi][0] < 0 else "short of")) + arrow(x + 32, y - 68, x + 3, y - 8))
     over = min(range(0, min(brk, n)), key=lambda i: abs(pat[i][0]), default=None)
     if over is not None and abs(pat[over][0]) < 600 and over > 2:
         x, y, _ = pts[over]

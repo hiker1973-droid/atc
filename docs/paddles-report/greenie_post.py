@@ -306,7 +306,26 @@ def backup():
             print("backup to %s failed: %s" % (root, e))
 
 
+LOCK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie.lock")
+
+
 def main():
+    """One refresh at a time (the hourly task, the watcher and the Stats page can all start one)."""
+    import time
+    if os.path.exists(LOCK_FILE) and time.time() - os.path.getmtime(LOCK_FILE) < 240:
+        print("another refresh is running")
+        return 0
+    open(LOCK_FILE, "w").write(str(os.getpid()))
+    try:
+        return _main()
+    finally:
+        try:
+            os.remove(LOCK_FILE)
+        except OSError:
+            pass
+
+
+def _main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=(dt.date.today() - dt.timedelta(days=1)).isoformat())
     ap.add_argument("--no-post", action="store_true")
