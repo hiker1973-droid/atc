@@ -305,6 +305,9 @@ type Tracker struct {
 	lastTrapAt time.Time
 	// Done receives each finished pass's summary line.
 	Done func(summary string)
+	// OnTrack, if set, gets each finished pass's track (see passTrack) for the
+	// greenie board's pass cards.
+	OnTrack func(callsign, track string)
 	// Case, if set, is the recovery case now (1, 2 or 3; 0 = not known): the
 	// summary says ", case III" so the greenie board can mark night passes.
 	Case func() int
@@ -804,6 +807,11 @@ func (t *Tracker) finish(p *Pass) {
 	if t.Done == nil {
 		return
 	}
+	if t.OnTrack != nil {
+		if tr := passTrack(p); tr != "" {
+			t.OnTrack(p.Callsign, tr)
+		}
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s (%s): %s", p.Callsign, p.Model, p.outcome)
 	if t.Case != nil {
@@ -874,6 +882,34 @@ func (t *Tracker) finish(p *Pass) {
 		fmt.Fprintf(&b, "; said: %s", strings.Join(p.calls, ", "))
 	}
 	t.Done(b.String())
+}
+
+// passTrack is the pass's groove for a pass card: up to 70 points of
+// "metres astern:glideslope error:lineup error" (degrees, one decimal, kept
+// within +/-9) joined by "|", from 2,400 m out to the ramp.
+func passTrack(p *Pass) string {
+	var pts []passSample
+	for _, s := range p.samples {
+		if s.g.astern <= 2400 && s.g.astern > -20 {
+			pts = append(pts, s)
+		}
+	}
+	if len(pts) < 3 {
+		return ""
+	}
+	step := 1
+	if len(pts) > 70 {
+		step = (len(pts) + 69) / 70
+	}
+	clip := func(v float64) float64 { return math.Max(-9, math.Min(9, v)) }
+	var b strings.Builder
+	for i := 0; i < len(pts); i += step {
+		if b.Len() > 0 {
+			b.WriteByte('|')
+		}
+		fmt.Fprintf(&b, "%.0f:%.1f:%.1f", pts[i].g.astern, clip(pts[i].gs), clip(pts[i].lineup))
+	}
+	return b.String()
 }
 
 // segMeans is one segment's mean glideslope, lineup and AoA error.

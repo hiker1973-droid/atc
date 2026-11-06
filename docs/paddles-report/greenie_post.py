@@ -215,7 +215,7 @@ td.s{width:54px;font-weight:700}td.e{width:54px}
         logo, ago or "-", board_avg, "".join(body), key)
 
 
-def screenshot(src_html, height):
+def screenshot(src_html, height, width=1700):
     for edge in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
                  r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"):
         if os.path.exists(edge):
@@ -226,7 +226,7 @@ def screenshot(src_html, height):
         src, out = os.path.join(d, "g.html"), os.path.join(d, "g.png")
         open(src, "w", encoding="utf-8").write(src_html)
         subprocess.run([edge, "--headless", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
-                        "--user-data-dir=" + os.path.join(d, "p"), "--window-size=1700,%d" % height,
+                        "--user-data-dir=" + os.path.join(d, "p"), "--window-size=%d,%d" % (width, height),
                         "--screenshot=" + out, "file:///" + src.replace("\\", "/")],
                        check=True, capture_output=True, timeout=90)
         return open(out, "rb").read()
@@ -342,6 +342,16 @@ def main():
         text += "\nNot on the board - add to the roster: " + ", ".join(UNMATCHED)
     what = post(hook, png, text)
     print(what)
+    # A card for each new graded pass (pass_cards.py); a failure here never costs the board its update.
+    try:
+        import pass_cards
+        yesterday = dt.date.today() - dt.timedelta(days=1)
+        recent = [p for p in passes if p.get("rig") and p["t"].date() >= yesterday]
+        n = pass_cards.post_cards(hook, recent, {yesterday.isoformat(), dt.date.today().isoformat()})
+        if n:
+            print("pass cards posted:", n)
+    except Exception as e:  # noqa: BLE001
+        print("pass cards failed:", e)
     return 0
 
 

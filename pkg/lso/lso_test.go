@@ -26,6 +26,9 @@ type flight struct {
 	caseNo int
 }
 
+// trackHook, when set, becomes the Tracker's OnTrack in flight.run.
+var trackHook func(callsign, track string)
+
 func world(p Params, s Ship, astern, right, height float64) (lat, lon, altM float64) {
 	le, ln := p.landingPoint(s)
 	ae, an := unit(s.HeadingDeg + p.AngledDeckDeg)
@@ -41,6 +44,9 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 	p.TouchdownCalM = 0 // corrects real Tacview tracks; these are exact
 	tr := NewTracker(p)
 	tr.Done = func(s string) { summary = s }
+	if trackHook != nil {
+		tr.OnTrack = trackHook
+	}
 	if f.caseNo > 0 {
 		tr.Case = func() int { return f.caseNo }
 	}
@@ -124,6 +130,19 @@ func TestOnGlideslopeTrap(t *testing.T) {
 	}
 	if !strings.Contains(sum, ": trap") || !strings.Contains(sum, "est. 3 wire") || !strings.Contains(sum, "grade _OK_: 3 wire") {
 		t.Errorf("summary = %q, want a 3-wire trap", sum)
+	}
+}
+
+func TestPassTrackIsLogged(t *testing.T) {
+	var got string
+	trackHook = func(cs, s string) { got = s }
+	defer func() { trackHook = nil }()
+	flight{gsErr: zero, luErr: zero, finish: "trap", ball: true}.run(t)
+	if got == "" || !strings.Contains(got, "|") || !strings.Contains(got, ":") {
+		t.Fatalf("track = %q, want astern:gs:lu points", got)
+	}
+	if first := strings.SplitN(got, "|", 2)[0]; !strings.HasPrefix(first, "2") && !strings.HasPrefix(first, "1") {
+		t.Errorf("first point %q should start well astern", first)
 	}
 }
 

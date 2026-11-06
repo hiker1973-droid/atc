@@ -294,6 +294,9 @@ type lsoFeed struct {
 
 func newLSOFeed(p lso.Params, say func(lso.Call)) *lsoFeed {
 	f := &lsoFeed{tr: lso.NewTracker(p), say: say, truth: newLSOTruth()}
+	f.tr.OnTrack = func(callsign, track string) {
+		log.Info().Str("callsign", callsign).Str("track", track).Msg("Paddles: pass track")
+	}
 	f.tr.Done = func(summary string) {
 		log.Info().Str("pass", summary).Msg("Paddles: pass")
 		f.truth.pass(summary, time.Now())
