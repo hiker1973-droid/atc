@@ -228,7 +228,10 @@ def approach_view(pat, brc=None, wind=None):
     for nm in (0.5, 1, 2, 3):
         r = nm * M_NM * k
         s.append('<circle cx="%d" cy="%.0f" r="%.1f" fill="none" stroke="#30363d" stroke-width="1.2"/>' % (sx, sy, r))
-        s.append(text(sx + r * math.cos(math.radians(25)) + 4, sy - r * math.sin(math.radians(25)) - 4, "%g NM" % nm, 12, "#6e7681"))
+        # the small rings are labelled above and to the right; the ship is near the top of the panel, so the 2 and 3 NM
+        # rings are labelled below and to the right, where they are on the panel
+        ang = math.radians(25 if nm <= 1 else -70 if nm == 2 else -40)
+        s.append(text(sx + r * math.cos(ang) + 4, sy - r * math.sin(ang) - 4 * (1 if nm <= 1 else -3), "%g NM" % nm, 13, "#8b949e"))
     # the downwind corridor: 1.2 / 1.3 / 1.5 NM to port of the ship, parallel to its heading
     for nm, col in ((1.2, YEL), (1.3, GRN), (1.5, RED)):
         y = sy + nm * M_NM * k
