@@ -130,7 +130,9 @@ def square(p):
         txt = {"B": "B", "WO": "WO", "WOFD": "WO"}.get(key, key)
     small = ' style="font-size:17px"' if len(txt) > 2 else ""
     if p.get("case3"):
-        txt = '<span class="c3"%s>%s</span>' % (small, html.escape(txt))
+        # A dark circle vanishes on a black wave-off square: use a light one there.
+        light = ' style="background:rgba(255,255,255,.28)%s"' % (";font-size:17px" if small else "") if key == "WO" else small
+        txt = '<span class="c3"%s>%s</span>' % (light, html.escape(txt))
     else:
         txt = '<span%s>%s</span>' % (small, html.escape(txt)) if small else html.escape(txt)
     return '<td class="s" style="background:%s;color:%s">%s</td>' % (fill, ink, txt)
