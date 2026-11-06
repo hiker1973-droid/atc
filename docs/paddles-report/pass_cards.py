@@ -282,7 +282,66 @@ def callouts(pat, pts):
     return out
 
 
-def card_html(p, label, pts, coarse, pat=None, brc=None):
+def read_context(days):
+    """(callsign lower, time, line) for each "Paddles: pass context" log line of those days."""
+    data = os.path.join(gp.REPORTS, "_data", "paddles")
+    out = []
+    for f in sorted(os.listdir(data)):
+        m = re.match(r"(\d{4}-\d{2}-\d{2}) (.+)\.log$", f)
+        if not m or m.group(1) not in days:
+            continue
+        for line in open(os.path.join(data, f), encoding="utf-8", errors="replace"):
+            if "Paddles: pass context" not in line:
+                continue
+            try:
+                o = json.loads(line)
+                out.append((o.get("callsign", "").lower(), dt.datetime.fromisoformat(o["time"]), o))
+            except (ValueError, KeyError):
+                continue
+    return out
+
+
+def context_for(p, rows):
+    for cs, t, o in rows:
+        if cs == p["callsign"].lower() and abs((t - p["t"]).total_seconds()) < 8:
+            return o
+    return None
+
+
+MAPS = (("UG", "Caucasus"), ("XR", "Caucasus"), ("OM", "Persian Gulf"), ("OK", "Persian Gulf"), ("LC", "Syria"), ("OL", "Syria"),
+        ("OS", "Syria"), ("LT", "Syria"), ("ED", "Germany"), ("ET", "Germany"), ("EB", "Germany"), ("OR", "Iraq"), ("EN", "Kola"))
+
+
+def map_name(ctx, rig):
+    """The DCS map: from the carrier's field in the context, else the rig's usual map."""
+    icao = ((ctx or {}).get("icao") or "").upper()
+    for prefix, name in MAPS:
+        if icao.startswith(prefix):
+            return name
+    return "Syria" if rig == "Foothold" else "Caucasus"
+
+
+def weather_line(ctx):
+    """A brief weather summary: wind, visibility, ceiling, altimeter."""
+    if not ctx or not ctx.get("altInHg"):
+        return ""
+    ceil = ctx.get("ceilingFt") or 0
+    vis = ctx.get("visNm") or 0
+    return "Wind %03d at %d kts, vis %s, %s, QNH %.2f" % (
+        round(ctx.get("windDir") or 0) % 360 or 360, round(ctx.get("windKts") or 0),
+        "10+ NM" if vis >= 10 or vis <= 0 else "%.0f NM" % vis,
+        "no ceiling" if ceil <= 0 or ceil >= 20000 else "ceiling %s ft" % format(int(round(ceil, -2)), ","), ctx["altInHg"])
+
+
+def mission_time(ctx):
+    mt = (ctx or {}).get("missionTime")
+    try:
+        return dt.datetime.fromisoformat(mt.replace("Z", "+00:00")).strftime("%A %B %d, %Y %H:%M:%SZ")
+    except (AttributeError, ValueError):
+        return ""
+
+
+def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None):
     key = gp.board_key(p)
     fill, ink, name = gp.COLOURS[key]
     badge = "WO" if key in ("WOFD", "WO") else ("B" if key == "B" else p["grade"] or key)
@@ -291,9 +350,10 @@ def card_html(p, label, pts, coarse, pat=None, brc=None):
         comment = (comment + " WIRE# %d" % p["wire"]).strip()
     model = (p.get("model") or "").replace("FA-18C_hornet", "F/A-18C").replace("_", " ")
     case = ("Case " + p["case"]) if p.get("case") else ""
-    when = p["t"].strftime("%A %B %d, %Y %H:%M:%S")
-    region = "Syria" if p.get("rig") == "Foothold" else "Caucasus"
-    lines = [when, 'Nimitz Class "ABE" somewhere in the %s region' % region, " | ".join(b for b in (model, case) if b), "",
+    when = mission_time(ctx) or p["t"].strftime("%A %B %d, %Y %H:%M:%S") + " (real time)"
+    daynight = ("Night" if ctx.get("isNight") else "Day") if ctx and "isNight" in ctx else ""
+    lines = ['Nimitz Class "ABE" | %s' % map_name(ctx, p.get("rig")), when, *([weather_line(ctx)] if weather_line(ctx) else []),
+             " | ".join(b for b in (model, case, daynight) if b), "",
              name if key in ("WOFD", "WO") else badge, comment, "", remark(p.get("comments")),
              "(segment averages only: this pass was logged before tracks)" if coarse else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
@@ -327,6 +387,7 @@ def post_cards(hook, log_passes, days):
     canon = {a: cs for cs, _, _, al in gp.roster() for a in al if cs}
     tracks = read_logged(days, "Paddles: pass track", "track") if todo else []
     patterns = read_logged(days, "Paddles: pass pattern", "pattern") if todo else []
+    contexts = read_context(days) if todo else []
     n = 0
     for p in todo:
         key = canon.get(p["callsign"].lower(), p["callsign"].lower())
@@ -337,7 +398,7 @@ def post_cards(hook, log_passes, days):
         coarse = not pts
         if coarse:
             pts = segment_points(p)
-        png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns), brc_for(p, patterns)), 980, 1760)
+        png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns), brc_for(p, patterns), context_for(p, contexts)), 980, 1760)
         gp.send(hook + "?wait=true", "POST", png, "")
         posted.add(pass_key(p))
         n += 1

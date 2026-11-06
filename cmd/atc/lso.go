@@ -211,6 +211,7 @@ func runLSO(ctx context.Context, apiKey string) {
 	feed := newLSOFeed(p, say)
 	caseSrc := &lsoCaseSource{marshal: flagLSOMarshalDash}
 	feed.tr.Case = caseSrc.get
+	feed.context = caseSrc.context
 	go caseSrc.run(ctx)
 	// The foul-deck wave-off carries his callsign, so render it as his pass
 	// starts: at a quarter mile there is no time to wait for TTS.
@@ -290,6 +291,11 @@ type lsoFeed struct {
 	tr    *lso.Tracker
 	say   func(lso.Call)
 	truth *lsoTruth
+	// missionClock is the DCS mission's clock (Tacview ReferenceTime plus the frame time), zero
+	// until known; context is the weather and field (lsoCaseSource.context). Both go on the
+	// pass card ("Paddles: pass context").
+	missionClock func() time.Time
+	context      func() map[string]any
 }
 
 func newLSOFeed(p lso.Params, say func(lso.Call)) *lsoFeed {
@@ -302,9 +308,30 @@ func newLSOFeed(p lso.Params, say func(lso.Call)) *lsoFeed {
 	}
 	f.tr.Done = func(summary string) {
 		log.Info().Str("pass", summary).Msg("Paddles: pass")
+		f.logContext(summary)
 		f.truth.pass(summary, time.Now())
 	}
 	return f
+}
+
+// logContext writes the mission time and the weather beside a pass's summary, for the pass card.
+func (f *lsoFeed) logContext(summary string) {
+	cs, _, _ := strings.Cut(summary, " (")
+	ev := log.Info().Str("callsign", cs)
+	any := false
+	if f.missionClock != nil {
+		if mt := f.missionClock(); !mt.IsZero() {
+			ev, any = ev.Str("missionTime", mt.UTC().Format(time.RFC3339)), true
+		}
+	}
+	if f.context != nil {
+		for k, v := range f.context() {
+			ev, any = ev.Interface(k, v), true
+		}
+	}
+	if any {
+		ev.Msg("Paddles: pass context")
+	}
 }
 
 func (f *lsoFeed) lock()   { f.mu.Lock() }
@@ -431,6 +458,8 @@ type lsoTacview struct {
 	feed           *lsoFeed
 	objs           map[string]*lsoObj
 	refLat, refLon float64
+	refTime        time.Time // the mission's reference time (Tacview header), UTC
+	frameSec       float64   // seconds since refTime at the last "#" frame
 	carrierID      string
 	track          []shipFix // the carrier's recent positions, for heading and speed
 	lastExpire     time.Time
@@ -454,6 +483,14 @@ const (
 	// the log flipped foul/clear several times a second.
 	onDeckKeep = 10 * time.Minute
 )
+
+// missionTime is the DCS mission's clock now (Tacview ReferenceTime plus the last frame), zero if unknown.
+func (t *lsoTacview) missionTime() time.Time {
+	if t.refTime.IsZero() {
+		return time.Time{}
+	}
+	return t.refTime.Add(time.Duration(t.frameSec * float64(time.Second)))
+}
 
 func newLSOTacview(feed *lsoFeed) *lsoTacview {
 	return &lsoTacview{feed: feed, objs: make(map[string]*lsoObj), onDeck: make(map[string][2]time.Time), now: time.Now}
@@ -490,7 +527,11 @@ func (t *lsoTacview) ship() (lso.Ship, bool) {
 
 func (t *lsoTacview) handleLine(line string) {
 	line = strings.TrimSpace(line)
-	if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+	if strings.HasPrefix(line, "#") { // a frame: seconds since the mission's reference time
+		t.frameSec, _ = strconv.ParseFloat(strings.TrimPrefix(line, "#"), 64)
+		return
+	}
+	if line == "" || strings.HasPrefix(line, "//") {
 		return
 	}
 	if strings.HasPrefix(line, "-") {
@@ -512,6 +553,7 @@ func (t *lsoTacview) handleLine(line string) {
 				t.refLon, _ = strconv.ParseFloat(v, 64)
 			case "ReferenceTime":
 				t.track, t.carrierID = nil, "" // new mission
+				t.refTime, _ = time.Parse(time.RFC3339, v)
 			}
 		}
 		return
@@ -684,6 +726,7 @@ func runLSOTacview(ctx context.Context, addr string, feed *lsoFeed) {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		conn.Write([]byte("XtraLib.Stream.0\nTacview.RealTimeTelemetry.0\nvSFG7-Paddles\n0\x00"))
 		tv := newLSOTacview(feed)
+		feed.missionClock = tv.missionTime
 		sc := bufio.NewScanner(conn)
 		sc.Buffer(make([]byte, 65536), 65536)
 		for sc.Scan() {
