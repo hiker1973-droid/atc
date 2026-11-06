@@ -109,7 +109,7 @@ def ship_top(x, y):
 
 
 
-HAND = 'font-family="Segoe Print, Bradley Hand ITC, Comic Sans MS, cursive" font-style="italic"'
+HAND = 'font-family="Arial, Helvetica, sans-serif" font-style="italic"'
 WORDS = {"H": "high", "LO": "low", "LUL": "lined up left", "LUR": "lined up right", "SLO": "slow", "F": "fast"}
 WHERE = {"X": "at the start (first third)", "IM": "in the middle", "IC": "in close (last third)", "AR": "at the ramp"}
 REMARK_RE = re.compile(r"(__)?(\()?(LUL|LUR|SLO|LO|H|F)(\))?(__)?(X|IM|IC|AR)\b")
@@ -277,7 +277,7 @@ def card_html(p, label, pts, coarse, pat=None, brc=None):
              "(segment averages only: this pass was logged before tracks)" if coarse else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
     return """<!doctype html><html><head><meta charset="utf-8"><style>
-body{margin:0;background:#0d1117;font-family:Consolas,'Courier New',monospace;color:#c9d1d9}
+body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9}
 .w{margin:8px;border:1px solid #30363d;background:#161b22;border-radius:6px;padding:14px 16px;width:1696px}
 .top{display:flex;align-items:center;gap:18px;margin-bottom:10px}
 .b{min-width:96px;height:58px;line-height:58px;text-align:center;border-radius:7px;font:700 32px Arial,sans-serif;background:%s;color:%s;padding:0 14px}
