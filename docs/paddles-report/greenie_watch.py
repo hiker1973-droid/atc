@@ -96,7 +96,7 @@ def main():
                 pass
             last_pass, pending = time.time(), True
         if pending and time.time() - last_pass >= QUIET_S:
-            run("recovery_summary.py", "--post")
+            # (the recovery summary post to the Trap house was dropped 2026-11-06, operator: not needed)
             run("marshal_card.py", "--post-new")  # a Marshal card for each finished approach
             pending = False
         week = weekly_due(dt.datetime.now())

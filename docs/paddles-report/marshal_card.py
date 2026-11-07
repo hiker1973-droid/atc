@@ -122,7 +122,7 @@ def stack_view(rec, mates, brc, name, carrier=None):
     s.append(pc.text(nx + 36 * math.sin(a), ny - 36 * math.cos(a) + 5, "N", 14, MUTED, "middle"))
     # the carrier: hull, island and angled deck, turned to its BRC
     rot = (brc if brc is not None else 0) + off - 270
-    s.append('<g transform="rotate(%.1f %d %d)">%s</g>' % (rot, cx, cy, pc.carrier_top(cx, cy, None)))
+    s.append('<g transform="translate(%d %d) scale(0.45) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
     if brc is not None:
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
     # every jet's logged hold fix, and this jet's flown track (green until it commenced, yellow after) with its logged fixes
@@ -218,7 +218,7 @@ def case1_stack_view(rec, brc, name, carrier=None):
     s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#8b949e" stroke-width="2"/>' % (nx, ny, nx + 26 * math.sin(a), ny - 26 * math.cos(a)))
     s.append(pc.text(nx + 36 * math.sin(a), ny - 36 * math.cos(a) + 5, "N", 14, MUTED, "middle"))
     rot = (brc if brc is not None else 0) + off - 270
-    s.append('<g transform="rotate(%.1f %d %d)">%s</g>' % (rot, cx, cy, pc.carrier_top(cx, cy, None)))
+    s.append('<g transform="translate(%d %d) scale(0.45) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
     if brc is not None:
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
     if fix:
@@ -325,7 +325,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
                 last_alt = alt
     if detail and has_pat:
         s.append(pc.poly([xy(-pt[1] / M_NM, -pt[0] / M_NM) for pt in rec["pattern"]], "#ffffff", 2.8))
-    sc = 0.3 if detail else 0.12
+    sc = 0.14 if detail else 0.06
     s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
     if detail:
         s.append(pc.text(W - 10, 52, "ABE  BRC %03d" % (round(b) % 360 or 360), 14, "#e6edf3", "end", 'font-weight="bold"'))
