@@ -473,6 +473,7 @@ def post_cards(hook, log_passes, days):
     first = not os.path.exists(STATE_FILE)
     state = {"posted": []} if first else json.load(open(STATE_FILE, encoding="utf-8"))
     posted = set(state["posted"])
+    ids = state.get("ids", {})
     todo = [p for p in sorted(log_passes, key=lambda p: p["t"]) if p.get("rig") and pass_key(p) not in posted]
     if first:
         posted.update(pass_key(p) for p in todo)
@@ -495,9 +496,30 @@ def post_cards(hook, log_passes, days):
             pts = segment_points(p)
         png = gp.screenshot(card_html(p, names.get(key, p["callsign"]), pts, coarse, match(p, patterns), brc_for(p, patterns), context_for(p, contexts),
                                       ps.pilot_line(names.get(key, p["callsign"]), everyone.get(key, []))), 1080, 1760)
-        gp.send(hook + "?wait=true", "POST", png, "")
+        made = gp.send(hook + "?wait=true", "POST", png, "")
+        ids[pass_key(p)] = str(made.get("id", ""))  # kept so a card can be replaced (repost_last) instead of duplicated
         posted.add(pass_key(p))
         n += 1
         time.sleep(1.0)
-    json.dump({"posted": sorted(posted)[-2000:]}, open(STATE_FILE, "w", encoding="utf-8"))
+    json.dump({"posted": sorted(posted)[-2000:], "ids": dict(list(ids.items())[-500:])}, open(STATE_FILE, "w", encoding="utf-8"))
     return n
+
+
+def repost_last(hook, log_passes, days, n=3, outcomes=("trap",)):
+    """Post the last n passes' cards again with the current look. A card whose message id was kept is deleted first; the
+    ones posted before ids were kept cannot be found by a webhook, so those are posted anew and the old ones left."""
+    import urllib.error
+    import urllib.request
+    state = json.load(open(STATE_FILE, encoding="utf-8"))
+    ids = state.get("ids", {})
+    last = [p for p in sorted(log_passes, key=lambda p: p["t"]) if p.get("rig") and p["outcome"] in outcomes][-n:]
+    for p in last:
+        old = ids.get(pass_key(p))
+        if old:
+            try:
+                urllib.request.urlopen(urllib.request.Request("%s/messages/%s" % (hook, old), method="DELETE", headers={"User-Agent": "ReadbackGreenie/1"}), timeout=30)
+            except urllib.error.HTTPError:
+                pass
+        state["posted"] = [k for k in state["posted"] if k != pass_key(p)]
+    json.dump(state, open(STATE_FILE, "w", encoding="utf-8"))
+    return post_cards(hook, last, days)
