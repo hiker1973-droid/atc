@@ -173,7 +173,7 @@ def groove_top(pts, groove_s=None, wind=None):
     """The lineup from above: the centreline, the lineup lines and the 1/4 .. 1 nm rings."""
     y0, x0 = TH / 2 + 4, 84
     def px(d): return x0 + d * 0.36
-    def py(d, deg): return y0 - d * math.tan(math.radians(deg)) * 1.4
+    def py(d, deg): return y0 - d * math.tan(math.radians(deg)) * 0.75
     s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, TH), ship_top(8, y0)]
     s.append(poly([(px(0), y0), (px(2000), y0)], "#c9d1d9", 1.0, "2 5"))
     for deg, col in ((0.4, GRN), (0.75, YEL), (1.5, RED)):
@@ -186,7 +186,7 @@ def groove_top(pts, groove_s=None, wind=None):
     track = [(px(a), py(a, l)) for a, _, l, *__ in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
     s.append(poly(track, WHITE, 2.6) or dots(track))
     if groove_s:  # T-19: seconds in the groove, pointed at the half-mile point
-        x, y = px(0.5 * M_NM), y0 - 1.4 * 0.5 * M_NM * math.tan(math.radians(0.3))
+        x, y = px(0.5 * M_NM), y0 - 0.75 * 0.5 * M_NM * math.tan(math.radians(0.3))
         s.append(note(x - 70, y0 - 110, "T-%d" % round(groove_s)) + arrow(x - 56, y0 - 100, x, y - 6))
     near = min(((abs(a - M_NM), a, g) for a, g, *_ in pts if 0 < a <= 2000), default=None)
     if near and near[0] < 450:  # Wake Alt: the height over the water at one mile
