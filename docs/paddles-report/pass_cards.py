@@ -143,12 +143,30 @@ def arrow(x1, y1, x2, y2):
 def note(x, y, s, size=17, anchor="start"):
     return '<text x="%.1f" y="%.1f" fill="%s" font-size="%d" text-anchor="%s" %s>%s</text>' % (x, y, YEL, size, anchor, HAND, html.escape(s))
 
-def groove_side(pts):
+WIRES_FROM_STERN_M = (55, 67, 79, 92)  # pkg/lso NimitzParams: wire 1 .. 4, metres forward of the stern
+
+
+def wire_ticks(pos, wire, half, label_at=None):
+    """The four arresting wires as ticks across the deck, the one that caught the jet highlighted. pos(m) is the x, y of a
+    wire m metres forward of the stern; half is the tick's half length. label_at (x, y) puts "3 wire" with an arrow."""
+    out = []
+    for n, m in enumerate(WIRES_FROM_STERN_M, 1):
+        x, y = pos(m)
+        hit = n == wire
+        out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="%s"/>' % (x, y - half * (1.5 if hit else 1), x, y + half * (1.5 if hit else 1), YEL if hit else "#c9d1d9", 3.2 if hit else 1.2))
+    if wire and label_at:
+        x, y = pos(WIRES_FROM_STERN_M[wire - 1])
+        lx, ly = label_at
+        out.append(note(lx, ly, "%d wire" % wire, 16, "middle") + arrow(lx, ly + 6, x, y - half * 1.5 - 2))
+    return "".join(out)
+
+
+def groove_side(pts, wire=None):
     """The glideslope from the side: height above the deck against distance astern."""
     base, x0 = SH - 16, 84
     def px(d): return x0 + d * 0.36
     def py(d, deg): return base - d * math.tan(math.radians(deg)) * 1.5
-    s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, SH), ship_side(8, base)]
+    s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, SH), ship_side(8, base), wire_ticks(lambda m: (x0 - m * 0.36, base + 2.5), wire, 9, (x0 - 30, base - 44))]
     for off, col in ((0.5, YEL), (0.0, GRN), (-0.7, RED)):
         s.append(poly([(px(0), py(0, GS_DEG + off)), (px(2000), py(2000, GS_DEG + off))], col, 1.6, "5 4"))
     track = [(px(a), py(a, GS_DEG + g)) for a, g, *_ in sorted(pts, key=lambda q: q[0]) if 0 <= a <= 2000]
@@ -169,12 +187,12 @@ def wind_arrow(x, y, wind_dir, wind_kts, brc):
             % (x - dx, y - dy, x + dx, y + dy, YEL, head, YEL)) + text(x, y + 44, "Wind %03d at %d kn" % (round(wind_dir) % 360 or 360, round(wind_kts)), 14, YEL, "middle")
 
 
-def groove_top(pts, groove_s=None, wind=None):
+def groove_top(pts, groove_s=None, wind=None, wire=None):
     """The lineup from above: the centreline, the lineup lines and the 1/4 .. 1 nm rings."""
     y0, x0 = TH / 2 + 4, 84
     def px(d): return x0 + d * 0.36
     def py(d, deg): return y0 - d * math.tan(math.radians(deg)) * 0.75
-    s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, TH), ship_top(8, y0)]
+    s = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, TH), ship_top(8, y0), wire_ticks(lambda m: (84 - m * 0.36, y0), wire, 8, (84 - 28, y0 - 40))]
     s.append(poly([(px(0), y0), (px(2000), y0)], "#c9d1d9", 1.0, "2 5"))
     for deg, col in ((0.4, GRN), (0.75, YEL), (1.5, RED)):
         for sign in (1, -1):
@@ -218,7 +236,7 @@ def carrier_top(sx, sy, brc=None):
     return "".join(s)
 
 
-def approach_view(pat, brc=None, wind=None):
+def approach_view(pat, brc=None, wind=None, wire=None):
     """The jet's last minutes round the ship, from above (ship at the left pointing left; port is down)."""
     h = SH + TH
     sx, sy, k = 330, 118, 0.08
@@ -242,6 +260,10 @@ def approach_view(pat, brc=None, wind=None):
         s.append(poly([(sx - 140, y), (sx + 3300 * k, y)], col, 1.3, "6 5"))
         s.append(text(sx + 3300 * k + 6, y + 4, "%.1f NM" % nm, 12, col))
     s.append(carrier_top(sx, sy, brc))  # the stern (the aft = 0 point) at the rings' centre
+    if wire:  # the wires on the angled deck (the deck is drawn bigger than the rings' scale), the one that caught the jet highlighted
+        ca, sa = math.cos(math.radians(9.14)), math.sin(math.radians(9.14))
+        s.append(wire_ticks(lambda m: (sx - 6 - m * 0.38 * ca, sy - 7 + m * 0.38 * sa), wire, 7, (sx - 52, sy + 44)))
+        ring_boxes.append((sx - 80, sy + 22, sx - 20, sy + 52))
     pts = [(sx + row[0] * k, sy + row[1] * k, row[2]) for row in pat]
     s.append(poly([(x, y) for x, y, _ in pts], WHITE, 2.4))
     if wind:
@@ -434,15 +456,15 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
 .w{margin:8px;border:1px solid #30363d;background:#161b22;border-radius:6px;padding:14px 16px;width:1696px}
 .top{display:flex;align-items:center;gap:18px;margin-bottom:10px}
 .b{min-width:96px;height:58px;line-height:58px;text-align:center;border-radius:7px;font:700 32px Arial,sans-serif;background:%s;color:%s;padding:0 14px}
-.n{font:700 28px Arial,sans-serif;color:#e6edf3}.logo{margin-left:auto;height:92px;width:auto;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255,255,255,.55))}
+.n{font:700 28px Arial,sans-serif;color:#e6edf3}.cs{font:700 24px Arial,sans-serif;color:#fff;background:#0a8fd8;border-radius:7px;padding:8px 16px}.logo{margin-left:auto;height:92px;width:auto;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255,255,255,.55))}
 .ps{display:flex;gap:16px}.pn{flex:none;width:840px;background:#0d1117;border:1px solid #30363d;border-radius:6px;overflow:hidden}
 .tab{background:#1f6feb;color:#fff;font:700 22px Arial,sans-serif;text-align:center;padding:9px 0}
 .info{margin-top:14px;font-size:20px;line-height:1.35;color:#e6edf3}
 .ft{font:12px Arial,sans-serif;color:#8b949e;margin-top:8px}
-</style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><img class="logo" src="%s"></div>
+</style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div>%s<img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
 <div class="info"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), LOGO, groove_side(pts), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind), approach_view(pat, brc, wind), body,
+        fill, ink, html.escape(badge), html.escape(label), ("<div class=\"cs\">%s</div>" % html.escape(case.upper())) if case else "", LOGO, groove_side(pts, p.get("wire")), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind, p.get("wire")), approach_view(pat, brc, wind, p.get("wire")), body,
         "track from Paddles" if not coarse else "coarse card")
 
 
