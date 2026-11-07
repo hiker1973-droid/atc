@@ -312,6 +312,17 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
                 s.append(pc.poly([xy(*q) for q in pts_], col, 2.6))
         ex, ey = xy(*(legs[1] or legs[0])[-1])
         s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="#fff"/>' % (ex, ey))
+        # the Marshal stack altitude: at the start, at each 500 ft change, and at the end of the track
+        last_alt, shown = None, []
+        trk = rec["track"]
+        for i, (ut, dist, brg, alt) in enumerate(trk):
+            if last_alt is None or abs(alt - last_alt) >= 500 or i == len(trk) - 1:
+                if not shown or math.hypot(*(a - b_ for a, b_ in zip(xy(dist * math.sin(math.radians(brg - b)), dist * math.cos(math.radians(brg - b))), shown[-1]))) > 30:
+                    px_, py_ = xy(dist * math.sin(math.radians(brg - b)), dist * math.cos(math.radians(brg - b)))
+                    shown.append((px_, py_))
+                    s.append('<circle cx="%.1f" cy="%.1f" r="2.5" fill="#fff"/>' % (px_, py_)
+                             + pc.text(px_ + 5, py_ - 5, "%s ft" % format(int(round(alt, -2)), ","), 11, "#e6edf3", "start"))
+                last_alt = alt
     if detail and has_pat:
         s.append(pc.poly([xy(-pt[1] / M_NM, -pt[0] / M_NM) for pt in rec["pattern"]], "#ffffff", 2.8))
     sc = 0.3 if detail else 0.12
