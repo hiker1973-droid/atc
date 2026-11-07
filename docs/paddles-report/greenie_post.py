@@ -113,6 +113,16 @@ def reassign_by_dcs(passes, dcs, window=20):
             continue  # that pilot has a pass of his own here
         p["logcs"] = p["callsign"]
         p["callsign"] = " ".join(w.capitalize() for w in who.split())
+        # DCS sends no grade for a bolter or wave-off, but it is the same jet: the passes just before the trap, under the
+        # same stale name with no more than ten minutes between them, were his as well (Bacon's 17:36 bolter).
+        later = p["t"]
+        for q in sorted((q for q in passes if q is not p and q.get("callsign") == p["logcs"] and "logcs" not in q and q["t"] < later),
+                        key=lambda q: q["t"], reverse=True):
+            if (later - q["t"]).total_seconds() > 600 or q.get("outcome") == "trap":
+                break
+            q["logcs"] = q["callsign"]
+            q["callsign"] = p["callsign"]
+            later = q["t"]
 
 
 def load_passes(end):
