@@ -31,7 +31,7 @@ PW, PH = 840, 520
 RANGE = 30  # NM the views reach
 YEL, GRN, RED, WHITE, MUTED = pc.YEL, pc.GRN, pc.RED, pc.WHITE, pc.MUTED
 PLATFORM_FT = 5000
-PLANNED = False  # operator 2026-11-06: the cards show what the pilot actually did, not the Case I / III instructions
+PLANNED = True  # the tracking guide (the planned pattern, faded) is drawn under the real track (operator 2026-11-07: "show the tracking guide like our sample and put it with his real track")
 GS_DEG = 3.5
 
 
@@ -125,6 +125,17 @@ def stack_view(rec, mates, brc, name, carrier=None):
     s.append('<g transform="translate(%d %d) scale(0.45) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
     if brc is not None:
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
+    if PLANNED:  # the tracking guide, faded: the hold racetrack on the radial, the way in and its steps (commence, platform, dirty up, Paddles)
+        g_ang = rec["angels"] or 6
+        g_hold = g_ang + 15
+        r1_, r2_ = pt(radial, g_hold - 2.5), pt(radial, g_hold + 2.5)
+        gy = (r1_[1] + r2_[1]) / 2
+        s.append('<g opacity=".6">' + '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="none" stroke="#58a6ff" stroke-width="1.6" stroke-dasharray="5 4"/>' % (
+            min(r1_[0], r2_[0]), gy - k, abs(r1_[0] - r2_[0]), 2 * k, k) + pc.poly([pt(radial, g_hold - 1), pt(radial, 0.5)], YEL, 2, "8 5"))
+        for nm_, lab_ in ((g_hold - 1, "commence"), (14, "platform"), (8, "dirty up"), (3, "Paddles")):
+            gx_, gy_ = pt(radial, nm_)
+            s.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s"/>' % (gx_, gy_, YEL) + pc.text(gx_, gy_ + 70, "%s %d NM" % (lab_, nm_), 11, "#c9d1d9", "middle"))
+        s.append("</g>")
     # every jet's logged hold fix, and this jet's flown track (green until it commenced, yellow after) with its logged fixes
     for m in mates:
         hold = next((f for f in m["fixes"] if f[0] == "hold" and f[3] is not None), None)
@@ -149,7 +160,7 @@ def stack_view(rec, mates, brc, name, carrier=None):
         s.append(pc.note(x, y + (-30 if up else 46), "%s A%s %s" % (kind, ang if ang is not None else "?", when.strftime("%H:%M")), 14, "middle") + pc.arrow(x, y + (-22 if up else 32), x, y + (-8 if up else 8)))
     if not rec["fixes"] and not rec.get("track"):
         s.append(pc.text(cx - 200, cy - 80, "no radar positions recorded for this approach", 15, MUTED, "middle"))
-    s.append(pc.text(PW - 8, 18, "from above, turned so the radial runs left", 12, MUTED, "end"))
+    s.append(pc.text(PW - 8, 18, "from above, turned so the radial runs left - flown track over the faded guide", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
 
@@ -169,6 +180,16 @@ def commence_view(rec, mates, name):
     for nm in (5, 10, 15, 20, 25, 30):
         s.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s"/>' % (px(nm), 40, px(nm), base, "#262d36" if nm % 10 == 0 else "#1c2128"))
         s.append(pc.text(px(nm), base + 18, "%d NM" % nm, 12, "#8b949e" if nm % 10 == 0 else "#58616b", "middle"))
+    if PLANNED:  # the tracking guide, faded: the glideslope with its tolerance lines, and the planned profile down to the platform and the groove
+        g_ang = rec["angels"] or 6
+        g_hold = g_ang + 15
+        g_cross = PLATFORM_FT / gs_at(1.0)
+        s.append('<g opacity=".6">')
+        for off_, col_ in ((0.5, YEL), (0.0, GRN), (-0.7, RED)):
+            s.append(pc.poly([(px(0), py(0)), (px(17), py(gs_at(17, off_)))], col_, 1.5, "5 4"))
+        s.append(pc.poly([(px(g_hold), py(g_ang * 1000)), (px(g_hold - 1), py(PLATFORM_FT)), (px(g_cross), py(PLATFORM_FT))] + [(px(d), py(gs_at(d))) for d in (12, 8, 3, 0)], "#ffffff", 2.2, "7 5"))
+        s.append(pc.text(px(16.5), py(gs_at(17)) - 10, "3.5 deg glideslope", 12, GRN, "end") + pc.text(px(g_cross) + 6, py(PLATFORM_FT) + 16, "platform 5,000 ft", 11, "#c9d1d9", "start"))
+        s.append("</g>")
     tr = rec.get("track") or []
     com_t = rec["commence"].timestamp() if rec.get("commence") else None
     legs = ([], [])
@@ -189,7 +210,7 @@ def commence_view(rec, mates, name):
         s.append(pc.note(x - 10 if left else x + 10, y + dy, "%s A%d %s" % (kind, ang, t(when)), 14, "end" if left else "start") + pc.arrow(x - 12 if left else x + 12, y + dy + (6 if dy < 0 else -16), x + 3, y + (-6 if dy < 0 else 6)))
     if not tr and not real:
         s.append(pc.text(PW / 2, PH / 2, "no radar positions recorded for this approach", 15, MUTED, "middle"))
-    s.append(pc.text(PW - 8, 18, "from the side, flown (Tacview)" if tr else "from the side, logged radar fixes", 12, MUTED, "end"))
+    s.append(pc.text(PW - 8, 18, "from the side, flown (Tacview) over the faded guide" if tr else "from the side, logged radar fixes", 12, MUTED, "end"))
     return "".join(s) + "</svg>"
 
 
@@ -269,7 +290,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     # 1) the marshal stack (green dots), wide view only
     has_track, has_pat = bool(rec.get("track")), bool(rec.get("pattern"))
     if not detail and PLANNED:
-        s.append('<g opacity="%s">' % (".3" if has_track else "1"))
+        s.append('<g opacity=".3">')
         s.append(pc.poly([xy(CC[0] + RX * math.cos(math.radians(n * 5)), CC[1] + RY * math.sin(math.radians(n * 5))) for n in range(0, 73)], GREEN, 2.2, "7 5"))
         s.append("</g>")
         for i, m in enumerate(sorted(mates, key=lambda m: m["angels"] or 2) if not has_track else []):
@@ -286,7 +307,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     # 2) commence (yellow): from position 3 on BRC+210 round to the Initial 3 NM astern, then inbound up the BRC
     com = bez((-3.2, 0.0), (-4.2, -2.5), (0.0, -4.5), (0.0, -3.0)) + [(0.0, 0.35)]
     if PLANNED:
-        s.append('<g opacity="%s">' % (".3" if (has_track and not detail) else "1") + pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5") + "</g>")
+        s.append('<g opacity=".3">' + pc.poly([xy(*q) for q in (com if not detail else [(0.0, -3.0), (0.0, 0.35)])], YEL, 2.4, "9 5") + "</g>")
     # 3) Paddles (white dashes): break (level turn) to port, downwind 1.25 NM abeam, the 180, the 90, the 45, the groove
     r1 = 0.625
     paddles = []
@@ -297,7 +318,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     turn = bez(A, (-1.25, -1.35), (0.15, -1.3), G, 40)
     paddles += [A] + turn[1:] + [(0.0, 0.0)]
     if PLANNED:
-        s.append('<g opacity="%s">' % (".3" if has_pat and detail else "1") + pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5") + "</g>")
+        s.append('<g opacity=".3">' + pc.poly([xy(*q) for q in paddles], "#ffffff", 2.4, "7 5") + "</g>")
     # the real tracks: the Marshal stack track (Tacview, range / bearing from the carrier) on the wide view, green until the
     # commence and yellow after; the Paddles pass pattern (ship frame, metres) on the magnified view in solid white
     if not detail and has_track:
