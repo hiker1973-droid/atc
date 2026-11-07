@@ -91,6 +91,30 @@ def points(p):
         {"B": "B", "WO": "WO"}.get(board_key(p), ""), None))
 
 
+def reassign_by_dcs(passes, dcs, window=20):
+    """Give a pass to the pilot DCS says landed. Tacview's pilot name can be stale (2026-11-06: Bacon, Raider 031, flew
+    a jet Tacview still called "Raider 306 | Turbo", so Paddles carded his bolter and trap as Turbo's). DCS's own LSO grade
+    names the player, so a trap Paddles credits to X, with no DCS grade for X but one for Y a few seconds from it that no
+    other pass claims, is Y's. The callsign the logs carry is kept as p["logcs"] (tracks and patterns are filed under it)."""
+    def same(a, b):
+        return a.lower().replace(" ", "") == b.lower().replace(" ", "")
+    grades = [(g["_t"], g.get("callsign", "")) for g in dcs if g.get("callsign")]
+    for p in passes:
+        if p.get("outcome") != "trap":
+            continue
+        near = [(t, c) for t, c in grades if abs((t - p["t"]).total_seconds()) <= window]
+        if not near or any(same(c, p["callsign"]) for _, c in near):
+            continue
+        others = {c.lower() for _, c in near}
+        if len(others) != 1:
+            continue
+        who = near[0][1]
+        if any(q is not p and same(q["callsign"], who) and abs((q["t"] - p["t"]).total_seconds()) <= window for q in passes):
+            continue  # that pilot has a pass of his own here
+        p["logcs"] = p["callsign"]
+        p["callsign"] = " ".join(w.capitalize() for w in who.split())
+
+
 def load_passes(end):
     """Every pass up to `end`: raw day logs where they still exist, else the summaries."""
     data = os.path.join(REPORTS, "_data", "paddles")
@@ -100,7 +124,9 @@ def load_passes(end):
         if m and m.group(1) <= end.isoformat():
             logs.append((m.group(2), os.path.join(data, f)))
             have.add(m.group(1))
-    passes = collect(logs, dt.date(2000, 1, 1), end)["pass"]
+    got = collect(logs, dt.date(2000, 1, 1), end)
+    passes = got["pass"]
+    reassign_by_dcs(passes, got.get("dcs", []))
     for p in passes:
         p["case3"] = p.get("case") == "III"  # Paddles writes ", case III" in the pass line (2026-11-06 on)
     summ = os.path.join(REPORTS, "_summary")

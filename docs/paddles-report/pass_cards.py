@@ -65,7 +65,7 @@ def read_logged(days, message, field):
 def match(p, rows):
     """The row for this pass: same callsign, logged within 8 s of the pass line."""
     for cs, t, pts, _ in rows:
-        if cs == p["callsign"].lower() and abs((t - p["t"]).total_seconds()) < 8:
+        if cs == p.get("logcs", p["callsign"]).lower() and abs((t - p["t"]).total_seconds()) < 8:
             return pts
     return None
 
@@ -73,7 +73,7 @@ def match(p, rows):
 def brc_for(p, rows):
     """The carrier's heading logged with this pass's pattern (the BRC), or None."""
     for cs, t, _, o in rows:
-        if cs == p["callsign"].lower() and abs((t - p["t"]).total_seconds()) < 8:
+        if cs == p.get("logcs", p["callsign"]).lower() and abs((t - p["t"]).total_seconds()) < 8:
             return o.get("brc") or None
     return None
 
@@ -351,7 +351,7 @@ def read_context(days):
 
 def context_for(p, rows):
     for cs, t, o in rows:
-        if cs == p["callsign"].lower() and abs((t - p["t"]).total_seconds()) < 8:
+        if cs == p.get("logcs", p["callsign"]).lower() and abs((t - p["t"]).total_seconds()) < 8:
             return o
     return None
 
