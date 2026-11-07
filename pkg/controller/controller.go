@@ -186,6 +186,10 @@ type ATCController struct {
 	rotationHeldLogged string
 
 	allPositions   map[string]*TacviewContact
+	// playerAlias: compact callsign of a player whose Tacview jet carries someone else's stale pilot name -> that jet's
+	// allPositions key; aliasKeys is the reverse (set by RefreshPlayerAliases, read by lookupContact).
+	playerAlias map[string]string
+	aliasKeys   map[string]string
 	allPositionsMu sync.RWMutex
 
 	airfieldCallsign   string
@@ -2169,11 +2173,22 @@ func (c *ATCController) sequencedArrivalResponse(callsign string, s *state.Airfi
 // ("Raider 036"). Direct map lookup misses when those don't match. Caller
 // must hold allPositionsMu (read-locked is enough).
 func (c *ATCController) lookupContact(callsign string) *TacviewContact {
-	if c, ok := c.allPositions[callsign]; ok {
+	// A player who took over a slot keeps the previous pilot's name in Tacview (Bacon, Raider 031, in the jet Tacview
+	// called "Raider 306 | Turbo", 2026-11-06); DCS says who is really in it (RefreshPlayerAliases).
+	if k, ok := c.playerAlias[compactCallsign(callsign)]; ok {
+		if ct, ok := c.allPositions[k]; ok {
+			return ct
+		}
+	}
+	stale := func(k string) bool {
+		w, ok := c.aliasKeys[k]
+		return ok && w != compactCallsign(callsign)
+	}
+	if c, ok := c.allPositions[callsign]; ok && !stale(callsign) {
 		return c
 	}
 	for k, v := range c.allPositions {
-		if strings.EqualFold(k, callsign) {
+		if strings.EqualFold(k, callsign) && !stale(k) {
 			return v
 		}
 	}
@@ -2185,11 +2200,75 @@ func (c *ATCController) lookupContact(callsign string) *TacviewContact {
 		return nil
 	}
 	for k, v := range c.allPositions {
-		if compactCallsign(k) == want {
+		if compactCallsign(k) == want && !stale(k) {
 			return v
 		}
 	}
 	return nil
+}
+
+// PlayerFix is a connected player and where DCS says their jet is.
+type PlayerFix struct {
+	Callsign string // "Raider 031"
+	Lat, Lon float64
+}
+
+// RefreshPlayerAliases matches each player DCS says is flying to a Tacview jet when Tacview has no jet under their
+// name: the pilot name Tacview shows is the one the slot was first flown under, so a pilot who takes over a slot keeps
+// the last pilot's name there. Only players with no jet of their own name are matched, to a jet whose name is no
+// connected player's, nearest first, within 1 NM.
+func (c *ATCController) RefreshPlayerAliases(players []PlayerFix) {
+	c.allPositionsMu.Lock()
+	defer c.allPositionsMu.Unlock()
+	names := map[string]bool{}
+	for _, p := range players {
+		names[compactCallsign(p.Callsign)] = true
+	}
+	type cand struct {
+		want, key string
+		d         float64
+	}
+	var cands []cand
+	for _, p := range players {
+		want := compactCallsign(p.Callsign)
+		own := false
+		for k, ct := range c.allPositions {
+			if compactCallsign(k) == want && time.Since(ct.UpdatedAt) < 60*time.Second {
+				own = true
+				break
+			}
+		}
+		if own {
+			continue
+		}
+		for k, ct := range c.allPositions {
+			if !strings.HasPrefix(ct.ObjType, "Air") || strings.Contains(ct.ObjType, "Rotor") || time.Since(ct.UpdatedAt) > 30*time.Second || names[compactCallsign(k)] {
+				continue
+			}
+			if d := haversineNm(orb.Point{p.Lon, p.Lat}, orb.Point{ct.Lon, ct.Lat}); d <= 1.0 {
+				cands = append(cands, cand{want, k, d})
+			}
+		}
+	}
+	sort.Slice(cands, func(i, j int) bool { return cands[i].d < cands[j].d })
+	alias, keys := map[string]string{}, map[string]string{}
+	for _, cd := range cands {
+		if _, ok := alias[cd.want]; ok {
+			continue
+		}
+		if _, ok := keys[cd.key]; ok {
+			continue
+		}
+		alias[cd.want], keys[cd.key] = cd.key, cd.want
+	}
+	c.playerAlias, c.aliasKeys = alias, keys
+}
+
+// PlayerAlias is the Tacview key standing in for this player's jet, for logging; "" when none.
+func (c *ATCController) PlayerAlias(callsign string) string {
+	c.allPositionsMu.RLock()
+	defer c.allPositionsMu.RUnlock()
+	return c.playerAlias[compactCallsign(callsign)]
 }
 
 // compactCallsign lowercases a callsign and drops spaces and dashes.
