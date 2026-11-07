@@ -115,7 +115,7 @@ def stack_view(rec, mates, brc, name, carrier=None):
         s.append(pc.text(cx - nm * k, 44, "%d NM" % nm, 13 if major else 11, "#8b949e" if major else "#58616b", "middle"))
     x30, y30 = pt(radial, RANGE)
     s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#58a6ff" stroke-width="1.4" stroke-dasharray="6 5" opacity=".7"/>' % (cx, cy, x30, y30))
-    s.append(pc.text(x30 + 6, y30 - 8, "%03d radial" % (round(radial) % 360 or 360), 13, "#58a6ff", "start"))
+    s.append(pc.text(x30 + 6, y30 + 24, "%03d radial" % (round(radial) % 360 or 360), 13, "#58a6ff", "start"))
     nx, ny = 52, 118  # north arrow
     a = math.radians(off)
     s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#8b949e" stroke-width="2"/>' % (nx, ny, nx + 26 * math.sin(a), ny - 26 * math.cos(a)))
@@ -185,7 +185,8 @@ def commence_view(rec, mates, name):
         x, y = px(d), py(ang * 1000)
         s.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x, y, YEL))
         dy = -30 if n % 2 == 0 else 40
-        s.append(pc.note(x + 10, y + dy, "%s A%d %s" % (kind, ang, t(when)), 14, "start") + pc.arrow(x + 12, y + dy + (6 if dy < 0 else -16), x + 3, y + (-6 if dy < 0 else 6)))
+        left = x > PW - 170  # near the right edge the note goes to the left of the point so it is not clipped
+        s.append(pc.note(x - 10 if left else x + 10, y + dy, "%s A%d %s" % (kind, ang, t(when)), 14, "end" if left else "start") + pc.arrow(x - 12 if left else x + 12, y + dy + (6 if dy < 0 else -16), x + 3, y + (-6 if dy < 0 else 6)))
     if not tr and not real:
         s.append(pc.text(PW / 2, PH / 2, "no radar positions recorded for this approach", 15, MUTED, "middle"))
     s.append(pc.text(PW - 8, 18, "from the side, flown (Tacview)" if tr else "from the side, logged radar fixes", 12, MUTED, "end"))
