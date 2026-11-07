@@ -420,9 +420,9 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
             msg = ('<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, PH)
                    + pc.text(PW / 2, PH / 2 - 8, "No Marshal check-in for this approach", 18, "#c9d1d9", "middle")
                    + pc.text(PW / 2, PH / 2 + 18, "the pattern is the flown Paddles track", 14, MUTED, "middle") + "</svg>")
-            return _page(badge, label, body.replace("(example position: the carrier is placed off the coast until Marshal logs its real position)", ""), "Pattern View", "Marshal",
+            return _page(badge, label, body.replace("(example position: the carrier is placed off the coast until Marshal logs its real position)", ""), "Pattern View - Case %s" % rec["case"], "Marshal",
                          case1_pattern_view(rec, mates, brc, name), msg)
-        return _page(badge, label, body, "Marshal View", "Stack View", case1_stack_view(rec, brc, name, carrier), case1_pattern_view(rec, mates, brc, name))
+        return _page(badge, label, body, "Marshal View", "Stack View - Case %s" % (rec["case"] or "I"), case1_stack_view(rec, brc, name, carrier), case1_pattern_view(rec, mates, brc, name))
     lines = ['Nimitz Class "ABE" | Marshal | %s server' % rec["rig"], rec["checkin"].strftime("%A %B %d, %Y"),
              *([weather] if weather else []), "BRC %s | Case %s" % ("%03d" % (round(brc) % 360 or 360) if brc is not None else "-", rec["case"] or "III"), "",
              "Marshal radial %03d, %d DME, angels %d, %s" % (round(rec["radial"]) % 360 or 360, (rec["angels"] or 6) + 15, rec["angels"] or 6, eat_line),
@@ -431,7 +431,7 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
              result or "", "(no radar positions were logged for this approach)" if not rec["fixes"] and not rec.get("track") else "",
              "(example position: the carrier is placed off the coast until Marshal logs its real position)" if carrier == EXAMPLE_CARRIER else ""]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
-    return _page(badge, label, body, "Stack View", "Commence View", stack_view(rec, mates, brc, name, carrier), commence_view(rec, mates, name))
+    return _page(badge, label, body, "Stack View - Case %s" % (rec["case"] or "III"), "Commence View", stack_view(rec, mates, brc, name, carrier), commence_view(rec, mates, name))
 
 
 def _page(badge, label, body, tab1, tab2, left, right):
