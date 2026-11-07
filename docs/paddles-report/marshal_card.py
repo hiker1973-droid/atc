@@ -397,7 +397,7 @@ def case1_side_view(rec, mates, name):
 
 
 def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None):
-    case1 = rec["case"] != "III"
+    case1 = rec["case"] != "III" or rec.get("no_marshal")
     badge = "Case " + (rec["case"] or "III")
     t = lambda x: x.strftime("%H:%M") if x else "-"
     eat_line = "approach time %s" % t(rec["eat"]) + (" (re-issued: it had passed)" if rec["eat_missed"] else "")
@@ -416,6 +416,12 @@ def card_html(rec, mates, label, name, brc, ctx=None, result=None, carrier=None)
                     "Checked in %s%s" % (t(rec["checkin"]), " at %d NM on the %03d bearing, angels %d" % (fix[2], fix[3], fix[4] or 0) if fix else "")]), "",
                  result or "", "(example position: the carrier is placed off the coast until Marshal logs its real position)" if carrier == EXAMPLE_CARRIER else ""]
         body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
+        if rec.get("no_marshal"):  # no check-in, so no Marshal position: the pattern the Paddles track recorded, and nothing planned
+            msg = ('<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">' % (PW, PH)
+                   + pc.text(PW / 2, PH / 2 - 8, "No Marshal check-in for this approach", 18, "#c9d1d9", "middle")
+                   + pc.text(PW / 2, PH / 2 + 18, "the pattern is the flown Paddles track", 14, MUTED, "middle") + "</svg>")
+            return _page(badge, label, body.replace("(example position: the carrier is placed off the coast until Marshal logs its real position)", ""), "Pattern View", "Marshal",
+                         case1_pattern_view(rec, mates, brc, name), msg)
         return _page(badge, label, body, "Marshal View", "Stack View", case1_stack_view(rec, brc, name, carrier), case1_pattern_view(rec, mates, brc, name))
     lines = ['Nimitz Class "ABE" | Marshal | %s server' % rec["rig"], rec["checkin"].strftime("%A %B %d, %Y"),
              *([weather] if weather else []), "BRC %s | Case %s" % ("%03d" % (round(brc) % 360 or 360) if brc is not None else "-", rec["case"] or "III"), "",
@@ -488,6 +494,16 @@ def build(rec, c3, events, passes, carrier=None):
     return card_html(rec, mates, names.get(key, rec["callsign"]), name, rec["brc"], ctx, result, carrier or rec.get("carrier") or EXAMPLE_CARRIER)
 
 
+def pattern_only_rec(p):
+    """A Marshal-card record for a landing nobody checked in for: the pass is all there is."""
+    rows = pc.read_logged({p["t"].date().isoformat()}, "Paddles: pass pattern", "pattern")
+    brc = pc.brc_for(p, rows)
+    return {"rig": p["rig"], "callsign": p["callsign"], "checkin": p["t"], "position": None, "angels": None, "eat": None,
+            "case": "III" if p.get("case3") else "I", "radial": None, "brc": brc, "fixes": [], "carrier": None, "ceiling": None, "vis": None,
+            "hold": None, "commence": None, "platform": None, "dirty": None, "handoff": None, "eat_missed": 0, "misses": 0,
+            "pass": p, "no_marshal": True}
+
+
 def post_cards(pngs):
     """Post each card as a new message to the Marshal cards' own channel (the pass cards' channel if there is none)."""
     f = next((x for x in (gp.MARSHAL_WEBHOOK_FILE, gp.CARDS_WEBHOOK_FILE) if os.path.exists(x)), gp.WEBHOOK_FILE)
@@ -509,15 +525,37 @@ def post_new():
         gp.fetch_today((dt.date.today() - dt.timedelta(days=back)).isoformat())
     events = mr.read_events(3)
     recs = mr.approaches(events)
-    mr.link_passes(recs, gp.load_passes(dt.date.today()))
+    passes_ = gp.load_passes(dt.date.today())
+    mr.link_passes(recs, passes_)
     done_ = {}
     first = not os.path.exists(POSTED)
     if not first:
         done_ = json.load(open(POSTED, encoding="utf-8"))
-    now = dt.datetime.now(recs[0]["checkin"].tzinfo) if recs else dt.datetime.now()
+    now = dt.datetime.now().astimezone()
     c3 = [r for r in recs if r["case"] == "III" and r.get("radial") is not None]
-    c1 = [r for r in recs if r["case"] in ("I", "II") and r["fixes"]]
+    c1 = [r for r in recs if r["case"] in ("I", "II") and (r["fixes"] or r.get("pass"))]  # a check-in with no radar fix still has its pass
     out = []
+    # a landing with no Marshal approach behind it (the pilot never checked in, or Marshal did not hear it): a card from the
+    # Paddles pattern alone. The first run records what exists, so the backlog is not posted.
+    linked = {id(r["pass"]) for r in recs if r.get("pass")}
+    names_ = {cs for cs, _, _, _ in gp.roster() if cs}
+    canon_ = {a: cs for cs, _, _, al in gp.roster() for a in al if cs}
+    started = "_pass_only_started" in done_
+    done_["_pass_only_started"] = now.isoformat()
+    for p_ in sorted(passes_, key=lambda p: p["t"]):
+        if not p_.get("rig") or p_["outcome"] not in ("trap", "bolter", "wave off") or id(p_) in linked:
+            continue
+        if p_["t"].date() < dt.date.today() - dt.timedelta(days=1) or canon_.get(p_["callsign"].lower(), p_["callsign"].lower()) not in names_:
+            continue
+        key = "pass|%s|%s|%s" % (p_["rig"], p_["callsign"].lower(), p_["t"].isoformat())
+        if key in done_ or now - p_["t"] < dt.timedelta(minutes=3):
+            continue
+        done_[key] = p_["t"].isoformat()
+        if not started or first:
+            continue
+        rec = pattern_only_rec(p_)
+        png = gp.screenshot(build(rec, [rec], events, passes_), 1010, 1760)
+        out.append(("Paddles pattern | %s | %s | Case %s" % (rec["callsign"], p_["t"].strftime("%Y-%m-%d %H:%M"), rec["case"]), png))
     for group in (c3, c1):
         for rec in group:
             key = "%s|%s|%s" % (rec["rig"], rec["callsign"].lower(), rec["checkin"].isoformat())
@@ -527,7 +565,7 @@ def post_new():
             done_[key] = rec["checkin"].isoformat()
             if first:
                 continue
-            png = gp.screenshot(build(rec, group, events, gp.load_passes(dt.date.today())), 1010, 1760)
+            png = gp.screenshot(build(rec, group, events, passes_), 1010, 1760)
             out.append(("Marshal | %s | %s | Case %s" % (rec["callsign"], rec["checkin"].strftime("%Y-%m-%d %H:%M"), rec["case"]), png))
     if out:
         post_cards(out)
