@@ -24,6 +24,7 @@ import pilot_stats as ps  # noqa: E402
 import recovery_summary as rs  # noqa: E402
 
 MIN_FOR_HIGHLIGHT = 3  # passes in the period (and before it, for "most improved"); 5 for the month
+WEEKLY_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-weekly-message.txt")  # the weekly message's id
 MONTHLY_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-monthly-message.txt")  # the monthly message's id
 
 
@@ -145,12 +146,8 @@ def main():
     open(out, "wb").write(png)
     print(summary, "->", out)
     if "--post" in sys.argv:
-        hook = gp.reports_hook()
-        if monthly:  # one message, edited each week
-            print(gp.post(hook, png, summary, MONTHLY_FILE))
-        else:
-            gp.send(hook + "?wait=true", "POST", png, summary)
-            print("posted")
+        # Each report is ONE message in the weekly/monthly channel, edited in place (the old picture is replaced).
+        print(gp.post(gp.weekly_hook(), png, summary, MONTHLY_FILE if monthly else WEEKLY_FILE))
     return 0
 
 
