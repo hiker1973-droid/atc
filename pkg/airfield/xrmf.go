@@ -41,8 +41,13 @@ var XRMF = &Airfield{
 	},
 	RunwayPairs: []RunwayPair{
 		{
-			Primary:    Runway{Designator: "08", MagneticHeading: 83.3, ThresholdLatLon: orb.Point{44.5914, 43.7918}},
-			Reciprocal: Runway{Designator: "26", MagneticHeading: 263.3, ThresholdLatLon: orb.Point{44.6204, 43.7916}},
+			// 2026-11-07: thresholds rotated about the runway midpoint by the Caucasus map's grid convergence
+			// ((lon - 33E) * sin(lat), 8.0 deg here). The points had been laid off the DCS yaw; DCS's grid is that
+			// far off true north, which at Senaki (refit from 1648 Tacview ground-roll fixes) put the old points
+			// 60-80 m off the runway. The same method reproduces the Senaki refit's bearing (100.7). NOT yet checked
+			// against a Tacview recording at this field.
+			Primary:    Runway{Designator: "08", MagneticHeading: 83.3, ThresholdLatLon: orb.Point{44.59156, 43.79327}},
+			Reciprocal: Runway{Designator: "26", MagneticHeading: 263.3, ThresholdLatLon: orb.Point{44.62024, 43.79013}},
 		},
 	},
 }

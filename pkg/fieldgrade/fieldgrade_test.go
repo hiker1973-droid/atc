@@ -185,18 +185,20 @@ func TestProfiles(t *testing.T) {
 		{"FA-18C_hornet", 700, 250, 6, "(OK): LNGTD"},   // long over 2000 ft
 		{"F-16C_50", 700, 250, 11, "OK: (LNG)TD"},       // Viper long is over 2500 ft; 700 m = 2300 ft
 		{"FA-18C_hornet", 300, 700, 6, "_OK_"},          // Hornet sink OK to 800 fpm
-		{"F-16C_50", 300, 450, 11, "OK: (HARD)"},        // Viper over 300 is firm...
-		{"F-16C_50", 300, 700, 11, "(OK): HARD"},        // ...over 600 is hard
+		{"F-16C_50", 300, 500, 11, "OK: (HARD)"},        // Viper over 450 is firm...
+		{"F-16C_50", 300, 800, 11, "(OK): HARD"},        // ...over 700 is hard
 		{"F-16C_50", 300, 250, 16, "(OK): TAIL"},        // pitch over 15: tail strike
 		{"FA-18C_hornet", 300, 250, 16, "_OK_"},         // not graded for the Hornet
 		{"F-16C_50", 30, 250, 11, "(OK): SHTTD"},        // under 200 ft short
+		{"F-14B", 500, 700, 6, "_OK_"},                   // Tomcat: touchdown to 2000 ft, sink as the Hornet
+		{"F-14B", 700, 700, 6, "OK: (LNG)TD"},   // 2300 ft: a little long
 	}
 	for _, c := range cases {
 		if got := td(c.model, c.past, c.sink, c.pitch); got != c.want {
 			t.Errorf("%s %.0f m %.0f fpm %.0f deg: %q, want %q", c.model, c.past, c.sink, c.pitch, got, c.want)
 		}
 	}
-	if ProfileFor("F-16C_50").GlideDeg != 2.75 || ProfileFor("FA-18C_hornet").GlideDeg != 3.0 || ProfileFor("").Name != "F/A-18C" {
+	if ProfileFor("F-14B").Name != "F-14" || ProfileFor("F-16C_50").GlideDeg != 2.75 || ProfileFor("FA-18C_hornet").GlideDeg != 3.0 || ProfileFor("").Name != "F/A-18C" {
 		t.Error("profile selection")
 	}
 }

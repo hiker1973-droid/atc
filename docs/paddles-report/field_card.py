@@ -20,6 +20,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import greenie_post as gp  # noqa: E402
+import pass_cards as pc  # noqa: E402  (weather_line)
 LOGO = "file:///" + os.path.join(os.path.dirname(HERE), "vsfg7_patch.png").replace("\\", "/")
 NM_FT = 6076.12
 GS = 3.0
@@ -135,7 +136,9 @@ def card_html(r, trk, title, when, footer):
     fill, ink = badge_colours(r["grade"])
     segs = "".join("<tr><td>%s</td><td>%+.1f&deg;</td><td>%s</td><td>%s</td><td>%.0f fpm</td></tr>" % (
         s["name"], s["gp"], ("%+.1f&deg;" % s["lu"]) if s.get("lu") is not None else "-", ("%.1f&deg;" % s["aoa"]) if s.get("aoa") is not None else "-", s["sink"]) for s in r["segs"])
-    lines = ["%s | %s" % (r["field"], r["map"]), when, "%s | rwy %s | %s" % (r["model"], r["runway"], r["outcome"]), "",
+    wx = r.get("wx") or {}
+    daynight = ("Night" if wx.get("isNight") else "Day") if "isNight" in wx else ""
+    lines = ["%s | %s" % (r["field"], r["map"]), when, *([pc.weather_line(wx)] if pc.weather_line(wx) else []), " | ".join(b for b in (r["model"], "rwy " + r["runway"], r["outcome"], daynight) if b), "",
              "Touchdown %d m past the threshold, %+d m %s of centreline, %d fpm" % (
                  r["td_past"], abs(r["td_right"]), "right" if r["td_right"] >= 0 else "left", r["td_sink"]), "", r["remark"]]
     body = "".join("<div>%s</div>" % (html.escape(x) if x else "&nbsp;") for x in lines)
@@ -240,7 +243,7 @@ def pilot_names():
 
 
 def day_passes(date):
-    """(time, callsign, summary, track) for each graded Venom / Raider landing in the Senaki Tower day logs of the rigs."""
+    """(time, callsign, summary, track, weather) for each graded Venom / Raider landing in the Senaki Tower day logs of the rigs."""
     out = []
     for rig, host in FIELD_RIGS:
         try:
@@ -260,9 +263,10 @@ def day_passes(date):
             if j.get("message") == "Approach graded" and j["callsign"].startswith(FIELD_FLIGHTS) and "landed" in j["summary"]:
                 t = dt.datetime.fromisoformat(j["time"])
                 # the track line is logged right after its graded line
-                tk = next((x["track"] for x in tracks if x["callsign"] == j["callsign"] and
-                           abs((dt.datetime.fromisoformat(x["time"]) - t).total_seconds()) < 5), "")
-                out.append((j["time"], j["callsign"], j["summary"], tk))
+                x = next((x for x in tracks if x["callsign"] == j["callsign"] and
+                          abs((dt.datetime.fromisoformat(x["time"]) - t).total_seconds()) < 5), {})
+                wx = {k: x[k] for k in ("windDir", "windKts", "ceilingFt", "visNm", "altInHg", "isNight") if k in x}
+                out.append((j["time"], j["callsign"], j["summary"], x.get("track", ""), wx))
     return sorted(out)
 
 
@@ -292,14 +296,15 @@ def post_field_cards(date, dry=False):
         done = set()
     names = pilot_names()
     n = 0
-    for when, cs, summary, track in day_passes(date):
+    for when, cs, summary, track, wx in day_passes(date):
         key = "%s|%s" % (when, cs)
         if key in done:
             continue
         _, r, trk = from_log(summary, track)
+        r["wx"] = wx
         t = dt.datetime.fromisoformat(when)
         title = "%s | %s" % (cs, names[cs.lower()]) if cs.lower() in names else cs
-        foot = "Senaki field landings - " + ("segment averages only: logged before tracks" if r["coarse"] else "track from the tower")
+        foot = "Senaki field landings - graded to the %s standard - " % r["model"] + ("segment averages only: logged before tracks" if r["coarse"] else "track from the tower")
         png = gp.screenshot(card_html(r, trk, title, t.strftime("%A %B %d, %Y %H:%M:%S") + " (real time)", foot), 960, 1730)
         if dry:
             open(os.path.join(os.path.expanduser("~"), "field-card-%s.png" % cs.replace(" ", "")), "wb").write(png)

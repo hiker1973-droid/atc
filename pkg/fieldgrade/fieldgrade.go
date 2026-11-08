@@ -60,15 +60,26 @@ var HornetProfile = Profile{Name: "F/A-18C", GlideDeg: 3.0, AimM: 300, AoA: 8.1,
 	TDOKLo: 500 * ft, TDOKHi: 1500 * ft, TDLong: 2000 * ft, TDShort: 200 * ft, SinkOK: 800, SinkHard: 1000}
 
 // Viper: 11 deg AoA (10-12 OK, 9-13 fair), 2.5-3 deg (graded on 2.75), aim 500-1000 ft, touchdown 500-2000 ft, long over 2500 ft,
-// short under 200 ft, sink OK under 300 and hard over 600, tail strike over 15 deg of pitch.
+// short under 200 ft, sink OK under 450 and firm over that, hard over 700 (the reference's 300/600 was too strict for a first
+// standard: both Venoms were over it - operator 2026-11-07), tail strike over 15 deg of pitch.
 var ViperProfile = Profile{Name: "F-16C", GlideDeg: 2.75, AimM: 225, AoA: 11, AoAOK: 1, AoAFair: 2, GPOK: 0.5, GPFair: 1.0,
-	TDOKLo: 500 * ft, TDOKHi: 2000 * ft, TDLong: 2500 * ft, TDShort: 200 * ft, SinkOK: 300, SinkHard: 600, TailStrikeDeg: 15}
+	TDOKLo: 500 * ft, TDOKHi: 2000 * ft, TDLong: 2500 * ft, TDShort: 200 * ft, SinkOK: 450, SinkHard: 700, TailStrikeDeg: 15}
 
-// ProfileFor is the profile for a DCS aircraft type ("F-16C_50", "FA-18C_hornet"): the Viper's for an F-16, the Hornet's for
-// anything else (the original standard).
+// Tomcat: PROVISIONAL - the landing reference has no F-14 section (operator 2026-11-07 asked for one). On-speed AoA taken as
+// 10.5 deg (the "15 units" approach), 3 deg to 300 m, touchdown and sink as the Hornet's (a carrier gear, no flare). Tighten from
+// real Tomcat passes.
+var F14Profile = Profile{Name: "F-14", GlideDeg: 3.0, AimM: 300, AoA: 10.5, AoAOK: 0.8, AoAFair: 1.5, GPOK: 0.5, GPFair: 1.0,
+	TDOKLo: 500 * ft, TDOKHi: 2000 * ft, TDLong: 2500 * ft, TDShort: 200 * ft, SinkOK: 800, SinkHard: 1000}
+
+// ProfileFor is the profile for a DCS aircraft type ("F-16C_50", "FA-18C_hornet", "F-14B"): the Viper's for an F-16, the Tomcat's
+// for an F-14, the Hornet's for anything else (the original standard).
 func ProfileFor(model string) Profile {
-	if strings.Contains(strings.ToLower(model), "f-16") {
+	m := strings.ToLower(model)
+	switch {
+	case strings.Contains(m, "f-16"):
 		return ViperProfile
+	case strings.Contains(m, "f-14"):
+		return F14Profile
 	}
 	return HornetProfile
 }

@@ -28,8 +28,13 @@ var UG5X = &Airfield{
 	},
 	RunwayPairs: []RunwayPair{
 		{
-			Primary:    Runway{Designator: "07", MagneticHeading: 63.0, ThresholdLatLon: orb.Point{41.8637, 41.9285}},
-			Reciprocal: Runway{Designator: "25", MagneticHeading: 243.0, ThresholdLatLon: orb.Point{41.8892, 41.9357}},
+			// 2026-11-07: thresholds rotated about the runway midpoint by the Caucasus map's grid convergence
+			// ((lon - 33E) * sin(lat), 5.9 deg here). The points had been laid off the DCS yaw; DCS's grid is that
+			// far off true north, which at Senaki (refit from 1648 Tacview ground-roll fixes) put the old points
+			// 60-80 m off the runway. The same method reproduces the Senaki refit's bearing (100.7). NOT yet checked
+			// against a Tacview recording at this field.
+			Primary:    Runway{Designator: "07", MagneticHeading: 63.0, ThresholdLatLon: orb.Point{41.86327, 41.92951}},
+			Reciprocal: Runway{Designator: "25", MagneticHeading: 243.0, ThresholdLatLon: orb.Point{41.88963, 41.93469}},
 		},
 	},
 }

@@ -135,14 +135,21 @@ func (t *fieldTacview) handleLine(line string) {
 	}
 }
 
-func logFieldGrade(r fieldgrade.Result) {
+func logFieldGrade(icao string, r fieldgrade.Result) {
 	log.Info().Str("callsign", r.Callsign).Str("runway", r.Runway).Str("grade", r.Grade).
 		Str("summary", r.Summary()).Msg("Approach graded")
-	// The flown path and runway course, for the field pass card (docs/paddles-report/field_card.py).
-	if r.Track != "" {
-		log.Info().Str("callsign", r.Callsign).Str("runway", r.Runway).Float64("course", r.CourseDeg).
-			Str("track", r.Track).Msg("Approach track")
+	// The flown path, the runway course and the field's weather, for the field pass card (docs/paddles-report/field_card.py).
+	if r.Track == "" {
+		return
 	}
+	go func() { // the weather is a local HTTP call: keep it off the Tacview reader
+		ev := log.Info().Str("callsign", r.Callsign).Str("runway", r.Runway).Float64("course", r.CourseDeg).Str("track", r.Track)
+		if w, ok := fetchTowerWeather(icao); ok {
+			ev = ev.Float64("windDir", w.WindDir).Float64("windKts", w.WindKts).Float64("ceilingFt", w.CeilFt).
+				Float64("visNm", w.VisNm).Float64("altInHg", w.AltInHg).Bool("isNight", w.IsNight)
+		}
+		ev.Msg("Approach track")
+	}()
 }
 
 // runFieldGrade has its own Tacview connection, like Paddles.
@@ -171,7 +178,7 @@ func runFieldGrade(ctx context.Context, addr string, af *airfield.Airfield) {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		conn.Write([]byte("XtraLib.Stream.0\nTacview.RealTimeTelemetry.0\nvSFG7-Approach\n0\x00"))
 		tr := fieldgrade.NewTracker(f)
-		tr.Done = logFieldGrade
+		tr.Done = func(r fieldgrade.Result) { logFieldGrade(af.ICAO, r) }
 		tv := newFieldTacview(tr)
 		sc := bufio.NewScanner(conn)
 		sc.Buffer(make([]byte, 65536), 65536)
