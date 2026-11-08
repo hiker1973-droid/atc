@@ -32,6 +32,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
 POLL_S = 15
+MARSHAL_S = 10 * 60 + 30  # post a Marshal card this long after a pass (marshal_card.py SETTLE is 10 min after hand-off)
 QUIET_S = 20 * 60 + 30  # a recovery is over when no pass has come for this long
 WEEK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-weekly.json")
 SETTLE_S = 8  # the pass line is the last of the pass's log lines; give the rest a moment to be written
@@ -113,7 +114,7 @@ def main():
             except (subprocess.SubprocessError, OSError):
                 pass
             last_pass, pending = time.time(), True
-        if pending and time.time() - last_pass >= QUIET_S:
+        if pending and time.time() - last_pass >= MARSHAL_S:
             # (the recovery summary post to the Trap house was dropped 2026-11-06, operator: not needed)
             run("marshal_card.py", "--post-new")  # a Marshal card for each finished approach
             pending = False
