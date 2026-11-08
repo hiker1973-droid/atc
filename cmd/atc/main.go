@@ -2789,6 +2789,8 @@ func txIntensity(callsign string) string {
 	switch {
 	case callsign == "OMDM-MSH" || callsign == "OMDM-DKB":
 		return flagCarrierRadioIntensity
+	case isTankerCall(callsign):
+		return flagTowerRadioIntensity
 	case strings.HasSuffix(callsign, "-ATC"):
 		return flagTowerRadioIntensity
 	case strings.HasSuffix(callsign, " ATIS"):
@@ -2803,9 +2805,17 @@ func txIntensity(callsign string) string {
 // txFX is the extra static for a transmitting callsign. ATIS is a recorded loop and stays as its tier is; the JTAC manpack
 // set is already the roughest, so it gets only the grit and tail; Paddles' calls are short and must be heard first time,
 // so the same. Every other live role gets the full amount.
+// isTankerCall is true for the Texaco and Shell SRS names (Texaco-1-1, Shell-2-1).
+func isTankerCall(callsign string) bool {
+	return strings.HasPrefix(callsign, "Texaco-") || strings.HasPrefix(callsign, "Shell-")
+}
+
 func txFX(callsign string) radioFX {
 	fx := radioFX{NoiseMul: flagRadioNoiseMul, Crush: flagRadioCrush, TailAdd: flagRadioTail}
 	switch {
+	case isTankerCall(callsign):
+		// Operator 2026-11-08: Texaco and Shell get more static than the other roles ("B" clip).
+		return radioFX{NoiseMul: 3, Crush: 0.55, TailAdd: 0.5}
 	case strings.HasSuffix(callsign, " ATIS"):
 		return radioFX{}
 	case flagLSOName != "" && callsign == flagLSOName,
