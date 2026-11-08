@@ -429,8 +429,7 @@ def card_html(p, label, pts, coarse, pat=None, brc=None, ctx=None, stats_line=""
     fill, ink, name = gp.COLOURS[key]
     badge = "WO" if key in ("WOFD", "WO") else ("B" if key == "B" else p["grade"] or key)
     comment = (p.get("comments") or "").strip()
-    if p.get("wire"):
-        comment = (comment + " WIRE# %d" % p["wire"]).strip()
+    wire_pill = ('<div class="wr">%d WIRE</div>' % p["wire"]) if p.get("wire") else ""  # the wire goes on the top line, beside the grade
     model = (p.get("model") or "").replace("FA-18C_hornet", "F/A-18C").replace("_", " ")
     case = ("Case " + p["case"]) if p.get("case") else ""
     wind = (ctx["windDir"], ctx.get("windKts") or 0, brc) if ctx and ctx.get("windDir") is not None and brc is not None else None
@@ -456,15 +455,15 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
 .w{margin:8px;border:1px solid #30363d;background:#161b22;border-radius:6px;padding:14px 16px;width:1696px}
 .top{display:flex;align-items:center;gap:18px;margin-bottom:10px}
 .b{min-width:96px;height:58px;line-height:58px;text-align:center;border-radius:7px;font:700 32px Arial,sans-serif;background:%s;color:%s;padding:0 14px}
-.n{font:700 28px Arial,sans-serif;color:#e6edf3}.cs{font:700 24px Arial,sans-serif;color:#fff;background:#0a8fd8;border-radius:7px;padding:8px 16px}.logo{margin-left:auto;height:92px;width:auto;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255,255,255,.55))}
+.n{font:700 28px Arial,sans-serif;color:#e6edf3}.cs{font:700 24px Arial,sans-serif;color:#fff;background:#0a8fd8;border-radius:7px;padding:8px 16px}.wr{font:700 30px Arial,sans-serif;color:#0d1117;background:#e8b400;border-radius:7px;padding:10px 16px}.logo{margin-left:auto;height:92px;width:auto;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255,255,255,.55))}
 .ps{display:flex;gap:16px}.pn{flex:none;width:840px;background:#0d1117;border:1px solid #30363d;border-radius:6px;overflow:hidden}
 .tab{background:#1f6feb;color:#fff;font:700 22px Arial,sans-serif;text-align:center;padding:9px 0}
 .info{margin-top:14px;font-size:20px;line-height:1.35;color:#e6edf3}
 .ft{font:12px Arial,sans-serif;color:#8b949e;margin-top:8px}
-</style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div>%s<img class="logo" src="%s"></div>
+</style></head><body><div class="w"><div class="top"><div class="b">%s</div>%s<div class="n">%s</div>%s<img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Groove View</div>%s%s</div><div class="pn"><div class="tab">Approach View</div>%s</div></div>
 <div class="info"><div>%s</div></div><div class="ft">VMFA-225 Greenieboard &middot; %s</div></div></body></html>""" % (
-        fill, ink, html.escape(badge), html.escape(label), ("<div class=\"cs\">%s</div>" % html.escape(case.upper())) if case else "", LOGO, groove_side(pts, p.get("wire")), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind, p.get("wire")), approach_view(pat, brc, wind, p.get("wire")), body,
+        fill, ink, html.escape(badge), wire_pill, html.escape(label), ("<div class=\"cs\">%s</div>" % html.escape(case.upper())) if case else "", LOGO, groove_side(pts, p.get("wire")), groove_top(pts, (p.get("pattern") or {}).get("groove", (None,))[0], wind, p.get("wire")), approach_view(pat, brc, wind, p.get("wire")), body,
         "track from Paddles" if not coarse else "coarse card")
 
 
