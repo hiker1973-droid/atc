@@ -232,6 +232,8 @@ func (t *Tracker) finish(tr *track) {
 		k++
 	}
 	r := t.Analyze(tr.cs, tr.model, tr.end, tr.buf[k:], tr.landed, tr.airborne)
+	r.Track = t.TrackString(tr.end, tr.buf[k:])
+	r.CourseDeg = t.F.Ends[tr.end].CourseDeg
 	if t.Done != nil {
 		t.Done(r)
 	}
@@ -285,6 +287,10 @@ type Result struct {
 	LowestFt  float64
 	Samples   int
 	Start, At time.Time
+	// Track is the flown path for the pass card (see TrackString); CourseDeg is the true course of
+	// the runway end flown to.
+	Track     string
+	CourseDeg float64
 }
 
 // Analyze grades one pass over its samples. landed is when he was first on
@@ -580,6 +586,42 @@ func grade(r Result) string {
 		g = "_OK_"
 	}
 	return with(g)
+}
+
+// maxTrackPoints caps the logged track so a long pass stays one short log line.
+const maxTrackPoints = 120
+
+// TrackString is the pass for the pass card: up to 120 points of
+// "metres before the threshold:feet AGL:metres right of the centreline:ground speed kt", comma-separated,
+// from 2 nm out to 600 m down the runway (negative metres = over the runway). Height is above the runway,
+// so a jet on its wheels reads 0.
+func (t *Tracker) TrackString(endIdx int, buf []Sample) string {
+	e := t.F.Ends[endIdx]
+	type pt struct{ before, ft, right, kts float64 }
+	var pts []pt
+	for i, s := range buf {
+		before, right := e.rel(s.Lat, s.Lon)
+		if before > 2*nm || before < -600 {
+			continue
+		}
+		kts := 0.0
+		if i > 0 {
+			kts = groundSpeed(buf[i-1], s) * 1.94384
+		}
+		pts = append(pts, pt{before, math.Max(0, t.height(s)*3.28084), right, kts})
+	}
+	if len(pts) == 0 {
+		return ""
+	}
+	stride := (len(pts) + maxTrackPoints - 1) / maxTrackPoints
+	var b strings.Builder
+	for i := 0; i < len(pts); i += stride {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		fmt.Fprintf(&b, "%.0f:%.0f:%.0f:%.0f", pts[i].before, pts[i].ft, pts[i].right, pts[i].kts)
+	}
+	return b.String()
 }
 
 // Summary is the one-line log record the daily report reads.

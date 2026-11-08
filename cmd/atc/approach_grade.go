@@ -138,6 +138,11 @@ func (t *fieldTacview) handleLine(line string) {
 func logFieldGrade(r fieldgrade.Result) {
 	log.Info().Str("callsign", r.Callsign).Str("runway", r.Runway).Str("grade", r.Grade).
 		Str("summary", r.Summary()).Msg("Approach graded")
+	// The flown path and runway course, for the field pass card (docs/paddles-report/field_card.py).
+	if r.Track != "" {
+		log.Info().Str("callsign", r.Callsign).Str("runway", r.Runway).Float64("course", r.CourseDeg).
+			Str("track", r.Track).Msg("Approach track")
+	}
 }
 
 // runFieldGrade has its own Tacview connection, like Paddles.

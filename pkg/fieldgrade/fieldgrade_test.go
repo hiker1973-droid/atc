@@ -1,6 +1,7 @@
 package fieldgrade
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -17,6 +18,8 @@ func senaki() Field {
 // path gives the height above the runway (m) at metres before the threshold;
 // right the offset from the centreline. The jet touches down where path
 // reaches 0 and rolls out at 3 m/s^2.
+var flyModel = "FA-18C_hornet"
+
 func fly(t *testing.T, path, right func(before float64) float64) []Result {
 	t.Helper()
 	f := senaki()
@@ -41,7 +44,7 @@ func fly(t *testing.T, path, right func(before float64) float64) []Result {
 			v -= 3 * 0.2
 		}
 		lat, lon := pos(before, right(before))
-		tr.Update("Raider 302", "FA-18C_hornet", Sample{At: at, Lat: lat, Lon: lon, AltM: ground + h, PitchDeg: 8.1 - 3, HasPitch: true})
+		tr.Update("Raider 302", flyModel, Sample{At: at, Lat: lat, Lon: lon, AltM: ground + h, PitchDeg: 8.1 - 3, HasPitch: true})
 		before -= v * 0.2
 		at = at.Add(200 * time.Millisecond)
 	}
@@ -141,4 +144,24 @@ func TestDepartureIgnored(t *testing.T) {
 	if n != 0 {
 		t.Errorf("departure graded %d times", n)
 	}
+}
+
+// A Viper landing at Senaki 09 logs a track the pass card can draw.
+func TestTrackString(t *testing.T) {
+	flyModel = "F-16C_50"
+	defer func() { flyModel = "FA-18C_hornet" }()
+	r := one(t, fly(t, glide(3.0), center))
+	if r.CourseDeg < 99 || r.CourseDeg > 102 {
+		t.Errorf("course %.1f, want ~100.7", r.CourseDeg)
+	}
+	pts := strings.Split(r.Track, ",")
+	if len(pts) < 20 || len(pts) > maxTrackPoints {
+		t.Fatalf("%d track points, want 20..%d", len(pts), maxTrackPoints)
+	}
+	var before, ft, right, kts float64
+	if _, err := fmt.Sscanf(pts[0], "%f:%f:%f:%f", &before, &ft, &right, &kts); err != nil || before > 2*nm {
+		t.Errorf("first point %q", pts[0])
+	}
+	t.Logf("SUMMARY %s", r.Summary())
+	t.Logf("TRACK %s", r.Track)
 }
