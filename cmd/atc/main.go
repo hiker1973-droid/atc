@@ -138,6 +138,9 @@ var (
 	flagTowerRadioIntensity  string
 	flagCarrierRadioIntensity string
 	flagATISRadioIntensity   string
+	flagRadioNoiseMul        float64
+	flagRadioCrush           float64
+	flagRadioTail            float64
 	flagTTSSpeed             float64
 	flagScudwatchOnly       bool
 	flagScudwatchFreq       string
@@ -340,6 +343,12 @@ func newRootCommand() *cobra.Command {
 		"Radio effect intensity for tower TX: light, medium, heavy, extreme")
 	f.StringVar(&flagATISRadioIntensity, "atis-radio-intensity", "light",
 		"Radio effect intensity for ATIS TX (kept clean since it's a recorded loop): light, medium, heavy, extreme")
+	f.Float64Var(&flagRadioNoiseMul, "radio-noise", 2.3,
+		"More static for live-person roles: multiplier on the tier's hiss (1 = the tier as is, 0-3). Not applied to ATIS, the JTAC set or Paddles")
+	f.Float64Var(&flagRadioCrush, "radio-crush", 0.40,
+		"Grit on the voice for live-person roles: acrusher mix plus a mild tanh soft clip (0 = off, 0-1). Not applied to ATIS")
+	f.Float64Var(&flagRadioTail, "radio-tail", 0.4,
+		"Extra squelch tail in seconds on live-person roles, added to the tier's own (0-1). Not applied to ATIS")
 	f.Float64Var(&flagOutputGainDB, "output-gain-db", 14,
 		"Gain in dB applied to every radio-effect TX after the noise mix — raises voice and hiss together (0 = the level before 2026-10-10)")
 	f.Float64Var(&flagTTSSpeed, "tts-speed", speedDeckboss,
@@ -2642,9 +2651,32 @@ func radioClicks(intensity string) (upAmp, upSec, dnAmp, dnSec float64) {
 	return 0.55, 0.07, 0.4, 0.18
 }
 
+// radioFX is the extra static on top of a tier (operator 2026-11-08: "a little bit more radio effect" on anything a live
+// person talks to): NoiseMul scales the tier's hiss, Crush is the acrusher mix (also switches on a mild tanh soft clip),
+// TailAdd lengthens the squelch tail in seconds. The zero value is no change.
+type radioFX struct {
+	NoiseMul, Crush, TailAdd float64
+}
+
+func clampF(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
+
+// radioFilter is the tier as is, with no extra static.
 func radioFilter(intensity string, levelDB, outGainDB float64) string {
+	return radioFilterFX(intensity, levelDB, outGainDB, radioFX{})
+}
+
+func radioFilterFX(intensity string, levelDB, outGainDB float64, fx radioFX) string {
 	noiseAmp, hpf, lpf := radioTier(intensity)
 	upAmp, upSec, dnAmp, dnSec := radioClicks(intensity)
+	if fx.NoiseMul > 0 {
+		noiseAmp = clampF(noiseAmp*clampF(fx.NoiseMul, 0, 3), 0, 0.15)
+	}
+	dnSec += clampF(fx.TailAdd, 0, 1)
+	grit := ""
+	if c := clampF(fx.Crush, 0, 1); c > 0 {
+		// Grit before the limiter, after the compressor has evened the voice out.
+		grit = fmt.Sprintf("acrusher=bits=10:mode=lin:mix=%.2f,asoftclip=type=tanh:param=1.4,", c)
+	}
 	return fmt.Sprintf(
 		// bass: +5 dB shelf at 150 Hz puts back the body the radio band cuts.
 		// Compression 4:1 (was 8:1) keeps the voice punchy without the squash.
@@ -2652,7 +2684,7 @@ func radioFilter(intensity string, levelDB, outGainDB float64) string {
 		"[0:a]volume=%.1fdB,highpass=f=%d,lowpass=f=%d,"+
 			"bass=g=5:f=150:w=0.7,"+
 			"acompressor=threshold=-22dB:ratio=4:attack=8:release=80,"+
-			"volume=1.15[voice];"+
+			"%svolume=1.15[voice];"+
 			"anoisesrc=color=pink:amplitude=%.3f:duration=0[noise];"+
 			"[voice][noise]amix=inputs=2:duration=first:dropout_transition=0:weights=1 0.5,"+
 			"volume=%.1fdB,"+
@@ -2666,7 +2698,7 @@ func radioFilter(intensity string, levelDB, outGainDB float64) string {
 			"highpass=f=300,lowpass=f=4000,"+
 			"afade=t=out:st=0.02:d=%.2f[click_dn];"+
 			"[click_up][body][click_dn]concat=n=3:v=0:a=1[out]",
-		levelDB, hpf, lpf, noiseAmp, outGainDB,
+		levelDB, hpf, lpf, grit, noiseAmp, outGainDB,
 		upAmp, upSec, upSec-0.02, dnAmp, dnSec, dnSec-0.02,
 	)
 }
@@ -2768,6 +2800,22 @@ func txIntensity(callsign string) string {
 	return flagRadioIntensity
 }
 
+// txFX is the extra static for a transmitting callsign. ATIS is a recorded loop and stays as its tier is; the JTAC manpack
+// set is already the roughest, so it gets only the grit and tail; Paddles' calls are short and must be heard first time,
+// so the same. Every other live role gets the full amount.
+func txFX(callsign string) radioFX {
+	fx := radioFX{NoiseMul: flagRadioNoiseMul, Crush: flagRadioCrush, TailAdd: flagRadioTail}
+	switch {
+	case strings.HasSuffix(callsign, " ATIS"):
+		return radioFX{}
+	case flagLSOName != "" && callsign == flagLSOName,
+		flagJTACName != "" && callsign == flagJTACName,
+		flagJTAC2Freq > 0 && flagJTAC2Name != "" && callsign == flagJTAC2Name:
+		fx.NoiseMul = 1
+	}
+	return fx
+}
+
 // prepareTX levels the clean TTS clip at inPath and, with the radio effect on,
 // runs it through the radio chain. It returns the path to transmit and a
 // cleanup func. On any ffmpeg failure it returns inPath untouched, so a
@@ -2792,7 +2840,7 @@ func prepareTX(inPath, callsign string) (string, func()) {
 	var filter string
 	switch {
 	case flagRadioEffect:
-		filter = radioFilter(txIntensity(callsign), levelDB, flagOutputGainDB)
+		filter = radioFilterFX(txIntensity(callsign), levelDB, flagOutputGainDB, txFX(callsign))
 	case math.Abs(levelDB) >= 0.5:
 		filter = levelFilter(levelDB)
 	default:

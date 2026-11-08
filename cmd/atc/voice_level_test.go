@@ -72,3 +72,28 @@ func TestTxIntensityByCallsign(t *testing.T) {
 		}
 	}
 }
+
+// Extra static is for live-person roles: ATIS stays as its tier, Paddles and the JTAC keep their hiss, and the zero
+// radioFX leaves the graph as it was.
+func TestRadioFX(t *testing.T) {
+	if radioFilter("heavy", 0, 14) != radioFilterFX("heavy", 0, 14, radioFX{}) {
+		t.Error("zero radioFX must not change the filter")
+	}
+	f := radioFilterFX("heavy", 0, 14, radioFX{NoiseMul: 1.5, Crush: 0.25, TailAdd: 0.2})
+	for _, want := range []string{"acrusher=bits=10:mode=lin:mix=0.25,asoftclip=type=tanh", "amplitude=0.090:"} {
+		if !strings.Contains(f, want) {
+			t.Errorf("filter is missing %q:\n%s", want, f)
+		}
+	}
+	flagRadioNoiseMul, flagRadioCrush, flagRadioTail = 1.5, 0.25, 0.2
+	flagLSOName = "Paddles"
+	if (txFX("Senaki ATIS") != radioFX{}) {
+		t.Error("ATIS must get no extra static")
+	}
+	if fx := txFX("Paddles"); fx.NoiseMul != 1 || fx.Crush != 0.25 {
+		t.Errorf("Paddles = %+v, want noise x1 with grit", fx)
+	}
+	if fx := txFX("UGKS-ATC"); fx.NoiseMul != 1.5 {
+		t.Errorf("tower = %+v, want noise x1.5", fx)
+	}
+}
