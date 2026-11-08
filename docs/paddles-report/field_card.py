@@ -70,13 +70,14 @@ def _at(trk, nm):
     return best[1:] if best and best[0] < 0.3 else None
 
 
-def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False):
+def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False, gs=None, aim_m=None):
     """Height above the runway against distance, with the Hornet card's three slope lines (3 deg +0.5 / 0 / -0.7,
     from the aim point) and the mile arcs."""
     L, R, T, B = 60, W - 24, 24, H - 50
     sx = lambda nm: R - ((nm + NM_MIN) / (nm_max + NM_MIN)) * (R - L)
     sy = lambda ft: B - (ft / ft_max) * (B - T)
-    aim = -AimM / 1852.0
+    gs, aim_m = gs or GS, aim_m or AimM
+    aim = -aim_m / 1852.0
     o = ['<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg" font-family="Arial">' % (W, H)]
     for ft in range(100, int(ft_max), 100):
         o.append('<line x1="%d" y1="%.0f" x2="%d" y2="%.0f" stroke="#21262d"/>' % (L, sy(ft), R, sy(ft)))
@@ -85,8 +86,8 @@ def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False):
         o.append('<path d="M%.1f %d q9 %d 0 %d" fill="none" stroke="#484f58" stroke-width="1"/>' % (sx(nm) - 5, T, (B - T) / 2, B - T))
         o.append(_txt(sx(nm), B + 22, lab, 13, MUTED, "middle"))
     for i, (off, col, lab) in enumerate(SLOPES):
-        o.append(_txt(R - 4, 44 + 20 * i, "%s  %.1f° (%+.1f)" % (lab, GS + off, off), 14, col, "end"))
-        t = math.tan(math.radians(GS + off))
+        o.append(_txt(R - 4, 44 + 20 * i, "%s  %.2f° (%+.1f)" % (lab, gs + off, off), 14, col, "end"))
+        t = math.tan(math.radians(gs + off))
         end = nm_max
         o.append(_poly([(sx(aim), sy(0)), (sx(end), sy((end - aim) * NM_FT * t))], col, 1.6, "5 4"))
     o.append('<rect x="%.1f" y="%.1f" width="%.1f" height="6" fill="#6e7681"/>' % (sx(0), sy(0), R - sx(0) + 24))
@@ -99,7 +100,7 @@ def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False):
         d, ft, _ = one
         o.append(_txt(sx(d) - 150, sy(ft) + 120, "Alt at 1 NM: %d ft" % round(ft), 17, YEL, "start", HAND))
         o.append(_arrow(sx(d) - 60, sy(ft) + 106, sx(d) - 2, sy(ft) + 6))
-    o.append(_txt(R, 16, "side view, glide path %.1f degrees" % GS, 12, MUTED, "end"))
+    o.append(_txt(R, 16, "side view, glide path %g degrees to the aim point %d m down" % (gs, aim_m), 12, MUTED, "end"))
     o.append('</svg>')
     return "".join(o)
 
@@ -132,8 +133,8 @@ def lineup_view(trk, td_right_m, td_past_m, nm_max=1.65):
 
 def card_html(r, trk, title, when, footer):
     fill, ink = badge_colours(r["grade"])
-    segs = "".join("<tr><td>%s</td><td>%+.1f&deg;</td><td>%s</td><td>%.0f fpm</td></tr>" % (
-        s["name"], s["gp"], ("%+.1f&deg;" % s["lu"]) if s.get("lu") is not None else "-", s["sink"]) for s in r["segs"])
+    segs = "".join("<tr><td>%s</td><td>%+.1f&deg;</td><td>%s</td><td>%s</td><td>%.0f fpm</td></tr>" % (
+        s["name"], s["gp"], ("%+.1f&deg;" % s["lu"]) if s.get("lu") is not None else "-", ("%.1f&deg;" % s["aoa"]) if s.get("aoa") is not None else "-", s["sink"]) for s in r["segs"])
     lines = ["%s | %s" % (r["field"], r["map"]), when, "%s | rwy %s | %s" % (r["model"], r["runway"], r["outcome"]), "",
              "Touchdown %d m past the threshold, %+d m %s of centreline, %d fpm" % (
                  r["td_past"], abs(r["td_right"]), "right" if r["td_right"] >= 0 else "left", r["td_sink"]), "", r["remark"]]
@@ -152,16 +153,16 @@ table{border-collapse:collapse;font-size:18px;color:#e6edf3}td,th{padding:4px 16
 .ft{font:12px Arial,sans-serif;color:#8b949e;margin-top:8px}
 </style></head><body><div class="w"><div class="top"><div class="b">%s</div><div class="n">%s</div><div class="cs">%s</div><img class="logo" src="%s"></div>
 <div class="ps"><div class="pn"><div class="tab">Glide View</div>%s</div><div class="pn"><div class="tab">Lineup View</div>%s</div></div>
-<div class="row"><div class="info">%s</div><table><tr><th>Segment</th><th>Glide path</th><th>Lineup</th><th>Sink</th></tr>%s</table></div>
+<div class="row"><div class="info">%s</div><table><tr><th>Segment</th><th>Glide path</th><th>Lineup</th><th>AoA</th><th>Sink</th></tr>%s</table></div>
 <div class="ft">%s</div></div></body></html>""" % (
         fill, ink, html.escape(r["grade"].split(":")[0]), html.escape(title), html.escape(r["field"].upper()), LOGO,
-        side_view(trk, r["td_past"], coarse=r.get("coarse", False)), lineup_view(trk, r["td_right"], r["td_past"]), body, segs, html.escape(footer))
+        side_view(trk, r["td_past"], coarse=r.get("coarse", False), gs=r.get("gs"), aim_m=r.get("aim")), lineup_view(trk, r["td_right"], r["td_past"]), body, segs, html.escape(footer))
 
 
 FAULTS = {"LUL": "lined up left", "LUR": "lined up right", "SINK": "sink rate high", "SLO": "slow", "LO": "low", "H": "high", "F": "fast",
-          "LRO": "late rollout", "SHT": "touched down short", "LNG": "touched down long", "HARD": "hard landing"}
+          "LRO": "late rollout", "TAIL": "pitch over the tail-strike limit at touchdown", "SHT": "touched down short", "LNG": "touched down long", "HARD": "hard landing"}
 WHERE = {"X": "at the start", "IM": "in the middle", "IC": "in close", "AR": "at the ramp", "TD": "at touchdown"}
-CODE_RE = re.compile(r"(__)?(\()?(LUL|LUR|SINK|SLO|LRO|SHT|LNG|HARD|LO|H|F)(\))?(__)?(X|IM|IC|AR|TD)?\b")
+CODE_RE = re.compile(r"(__)?(\()?(LUL|LUR|SINK|SLO|LRO|SHT|LNG|HARD|TAIL|LO|H|F)(\))?(__)?(X|IM|IC|AR|TD)?\b")
 
 
 def remark_words(grade):
@@ -179,19 +180,21 @@ def from_log(summary, track=""):
     m = re.match(r"(.+?) \((.+?)\): rwy (\S+) (.+?), grade (.+?)(?:,|;)", summary)
     cs, model, rwy, outcome, grade = m.groups()
     td = re.search(r"touched (\d+) m past the threshold, ([+-]\d+) m right, (\d+) fpm", summary)
-    segs = [{"name": n, "gp": float(g), "lu": float(l) if l else None, "sink": float(k)} for n, g, l, k in
-            re.findall(r"; (X|IM|IC|AR) GP ([+-][\d.]+)\S*(?: LU ([+-][\d.]+)\S*)? sink (\d+)", summary)]
+    segs = [{"name": n, "gp": float(g), "lu": float(l) if l else None, "sink": float(k), "aoa": float(a) if a else None} for n, g, l, k, a in
+            re.findall(r"; (X|IM|IC|AR) GP ([+-][\d.]+)\S*(?: LU ([+-][\d.]+)\S*)? sink (\d+)(?: AoA ([\d.]+))?", summary)]
+    viper = "f-16" in model.lower()
+    gs, aim = (2.75, 225) if viper else (GS, AimM)  # pkg/fieldgrade ViperProfile / HornetProfile
     if track:
         trk = [(float(a) / 1852.0, float(b), float(c)) for a, b, c, _ in (q.split(":") for q in track.split(","))]
     else:
         mid = {"X": 1.25, "IM": 0.75, "IC": 0.375, "AR": 0.125}
-        trk = [(mid[g["name"]], (mid[g["name"]] * 1852 + AimM) * math.tan(math.radians(GS + g["gp"])) * 3.28084,
+        trk = [(mid[g["name"]], (mid[g["name"]] * 1852 + aim) * math.tan(math.radians(gs + g["gp"])) * 3.28084,
                 math.tan(math.radians(g["lu"] or 0.0)) * mid[g["name"]] * 1852) for g in segs]
         trk.append((-int(td.group(1)) / 1852.0, 0.0, float(td.group(2))))
     names = {"FA-18C_hornet": "F/A-18C", "F-16C_50": "F-16C", "F-16C": "F-16C"}
     r = {"field": "Senaki", "map": "Caucasus", "model": names.get(model, model.replace("_", " ")), "runway": rwy,
          "outcome": outcome, "grade": grade, "td_past": int(td.group(1)), "td_right": int(td.group(2)), "td_sink": int(td.group(3)),
-         "remark": remark_words(grade), "segs": segs, "coarse": not track}
+         "remark": remark_words(grade), "segs": segs, "coarse": not track, "gs": gs, "aim": aim}
     return cs, r, trk
 
 
@@ -219,6 +222,7 @@ def sample():
 
 FIELD_WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards-webhook.txt")  # the field cards' channel (Venom + Raider)
 FIELD_STATE_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards.json")           # passes already posted
+FIELD_IDS_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards-ids.json")             # pass key -> the card's Discord message id
 FIELD_FLIGHTS = ("Venom", "Raider")
 FIELD_RIGS = (("Day", "192.168.1.220"), ("Night", "192.168.1.221"))
 
@@ -262,6 +266,24 @@ def day_passes(date):
     return sorted(out)
 
 
+def post_card(hook, png, text, key):
+    """Post a card and remember its message id; if this pass already has a card, that one is deleted first (a repost replaces it)."""
+    try:
+        ids = json.load(open(FIELD_IDS_FILE))
+    except (OSError, ValueError):
+        ids = {}
+    old = ids.get(key)
+    if old:
+        try:
+            urllib.request.urlopen(urllib.request.Request("%s/messages/%s" % (hook, old), method="DELETE", headers={"User-Agent": "ReadbackGreenie/1"}), timeout=30)
+        except OSError as e:
+            print("old card %s not deleted: %s" % (old, e))
+    made = gp.send(hook + "?wait=true", "POST", png, text)
+    ids[key] = str(made["id"])
+    json.dump(ids, open(FIELD_IDS_FILE, "w"))
+    return made
+
+
 def post_field_cards(date, dry=False):
     hook = open(FIELD_WEBHOOK_FILE, encoding="utf-8").read().strip()
     try:
@@ -282,7 +304,7 @@ def post_field_cards(date, dry=False):
         if dry:
             open(os.path.join(os.path.expanduser("~"), "field-card-%s.png" % cs.replace(" ", "")), "wb").write(png)
         else:
-            gp.send(hook + "?wait=true", "POST", png, "**%s** - Senaki rwy %s: %s" % (title, r["runway"], r["grade"]))
+            post_card(hook, png, "**%s** - Senaki rwy %s: %s" % (title, r["runway"], r["grade"]), key)
             done.add(key)
             json.dump(sorted(done), open(FIELD_STATE_FILE, "w"))
         n += 1

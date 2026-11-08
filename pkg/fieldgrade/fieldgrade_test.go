@@ -165,3 +165,38 @@ func TestTrackString(t *testing.T) {
 	t.Logf("SUMMARY %s", r.Summary())
 	t.Logf("TRACK %s", r.Track)
 }
+
+// The landing reference's two standards: the same touchdown grades differently for a Hornet and a Viper.
+func TestProfiles(t *testing.T) {
+	td := func(model string, past, sink, pitch float64) string {
+		r := Result{Model: model, Outcome: "landed", HasTD: true, TDPastM: past, TDSinkFpm: sink, TDPitchDeg: pitch, HasTDPitch: true,
+			HasRollout: true, RolloutNm: 1.2}
+		return grade(r)
+	}
+	cases := []struct {
+		model             string
+		past, sink, pitch float64
+		want              string
+	}{
+		{"F-16C_50", 300, 250, 11, "_OK_"},              // the Viper's zone and sink
+		{"FA-18C_hornet", 300, 250, 6, "_OK_"},
+		{"F-16C_50", 500, 250, 11, "_OK_"},              // 1600 ft: Viper OK to 2000 ft...
+		{"FA-18C_hornet", 500, 250, 6, "OK: (LNG)TD"},   // ...the Hornet's OK ends at 1500 ft
+		{"FA-18C_hornet", 700, 250, 6, "(OK): LNGTD"},   // long over 2000 ft
+		{"F-16C_50", 700, 250, 11, "OK: (LNG)TD"},       // Viper long is over 2500 ft; 700 m = 2300 ft
+		{"FA-18C_hornet", 300, 700, 6, "_OK_"},          // Hornet sink OK to 800 fpm
+		{"F-16C_50", 300, 450, 11, "OK: (HARD)"},        // Viper over 300 is firm...
+		{"F-16C_50", 300, 700, 11, "(OK): HARD"},        // ...over 600 is hard
+		{"F-16C_50", 300, 250, 16, "(OK): TAIL"},        // pitch over 15: tail strike
+		{"FA-18C_hornet", 300, 250, 16, "_OK_"},         // not graded for the Hornet
+		{"F-16C_50", 30, 250, 11, "(OK): SHTTD"},        // under 200 ft short
+	}
+	for _, c := range cases {
+		if got := td(c.model, c.past, c.sink, c.pitch); got != c.want {
+			t.Errorf("%s %.0f m %.0f fpm %.0f deg: %q, want %q", c.model, c.past, c.sink, c.pitch, got, c.want)
+		}
+	}
+	if ProfileFor("F-16C_50").GlideDeg != 2.75 || ProfileFor("FA-18C_hornet").GlideDeg != 3.0 || ProfileFor("").Name != "F/A-18C" {
+		t.Error("profile selection")
+	}
+}

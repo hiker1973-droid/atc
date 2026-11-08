@@ -24,15 +24,54 @@ const (
 	// GlidepathDeg is the path graded against: 3 degrees to AimM past the
 	// threshold. Senaki 2026-10-17 (Raider 303) flew 3.0-3.2 degrees to a
 	// touchdown 315 m past the 09 threshold.
-	GlidepathDeg = 3.0
+	GlidepathDeg = 3.0 // the Hornet's (HornetProfile); the Viper's is in ViperProfile
 	AimM         = 300.0
 	// refAboveRunwayM: a Hornet's Tacview point sits ~2.3 m above the runway
 	// on its wheels (Senaki, 15.4 m rolling, field 13.1 m). The runway level
 	// is taken from the jet's own rollout when there is one.
 	refAboveRunwayM = 2.3
-	hornetOnSpeed   = 8.1
 	keep            = 3 * time.Minute
 )
+
+// Profile is what a jet is graded against on final and at touchdown (operator's landing reference, 2026-11-07:
+// "Airfield Landing Reference - F/A-18C vs F-16C"). AoA is the primary parameter for both jets.
+type Profile struct {
+	Name string
+	// GlideDeg to AimM past the threshold is the path graded against.
+	GlideDeg, AimM float64
+	// AoA on final: the on-speed value, the half-width of the OK band (outside it is a little fast/slow) and of the
+	// fair band (outside it is a lot).
+	AoA, AoAOK, AoAFair float64
+	// Glide path deviation: a little beyond GPOK degrees, a lot beyond GPFair.
+	GPOK, GPFair float64
+	// Touchdown, metres past the threshold: the OK window; past TDLong is long, short of TDShort is short (undershoot).
+	TDOKLo, TDOKHi, TDLong, TDShort float64
+	// Touchdown sink, fpm: over SinkOK is firm, over SinkHard is hard.
+	SinkOK, SinkHard float64
+	// TailStrikeDeg is the touchdown pitch over which a jet risks a tail strike (0 = not graded).
+	TailStrikeDeg float64
+}
+
+const ft = 0.3048
+
+// Hornet: 8.1 deg AoA (7.4-8.8 OK, 6.9-9.3 fair), 3 deg, aim ~1000 ft, touchdown 500-1500 ft, long over 2000 ft, short under 200 ft,
+// sink OK under 800 and hard over 1000.
+var HornetProfile = Profile{Name: "F/A-18C", GlideDeg: 3.0, AimM: 300, AoA: 8.1, AoAOK: 0.7, AoAFair: 1.2, GPOK: 0.5, GPFair: 1.0,
+	TDOKLo: 500 * ft, TDOKHi: 1500 * ft, TDLong: 2000 * ft, TDShort: 200 * ft, SinkOK: 800, SinkHard: 1000}
+
+// Viper: 11 deg AoA (10-12 OK, 9-13 fair), 2.5-3 deg (graded on 2.75), aim 500-1000 ft, touchdown 500-2000 ft, long over 2500 ft,
+// short under 200 ft, sink OK under 300 and hard over 600, tail strike over 15 deg of pitch.
+var ViperProfile = Profile{Name: "F-16C", GlideDeg: 2.75, AimM: 225, AoA: 11, AoAOK: 1, AoAFair: 2, GPOK: 0.5, GPFair: 1.0,
+	TDOKLo: 500 * ft, TDOKHi: 2000 * ft, TDLong: 2500 * ft, TDShort: 200 * ft, SinkOK: 300, SinkHard: 600, TailStrikeDeg: 15}
+
+// ProfileFor is the profile for a DCS aircraft type ("F-16C_50", "FA-18C_hornet"): the Viper's for an F-16, the Hornet's for
+// anything else (the original standard).
+func ProfileFor(model string) Profile {
+	if strings.Contains(strings.ToLower(model), "f-16") {
+		return ViperProfile
+	}
+	return HornetProfile
+}
 
 // End is one landing direction: its threshold, the true course flown to land
 // on it and the runway length ahead of it.
@@ -291,13 +330,20 @@ type Result struct {
 	// the runway end flown to.
 	Track     string
 	CourseDeg float64
+	// Profile is the standard graded against, with its glide path and aim point (the pass card draws the guides from them);
+	// TDPitchDeg is the pitch at touchdown.
+	Profile        string
+	GlideDeg, AimM float64
+	TDPitchDeg     float64
+	HasTDPitch     bool
 }
 
 // Analyze grades one pass over its samples. landed is when he was first on
 // the runway (zero for a go-around); airborne: he took off again.
 func (t *Tracker) Analyze(cs, model string, endIdx int, buf []Sample, landed time.Time, airborne bool) Result {
 	e := t.F.Ends[endIdx]
-	r := Result{Callsign: cs, Model: model, Runway: e.Name, Samples: len(buf)}
+	prof := ProfileFor(model)
+	r := Result{Callsign: cs, Model: model, Runway: e.Name, Samples: len(buf), Profile: prof.Name, GlideDeg: prof.GlideDeg, AimM: prof.AimM}
 	if len(buf) > 0 {
 		r.Start, r.At = buf[0].At, buf[len(buf)-1].At
 	}
@@ -371,6 +417,9 @@ func (t *Tracker) Analyze(cs, model string, endIdx int, buf []Sample, landed tim
 			r.TDSinkFpm = -(pts[td].s.AltM - pts[k].s.AltM) / dt * 196.85
 		}
 		r.HasTD = true
+		if pts[td].s.HasPitch {
+			r.TDPitchDeg, r.HasTDPitch = pts[td].s.PitchDeg, true
+		}
 	}
 	last := len(pts)
 	if td >= 0 {
@@ -416,8 +465,8 @@ func (t *Tracker) Analyze(cs, model string, endIdx int, buf []Sample, landed tim
 				math.Abs(p.right) > 1000 || angleDiff(p.hdg, e.CourseDeg) > 100 {
 				continue // not on final yet (downwind abeam the threshold)
 			}
-			d := p.before + AimM
-			m.GP += math.Atan2(p.h, d)*180/math.Pi - GlidepathDeg
+			d := p.before + prof.AimM
+			m.GP += math.Atan2(p.h, d)*180/math.Pi - prof.GlideDeg
 			m.samples++
 			m.SinkFpm += -p.vs * 196.85
 			m.sinkN++
@@ -485,19 +534,19 @@ func grade(r Result) string {
 	} else if r.Outcome != "go-around" {
 		add("LRO", "", true) // never wings level on final
 	}
-	hornet := strings.Contains(strings.ToLower(r.Model), "fa-18")
+	prof := ProfileFor(r.Model)
 	for _, m := range r.Segs {
 		if !m.HasGP {
 			continue
 		}
 		switch {
-		case m.GP > 1.0:
+		case m.GP > prof.GPFair:
 			add("H", m.Name, true)
-		case m.GP > 0.5:
+		case m.GP > prof.GPOK:
 			add("H", m.Name, false)
-		case m.GP < -0.8:
+		case m.GP < -prof.GPFair:
 			add("LO", m.Name, true)
-		case m.GP < -0.4:
+		case m.GP < -prof.GPOK:
 			add("LO", m.Name, false)
 		}
 		if m.HasLU {
@@ -522,15 +571,15 @@ func grade(r Result) string {
 				add("SINK", m.Name, false)
 			}
 		}
-		if hornet && m.HasAoA && m.Name != "X" {
+		if m.HasAoA && m.Name != "X" {
 			switch {
-			case m.AoA < hornetOnSpeed-1.5:
+			case m.AoA < prof.AoA-prof.AoAFair:
 				add("F", m.Name, true)
-			case m.AoA < hornetOnSpeed-0.75:
+			case m.AoA < prof.AoA-prof.AoAOK:
 				add("F", m.Name, false)
-			case m.AoA > hornetOnSpeed+1.5:
+			case m.AoA > prof.AoA+prof.AoAFair:
 				add("SLO", m.Name, true)
-			case m.AoA > hornetOnSpeed+0.75:
+			case m.AoA > prof.AoA+prof.AoAOK:
 				add("SLO", m.Name, false)
 			}
 		}
@@ -549,13 +598,13 @@ func grade(r Result) string {
 	}
 	short := r.TDPastM < 0
 	switch {
-	case short:
+	case short, r.TDPastM < prof.TDShort:
 		add("SHT", "TD", true)
-	case r.TDPastM < 100:
+	case r.TDPastM < prof.TDOKLo:
 		add("SHT", "TD", false)
-	case r.TDPastM > 900:
+	case r.TDPastM > prof.TDLong:
 		add("LNG", "TD", true)
-	case r.TDPastM > 600:
+	case r.TDPastM > prof.TDOKHi:
 		add("LNG", "TD", false)
 	}
 	switch {
@@ -569,10 +618,13 @@ func grade(r Result) string {
 		add("LUR", "TD", false)
 	}
 	switch {
-	case r.TDSinkFpm > 1200:
+	case r.TDSinkFpm > prof.SinkHard:
 		add("HARD", "", true)
-	case r.TDSinkFpm > 900:
+	case r.TDSinkFpm > prof.SinkOK:
 		add("HARD", "", false)
+	}
+	if prof.TailStrikeDeg > 0 && r.HasTDPitch && r.TDPitchDeg > prof.TailStrikeDeg {
+		add("TAIL", "", true) // pitch at touchdown over the tail-strike limit
 	}
 	g := "OK"
 	switch {
@@ -582,7 +634,7 @@ func grade(r Result) string {
 		g = "---"
 	case majors > 0:
 		g = "(OK)"
-	case len(errs) == 0 && r.TDPastM >= 150 && r.TDPastM <= 450:
+	case len(errs) == 0 && r.TDPastM >= prof.TDOKLo && r.TDPastM <= prof.TDOKHi:
 		g = "_OK_"
 	}
 	return with(g)
