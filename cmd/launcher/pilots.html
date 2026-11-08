@@ -58,6 +58,18 @@
   .empty, .setup { padding: 1.2rem; color: var(--muted); }
   .setup code { color: var(--text); background: var(--bg); padding: 0.1rem 0.3rem; border-radius: 3px; }
   .setup pre { background: var(--bg); padding: 0.6rem; border-radius: 5px; color: var(--text); overflow-x: auto; }
+
+ button.pen { padding: 0 0.35rem; font-size: 0.8rem; margin-left: 0.3rem; opacity: 0.55; }
+ button.pen:hover { opacity: 1; }
+ #ed { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 50; }
+ #ed .dlg { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.3rem; width: min(420px, 92vw); }
+ #ed h3 { margin: 0 0 0.2rem; font-size: 1.05rem; }
+ #ed label { display: block; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0.7rem 0 0.2rem; }
+ #ed select, #ed input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 0.4rem 0.5rem; font-size: 0.95rem; }
+ #ed .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+ #ed .prev { font-size: 1.25rem; font-weight: 700; margin: 0.9rem 0 0.1rem; color: var(--blue); }
+ #ed .btns { display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center; }
+ #ed .err { color: var(--red); font-size: 0.82rem; min-height: 1.1em; margin-top: 0.4rem; }
 </style>
 </head>
 <body>
@@ -79,6 +91,19 @@
   </table></div>
   <div id="detail"></div>
 </main>
+<div id="ed" onclick="if(event.target===this)edClose()"><div class="dlg">
+  <h3>Edit pilot name</h3>
+  <div class="muted">DCS name: <span id="ed-dcs"></span></div>
+  <div class="row">
+    <div><label>Flight</label><select id="ed-flight" onchange="edPreview()"><option>Raider</option><option>Venom</option></select></div>
+    <div><label>Number</label><input id="ed-num" placeholder="302 or 2-1" oninput="edPreview()"></div>
+  </div>
+  <label>Name / call sign handle</label><input id="ed-handle" placeholder="Jedi" oninput="edPreview()">
+  <div class="prev" id="ed-prev"></div>
+  <div class="err" id="ed-err"></div>
+  <div class="btns"><button class="on" onclick="edSave(false)">Save</button><button onclick="edClose()">Cancel</button>
+    <span class="spacer"></span><button onclick="edSave(true)" title="Drop your edit and use the tidied DCS name">Use automatic name</button></div>
+</div></div>
 <script>
 // Data: DCSServerBot (slot time, kills, deaths, takeoffs, landings, traps)
 // from every rig, merged by the launcher (cmd/launcher/pilots.go).
@@ -160,7 +185,7 @@ function render() {
     $('body').innerHTML = `<tr><td colspan="${COLS.length}" class="empty">No pilots in this range.</td></tr>`;
   } else {
     $('body').innerHTML = rows.map(p => `<tr class="${p.ucid === selected ? 'sel' : ''}" onclick="pick('${esc(p.ucid)}')">
-      <td>${p.online ? '<span class="dot" title="in a slot now"></span>' : ''}${esc(p.name)}${p.needsName ? ' <span style="color:var(--amber)" title="Not in Raider/Venom format - click, then Edit name">⚠ needs callsign</span>' : ''}</td>
+      <td>${p.online ? '<span class="dot" title="in a slot now"></span>' : ''}${esc(p.name)}${p.needsName ? ' <span style="color:var(--amber)" title="Not in Raider/Venom format - press the pencil to set it">⚠ needs callsign</span>' : ''} <button class="pen" title="Edit name" onclick="event.stopPropagation();editName('${esc(p.ucid)}')">✎</button></td>
       ${num(p.hours, 1)}${num(p.sessions)}${num(p.sorties)}${num(p.landings)}${num(p.traps)}${num(p.trapPoints, 1)}
       ${num(p.kills)}${num(p.deaths)}${num(p.crashes)}${num(p.ejections)}
       <td class="l">${esc(p.top)}</td><td class="l muted">${p.online ? 'now' : ago(p.lastSeen)}</td></tr>`).join('');
@@ -207,18 +232,41 @@ function detail(p) {
     </div>`;
 }
 
-async function editName(ucid) {
+let editUcid = null;
+function editName(ucid) {
   const p = (data.pilots || []).find(x => x.ucid === ucid);
   if (!p) return;
-  const v = prompt('Name must be Raider 302 | Jedi or Venom 024 | Leeroy.\nLeave empty to go back to the automatic name.', p.name);
-  if (v === null) return;
-  const r = await fetch('/api/pilot-name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ucid, name: v }) });
-  if (!r.ok) { alert('Could not save: ' + (await r.text())); return; }
-  await load();
-  const q = (data.pilots || []).find(x => x.ucid === ucid);
-  if (q) detail(q);
+  editUcid = ucid;
+  const m = /^(Raider|Venom)\s+(\d[\d-]*)\s*\|\s*(.*)$/.exec(p.name || '');
+  $('ed-flight').value = m ? m[1] : 'Venom';
+  $('ed-num').value = m ? m[2] : '';
+  $('ed-handle').value = m ? m[3] : '';
+  $('ed-dcs').textContent = p.rawName || p.name || '';
+  $('ed-err').textContent = '';
+  edPreview();
+  $('ed').style.display = 'flex';
+  (m ? $('ed-handle') : $('ed-num')).focus();
 }
+function edName() {
+  const n = $('ed-num').value.trim(), h = $('ed-handle').value.trim().replace(/\s+/g, ' ');
+  return n && h ? `${$('ed-flight').value} ${n} | ${h}` : '';
+}
+function edPreview() { $('ed-prev').textContent = edName() || 'Raider 302 | Jedi'; $('ed-prev').style.opacity = edName() ? 1 : 0.4; }
+function edClose() { $('ed').style.display = 'none'; editUcid = null; }
+async function edSave(reset) {
+  const name = reset ? '' : edName();
+  if (!reset && !/^\d[\d-]*$/.test($('ed-num').value.trim())) { $('ed-err').textContent = 'Enter the number, e.g. 302 or 2-1.'; return; }
+  if (!reset && !name) { $('ed-err').textContent = 'Fill in the number and the name.'; return; }
+  const r = await fetch('/api/pilot-name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ucid: editUcid, name }) });
+  if (!r.ok) { $('ed-err').textContent = 'Could not save: ' + (await r.text()); return; }
+  const u = editUcid;
+  edClose();
+  await load();
+  const q = (data.pilots || []).find(x => x.ucid === u);
+  if (q && selected === u) detail(q);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') edClose(); if (e.key === 'Enter' && editUcid && e.target.tagName === 'INPUT') edSave(false); });
 
 function setupHelp() {
   return `<b>Connect DCSServerBot.</b> On each server, give the launcher the DCSServerBot database
