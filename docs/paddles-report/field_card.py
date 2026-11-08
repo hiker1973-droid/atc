@@ -7,10 +7,15 @@ runway and the flown track). Input is a dict shaped like the tower's "Approach g
 
     python field_card.py            # renders a SAMPLE card to field-card-sample.png
 """
+import datetime as dt
 import html
+import json
 import math
 import os
+import re
 import sys
+import urllib.parse
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -65,7 +70,7 @@ def _at(trk, nm):
     return best[1:] if best and best[0] < 0.3 else None
 
 
-def side_view(trk, td_past_m, nm_max=1.65, ft_max=720):
+def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False):
     """Height above the runway against distance, with the Hornet card's three slope lines (3 deg +0.5 / 0 / -0.7,
     from the aim point) and the mile arcs."""
     L, R, T, B = 60, W - 24, 24, H - 50
@@ -89,7 +94,7 @@ def side_view(trk, td_past_m, nm_max=1.65, ft_max=720):
     o.append(_poly([(sx(d), sy(h)) for d, h, _ in trk if d <= nm_max], WHITE))
     o.append('<circle cx="%.1f" cy="%.1f" r="6" fill="%s"/>' % (sx(-td_past_m / 1852.0), sy(0), YEL))
     o.append(_txt(sx(-td_past_m / 1852.0), sy(0) - 34, "TD %d m" % td_past_m, 14, "#e6edf3", "middle"))
-    one = _at(trk, 1.0)
+    one = None if coarse else _at(trk, 1.0)
     if one:  # the height at one mile, like "Alt at 1 NM" on the Hornet card
         d, ft, _ = one
         o.append(_txt(sx(d) - 150, sy(ft) + 120, "Alt at 1 NM: %d ft" % round(ft), 17, YEL, "start", HAND))
@@ -150,25 +155,43 @@ table{border-collapse:collapse;font-size:18px;color:#e6edf3}td,th{padding:4px 16
 <div class="row"><div class="info">%s</div><table><tr><th>Segment</th><th>Glide path</th><th>Lineup</th><th>Sink</th></tr>%s</table></div>
 <div class="ft">%s</div></div></body></html>""" % (
         fill, ink, html.escape(r["grade"].split(":")[0]), html.escape(title), html.escape(r["field"].upper()), LOGO,
-        side_view(trk, r["td_past"]), lineup_view(trk, r["td_right"], r["td_past"]), body, segs, html.escape(footer))
+        side_view(trk, r["td_past"], coarse=r.get("coarse", False)), lineup_view(trk, r["td_right"], r["td_past"]), body, segs, html.escape(footer))
 
 
-def from_log(summary, track):
-    """Build the card's inputs from an "Approach graded" summary and an "Approach track" string."""
-    import re
+FAULTS = {"LUL": "lined up left", "LUR": "lined up right", "SINK": "sink rate high", "SLO": "slow", "LO": "low", "H": "high", "F": "fast",
+          "LRO": "late rollout", "SHT": "touched down short", "LNG": "touched down long", "HARD": "hard landing"}
+WHERE = {"X": "at the start", "IM": "in the middle", "IC": "in close", "AR": "at the ramp", "TD": "at touchdown"}
+CODE_RE = re.compile(r"(__)?(\()?(LUL|LUR|SINK|SLO|LRO|SHT|LNG|HARD|LO|H|F)(\))?(__)?(X|IM|IC|AR|TD)?\b")
+
+
+def remark_words(grade):
+    """The grade's fault codes in words: "(LUL)IM" is "a little lined up left in the middle"."""
+    out = []
+    for m in CODE_RE.finditer(grade.split(":", 1)[1] if ":" in grade else ""):
+        amount = "VERY " if m.group(1) or m.group(5) else "a little " if m.group(2) else ""
+        out.append("%s%s%s" % (amount, FAULTS[m.group(3)], (" " + WHERE[m.group(6)]) if m.group(6) else ""))
+    return ("; ".join(out) + ".").capitalize() if out else "Good pass."
+
+
+def from_log(summary, track=""):
+    """Build the card's inputs from an "Approach graded" summary and, if the rig logged one, an "Approach track" string.
+    Without a track the path is drawn through the four segment averages (r["coarse"])."""
     m = re.match(r"(.+?) \((.+?)\): rwy (\S+) (.+?), grade (.+?)(?:,|;)", summary)
     cs, model, rwy, outcome, grade = m.groups()
     td = re.search(r"touched (\d+) m past the threshold, ([+-]\d+) m right, (\d+) fpm", summary)
-    segs = [{"name": n, "gp": float(g), "lu": float(l), "sink": float(k)} for n, g, l, k in
-            re.findall(r"; (X|IM|IC|AR) GP ([+-][\d.]+)\S* LU ([+-][\d.]+)\S* sink (\d+)", summary)]
-    fault = {"SINK": "sink rate high", "LRO": "late rollout", "SHT": "touched down short", "LNG": "touched down long"}
-    code = re.search(r"\(?(SINK|LRO|SHT|LNG)\)?(X|IM|IC|AR)?", grade)
-    remark = ("Watch the %s%s." % (fault[code.group(1)], " at the " + {"AR": "ramp", "IC": "in close", "IM": "in the middle", "X": "start"}[code.group(2)]
-              if code.group(2) else "")) if code else "Good pass."
-    trk = [(float(a) / 1852.0, float(b), float(c)) for a, b, c, _ in (q.split(":") for q in track.split(","))]
-    r = {"field": "Senaki", "map": "Caucasus", "model": model.replace("_50", "").replace("F-16C", "F-16C"), "runway": rwy,
+    segs = [{"name": n, "gp": float(g), "lu": float(l) if l else None, "sink": float(k)} for n, g, l, k in
+            re.findall(r"; (X|IM|IC|AR) GP ([+-][\d.]+)\S*(?: LU ([+-][\d.]+)\S*)? sink (\d+)", summary)]
+    if track:
+        trk = [(float(a) / 1852.0, float(b), float(c)) for a, b, c, _ in (q.split(":") for q in track.split(","))]
+    else:
+        mid = {"X": 1.25, "IM": 0.75, "IC": 0.375, "AR": 0.125}
+        trk = [(mid[g["name"]], (mid[g["name"]] * 1852 + AimM) * math.tan(math.radians(GS + g["gp"])) * 3.28084,
+                math.tan(math.radians(g["lu"] or 0.0)) * mid[g["name"]] * 1852) for g in segs]
+        trk.append((-int(td.group(1)) / 1852.0, 0.0, float(td.group(2))))
+    names = {"FA-18C_hornet": "F/A-18C", "F-16C_50": "F-16C", "F-16C": "F-16C"}
+    r = {"field": "Senaki", "map": "Caucasus", "model": names.get(model, model.replace("_", " ")), "runway": rwy,
          "outcome": outcome, "grade": grade, "td_past": int(td.group(1)), "td_right": int(td.group(2)), "td_sink": int(td.group(3)),
-         "remark": remark, "segs": segs}
+         "remark": remark_words(grade), "segs": segs, "coarse": not track}
     return cs, r, trk
 
 
@@ -193,7 +216,83 @@ def sample():
     return r, trk
 
 
-if __name__ == "__main__" and len(sys.argv) > 2:
+
+FIELD_WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards-webhook.txt")  # the field cards' channel (Venom + Raider)
+FIELD_STATE_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards.json")           # passes already posted
+FIELD_FLIGHTS = ("Venom", "Raider")
+FIELD_RIGS = (("Day", "192.168.1.220"), ("Night", "192.168.1.221"))
+
+
+def pilot_names():
+    out = {}
+    try:
+        for line in open(os.path.join(os.path.expanduser("~"), "readback-pilots.csv"), encoding="utf-8-sig"):
+            c = line.rstrip("\r\n").split(",")
+            if len(c) > 1:
+                out[c[0].strip().lower()] = c[1].strip()
+    except OSError:
+        pass
+    return out
+
+
+def day_passes(date):
+    """(time, callsign, summary, track) for each graded Venom / Raider landing in the Senaki Tower day logs of the rigs."""
+    out = []
+    for rig, host in FIELD_RIGS:
+        try:
+            url = "http://%s:7000/api/day-log?name=%s&date=%s" % (host, urllib.parse.quote("Senaki Tower"), date)
+            lines = urllib.request.urlopen(url, timeout=60).read().decode("utf-8", "replace").splitlines()
+        except OSError as e:
+            print("%s: no Senaki Tower log (%s)" % (rig, e))
+            continue
+        recs = []
+        for line in lines:
+            try:
+                recs.append(json.loads(line))
+            except ValueError:
+                pass
+        tracks = [j for j in recs if j.get("message") == "Approach track"]
+        for j in recs:
+            if j.get("message") == "Approach graded" and j["callsign"].startswith(FIELD_FLIGHTS) and "landed" in j["summary"]:
+                t = dt.datetime.fromisoformat(j["time"])
+                # the track line is logged right after its graded line
+                tk = next((x["track"] for x in tracks if x["callsign"] == j["callsign"] and
+                           abs((dt.datetime.fromisoformat(x["time"]) - t).total_seconds()) < 5), "")
+                out.append((j["time"], j["callsign"], j["summary"], tk))
+    return sorted(out)
+
+
+def post_field_cards(date, dry=False):
+    hook = open(FIELD_WEBHOOK_FILE, encoding="utf-8").read().strip()
+    try:
+        done = set(json.load(open(FIELD_STATE_FILE)))
+    except (OSError, ValueError):
+        done = set()
+    names = pilot_names()
+    n = 0
+    for when, cs, summary, track in day_passes(date):
+        key = "%s|%s" % (when, cs)
+        if key in done:
+            continue
+        _, r, trk = from_log(summary, track)
+        t = dt.datetime.fromisoformat(when)
+        title = "%s | %s" % (cs, names[cs.lower()]) if cs.lower() in names else cs
+        foot = "Senaki field landings - " + ("segment averages only: logged before tracks" if r["coarse"] else "track from the tower")
+        png = gp.screenshot(card_html(r, trk, title, t.strftime("%A %B %d, %Y %H:%M:%S") + " (real time)", foot), 960, 1730)
+        if dry:
+            open(os.path.join(os.path.expanduser("~"), "field-card-%s.png" % cs.replace(" ", "")), "wb").write(png)
+        else:
+            gp.send(hook + "?wait=true", "POST", png, "**%s** - Senaki rwy %s: %s" % (title, r["runway"], r["grade"]))
+            done.add(key)
+            json.dump(sorted(done), open(FIELD_STATE_FILE, "w"))
+        n += 1
+        print("%s %s %s" % ("drew" if dry else "posted", cs, r["grade"]))
+    return n
+
+
+if __name__ == "__main__" and sys.argv[1:2] == ["--post"]:
+    post_field_cards(sys.argv[2] if len(sys.argv) > 2 else dt.date.today().isoformat(), dry="--dry" in sys.argv)
+elif __name__ == "__main__" and len(sys.argv) > 2:
     lines = open(sys.argv[2], encoding="utf-8").read().splitlines()
     cs, r, trk = from_log(lines[0], lines[1])
     open(sys.argv[1], "wb").write(gp.screenshot(card_html(r, trk, cs, "Saturday November 07, 2026 (SIMULATED PASS)", "Senaki field landings - simulated pass through the real grader"), 960, 1730))
