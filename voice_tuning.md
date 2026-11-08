@@ -104,6 +104,15 @@ character compression alone doesn't give.
 Intensity is per role: `--radio-effect-intensity` (default `medium`),
 `--tower-radio-intensity` (`heavy`), `--atis-radio-intensity` (`light`).
 
+**Extra static for live-person roles (2026-11-08, 1678a8c).** On top of the tier,
+`--radio-noise` (multiplier on the tier's hiss, default 2.3), `--radio-crush`
+(acrusher mix plus a tanh soft clip on the voice, 0.40) and `--radio-tail`
+(seconds added to the squelch tail, 0.4). This is the "heavy" setting; "current"
+is `1 / 0 / 0`, and a mild one is about `1.5 / 0.25 / 0.2`. ATIS is exempt, and
+Paddles and the JTAC set take the grit and tail but not the extra hiss
+(`txFX`). Hiss is capped at amplitude 0.15. Set the flags in a role's bat file to
+turn one role down.
+
 The pink-noise amplitude behind each tier was raised ~60% on 2026-08-16 for a
 more audible carrier hiss. The tiers keep their old spacing:
 
