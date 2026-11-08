@@ -9,6 +9,10 @@ pass's track, pattern and context lines are written too, then runs
 greenie_post.py --refresh, which redraws the board, edits the Discord message and
 posts a card for each new pass. The hourly task stays as the backstop.
 
+Field landings ride on it too: every poll it counts the "Approach graded" lines in the Senaki Tower day log of the Day
+and Night rigs; on a new one it waits a few seconds (the "Approach track" line follows) and runs
+field_card.py --post, a card for each Venom / Raider landing to the field cards channel.
+
 Two more jobs ride on the same loop: twenty minutes after the last pass of a recovery it posts the
 recovery summary (recovery_summary.py --post), and on Sunday after 20:00 it posts the weekly report
 (weekly_report.py --post) once, as a new message in the greenie board's channel, and refreshes the
@@ -32,6 +36,8 @@ QUIET_S = 20 * 60 + 30  # a recovery is over when no pass has come for this long
 WEEK_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-weekly.json")
 SETTLE_S = 8  # the pass line is the last of the pass's log lines; give the rest a moment to be written
 MARK = b'"message":"Paddles: pass"'
+FIELD_RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221")]  # the rigs with a Senaki Tower
+FIELD_MARK = b'"message":"Approach graded"'
 
 
 def count(host, day):
@@ -44,6 +50,18 @@ def count(host, day):
     except (urllib.error.URLError, OSError):
         return None
     return body.count(MARK)
+
+
+def field_count(host, day):
+    """The number of graded field landings in this rig's Senaki Tower log for the day, or None if the rig didn't answer."""
+    try:
+        with urllib.request.urlopen("http://%s:7000/api/day-log?name=Senaki%%20Tower&date=%s" % (host, day), timeout=20) as r:
+            body = r.read()
+            if "html" in r.headers.get("Content-Type", ""):
+                return None
+    except (urllib.error.URLError, OSError):
+        return None
+    return body.count(FIELD_MARK)
 
 
 def refresh():
@@ -73,13 +91,13 @@ def weekly_due(now):
 
 
 def main():
-    seen = {}
+    seen, field_seen = {}, {}
     last_pass, pending = 0.0, False
     day = dt.date.today().isoformat()
     while True:
         today = dt.date.today().isoformat()
         if today != day:  # a new day: start counting again
-            day, seen = today, {}
+            day, seen, field_seen = today, {}, {}
         fresh = False
         for rig, host in RIGS:
             n = count(host, day)
@@ -99,6 +117,17 @@ def main():
             # (the recovery summary post to the Trap house was dropped 2026-11-06, operator: not needed)
             run("marshal_card.py", "--post-new")  # a Marshal card for each finished approach
             pending = False
+        field_fresh = False
+        for rig, host in FIELD_RIGS:
+            n = field_count(host, day)
+            if n is None:
+                continue
+            if rig in field_seen and n > field_seen[rig]:
+                field_fresh = True
+            field_seen[rig] = n
+        if field_fresh:
+            time.sleep(SETTLE_S)
+            run("field_card.py", "--post", day)  # skips what it already posted
         week = weekly_due(dt.datetime.now())
         if week:
             import json
