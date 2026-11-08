@@ -351,19 +351,26 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     if detail and has_pat and rec.get("abeam_t") and rec.get("pass"):
         ai = abeam_point(rec["pattern"], (rec["pass"]["t"] - rec["abeam_t"]).total_seconds())
         if ai is not None:
-            row = rec["pattern"][ai]
+            # Operator 2026-11-08: the abeam call goes on the oval at the top of the port side, about 2 NM ahead of the ship,
+            # where the turn is. Of the track points 0.5-2.2 NM to port, take the one nearest 2 NM ahead (the reply's time,
+            # worked back from the pass, only says which pass it belongs to and is too loose to place it).
+            pat_ = rec["pattern"]
+            near = [i for i in range(len(pat_)) if 0.5 <= pat_[i][1] / M_NM <= 2.2 and pat_[i][0] < 0]
+            if near:
+                ai = min(near, key=lambda i: abs(-pat_[i][0] / M_NM - 2.0))
+            row = pat_[ai]
             ax, ay = xy(-row[1] / M_NM, -row[0] / M_NM)
             s.append('<circle cx="%.1f" cy="%.1f" r="9" fill="none" stroke="%s" stroke-width="3"/>' % (ax, ay, YEL))
             s.append('<circle cx="%.1f" cy="%.1f" r="3" fill="%s"/>' % (ax, ay, YEL))
             lab = "ABEAM CALL"
-            sub = "%.1f NM / %d ft  %s" % (abs(row[1]) / M_NM, round(row[2], -1), rec["abeam_t"].strftime("%H:%M:%S"))
-            side = -1 if ax < cx else 1  # the label goes on the outside, away from the ship and clear of the track
-            ex = ax + side * 16
-            anc = "end" if side < 0 else "start"
-            s.append(pc.note(ex, ay - 2, lab, 14, anc))
-            s.append(pc.text(ex, ay + 15, sub, 12, "#e6edf3", anc))
-            wlab = max(len(lab) * 7.5, len(sub) * 6.5)
-            abeam_box = (ex - wlab, ay - 20, ex, ay + 20) if side < 0 else (ex, ay - 20, ex + wlab, ay + 20)
+            subs = ["%.1f NM / %d ft" % (abs(row[1]) / M_NM, round(row[2], -1)), rec["abeam_t"].strftime("%H:%M:%S")]
+            # the note sits below and left of the ring, in the clear between the initial approach and the oval
+            ex = ax - 12
+            s.append(pc.note(ex, ay + 36, lab, 14, "end"))
+            for n_, sub in enumerate(subs):
+                s.append(pc.text(ex, ay + 52 + 14 * n_, sub, 12, "#e6edf3", "end"))
+            wlab = 100
+            abeam_box = (ex - wlab, ay + 20, ex, ay + 84)
     sc = 0.14 if detail else 0.06
     s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
     if detail:
