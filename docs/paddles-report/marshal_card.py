@@ -348,29 +348,36 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
     if detail and has_pat:
         s.append(pc.poly([xy(-pt[1] / M_NM, -pt[0] / M_NM) for pt in rec["pattern"]], "#ffffff", 2.8))
     abeam_box = None
-    if detail and has_pat and rec.get("abeam_t") and rec.get("pass"):
-        ai = abeam_point(rec["pattern"], (rec["pass"]["t"] - rec["abeam_t"]).total_seconds())
-        if ai is not None:
-            # Operator 2026-11-08: the abeam call goes on the oval at the top of the port side, about 2 NM ahead of the ship,
-            # where the turn is. Of the track points 0.5-2.2 NM to port, take the one nearest 2 NM ahead (the reply's time,
-            # worked back from the pass, only says which pass it belongs to and is too loose to place it).
-            pat_ = rec["pattern"]
-            near = [i for i in range(len(pat_)) if 0.5 <= pat_[i][1] / M_NM <= 2.2 and pat_[i][0] < 0]
-            if near:
-                ai = min(near, key=lambda i: abs(-pat_[i][0] / M_NM - 2.0))
-            row = pat_[ai]
-            ax, ay = xy(-row[1] / M_NM, -row[0] / M_NM)
-            s.append('<circle cx="%.1f" cy="%.1f" r="9" fill="none" stroke="%s" stroke-width="3"/>' % (ax, ay, YEL))
-            s.append('<circle cx="%.1f" cy="%.1f" r="3" fill="%s"/>' % (ax, ay, YEL))
-            lab = "ABEAM CALL"
-            subs = ["%.1f NM / %d ft" % (abs(row[1]) / M_NM, round(row[2], -1)), rec["abeam_t"].strftime("%H:%M:%S")]
-            # the note sits below and left of the ring, in the clear between the initial approach and the oval
-            ex = ax - 12
-            s.append(pc.note(ex, ay + 36, lab, 14, "end"))
+    brk_box = None
+    if detail and has_pat:
+        pat_ = rec["pattern"]
+        ring = lambda ax, ay: ('<circle cx="%.1f" cy="%.1f" r="9" fill="none" stroke="%s" stroke-width="3"/>' % (ax, ay, YEL)
+                               + '<circle cx="%.1f" cy="%.1f" r="3" fill="%s"/>' % (ax, ay, YEL))
+        # the break (operator 2026-11-08): the top of the port side of the oval, about 2 NM ahead of the ship, where the turn is
+        near = [i for i in range(len(pat_)) if 0.5 <= pat_[i][1] / M_NM <= 2.2 and pat_[i][0] < 0]
+        if near:
+            bi_ = min(near, key=lambda i: abs(-pat_[i][0] / M_NM - 2.0))
+            row = pat_[bi_]
+            bx, by = xy(-row[1] / M_NM, -row[0] / M_NM)
+            s.append(ring(bx, by))
+            subs = ["%d kts / %d ft" % (round(row[3]), round(row[2]))] if len(row) > 3 and row[3] > 40 else ["%d ft" % round(row[2])]
+            s.append(pc.note(bx - 12, by + 36, "BREAK", 14, "end"))
             for n_, sub in enumerate(subs):
-                s.append(pc.text(ex, ay + 52 + 14 * n_, sub, 12, "#e6edf3", "end"))
-            wlab = 100
-            abeam_box = (ex - wlab, ay + 20, ex, ay + 84)
+                s.append(pc.text(bx - 12, by + 52 + 14 * n_, sub, 12, "#e6edf3", "end"))
+            brk_box = (bx - 112, by + 20, bx - 12, by + 70)
+        # the abeam call: where the jet was when Paddles answered it, from the reply's time worked back from the pass
+        if rec.get("abeam_t") and rec.get("pass"):
+            ai = abeam_point(pat_, (rec["pass"]["t"] - rec["abeam_t"]).total_seconds())
+            if ai is not None:
+                row = pat_[ai]
+                ax, ay = xy(-row[1] / M_NM, -row[0] / M_NM)
+                s.append(ring(ax, ay))
+                lab = "ABEAM CALL"
+                sub = "%.1f NM / %d ft  %s" % (abs(row[1]) / M_NM, round(row[2], -1), rec["abeam_t"].strftime("%H:%M:%S"))
+                ex = ax - 16
+                s.append(pc.note(ex, ay - 2, lab, 14, "end"))
+                s.append(pc.text(ex, ay + 15, sub, 12, "#e6edf3", "end"))
+                abeam_box = (ex - max(len(lab) * 7.5, len(sub) * 6.5), ay - 20, ex, ay + 20)
     sc = 0.14 if detail else 0.06
     s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
     if detail:
@@ -379,7 +386,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
             pat = rec["pattern"]
             pts_ = [(*xy(-row[1] / M_NM, -row[0] / M_NM), row[2]) for row in pat]
             rings_ = [(cx + n * k * 0.72 + 2, cy - n * k * 0.69 - 14, cx + n * k * 0.72 + 52, cy - n * k * 0.69 + 5) for n in (0.5, 1, 2, 3, 4) if n < far]
-            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_ + ([abeam_box] if abeam_box else []), over_note=False)  # the last two keep notes on the panel
+            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_ + [b_ for b_ in (abeam_box, brk_box) if b_], over_note=False)  # the last two keep notes on the panel
         else:
             s.append(pc.text(W / 2, H / 2, "no pattern track recorded", 15, MUTED, "middle"))
     else:
