@@ -210,8 +210,7 @@ function detail(p) {
 async function editName(ucid) {
   const p = (data.pilots || []).find(x => x.ucid === ucid);
   if (!p) return;
-  const v = prompt('Name must be Raider 302 | Jedi or Venom 024 | Leeroy.
-Leave empty to go back to the automatic name.', p.name);
+  const v = prompt('Name must be Raider 302 | Jedi or Venom 024 | Leeroy.\nLeave empty to go back to the automatic name.', p.name);
   if (v === null) return;
   const r = await fetch('/api/pilot-name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ucid, name: v }) });
