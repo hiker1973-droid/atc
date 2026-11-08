@@ -347,6 +347,23 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
                 last_alt = alt
     if detail and has_pat:
         s.append(pc.poly([xy(-pt[1] / M_NM, -pt[0] / M_NM) for pt in rec["pattern"]], "#ffffff", 2.8))
+    abeam_box = None
+    if detail and has_pat and rec.get("abeam_t") and rec.get("pass"):
+        ai = abeam_point(rec["pattern"], (rec["pass"]["t"] - rec["abeam_t"]).total_seconds())
+        if ai is not None:
+            row = rec["pattern"][ai]
+            ax, ay = xy(-row[1] / M_NM, -row[0] / M_NM)
+            s.append('<circle cx="%.1f" cy="%.1f" r="9" fill="none" stroke="%s" stroke-width="3"/>' % (ax, ay, YEL))
+            s.append('<circle cx="%.1f" cy="%.1f" r="3" fill="%s"/>' % (ax, ay, YEL))
+            lab = "ABEAM CALL"
+            sub = "%.1f NM / %d ft  %s" % (abs(row[1]) / M_NM, round(row[2], -1), rec["abeam_t"].strftime("%H:%M:%S"))
+            side = -1 if ax < cx else 1  # the label goes on the outside, away from the ship and clear of the track
+            ex = ax + side * 16
+            anc = "end" if side < 0 else "start"
+            s.append(pc.note(ex, ay - 2, lab, 14, anc))
+            s.append(pc.text(ex, ay + 15, sub, 12, "#e6edf3", anc))
+            wlab = max(len(lab) * 7.5, len(sub) * 6.5)
+            abeam_box = (ex - wlab, ay - 20, ex, ay + 20) if side < 0 else (ex, ay - 20, ex + wlab, ay + 20)
     sc = 0.14 if detail else 0.06
     s.append('<g transform="translate(%d %d) scale(%.2f) translate(%d %d) rotate(-270 %d %d)">%s</g>' % (cx, cy + 34 * sc, sc, -cx, -cy, cx, cy, pc.carrier_top(cx, cy, None)))
     if detail:
@@ -355,7 +372,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
             pat = rec["pattern"]
             pts_ = [(*xy(-row[1] / M_NM, -row[0] / M_NM), row[2]) for row in pat]
             rings_ = [(cx + n * k * 0.72 + 2, cy - n * k * 0.69 - 14, cx + n * k * 0.72 + 52, cy - n * k * 0.69 + 5) for n in (0.5, 1, 2, 3, 4) if n < far]
-            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_)  # the last two keep notes on the panel
+            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_ + ([abeam_box] if abeam_box else []))  # the last two keep notes on the panel
         else:
             s.append(pc.text(W / 2, H / 2, "no pattern track recorded", 15, MUTED, "middle"))
     else:
@@ -502,6 +519,45 @@ def pass_pattern(rec):
     return pc.match(p, rows)
 
 
+def abeam_call(rec):
+    """When the pilot made the abeam call: Paddles' reply ("Paddles contact, 302, Hornet in the groove, at three-quarters of a
+    mile call the ball") is logged as a Command/Paddles TX within 7 minutes before the pass ended. Returns its time, or None."""
+    p = rec.get("pass")
+    if not p or not p.get("rig"):
+        return None
+    modex = re.sub(r"\D", "", p.get("logcs", p["callsign"]))[-3:]
+    data = os.path.join(gp.REPORTS, "_data", "paddles")
+    best = None
+    for f in sorted(os.listdir(data)):
+        m = re.match(r"(\d{4}-\d{2}-\d{2}) (.+)\.log$", f)
+        if not m or m.group(1) != p["t"].date().isoformat() or m.group(2) != p["rig"]:
+            continue
+        for line in open(os.path.join(data, f), encoding="utf-8", errors="replace"):
+            if "in the groove" not in line or "three-quarter" not in line:
+                continue
+            try:
+                o = json.loads(line)
+                t = dt.datetime.fromisoformat(o["time"])
+            except (ValueError, KeyError):
+                continue
+            if re.sub(r"\D", "", o.get("callsign", ""))[-3:] == modex and 0 <= (p["t"] - t).total_seconds() <= 420:
+                best = t  # the last one before the pass
+    return best
+
+
+def abeam_point(pattern, secs_before_end):
+    """The row of the Paddles pattern ([astern m, port m, ft, kts]) the jet was at `secs_before_end` seconds before the pass
+    ended. The rows carry no clock, so time is rebuilt back from the end: each step is its length over the jet's mean speed."""
+    t = 0.0
+    for i in range(len(pattern) - 1, 0, -1):
+        a, b = pattern[i - 1], pattern[i]
+        v = max(30.0, (a[3] + b[3]) / 2) * 0.5144  # knots -> m/s
+        t += math.hypot(a[0] - b[0], a[1] - b[1]) / v
+        if t >= secs_before_end:
+            return i - 1
+    return None
+
+
 def build(rec, c3, events, passes, carrier=None):
     names = {cs: label for cs, label, _, _ in gp.roster()}
     canon = {a: cs for cs, _, _, al in gp.roster() for a in al if cs}
@@ -510,6 +566,7 @@ def build(rec, c3, events, passes, carrier=None):
     mates = [r for r in c3 if r["rig"] == rec["rig"] and abs((r["checkin"] - rec["checkin"]).total_seconds()) < 3600]
     rec["track"] = stack_track(rec, events)
     rec["pattern"] = pass_pattern(rec)
+    rec["abeam_t"] = abeam_call(rec)
     p = rec.get("pass")
     result = ("Paddles: %s%s" % (p["grade"], ", %d wire" % p["wire"] if p.get("wire") and not p["grade"].startswith("WO") else "")) if p else "No Paddles pass seen"
     ctx = {"ceiling": rec.get("ceiling"), "vis": rec.get("vis")}
