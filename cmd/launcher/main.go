@@ -167,6 +167,7 @@ func main() {
 	mux.HandleFunc("/api/day-log", handleDayLog)
 	mux.HandleFunc("/api/pilots-raw", handlePilotsRaw)
 	mux.HandleFunc("/api/pilots", handlePilots)
+	mux.HandleFunc("/api/pilot-name", handlePilotName)
 	mux.HandleFunc("/api/reports", handleReports)
 	// GET = one saved debrief (viewer); POST = delete it (control, checked inside).
 	mux.HandleFunc("/api/reports/file", handleReportFile)

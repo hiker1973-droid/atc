@@ -160,7 +160,7 @@ function render() {
     $('body').innerHTML = `<tr><td colspan="${COLS.length}" class="empty">No pilots in this range.</td></tr>`;
   } else {
     $('body').innerHTML = rows.map(p => `<tr class="${p.ucid === selected ? 'sel' : ''}" onclick="pick('${esc(p.ucid)}')">
-      <td>${p.online ? '<span class="dot" title="in a slot now"></span>' : ''}${esc(p.name)}</td>
+      <td>${p.online ? '<span class="dot" title="in a slot now"></span>' : ''}${esc(p.name)}${p.needsName ? ' <span style="color:var(--amber)" title="Not in Raider/Venom format - click, then Edit name">⚠ needs callsign</span>' : ''}</td>
       ${num(p.hours, 1)}${num(p.sessions)}${num(p.sorties)}${num(p.landings)}${num(p.traps)}${num(p.trapPoints, 1)}
       ${num(p.kills)}${num(p.deaths)}${num(p.crashes)}${num(p.ejections)}
       <td class="l">${esc(p.top)}</td><td class="l muted">${p.online ? 'now' : ago(p.lastSeen)}</td></tr>`).join('');
@@ -191,7 +191,8 @@ function detail(p) {
   }).join('');
   const traps = (p.recentTraps || []).map(t => `<tr><td class="l">${when(t.time)}</td><td class="l">${esc(t.aircraft)}</td>
     <td class="l">${esc(t.grade)}</td><td>${t.wire || '—'}</td><td>${t.points}</td><td class="l">${t.night ? 'night' : 'day'}</td></tr>`).join('');
-  d.innerHTML = `<h2>${esc(p.name)}</h2>
+  d.innerHTML = `<h2>${esc(p.name)} <button onclick="editName('${p.ucid}')" title="Rename this pilot everywhere (Pilots, Stats, reports)">Edit name</button></h2>
+    ${p.rawName && p.rawName !== p.name ? `<div class="muted">DCS name: ${esc(p.rawName)}</div>` : ''}
     <div class="muted">${p.callsign ? esc(p.callsign) + ' · ' : ''}first seen ${when(p.firstSeen)} · last seen ${p.online ? 'now (in a slot)' : when(p.lastSeen)}
       · ${p.killsAir} air / ${p.killsGround} ground kills${p.teamkills ? ` · <span style="color:var(--red)">${p.teamkills} team kills</span>` : ''}</div>
     <div class="cols">
@@ -204,6 +205,20 @@ function detail(p) {
       <div class="box"><h3>Carrier traps (greenieboard)</h3>${traps ? `<table><thead><tr><th class="l">When</th><th class="l">Aircraft</th>
         <th class="l">Grade</th><th>Wire</th><th>Pts</th><th class="l"></th></tr></thead><tbody>${traps}</tbody></table>` : '<div class="muted">No graded traps in this range.</div>'}</div>
     </div>`;
+}
+
+async function editName(ucid) {
+  const p = (data.pilots || []).find(x => x.ucid === ucid);
+  if (!p) return;
+  const v = prompt('Name must be Raider 302 | Jedi or Venom 024 | Leeroy.
+Leave empty to go back to the automatic name.', p.name);
+  if (v === null) return;
+  const r = await fetch('/api/pilot-name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ucid, name: v }) });
+  if (!r.ok) { alert('Could not save: ' + (await r.text())); return; }
+  await load();
+  const q = (data.pilots || []).find(x => x.ucid === ucid);
+  if (q) detail(q);
 }
 
 function setupHelp() {

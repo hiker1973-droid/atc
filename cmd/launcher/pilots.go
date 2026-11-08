@@ -293,6 +293,8 @@ func readTraps(ctx context.Context, conn *pgx.Conn, table string, have map[strin
 type PilotStats struct {
 	UCID       string             `json:"ucid"`
 	Name       string             `json:"name"`
+	RawName    string             `json:"rawName"` // as DCS has it
+	NeedsName  bool               `json:"needsName"` // not Raider/Venom NNN | Handle: the operator must set it
 	Callsign   string             `json:"callsign"` // "Venom 212" from "Venom 212 | Dabs"
 	Hours      float64            `json:"hours"`    // in a slot (DCSServerBot hop_on..hop_off)
 	Sessions   int                `json:"sessions"`
@@ -459,7 +461,10 @@ func mergePilots(parts []PilotsRaw, now time.Time) *PilotsReport {
 		}
 	}
 	for _, p := range by {
+		p.RawName = p.Name
+		p.Name = displayPilotName(p.UCID, p.Name)
 		p.Callsign = pilotCallsign(p.Name)
+		p.NeedsName = !isStandardPilotName(p.Name)
 		sort.Slice(p.Recent, func(i, j int) bool { return p.Recent[i].HopOn.After(p.Recent[j].HopOn) })
 		if len(p.Recent) > 15 {
 			p.Recent = p.Recent[:15]
