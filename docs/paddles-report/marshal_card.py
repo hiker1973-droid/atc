@@ -372,7 +372,7 @@ def _case1_pattern(rec, mates, brc, name, W, H, far, detail):
             pat = rec["pattern"]
             pts_ = [(*xy(-row[1] / M_NM, -row[0] / M_NM), row[2]) for row in pat]
             rings_ = [(cx + n * k * 0.72 + 2, cy - n * k * 0.69 - 14, cx + n * k * 0.72 + 52, cy - n * k * 0.69 + 5) for n in (0.5, 1, 2, 3, 4) if n < far]
-            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_ + ([abeam_box] if abeam_box else []))  # the last two keep notes on the panel
+            s += pc.callouts(pat, pts_, [(W - 190, 40, W, 62), (-600, -600, 4, 2000), (W - 4, -600, W + 600, 2000)] + rings_ + ([abeam_box] if abeam_box else []), over_note=False)  # the last two keep notes on the panel
         else:
             s.append(pc.text(W / 2, H / 2, "no pattern track recorded", 15, MUTED, "middle"))
     else:

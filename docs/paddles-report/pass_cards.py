@@ -293,7 +293,7 @@ def _hit(a, b):
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
-def callouts(pat, pts, avoid=()):
+def callouts(pat, pts, avoid=(), over_note=True):
     """The DCS card's hand-written numbers: speed and height over the ship, the apex of the break, downwind,
     the height abeam and where the jet rolled out. A note that would land on another note (or on a ring label in
     `avoid`) is moved to the next free spot, so the words never overlap (Turbo's pass 2026-11-06)."""
@@ -308,7 +308,10 @@ def callouts(pat, pts, avoid=()):
             lx = px + dx
             x0 = lx if anc == "start" else lx - w if anc == "end" else lx - w / 2
             return (x0 - 3, py + dy - size, x0 + w + 3, py + dy + (17 if sub else 6))
-        pick = next((c for c in cands if not any(_hit(box(*c), t) for t in taken)), cands[0])
+        def on_track(bx):  # the flown line runs through this box (the point the note is for does not count)
+            return any(bx[0] <= qx <= bx[2] and bx[1] <= qy <= bx[3] and math.hypot(qx - px, qy - py) > 24 for qx, qy, _ in pts)
+        free = [c for c in cands if not any(_hit(box(*c), t) for t in taken)]
+        pick = next((c for c in free if not on_track(box(*c))), free[0] if free else cands[0])
         taken.append(box(*pick))
         dx, dy, anc = pick
         lx, ly = px + dx, py + dy
@@ -321,14 +324,14 @@ def callouts(pat, pts, avoid=()):
     label = lambda i: ("%d kts " % kts(i) if kts(i) else "") + "%d ft" % pat[i][2]
     brk = next((i for i in range(n) if pat[i][1] > 600), n)   # the break: first well to port
     bi = break_index(pat)
-    if bi is not None:  # "in the break": where the turn began and how far from the boat that was
+    if bi is not None and pts[bi][0] > 14:  # "in the break" (left of the view, the note would point off the card): where the turn began and how far from the boat that was
         x, y, _ = pts[bi]
         d = abs(pat[bi][0]) / M_NM  # along the ship's heading: ahead of the ship is "past ABE"
         out.append('<circle cx="%.1f" cy="%.1f" r="6" fill="none" stroke="%s" stroke-width="2"/>' % (x, y, YEL))
-        put(x, y, "in the break: %.1f NM %s ABE" % (d, "past" if pat[bi][0] < 0 else "short of"), 17,
-            [(36, -74, "start"), (-36, -74, "end"), (36, 80, "start"), (-36, 80, "end"), (36, -110, "start")])
+        put(x, y, "Break - " + label(bi), 17,
+            [(36, -74, "start"), (-36, -74, "end"), (30, 22, "start"), (36, 80, "start"), (-36, 80, "end"), (36, -110, "start"), (-36, -110, "end"), (70, -74, "start"), (70, 80, "start")])
     over = min(range(0, min(brk, n)), key=lambda i: abs(pat[i][0]), default=None)
-    if over is not None and abs(pat[over][0]) < 600 and over > 2:
+    if over_note and over is not None and abs(pat[over][0]) < 600 and over > 2:  # speed and height over the ship
         x, y, _ = pts[over]
         put(x, y, label(over), 15, [(-10, -46, "end"), (10, -46, "start"), (-10, 56, "end"), (10, 56, "start")])
     ahead = [i for i in range(brk, n) if pat[i][0] < 0]
@@ -340,7 +343,8 @@ def callouts(pat, pts, avoid=()):
     down = next((i for i in range(brk, n) if pat[i][1] > 0.8 * far), None)
     if down is not None and far > 800:
         x, y, _ = pts[down]
-        put(x, y, label(down), 15, [(14, -34, "start"), (-14, -34, "end"), (14, 44, "start"), (-14, 44, "end")])
+        if over_note:  # speed and height on the downwind
+            put(x, y, label(down), 15, [(14, -34, "start"), (-14, -34, "end"), (14, 44, "start"), (-14, 44, "end")])
         ab = min((i for i in range(down, n) if pat[i][1] > 0.6 * far), key=lambda i: abs(pat[i][0]), default=None)
         if ab is not None and abs(pat[ab][0]) < 700:
             x, y, _ = pts[ab]
