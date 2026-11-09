@@ -1631,6 +1631,15 @@ func (c *ATCComposer) MarshalCaseChange(newCaseLabel string) string {
 	})
 }
 
+// MarshalRecoveryBRC is the one call to all aircraft after Turn Into Wind
+// starts and the ship has settled. brc is magnetic; below 0 = not on scope.
+func (c *ATCComposer) MarshalRecoveryBRC(brc float64) string {
+	if brc < 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s, all aircraft, BRC %03.0f.", c.towerCallsign, brc)
+}
+
 // SpeedWarning warns an aircraft exceeding 350kt within 10nm — 3 variations.
 func (c *ATCComposer) SpeedWarning(callsign string) string {
 	return pick([]string{

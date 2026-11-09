@@ -148,6 +148,8 @@ var (
 	flagScudwatchBullseye   string
 	flagMarshalOnly         bool
 	flagMarshalTestTx       bool
+	flagTiwLog              string
+	flagTiwDelay            time.Duration
 	flagCommandTestTx       bool
 	flagPprofPort           int
 	flagRunwayRotation      bool
@@ -371,6 +373,8 @@ func newRootCommand() *cobra.Command {
 	registerSayFlags(f)
 	f.BoolVar(&flagMarshalOnly, "marshal-only", false,
 		"Run as carrier Marshal only — no tower, ATIS, command, deckboss, scudwatch")
+	f.StringVar(&flagTiwLog, "tiw-log", "", "dcs.log to watch for the mission's Turn Into Wind flag line (default: newest Saved Games DCS*/Logs/dcs.log)")
+	f.DurationVar(&flagTiwDelay, "tiw-brc-delay", 4*time.Minute, "Marshal says the BRC to all aircraft this long after Turn Into Wind starts (0 = off)")
 	f.BoolVar(&flagMarshalTestTx, "marshal-test-tx", false,
 		"DEBUG: have Marshal transmit \"test\" every 30s (used to verify SRS routing — leave off in production)")
 	f.BoolVar(&flagCommandTestTx, "command-test-tx", false,

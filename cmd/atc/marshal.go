@@ -493,6 +493,7 @@ func marshalLoop(ctx context.Context, srsAddr string, freqMHz float64, apiKey, e
 		}
 	}()
 
+	go watchTurnIntoWind(ctx, comp, transmit, atcCtrl)    // marshal_tiw.go
 	go watchCharlie(ctx, stack, comp, transmit, atcCtrl) // marshal_charlie.go
 	go watchCase3Paddles(ctx, comp, transmit, atcCtrl)   // marshal_case3.go
 	go watchMarshalTracks(ctx, stack, atcCtrl)           // marshal_track.go
