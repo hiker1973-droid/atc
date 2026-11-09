@@ -249,7 +249,7 @@ func newRootCommand() *cobra.Command {
 	// difference"). eleven_multilingual_v2 is the richer, 2x-cost model.
 	f.IntVar(&flagElevenStopAt, "elevenlabs-stop-at", 127000, "ElevenLabs credits used this billing period (the account's count) at which every role switches to OpenAI until the period resets; checked every 10 min (operator 2026-10-16: \"flip to open AI once we hit 127k\"; 0 = never)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
-	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elDeparture11, "ElevenLabs voice ID for Command (default round 11 voice 4 \"Jodi\", library - the Departure voice too)")
+	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elEryn, "ElevenLabs voice ID for Command (default library \"Eryn\", American woman; was Jodi until 2026-11-08, who stays the Departure voice)")
 	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
 	f.StringVar(&flagElevenTowerVoice, "elevenlabs-tower-voice", "",
 		"ElevenLabs voice ID for this tower, over the accent default (Lisa / Alice / George); Senaki uses round 13 senaki_6 for Tower, Ground and Traffic")

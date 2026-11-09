@@ -113,7 +113,7 @@ var TowerStation = Station{Key: "tower", Label: "Tower", Owner: OwnerTower, Name
 // Defaults are atc.exe's own flag defaults, for a station whose bat line does
 // not name the flag. cmd/atc's TestRoleCatalogDefaults keeps them in step.
 var Defaults = map[string]string{
-	"command-freq": "0", "command-name": "vSFG-7-Command", "command-voice": "onyx", "elevenlabs-command-voice": "FF59babHL8N8gfTgtBMT",
+	"command-freq": "0", "command-name": "vSFG-7-Command", "command-voice": "onyx", "elevenlabs-command-voice": "8tsLeAV5vPVuzCCvqbbU",
 	"overlord-name": "Overlord-Actual", "overlord-voice": "ash", "elevenlabs-overlord-voice": "d7KZ4gJXiEWKJV0PMsGG",
 	"jtac-freq": "0", "jtac-name": "Hitman-1-1", "jtac-voice": "ash", "elevenlabs-jtac-voice": "7QoDxbTwBuOlgOCahTNI",
 	"jtac2-freq": "0", "jtac2-name": "Hitman-2-1", "jtac2-voice": "echo", "elevenlabs-jtac2-voice": "9JbYHzFp74No6NSJoI0w",

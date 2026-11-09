@@ -87,6 +87,7 @@ const (
 	// elBrad is round 10's "command_3_Brad-calm-commanding", picked 2026-10-16 for
 	// Overlord Actual, who answers permission requests on Command's net.
 	elBrad = "d7KZ4gJXiEWKJV0PMsGG" // "Brad", American man, calm, commanding (Overlord Actual)
+	elEryn = "8tsLeAV5vPVuzCCvqbbU" // "Eryn - Confident Corporate Training American Female Voice" (library) - Command since 2026-11-08 (operator: "we need to change command to a female american", picked Eryn)
 	elHank = "KvaCHcJoMXfOzwtsULOZ" // American man, 38, gruff, rugged, calm (Deckboss until 2026-10-15)
 )
 
