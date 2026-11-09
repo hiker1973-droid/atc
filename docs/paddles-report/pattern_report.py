@@ -160,9 +160,11 @@ def main():
     open(out, "wb").write(png)
     print(summary, "->", out)
     if "--post" in sys.argv:
-        hook = gp.reports_hook()
-        gp.send(hook + "?wait=true", "POST", png, summary)
-        print("posted")
+        home = os.path.expanduser("~")
+        hf = os.path.join(home, "readback-pattern-webhook.txt")  # the pattern report's own channel; the reports channel if absent
+        hook = open(hf, encoding="utf-8").read().strip() if os.path.exists(hf) else gp.reports_hook()
+        # one message, edited in place each run (made again if someone deletes it)
+        print(gp.post(hook, png, summary, os.path.join(home, "readback-pattern-message.txt")))
     return 0
 
 
