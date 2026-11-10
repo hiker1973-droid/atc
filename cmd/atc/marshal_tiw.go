@@ -147,7 +147,7 @@ func watchTurnIntoWind(ctx context.Context, comp *composer.ATCComposer, transmit
 			if n > 0 && due.IsZero() {
 				due, extra = time.Now().Add(flagTiwDelay), 0
 				log.Info().Int("minutes", n).Time("callAt", due).Msg("Marshal: Turn Into Wind started, BRC call scheduled")
-				transmit(comp.MarshalTurningIntoWind())
+				transmit(comp.MarshalTurningIntoWind(n))
 			} else if n == 0 && !due.IsZero() {
 				due = time.Time{}
 				log.Info().Msg("Marshal: Turn Into Wind ended before the BRC call, cancelled")

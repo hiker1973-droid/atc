@@ -1632,8 +1632,8 @@ func (c *ATCComposer) MarshalCaseChange(newCaseLabel string) string {
 }
 
 // MarshalTurningIntoWind is the heads-up when the ship starts turning into wind.
-func (c *ATCComposer) MarshalTurningIntoWind() string {
-	return fmt.Sprintf("%s, all aircraft, mother is turning into wind, BRC to follow.", c.towerCallsign)
+func (c *ATCComposer) MarshalTurningIntoWind(minutes int) string {
+	return fmt.Sprintf("%s, all aircraft, mother is turning into wind, carrier recovery operations in effect for the next %d minutes, BRC to follow.", c.towerCallsign, minutes)
 }
 
 // MarshalRecoveryBRC is the one call to all aircraft after Turn Into Wind
