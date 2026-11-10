@@ -987,6 +987,7 @@ func run(cmd *cobra.Command, args []string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		tacviewOfflineLogged := false // warn once per outage, not every minute (paused Foothold flooded logs)
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -995,8 +996,15 @@ func run(cmd *cobra.Command, args []string) error {
 				return
 			case <-ticker.C:
 				if atomic.LoadInt32(&tacviewConnected) == 0 {
-					log.Warn().Msg("Tacview telemetry offline — speed warnings and conflict detection disabled")
+					if !tacviewOfflineLogged {
+						log.Warn().Msg("Tacview telemetry offline — speed warnings and conflict detection disabled (further reminders suppressed until it reconnects)")
+						tacviewOfflineLogged = true
+					}
 				} else {
+					if tacviewOfflineLogged {
+						log.Info().Msg("Tacview telemetry back online")
+						tacviewOfflineLogged = false
+					}
 					nano := atomic.LoadInt64(&tacviewLastData)
 					if nano == 0 {
 						log.Warn().Msg("Tacview connected — no air contacts yet")
