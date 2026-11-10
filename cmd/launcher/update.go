@@ -85,6 +85,13 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "this copy was installed by Readback-Setup.exe: update it from Settings > Updates, or run a newer Readback-Setup.exe", http.StatusConflict)
 		return
 	}
+	// Refuse to restart the roles under a live session unless forced (?force=1).
+	if r.URL.Query().Get("force") != "1" {
+		if t := lastPilotCall(filepath.Join(rootDir, "logs"), time.Now().Add(-recentPilotWindow)); !t.IsZero() {
+			http.Error(w, fmt.Sprintf("pilot call heard at %s (within %v) - an Update would restart the roles mid-session; add ?force=1 to override", t.Format("15:04:05"), recentPilotWindow), http.StatusConflict)
+			return
+		}
+	}
 	updMu.Lock()
 	if upd.Running {
 		updMu.Unlock()

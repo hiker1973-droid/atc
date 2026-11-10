@@ -51,7 +51,7 @@ GCI_MISS = "GCI: not addressed to us or not understood - silent"
 GCI_CALLS = {"brevity.ThreatCall": "gci_threat", "brevity.MergedCall": "gci_merged",
              "brevity.FadedCall": "gci_faded", "brevity.PictureResponse": "gci_picture"}
 # Start-up banners and other lines that are not problems.
-NOISE = re.compile(r"^═|^Speed warnings and conflict detection DISABLED|^TACVIEW OFFLINE|"
+NOISE = re.compile(r"^═|^Speed warnings and conflict detection DISABLED|^TACVIEW OFFLINE|^Tacview telemetry offline|^Tacview telemetry back online|"
                    r"^\.miz weather read failed|^Tacview connected — no air contacts yet")
 # Link drops and the retries after them: counted in the SRS / Tacview columns,
 # one per outage, so they stay out of the warnings. Command logs one line per

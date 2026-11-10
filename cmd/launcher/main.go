@@ -972,6 +972,7 @@ type RigStatus struct {
 	Health     *Health      `json:"health,omitempty"`
 	Version    *VersionInfo `json:"version,omitempty"`
 	RolesTotal int          `json:"rolesTotal"`
+	RolesRunning int        `json:"rolesRunning"`
 	Running    []Role       `json:"running,omitempty"`
 	Alerts     []Alert      `json:"alerts,omitempty"`
 	Mission    *RigMission  `json:"mission,omitempty"`
@@ -1030,6 +1031,7 @@ func pollRig(rig Rig) RigStatus {
 		if err := fleetGetJSON(base+"/api/alerts", &alerts); err == nil {
 			rs.Alerts = alerts
 		}
+		rs.RolesRunning = len(rs.Running)
 		rs.Mission = pollRigMission(base, rs.Running)
 	}
 	rs.Air = rigAir(rig)
