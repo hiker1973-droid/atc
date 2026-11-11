@@ -40,7 +40,9 @@ type jtacStage int
 
 const (
 	jtacAssigned jtacStage = iota // no 9-line passed yet
-	jtacBriefed                   // 9-line passed, readback not heard
+	jtacBriefed                   // lines 1-3 passed, readback not heard
+	jtacBrief2                    // lines 4-6 passed, readback not heard
+	jtacBrief3                    // lines 7-9 passed, readback not heard
 	jtacReady                     // readback heard, waiting for IP inbound
 	jtacInbound                   // IP inbound, waiting for the in call
 	jtacCleared                   // cleared hot, the watch is running
@@ -75,7 +77,7 @@ const (
 	jtacContactMaxAge = 30 * time.Second
 	// jtacWhisperCalls: the net's calls, between its callsign and its IP
 	// names in jtacWhisperPrompt.
-	jtacWhisperCalls = "Raider, Venom, Viper, checking in, request tasking, ready for 9-line, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
+	jtacWhisperCalls = "Raider, Venom, Viper, checking in, request tasking, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -225,23 +227,23 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		cur.redraw = false
 		cur.issued, cur.awaiting, cur.stage = now, false, jtacBriefed
 		t := b.targets[cur.target]
-		// Target and IP only (operator 2026-10-14: "Hitman just needs to read
-		// the target not the whole 9 line ( we can do that later)"). The rest of
-		// the card - control, elevation, attack headings, egress - is on the
-		// pilot's kneeboard and still checked against the Tacview picture.
-		resp := say("target %d, %s, IP %s.", t.Number, t.Name, t.IP)
+		// The 9-line goes out in three blocks of three lines, each read back
+		// (operator 2026-11-11; jtac_brief.go). Block 1 here, with the target
+		// introduction.
+		intro := say("target %d, %s.", t.Number, t.Name)
 		switch t.Phase {
 		case 1:
-			resp = say("troops in contact. Target %d, enemy force, %s. IP %s.", t.Number, t.Spoken, t.IP)
+			intro = say("troops in contact. Target %d, enemy force.", t.Number)
 		case 2:
-			resp = say("next target %d, %s, IP %s.", t.Number, t.Name, t.IP)
+			intro = say("next target %d, %s.", t.Number, t.Name)
 		}
+		resp := intro + " " + briefBlock(t, 1)
 		if pos, _, ok := pic.Contact(callsign); ok {
 			if brg, nm := bearingRangeFromRef(pos, t.IPPos[0], t.IPPos[1]); nm > jtacIPNearNm {
 				resp += fmt.Sprintf(" %s bears %s for %d.", t.IP, spokenBearing(toMagnetic(brg, t.MagVar)), int(nm+0.5))
 			}
 		}
-		return resp + " Read back."
+		return resp
 	}
 
 	if cur == nil || cur.stage == jtacAssigned {
@@ -252,6 +254,12 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		return ""
 	}
 	t := b.targets[cur.target]
+
+	if cur.stage >= jtacBriefed && cur.stage <= jtacBrief3 {
+		if r, ok := b.briefStep(cur, lower, callsign, t, func(f string, a ...interface{}) string { return say(f, a...) }); ok {
+			return r
+		}
+	}
 
 	switch {
 	case !cur.effectsAsked.IsZero() && now.Sub(cur.effectsAsked) <= bdaEffectsWindow && !isBDARequest(lower) && pilotEffects(lower) != 0:
@@ -385,21 +393,6 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		b.clear(cur, now)
 		return say("cleared hot.")
 
-	case isTaskingAck(lower) || isTargetReadback(lower, t):
-		if cur.stage != jtacBriefed {
-			return ""
-		}
-		// Our own brief heard back carries the target and the IP too. It leads
-		// with the callsign and names Hitman mid-string ("Raider 302, Hitman
-		// 1-1, target 3, ..."); a pilot leads with Hitman or leaves it out.
-		// Seen live 2026-10-14 11:48:39: an unknown SRS origin returned the
-		// brief word for word and was taken as a good readback.
-		if i := strings.Index(lower, "hitman"); i > 0 {
-			log.Info().Str("callsign", callsign).Str("text", text).Msg("JTAC: readback names Hitman mid-call, treated as our own echo")
-			return ""
-		}
-		cur.stage = jtacReady
-		return say("good readback. Report IP inbound.")
 	}
 	return ""
 }

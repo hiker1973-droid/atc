@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -17,10 +18,19 @@ func TestCASTICFlow(t *testing.T) {
 
 	r := b.JTACResponse("Hitman one one, Raider 302, checking in", "Raider 302", hitman, pic)
 	tg := b.targets[b.flights["raider 302"].target]
-	if tg.Phase != 1 || !strings.Contains(r, "troops in contact") || !strings.Contains(r, tg.Spoken) || !strings.Contains(r, "IP "+tg.IP) {
+	if tg.Phase != 1 || !strings.Contains(r, "troops in contact") || !strings.Contains(r, "IP "+tg.IP) {
 		t.Fatalf("phase 1 brief: %q", r)
 	}
-	b.JTACResponse("copy", "Raider 302", hitman, pic)
+	// Lines 4-6 carry the target as the kneeboard words it.
+	r = b.JTACResponse(fmt.Sprintf("Hitman, Raider 302, IP %s, heading %03d", tg.IP, tg.RunIn), "Raider 302", hitman, pic)
+	if !strings.Contains(r, "line 5, target, "+tg.Spoken) {
+		t.Fatalf("block 2: %q", r)
+	}
+	d := nineData(tg)
+	b.JTACResponse(fmt.Sprintf("Hitman, Raider 302, elevation %d, location %s", tg.ElevFt, d.Grid), "Raider 302", hitman, pic)
+	if r = b.JTACResponse("Hitman, Raider 302, copy", "Raider 302", hitman, pic); !strings.Contains(r, "confirmed. Report IP inbound.") {
+		t.Fatalf("block 3 readback: %q", r)
+	}
 
 	r = b.JTACResponse("Raider 302, established IP "+tg.IP, "Raider 302", hitman, pic)
 	if !strings.Contains(r, "Run in heading") || !strings.Contains(r, "final attack heading") {
