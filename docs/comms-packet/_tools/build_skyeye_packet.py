@@ -85,6 +85,10 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.40 (operator 2026-11-11): Hitman passes the 9-line in three blocks of three lines (1-3, 4-6, 7-9),
+each read back by the pilot; wrong readback = the block again; "say again" / "say again line 6";
+"confirmed. Report IP inbound." after the third (card 13; cmd/atc/jtac_brief.go).
+
 v1.39 (operator 2026-10-27, "update the comms packet") follows origin/main 9de1eb0 (Readback
 ATC 0.3.2): Case III approach times ten minutes apart, "radar contact" on commencing, Marshal's
 "eight miles, dirty up", and the Case III bolter / wave-off pattern - climb to 1,200, turn
@@ -140,8 +144,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.39"
-DATE = "27 OCT 2026"   # release date of VER - change it together with VER
+VER = "v1.40"
+DATE = "11 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -687,8 +691,10 @@ def c12_jtac_flow():
     NK.band(c, "THE RUN", "every call starts \"Hitman, Raider 1, ...\"")
     NK.steps(c, [
         ("COMMAND", "request tasking  ->  contact Hitman 1-1 or 2-1"),
-        ("CHECK IN", "checking in  ->  Hitman picks the target, 9-line"),
-        ("COPY", "copy  ->  report IP inbound"),
+        ("CHECK IN", "checking in  ->  target + lines 1-3, read back"),
+        ("LINES 4-6", "read back 1-3  ->  elevation, target, grid"),
+        ("LINES 7-9", "read back 4-6  ->  mark, friendlies, egress"),
+        ("COPY", "read back 7-9  ->  confirmed, report IP inbound"),
         ("IP INBOUND", "IP inbound  ->  continue"),
         ("IN", "in from the <dir>  ->  cleared hot, or abort"),
         ("OFF", "off  ->  egress per line 9"),
@@ -699,9 +705,9 @@ def c12_jtac_flow():
          ("Hitman 1-1 runs Kuban Valley (1 - 3), Hitman 2-1 Cherkessk (4 - 5). Command sends "
           "you to the one with a free target - the other sector when you come back for more.", False)],
         [("Hitman picks the target, at random.", True),
-         ("Not one another flight is working, not the one you just did. Hitman reads its "
-          "number, name and IP, and the IP's bearing if you are not there yet - elevation, "
-          "attack headings and egress are on that kneeboard card.", False)],
+         ("Not one another flight is working, not the one you just did. Hitman reads the 9-line "
+          "in three blocks, lines 1-3, 4-6, 7-9, and you read each back. Wrong readback: he says "
+          "the block again. \"Say again\" or \"say again line 6\" if you miss it.", False)],
         [("Another target:", True),
          ("after \"off\", say \"request tasking\" to Hitman - or ask Command again.", False)],
     ])

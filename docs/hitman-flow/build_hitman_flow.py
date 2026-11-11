@@ -21,7 +21,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Table, TableStyle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = "SkyEye 15c969b, 16 Oct 2026"
+BUILD = "SkyEye d766c65, 11 Nov 2026"
 OUT_NAME = "Hitman JTAC Comms Flow.pdf"
 # Documentation only: the second copy in the folder root went with the 2026-10-21 tidy.
 DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"]
@@ -77,16 +77,21 @@ S.append(section("1. Command (282.000): get handed to a Hitman",
     ], [3.3, 4.1]),
     "Command does not pick the target; Hitman does. With no targets: \"negative tasking at this time.\""))
 
-S.append(section("2. Check in and get the target",
+S.append(section("2. Check in and get the 9-line (three blocks, each read back)",
     table(["Pilot", "Hitman"], [
         ["\"Hitman one one, Raider 32, <b>checking in</b>\"<br/>(or \"ready for 9-line\", \"request tasking\")",
-         "\"Raider 32, Hitman one one, <b>target 2, &lt;name&gt;, IP &lt;IP&gt;.</b> Read back.\"<br/>"
+         "\"Raider 32, Hitman one one, <b>target 2, &lt;name&gt;.</b> Line 1, IP &lt;IP&gt;. Line 2, heading &lt;hdg&gt;. "
+         "Line 3, distance &lt;nm&gt; miles. <b>Read back.</b>\"<br/>"
          "More than 5 nm from the IP, he adds: \"&lt;IP&gt; bears 270 for 18.\""],
-        ["\"Hitman, Raider 32, <b>target 2, &lt;IP&gt;</b>\" (or \"copy\")",
-         "\"Raider 32, Hitman one one, good readback. Report IP inbound.\""],
+        ["<b>Lines 1-3:</b> \"Hitman, Raider 32, IP &lt;IP&gt;, heading &lt;hdg&gt;, distance &lt;nm&gt;\"",
+         "\"Line 4, elevation... Line 5, target... Line 6, location (the grid, read digit by digit). <b>Read back.</b>\""],
+        ["<b>Lines 4-6:</b> \"Hitman, Raider 32, elevation &lt;ft&gt;, location &lt;grid&gt;\"",
+         "\"Line 7, mark... Line 8, friendlies... Line 9, egress, back to &lt;IP&gt;, &lt;altitude&gt;. <b>Read back.</b>\""],
+        ["<b>Lines 7-9:</b> \"Hitman, Raider 32, copy\" (or the friendlies / egress)",
+         "\"Raider 32, Hitman one one, <b>confirmed.</b> Report IP inbound.\""],
     ], [3.3, 4.1]),
-    "Hitman reads only the target and the IP. The rest of the 9-line (elevation, attack headings, egress) is on your "
-    "kneeboard card, and Hitman still checks it from the Tacview picture.",
+    "<b>Wrong readback:</b> \"negative, readback incorrect\" and the same block again. <b>Missed it?</b> \"Say again\" repeats "
+    "the block; \"say again line 6\" repeats one line. Hitman still checks the run from the Tacview picture.",
     "<b>Readback tip:</b> don't say \"Hitman\" partway through your readback; a call like that is dropped as "
     "Hitman's own echo. Put Hitman first, or leave his name out."))
 

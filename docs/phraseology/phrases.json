@@ -511,7 +511,7 @@
  },
  {
   "role": "jtac",
-  "say": "Hitman, Raider 1-1, target 4, Indigo.",
+  "say": "Hitman, Raider 1-1, IP Indigo, heading 297, distance 8.5.",
   "tower": "",
   "want": "copy"
  },
@@ -520,6 +520,18 @@
   "say": "Hitman, Raider 1-1, copy.",
   "tower": "",
   "want": "copy"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, say again.",
+  "tower": "",
+  "want": "say_again"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, say again line 6.",
+  "tower": "",
+  "want": "say_again"
  },
  {
   "role": "jtac",

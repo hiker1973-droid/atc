@@ -115,7 +115,7 @@ func briefLine(t taskingTarget, n int) string {
 		if d.Friend == "" {
 			return "line 8, friendlies on your kneeboard."
 		}
-		return "line 8, friendlies " + strings.ToLower(d.Friend) + "."
+		return "line 8, friendlies " + strings.TrimSuffix(strings.ToLower(d.Friend), " m") + " metres."
 	case 9:
 		return "line 9, egress, back to " + t.IP + ", " + t.Egress + "."
 	}

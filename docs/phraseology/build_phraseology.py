@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.1"
-DATE = "25 OCT 2026"          # change together with VER
+VER = "v3.2"
+DATE = "11 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -136,8 +136,9 @@ RANGE = [
     ("Fuel low, still working", "Joker", "Copy Joker", "joker"),
 ]
 JTAC = [
-    ("Check in", "checking in  /  request tasking", "target N, <name>, IP <IP>, read back", "check_in"),
-    ("Readback", "target N, <IP>  /  copy", "Good readback, report IP inbound", "copy"),
+    ("Check in", "checking in  /  request tasking", "target N, <name>; lines 1-3 (IP, heading, distance), read back", "check_in"),
+    ("Readback", "IP <IP>, heading 297, distance 8.5  /  copy", "Next three lines, read back; after lines 7-9: confirmed, report IP inbound", "copy"),
+    ("Say again", "say again  /  say again line 6", "Hitman repeats the block, or that line", "say_again"),
     ("IP inbound", "IP inbound", "Continue (or where the IP is)", "ip_inbound"),
     ("In", "in from the south  /  in heading 330", "Cleared hot  -  or abort, abort, abort", "in"),
     ("Off", "off  /  off safe", "Egress per line 9", "off"),
@@ -618,9 +619,16 @@ def build():
     d.table(("Intent", "Say something like", "Response"),
             table_rows("jtac", JTAC, "Hitman"), (0.18, 0.4, 0.42))
     d.dialogue([("Pilot", "Hitman 1-1, Raider 1-1, checking in."),
-                ("Hitman", "Raider 1-1, Hitman one one, target 4, Fuel Depot, IP Indigo. Read back."),
-                ("Pilot", "Hitman, Raider 1-1, target 4, Indigo."),
-                ("Hitman", "Raider 1-1, Hitman one one, good readback. Report IP inbound."),
+                ("Hitman", "Raider 1-1, Hitman one one, target 4, Fuel Depot. Line 1, IP Indigo. Line 2, heading two-niner-seven. "
+                           "Line 3, distance eight point five miles. Read back."),
+                ("Pilot", "Hitman, Raider 1-1, IP Indigo, heading 297, distance 8.5."),
+                ("Hitman", "Raider 1-1, Hitman one one, line 4, elevation two one one zero feet MSL. Line 5, target, (as on your card). "
+                           "Line 6, location three eight Tango, Kilo Papa, six niner four three zero, niner seven zero niner five. Read back."),
+                ("Pilot", "Hitman, Raider 1-1, elevation 2110, location 38T KP 69430 97095."),
+                ("Hitman", "Raider 1-1, Hitman one one, line 7, mark, no mark, talk-on from the four large tanks. "
+                           "Line 8, friendlies south-west sixteen hundred metres. Line 9, egress, back to Indigo, angels 14. Read back."),
+                ("Pilot", "Hitman, Raider 1-1, copy."),
+                ("Hitman", "Raider 1-1, Hitman one one, confirmed. Report IP inbound."),
                 ("Pilot", "Hitman, Raider 1-1, IP inbound."),
                 ("Hitman", "Raider 1-1, Hitman one one, continue."),
                 ("Pilot", "Hitman, Raider 1-1, in from the east."),

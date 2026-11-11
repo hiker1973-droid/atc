@@ -310,6 +310,8 @@ func jtacKind(lower string) string {
 		return "ip_inbound"
 	case jtacInRe.MatchString(lower):
 		return "in"
+	case sayAgainRe.MatchString(lower):
+		return "say_again"
 	case isTaskingAck(lower) || isTargetReadback(lower, docReadbackTarget):
 		return "copy"
 	}
