@@ -64,8 +64,11 @@ const (
 	// the card's window before it counts, and how many samples in a row.
 	jtacWatchEvery    = 2 * time.Second
 	jtacWatchFor      = 4 * time.Minute
-	jtacWatchSlackDeg = 10.0
-	jtacWatchSamples  = 2
+	// Loosened 2026-11-11 (Raider 302 was cleared hot at 11 nm, still turning in, and aborted at 8 nm / 2 nm).
+	jtacWatchSlackDeg = 20.0 // was 10
+	jtacWatchSamples  = 3    // was 2 (6 s outside the window)
+	jtacWatchHdgNm    = 6.0  // the heading is only judged inside this; further out the flight is still lining up
+	jtacInSlackDeg    = 20.0 // slack on the in call's own heading check (was 0)
 	jtacWatchNoseDeg  = 45.0 // target further off the nose than this = pulling off, not attacking
 	jtacWatchStopNm   = 1.5  // inside this the run is over either way
 	jtacReleaseRadius = 1.5  // a weapon first seen this close to the jet is its release
@@ -284,16 +287,17 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		// (bdaDue) once the weapons are down.
 		word := jtacReleaseCallRe.FindString(lower)
 		switch {
-		case cur.stage == jtacInbound:
+		case cur.stage >= jtacBriefed && cur.stage < jtacCleared:
 			// Released off IP inbound without an in call (Raider 302 flew it
-			// that way all sortie, 2026-10-15). Take the release as the attack:
-			// acknowledge it and start the clock, so the automatic BDA comes.
+			// that way all sortie, 2026-10-15), or after an abort / before the
+			// IP call (2026-11-11: "pickle" after our abort got "negative, you
+			// are not cleared, re-attack" and the BDA never came). Take the
+			// release as the attack: acknowledge it and start the clock, so the
+			// automatic BDA comes.
 			b.clear(cur, now)
 			return say("copy %s, will report BDA.", word)
 		case cur.stage < jtacCleared:
-			// Not cleared - after an abort, or before IP inbound. Silence here
-			// left the pilot calling "pickle" into a dead net (16:12:26, 16:12:35).
-			return say("negative, you are not cleared. Re-attack from %s.", t.IP)
+			return say("negative, no 9-line passed. Check in for tasking.")
 		}
 		return say("copy %s, will report BDA.", word)
 
@@ -370,7 +374,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		case nm > jtacInMaxNm:
 			cur.stage = jtacReady
 			return say("abort, abort, abort. You are %d miles from the target. Report IP inbound from %s.", int(nm+0.5), t.IP)
-		case !inWindow(mag, float64(t.FAHLow), float64(t.FAHHigh), 0):
+		case nm <= jtacWatchHdgNm && !inWindow(mag, float64(t.FAHLow), float64(t.FAHHigh), jtacInSlackDeg):
 			cur.stage = jtacReady
 			return say("abort, abort, abort. Outside final attack heading, %s to %s. Re-attack from %s.",
 				spokenBearing(float64(t.FAHLow)), spokenBearing(float64(t.FAHHigh)), t.IP)
@@ -457,7 +461,7 @@ func (b *taskingBoard) jtacWatch(name string, pic jtacPicture) []string {
 			continue
 		}
 		mag := toMagnetic(hdg, t.MagVar)
-		if inWindow(mag, float64(t.FAHLow), float64(t.FAHHigh), jtacWatchSlackDeg) || angleDiff(hdg, brgT) > jtacWatchNoseDeg {
+		if nm > jtacWatchHdgNm || inWindow(mag, float64(t.FAHLow), float64(t.FAHHigh), jtacWatchSlackDeg) || angleDiff(hdg, brgT) > jtacWatchNoseDeg {
 			cur.offAxis = 0
 			continue
 		}

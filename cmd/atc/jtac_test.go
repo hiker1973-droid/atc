@@ -147,17 +147,16 @@ func TestJTACFullRun(t *testing.T) {
 	}
 }
 
-// A release call before cleared hot is not acknowledged.
-// Before IP inbound, or after an abort, a release call is answered "not
-// cleared" - silence left Raider 302 calling pickle into a dead net
-// (2026-10-15 16:12:26, 16:12:35).
+// A release call after a 9-line is the attack even before IP inbound or after
+// an abort (loosened 2026-11-11: "negative, not cleared" left the pilot with
+// no BDA). With no 9-line passed it is still refused.
 func TestJTACPickleNotClearedAnswered(t *testing.T) {
 	b, _ := newJTACBoard(t)
 	pic := &fakePicture{}
 	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
 	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, negative, you are not cleared. Re-attack from Falcon." {
-		t.Errorf("pickle before IP inbound = %q", got)
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, pickle", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, copy pickle, will report BDA." {
+		t.Errorf("pickle after the 9-line = %q", got)
 	}
 }
 
@@ -320,14 +319,16 @@ func clearedFlight(t *testing.T) (*taskingBoard, *fakePicture) {
 }
 
 // After cleared hot, a run that swings outside the window while still
-// pointed at the target is aborted, but only after two samples.
+// pointed at the target is aborted, but only after jtacWatchSamples samples, inside jtacWatchHdgNm.
 func TestJTACWatchAbortsOffAxisRun(t *testing.T) {
 	b, pic := clearedFlight(t)
 	tgt := caucasusTaskingTargets[0]
 	// 5 nm east of the target, nose on it: heading 270, outside 309-349 + 10.
 	pic.place(tgt.TgtPos, 90, 5, 270)
-	if out := b.jtacWatch(hitman, pic); len(out) != 0 {
-		t.Fatalf("first sample aborted already: %v", out)
+	for i := 0; i < jtacWatchSamples-1; i++ {
+		if out := b.jtacWatch(hitman, pic); len(out) != 0 {
+			t.Fatalf("sample %d aborted already: %v", i+1, out)
+		}
 	}
 	out := b.jtacWatch(hitman, pic)
 	if len(out) != 1 || !strings.HasPrefix(out[0], "Raider 11, Hitman one one, abort, abort, abort.") {
@@ -732,5 +733,27 @@ func TestJTACWhisperPrompt(t *testing.T) {
 	got := jtacWhisperPrompt("Hitman-2-1", sectorTargets(caucasusTaskingTargets, "Cherkessk"))
 	if !strings.HasPrefix(got, "Hitman 2-1, Raider,") || !strings.HasSuffix(got, "request BDA, Indigo, Javelin") {
 		t.Errorf("prompt = %q", got)
+	}
+}
+
+// 2026-11-11 (Raider 302): an in call while still lining up, far out and off
+// the attack heading, is cleared hot; the watch only judges the heading inside
+// jtacWatchHdgNm. Inside that range an off-heading in call is still refused.
+func TestJTACInCallFarOutLooseHeading(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic)
+	pic.place(tgt.TgtPos, 169, 11, 61) // 11 nm out, 90 deg off
+	if got := b.JTACResponse("Hitman, Raider 11, in from the south", "Raider 11", hitman, pic); !strings.Contains(got, "cleared hot") {
+		t.Errorf("far-out in call = %q, want cleared hot", got)
+	}
+	b2, _ := newJTACBoard(t)
+	b2.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
+	b2.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic)
+	pic.place(tgt.TgtPos, 90, 4, 270)
+	if got := b2.JTACResponse("Hitman, Raider 11, in from the east", "Raider 11", hitman, pic); !strings.Contains(got, "abort") {
+		t.Errorf("close in call off the heading = %q, want abort", got)
 	}
 }
