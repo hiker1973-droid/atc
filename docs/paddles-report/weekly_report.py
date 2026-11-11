@@ -80,15 +80,17 @@ def build(now=None, days=7, kind="Weekly"):
              ("Average grade", "%.1f" % total["avg"] if total["avg"] is not None else "-"), ("3-wire", "%d%%" % round(total["three"]) if total["three"] is not None else "-"),
              ("Case III passes", night), ("Recoveries", len(sess_all))]
 
+    cqon = days > 7  # CQ progress is monthly only (operator 2026-11-11)
     body = []
     for _, k in rows:
         s, delta = stat[k]
         d, n = ps.cq_progress(ga[k], cfg)
         cq = lambda have, need: '<span class="%s">%d/%d</span>' % ("ok" if have >= need else "", min(have, need), need)
-        body.append("<tr><td class='n'>%s</td><td>%d</td><td>%d</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='f'>%s</td><td>%s</td><td>%s</td></tr>" % (
+        body.append("<tr><td class='n'>%s</td><td>%d</td><td>%d</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='f'>%s</td>%s</tr>" % (
             html.escape(names[k]), s["n"], s["traps"], s["bolters"], s["wos"], "%d%%" % round(s["boarding"]) if s["boarding"] is not None else "-",
             "%.1f" % s["avg"] if s["avg"] is not None else "-", arrow(delta), "%d%%" % round(s["three"]) if s["three"] is not None else "-",
-            html.escape(s["fault"]) or "-", cq(d, cfg["day"]), cq(n, cfg["night"])))
+            html.escape(s["fault"]) or "-",
+            "<td>%s</td><td>%s</td>" % (cq(d, cfg["day"]), cq(n, cfg["night"])) if cqon else ""))
     recs = []
     for rig, plist in sess:
         r = rs.summarise(rig, plist, contexts, patterns)
@@ -125,15 +127,16 @@ ul{margin:4px 0 0 18px;padding:0;font-size:16px;line-height:1.6}.chip{display:in
 .ft{color:#8b949e;font-size:12px;margin-top:10px}
 </style></head><body><div class="w"><div class="top"><div><h1>VMFA-225 %s Report</h1><div class="sub">%s</div></div><img class="logo" src="%s"></div>
 <div class="tiles">%s</div><div class="hl">%s</div>
-<h2>Pilots</h2><table><tr><th>Pilot</th><th>Passes</th><th>Traps</th><th>Bolters</th><th>WO</th><th>Boarding</th><th>Avg</th><th>vs before</th><th>3-wire</th><th>Most common fault</th><th>CQ day</th><th>CQ night</th></tr>%s</table>
+<h2>Pilots</h2><table><tr><th>Pilot</th><th>Passes</th><th>Traps</th><th>Bolters</th><th>WO</th><th>Boarding</th><th>Avg</th><th>vs before</th><th>3-wire</th><th>Most common fault</th>%s</tr>%s</table>
 <h2>Recoveries</h2><ul>%s</ul>
-<h2>Carrier qualification (%d day, %d night traps since %s)</h2><div>%s</div>
+%s
 <div class="ft">Grades from Paddles; an average counts a foul-deck wave-off as no score. A Case III trap is a night trap; others count as day.</div></div></body></html>""" % (
         html.escape(kind), html.escape(title), logo,
         "".join("<div class='tile'><b>%s</b><span>%s</span></div>" % (v, html.escape(label)) for label, v in tiles),
         "".join("<div><small>%s</small>%s</div>" % (html.escape(a), b) for a, b in highlights),
+        "<th>CQ day</th><th>CQ night</th>" if cqon else "",
         "".join(body) or "<tr><td colspan='12'>No passes in this period.</td></tr>", ("".join(recs) + ("<li>and %d earlier</li>" % older if older else "")) or "<li>No recoveries in this period.</li>",
-        cfg["day"], cfg["night"], cfg["since"], "".join(cqs))
+        ("<h2>Carrier qualification (%d day, %d night traps since %s)</h2><div>%s</div>" % (cfg["day"], cfg["night"], cfg["since"], "".join(cqs))) if cqon else "")
     summary = "**%s report** - %s: %d passes, %d traps, boarding rate %s" % (kind, title, len(week), total["traps"], tiles[2][1])
     return page, summary, len(rows), len(sess)
 
