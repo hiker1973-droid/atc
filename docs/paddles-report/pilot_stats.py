@@ -6,8 +6,8 @@ Everything here is computed from the same passes the greenie board draws (greeni
 Paddles logs, the day summaries, the hand-added passes and the corrections), so the numbers always agree
 with the board.
 
-CQ requirement: 6 day and 4 night traps (the usual Navy numbers), counted from "since" on. Change it in
-%USERPROFILE%\\readback-cq.json:  {"day": 6, "night": 4, "since": "2026-10-17"}
+CQ requirement: 6 day and 2 night traps (night was 4, changed 2026-11-11), counted from "since" on. Change it in
+%USERPROFILE%\\readback-cq.json:  {"day": 6, "night": 2, "since": "2026-10-17"}
 A trap flown in Case III is a night trap; anything else counts as day (older passes carry no case).
 """
 import collections
@@ -24,7 +24,7 @@ HORNET_ON_SPEED_AOA = 8.1  # degrees (pkg/lso hornetOnSpeed)
 
 
 def cq_config():
-    cfg = {"day": 6, "night": 4, "since": "2026-10-17"}  # 17 Oct = the first Paddles logs
+    cfg = {"day": 6, "night": 2, "since": "2026-10-17"}  # 17 Oct = the first Paddles logs
     if os.path.exists(CQ_FILE):
         try:
             cfg.update(json.load(open(CQ_FILE, encoding="utf-8")))
