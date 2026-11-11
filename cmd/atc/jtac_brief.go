@@ -37,9 +37,9 @@ func nineData(t taskingTarget) nineLineData {
 	if d.Desc == "" {
 		d.Desc = t.Name
 	}
-	if d.DistNm == 0 {
-		_, d.DistNm = bearingRangeFromRef(t.IPPos, t.TgtPos[0], t.TgtPos[1])
-	}
+	// Always from the loaded table's own IP and target, so line 3 agrees with
+	// lines 1-2 whichever mission version the table is for.
+	_, d.DistNm = bearingRangeFromRef(t.IPPos, t.TgtPos[0], t.TgtPos[1])
 	return d
 }
 
