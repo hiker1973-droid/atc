@@ -31,6 +31,11 @@ type taskingTarget struct {
 	FAHHigh int
 	ElevFt  int    // line 4
 	Egress  string // line 9 altitude, e.g. "angels 15"
+
+	// CAS-LGB TIC mission (cas_tic_targets.go): every site has two 9-lines.
+	Phase  int    // 0 = single 9-line; 1 = the RED force (troops in contact); 2 = the static target, flown after phase 1
+	BDAKey int    // key into casTICBDA when non-zero; else caucasusBDA[Number]
+	Spoken string // phase 1: the target as the JTAC says it ("2 tanks, 1 truck, dug in, 200 metres south of the heli farp")
 }
 
 // caucasusTaskingTargets mirrors the 9-line pages of the vSFG-7 Caucasus
@@ -67,6 +72,9 @@ func taskingTargetsForMap(mapName string) []taskingTarget {
 	}
 	switch strings.ToLower(strings.TrimSpace(mapName)) {
 	case "ca", "caucasus", "blacksea", "black-sea", "black sea":
+		if casTICLoaded() {
+			return casTICTargets
+		}
 		return caucasusTaskingTargets
 	}
 	return nil
@@ -115,6 +123,7 @@ type taskingBoard struct {
 type jtacNet struct {
 	Spoken  string  // "Hitman one one"
 	FreqMHz float64 // 61.000
+	Sector  string  // the sector its own board runs, "" = Command's board
 	// board is the JTAC's own board, holding its sector's targets, when there
 	// is more than one JTAC (operator 2026-10-16: Hitman 2-1 on 62.000, split
 	// by sector). nil = the JTAC works Command's board, the whole range.
@@ -132,6 +141,16 @@ func (n *jtacNet) workBoard(command *taskingBoard) *taskingBoard {
 type jtacHandoff struct {
 	at  time.Time
 	net *jtacNet
+}
+
+// setTargets swaps the board's target set (the loaded mission changed) and
+// forgets the flights, which were working the old set.
+func (b *taskingBoard) setTargets(ts []taskingTarget) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.targets = ts
+	b.flights = make(map[string]*taskingAssignment)
+	b.handoffs = make(map[string]jtacHandoff)
 }
 
 func newTaskingBoard(targets []taskingTarget) *taskingBoard {
@@ -253,7 +272,12 @@ func (b *taskingBoard) pick(key string, now time.Time) int {
 	case last >= 0 && !held[last]:
 		return last
 	}
-	return b.intn(len(b.targets))
+	for i := 0; i < 8; i++ { // any target at all, but never a phase 2 entry
+		if j := b.intn(len(b.targets)); b.targets[j].Phase != 2 {
+			return j
+		}
+	}
+	return 0
 }
 
 // free lists the targets no other flight holds, less the one this flight has
@@ -263,14 +287,29 @@ func (b *taskingBoard) free(key string, now time.Time) (free []int, last int, he
 	for k, a := range b.flights {
 		if k != key && now.Sub(a.issued) < taskingHoldTime {
 			held[a.target] = true
+			if a.target < len(b.targets) && b.targets[a.target].Phase > 0 {
+				// A site is held whichever of its two 9-lines the flight is on.
+				for i, t := range b.targets {
+					if t.Number == b.targets[a.target].Number {
+						held[i] = true
+					}
+				}
+			}
 		}
 	}
 	last = -1
-	if a := b.flights[key]; a != nil {
+	lastNum := -1
+	if a := b.flights[key]; a != nil && a.target < len(b.targets) {
 		last = a.target
+		if b.targets[last].Phase > 0 {
+			lastNum = b.targets[last].Number
+		}
 	}
-	for i := range b.targets {
-		if !held[i] && i != last {
+	for i, t := range b.targets {
+		if t.Phase == 2 { // phase 2 is reached from phase 1, never drawn
+			continue
+		}
+		if !held[i] && i != last && (lastNum < 0 || t.Number != lastNum) {
 			free = append(free, i)
 		}
 	}
@@ -328,7 +367,7 @@ func (b *taskingBoard) handOffTarget(key string, numbers []int) *jtacNet {
 		_, _, held := jb.free(key, now)
 		for i, t := range jb.targets {
 			for _, num := range numbers {
-				if t.Number == num && (pick < 0 || held[pick] && !held[i]) {
+				if t.Phase != 2 && t.Number == num && (pick < 0 || held[pick] && !held[i]) {
 					pick = i
 				}
 			}

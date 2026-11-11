@@ -120,6 +120,14 @@ var caucasusBDA = map[int]bdaTarget{
 	}},
 }
 
+// bdaTargetFor is the placed-object table of this 9-line.
+func bdaTargetFor(t taskingTarget) bdaTarget {
+	if t.BDAKey != 0 {
+		return casTICBDA[t.BDAKey]
+	}
+	return caucasusBDA[t.Number]
+}
+
 func metresBetween(a, b orb.Point) float64 { return haversineNm(a, b) * 1852 }
 
 // bdaKills matches the picture's ground objects to the target's placed
@@ -302,7 +310,7 @@ var (
 // was. pick chooses among the wordings (the board's intn).
 func bdaFor(callsign, name string, t taskingTarget, ground []tacviewGround, impacts []tacviewImpact, pick func(int) int) (string, bdaOutcome) {
 	one := func(opts []string) string { return oneOf(pick, opts) }
-	bt := caucasusBDA[t.Number]
+	bt := bdaTargetFor(t)
 	d := bdaDamageOf(bt, ground)
 	parts := []string{fmt.Sprintf("%s, %s, BDA.", callsign, name), bdaImpactText(t, bt, impacts)}
 	var out bdaOutcome
@@ -320,7 +328,7 @@ func bdaFor(callsign, name string, t taskingTarget, ground []tacviewGround, impa
 			k += " Mission successful."
 		}
 		parts = append(parts, one(bdaGoodLines), strings.TrimSpace(k), one(bdaThanks),
-			fmt.Sprintf("Egress %s, report ready for further tasking.", t.Egress))
+			t.egressLine())
 	case d.dead > 0:
 		out = bdaPartial
 		parts = append(parts, one(bdaPartialLines), d.text, fmt.Sprintf(one(bdaReattack), t.IP))

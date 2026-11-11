@@ -156,7 +156,16 @@ func isTargetReadback(lower string, t taskingTarget) bool {
 // targetWords spells the card numbers the way Whisper sometimes writes them.
 var targetWords = map[int]string{1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 
+// isJTACEstablished: "established IP Knife", "established at the IP", "IP Knife
+// established". The pilot is at the IP and wants the run-in.
+func isJTACEstablished(lower string) bool {
+	return strings.Contains(lower, "established") || strings.Contains(lower, "establish ")
+}
+
 func isJTACInbound(lower string) bool {
+	if isJTACEstablished(lower) {
+		return true
+	}
 	if !strings.Contains(lower, "inbound") && !containsAny(lower, "leaving the ip", "departing the ip", "leaving ip", "departing ip") {
 		return false
 	}
@@ -199,6 +208,14 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		case cur == nil:
 			cur = &taskingAssignment{target: b.pick(key, now)}
 			b.flights[key] = cur
+		case cur.target < len(b.targets) && b.targets[cur.target].Phase == 1 && cur.stage >= jtacOff && !cur.redraw:
+			// Phase 1 flown: the same site's static target is the next 9-line.
+			for i, nt := range b.targets {
+				if nt.Number == b.targets[cur.target].Number && nt.Phase == 2 {
+					cur.target = i
+					break
+				}
+			}
 		case cur.redraw || cur.stage >= jtacCleared && isTaskingRequest(lower):
 			cur.target = b.pick(key, now)
 		}
@@ -210,6 +227,12 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		// the card - control, elevation, attack headings, egress - is on the
 		// pilot's kneeboard and still checked against the Tacview picture.
 		resp := say("target %d, %s, IP %s.", t.Number, t.Name, t.IP)
+		switch t.Phase {
+		case 1:
+			resp = say("troops in contact. Target %d, enemy force, %s. IP %s.", t.Number, t.Spoken, t.IP)
+		case 2:
+			resp = say("next target %d, %s, IP %s.", t.Number, t.Name, t.IP)
+		}
 		if pos, _, ok := pic.Contact(callsign); ok {
 			if brg, nm := bearingRangeFromRef(pos, t.IPPos[0], t.IPPos[1]); nm > jtacIPNearNm {
 				resp += fmt.Sprintf(" %s bears %s for %d.", t.IP, spokenBearing(toMagnetic(brg, t.MagVar)), int(nm+0.5))
@@ -287,6 +310,24 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		cur.offAcked = true
 		cur.stage = jtacOff
 		return say("copy off. Egress back to %s, %s. Report IP inbound for re-attack.", t.IP, t.Egress)
+
+	case isJTACEstablished(lower):
+		// "Established IP Knife": give the run-in heading and the attack window
+		// (operator 2026-11-11). A different IP than the card's is corrected.
+		for _, o := range allTaskingIPs() {
+			if !strings.EqualFold(o, t.IP) && strings.Contains(lower, strings.ToLower(o)) {
+				return say("negative, your IP is %s. %s bears %s.", t.IP, t.IP, spokenBearing(float64(t.RunIn)))
+			}
+		}
+		if pos, _, ok := pic.Contact(callsign); ok {
+			if brgIP, nmIP := bearingRangeFromRef(pos, t.IPPos[0], t.IPPos[1]); nmIP > jtacIPInboundNm {
+				return say("negative, you are not at %s. %s bears %s for %d. Report established.",
+					t.IP, t.IP, spokenBearing(toMagnetic(brgIP, t.MagVar)), int(nmIP+0.5))
+			}
+		}
+		cur.stage = jtacInbound
+		return say("copy established %s. Run in heading %s, final attack heading %s to %s. Call in.",
+			t.IP, spokenBearing(float64(t.RunIn)), spokenBearing(float64(t.FAHLow)), spokenBearing(float64(t.FAHHigh)))
 
 	case isJTACInbound(lower) && !b.inboundIsInCall(cur, lower, callsign, t, pic):
 		pos, hdg, ok := pic.Contact(callsign)
@@ -592,7 +633,7 @@ func startJTACs(ctx context.Context, apiKey string, store *tacviewPositions) {
 	board := commandTaskingBoard()
 	cfgs := jtacConfigs()
 	for _, c := range cfgs {
-		n := &jtacNet{Spoken: c.Spoken, FreqMHz: c.FreqMHz}
+		n := &jtacNet{Spoken: c.Spoken, FreqMHz: c.FreqMHz, Sector: c.Sector}
 		if len(cfgs) > 1 && c.Sector != "" { // no sector: the whole range, on Command's board
 			ts := sectorTargets(board.targets, c.Sector)
 			if len(ts) == 0 {
@@ -604,6 +645,7 @@ func startJTACs(ctx context.Context, apiKey string, store *tacviewPositions) {
 		board.jtacs = append(board.jtacs, n)
 		startJTAC(ctx, apiKey, store, c, n.workBoard(board))
 	}
+	go watchTaskingSet(ctx, board)
 }
 
 // startJTAC runs one JTAC net working board.
@@ -624,7 +666,7 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 		transmitExternalAudioFile(ctx, mp3, c.FreqMHz, c.Name, srsHost, srsPort, flagExternalAudio)
 	}
 	go voiceNetLoop(ctx, flagSRSAddr, c.FreqMHz, c.Name, apiKey, flagEAMPassword, c.Voice, flagExternalAudio,
-		jtacWhisperPrompt(c.Name, board.targets), nil, func(text string) (string, string) {
+		jtacWhisperPrompt(c.Name, append(append([]taskingTarget{}, board.targets...), otherTaskingSet()...)), nil, func(text string) (string, string) {
 			cs := jtacCallsign(text)
 			return cs, board.JTACResponse(text, cs, c.Spoken, pic)
 		})
@@ -636,9 +678,13 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 // jtacWhisperPrompt biases Whisper towards the net's calls: its own callsign
 // as pilots write it ("Hitman-2-1" -> "Hitman 2-1") and its IP names.
 func jtacWhisperPrompt(srsName string, targets []taskingTarget) string {
-	ips := make([]string, len(targets))
-	for i, t := range targets {
-		ips[i] = t.IP
+	var ips []string // targets' IPs once each; the net's Whisper bias
+	seen := map[string]bool{}
+	for _, t := range targets {
+		if !seen[t.IP] {
+			seen[t.IP] = true
+			ips = append(ips, t.IP)
+		}
 	}
 	return strings.Replace(srsName, "-", " ", 1) + ", " + jtacWhisperCalls + ", " + strings.Join(ips, ", ")
 }
