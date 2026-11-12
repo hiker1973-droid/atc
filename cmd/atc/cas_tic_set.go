@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -20,8 +22,24 @@ var casTICOn atomic.Bool
 
 // casTICMissionName reports whether a .miz path is the CAS-LGB TIC mission.
 func casTICMissionName(path string) bool {
-	return strings.Contains(strings.ToLower(filepath.Base(path)), "cas-lgb_tic")
+	base := strings.ToLower(filepath.Base(path))
+	if strings.Contains(base, "cas-lgb_tic") {
+		return true
+	}
+	// The Day and Night training sets carry the nine sites from V1.42 on.
+	if !strings.Contains(base, "training_mission_ca") {
+		return false
+	}
+	m := trainingVerRe.FindStringSubmatch(base)
+	if m == nil {
+		return false
+	}
+	major, _ := strconv.Atoi(m[1])
+	minor, _ := strconv.Atoi(m[2])
+	return major > 1 || (major == 1 && minor >= 42)
 }
+
+var trainingVerRe = regexp.MustCompile(`v(\d+)\.(\d+)`)
 
 // currentMissionIsCASTIC reads the loaded mission: the watch file first, then --miz-path.
 func currentMissionIsCASTIC() bool {
