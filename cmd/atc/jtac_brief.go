@@ -171,11 +171,16 @@ func briefReadbackOK(lower string, t taskingTarget, block int) bool {
 	case 1:
 		return strings.Contains(lower, strings.ToLower(t.IP)) && strings.Contains(digits, fmt.Sprintf("%03d", t.RunIn))
 	case 2:
-		if !strings.Contains(digits, strconv.Itoa(t.ElevFt)) {
+		// Pilots say "two zero niner" or "209er" for 2090 ft: the leading three
+		// digits are enough.
+		e := strconv.Itoa(t.ElevFt)
+		if len(e) > 3 {
+			e = e[:3]
+		}
+		if !strings.Contains(digits, e) {
 			return false
 		}
-		g := gridDigits(d.Grid)
-		return g == "" || strings.Contains(digits, g)
+		return gridReadOK(digits, gridDigits(d.Grid))
 	default:
 		// Lines 7-9 carry no numbers to check: the friendly direction, the
 		// egress altitude or a plain copy is taken.
@@ -210,7 +215,7 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 		return "", true
 	}
 	// The callsign's own digits are not part of a readback.
-	lower = strings.ReplaceAll(lower, strings.ToLower(strings.TrimSpace(callsign)), " ")
+	lower = stripCallsign(lower, callsign)
 	block := int(cur.stage-jtacBriefed) + 1
 
 	if sayAgainRe.MatchString(lower) {
@@ -242,4 +247,46 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 		return say("negative, readback incorrect. %s", briefBlock(t, block)), true
 	}
 	return "", true
+}
+
+// gridReadOK: the full easting and northing, or the usual short readback (four
+// digits each, Whisper often drops one): the eastings' first four and the
+// northings' first or last four, in that order.
+func gridReadOK(digits, g string) bool {
+	if g == "" || strings.Contains(digits, g) {
+		return true
+	}
+	if len(g) != 10 {
+		return false
+	}
+	e, n := g[:5], g[5:]
+	i := strings.Index(digits, e[:4])
+	if i < 0 {
+		return false
+	}
+	rest := digits[i+4:]
+	return strings.Contains(rest, n[:4]) || strings.Contains(rest, n[1:]) || strings.Contains(rest, n)
+}
+
+// stripCallsign removes the pilot's own callsign from a readback, however
+// Whisper spaced its digits ("Raider 3-0-2" for "raider 302").
+func stripCallsign(lower, callsign string) string {
+	cs := strings.ToLower(strings.TrimSpace(callsign))
+	if cs == "" {
+		return lower
+	}
+	word, num := splitCallsign(cs)
+	if num == "" || word == "" {
+		return strings.ReplaceAll(lower, cs, " ")
+	}
+	var sb strings.Builder
+	sb.WriteString(regexp.QuoteMeta(word) + `[\s,.-]*`)
+	for _, r := range num {
+		sb.WriteString(string(r) + `[\s,.-]*`)
+	}
+	re, err := regexp.Compile(sb.String())
+	if err != nil {
+		return strings.ReplaceAll(lower, cs, " ")
+	}
+	return re.ReplaceAllString(lower, " ")
 }

@@ -535,7 +535,12 @@ func jtacCallsign(text string) string {
 	cs := extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
 		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21",
 		"hey man one-one", "hey man one one", "hey man 1-1", "hey man 1 1", "hey man 11",
-		"hey man two-one", "hey man two one", "hey man 2-1", "hey man 2 1", "hey man 21", "hey man", "hitman")
+		"hey man two-one", "hey man two one", "hey man 2-1", "hey man 2 1", "hey man 21", "hey man",
+		// Whisper hears "Hitman" as "Hammer" (Day 2026-11-12, Raider 302: five
+		// calls missed); "Hammer" is also an IP name, but never opens a call to
+		// anyone else on this net.
+		"hammer one-one", "hammer one one", "hammer 1-1", "hammer 1 1", "hammer 11",
+		"hammer two-one", "hammer two one", "hammer 2-1", "hammer 2 1", "hammer 21", "hammer", "hitman")
 	cs = strings.TrimSpace(cs)
 	for _, filler := range []string{"and ", "this is "} {
 		if len(cs) > len(filler) && strings.EqualFold(cs[:len(filler)], filler) {
