@@ -59,8 +59,8 @@ S = [
     Paragraph("vSFG7 SkyEye &middot; Caucasus (Day / Night) &middot; Command 282.000 &rarr; Hitman 1-1 61.000 / "
               "2-1 62.000 FM &middot; %s" % BUILD, sub),
     Paragraph("<b>Radios:</b> Command 282.000 AM &middot; <b>Hitman 1-1 61.000 FM</b> (Hornet COMM 2 CH 12, Viper COMM 2 CH 8) "
-              "runs <b>Kuban Valley, targets 1-3</b> &middot; <b>Hitman 2-1 62.000 FM</b> (no preset yet: dial it) runs "
-              "<b>Cherkessk, targets 4-5</b>. Set the radio to <b>FM</b> for both. Same calls on either net; "
+              "runs <b>targets 1, 2, 3, 4, 6</b> &middot; <b>Hitman 2-1 62.000 FM</b> (no preset yet: dial it) runs "
+              "<b>targets 5, 7, 8, 9</b> (nine sites, each a troops-in-contact force then its static target; V1.42 missions on). Set the radio to <b>FM</b> for both. Same calls on either net; "
               "replies below use Hitman one one.", note),
 ]
 
@@ -80,7 +80,9 @@ S.append(section("1. Command (282.000): get handed to a Hitman",
 S.append(section("2. Check in and get the 9-line (three blocks, each read back)",
     table(["Pilot", "Hitman"], [
         ["\"Hitman one one, Raider 32, <b>checking in</b>\"<br/>(or \"ready for 9-line\", \"request tasking\")",
-         "\"Raider 32, Hitman one one, <b>target 2, &lt;name&gt;.</b> Line 1, IP &lt;IP&gt;. Line 2, heading &lt;hdg&gt;. "
+         "\"Raider 32, Hitman one one, copy check-in. <b>Say ordnance and playtime.</b>\" (first check-in only; no target yet)"],
+        ["\"Raider 32, <b>four GBU-12s, thirty minutes</b>\"<br/>(any weapon / count / time on station)",
+         "\"Raider 32, Hitman one one, copy ordnance and playtime. <b>Target 2, &lt;name&gt;.</b> Line 1, IP &lt;IP&gt;. Line 2, heading &lt;hdg&gt;. "
          "Line 3, distance &lt;nm&gt; miles. <b>Read back.</b>\"<br/>"
          "More than 5 nm from the IP, he adds: \"&lt;IP&gt; bears 270 for 18.\""],
         ["<b>Lines 1-3:</b> \"Hitman, Raider 32, IP &lt;IP&gt;, heading &lt;hdg&gt;, distance &lt;nm&gt;\"",
@@ -97,6 +99,7 @@ S.append(section("2. Check in and get the 9-line (three blocks, each read back)"
 
 S.append(section("3. The run",
     table(["Pilot", "Hitman checks", "Hitman says"], [
+        ["\"Raider 32, <b>established IP Knife</b>\"", "At the IP (within 20 nm)", "\"Copy established Knife. Run in heading 297, final attack heading 270 to 330. Call in.\" (wrong IP: \"negative, your IP is ...\")"],
         ["\"Raider 32, <b>IP inbound</b>\"", "Within 20 nm of the IP, nose on the target", "\"Continue.\""],
         ["", "Within 20 nm but off the run-in line", "\"Continue. Run in heading 297 from &lt;IP&gt;.\""],
         ["", "Pointed more than 30&deg; away from the target", "\"Continue. Check heading, target bears 090.\""],
