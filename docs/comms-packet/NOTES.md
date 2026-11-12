@@ -7,6 +7,13 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.41 (12 NOV 2026) - Hitman ordnance/playtime, nine sites, loosened checks
+
+Follows origin/main f1ec141 (8f1d67e detection on V1.42 Day/Night names, cas_tic_set.go). Card 13: ordnance and playtime
+step at first check-in, "established IP <name>", nine sites split 1-1 = 1,2,3,4,6 / 2-1 = 5,7,8,9. Card 14: established IP row,
+20 deg slack, heading judged inside 6 nm. v1.40 (11 NOV, three-block 9-line) was already built the day before. Card 15 range
+areas still describes the old five-site range. Discord post still the v1.40 text.
+
 ## v1.39 (27 OCT 2026) — Case III bolter pattern, ten-minute approach times
 
 Follows Readback ATC 0.3.2 (origin/main 9de1eb0). Card 6: approach times ten minutes apart, "radar contact"

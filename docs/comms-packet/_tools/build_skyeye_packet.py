@@ -85,6 +85,12 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.41 (operator 2026-11-11, origin/main f1ec141): Hitman asks "say ordnance and playtime" on the first
+check-in and passes the 9-line once you answer; nine sites (each a red-force pass, then its static
+target) on the V1.42 Day / Night missions - 1-1 runs targets 1, 2, 3, 4, 6, 2-1 runs 5, 7, 8, 9; "established
+IP <name>" gets the run-in heading and attack window; cleared-hot checks loosened (20 deg slack,
+heading judged inside 6 nm) (card 13, 14; cmd/atc/jtac.go, cas_tic_set.go).
+
 v1.40 (operator 2026-11-11): Hitman passes the 9-line in three blocks of three lines (1-3, 4-6, 7-9),
 each read back by the pilot; wrong readback = the block again; "say again" / "say again line 6";
 "confirmed. Report IP inbound." after the third (card 13; cmd/atc/jtac_brief.go).
@@ -144,8 +150,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.40"
-DATE = "11 NOV 2026"   # release date of VER - change it together with VER
+VER = "v1.41"
+DATE = "12 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -691,19 +697,22 @@ def c12_jtac_flow():
     NK.band(c, "THE RUN", "every call starts \"Hitman, Raider 1, ...\"")
     NK.steps(c, [
         ("COMMAND", "request tasking  ->  contact Hitman 1-1 or 2-1"),
-        ("CHECK IN", "checking in  ->  target + lines 1-3, read back"),
+        ("CHECK IN", "checking in  ->  say ordnance and playtime"),
+        ("ORDNANCE", "4 GBU-12, 30 minutes  ->  target + lines 1-3"),
         ("LINES 4-6", "read back 1-3  ->  elevation, target, grid"),
         ("LINES 7-9", "read back 4-6  ->  mark, friendlies, egress"),
         ("COPY", "read back 7-9  ->  confirmed, report IP inbound"),
-        ("IP INBOUND", "IP inbound  ->  continue"),
+        ("AT THE IP", "established IP <name>  ->  run-in heading"),
         ("IN", "in from the <dir>  ->  cleared hot, or abort"),
         ("OFF", "off  ->  egress per line 9"),
     ], split=190)
     NK.band(c, "THE 9-LINE", "by reference to your kneeboard card")
     c.bullets([
         [("Two JTACs, one sector each.", True),
-         ("Hitman 1-1 runs Kuban Valley (1 - 3), Hitman 2-1 Cherkessk (4 - 5). Command sends "
-          "you to the one with a free target - the other sector when you come back for more.", False)],
+         ("Nine sites: Hitman 1-1 runs targets 1, 2, 3, 4, 6; Hitman 2-1 runs 5, 7, 8, 9. Each site "
+          "is the red force first, then its static target. Command sends you to the one with a free target.", False)],
+        [("Hitman asks ordnance and playtime", True),
+         ("on your first check-in - answer it and he passes the target.", False)],
         [("Hitman picks the target, at random.", True),
          ("Not one another flight is working, not the one you just did. Hitman reads the 9-line "
           "in three blocks, lines 1-3, 4-6, 7-9, and you read each back. Wrong readback: he says "
@@ -720,18 +729,19 @@ def c13_jtac_checks():
                                   "Bearings and headings magnetic."], 14)
     NK.band(c, "HITMAN CHECKS", "or tells you why not")
     c.kv([
+        ("Established IP <name>", "run-in heading + attack window"),
         ("IP inbound", "within 20 nm of the IP"),
         ("  not there", "negative - IP bears NNN for NN"),
         ("  off the run-in line", "continue, run in heading NNN"),
         ("  nose off the target", "continue, check heading"),
-        ("In call", "inside the final attack heading"),
+        ("In call", "inside the final attack heading (20 deg slack)"),
         ("  and", "0.5 - 15 nm from the target"),
         ("  outside either", "abort, abort, abort - and why"),
     ])
     NK.band(c, "AFTER CLEARED HOT", "Hitman keeps watching")
     c.bullets([
-        [("Swing more than 10 deg outside the final attack heading", True),
-         ("while still pointed at the target, before a weapon comes off, and Hitman calls "
+        [("Swing more than 20 deg outside the final attack heading", True),
+         ("inside 6 nm, still pointed at the target, before a weapon comes off, and Hitman calls "
           "the abort. Go round from the IP.", False)],
         [("Pulling off, a release, or 1.5 nm to go", True), ("ends the watch.", False)],
         [("No radar picture of you", True),
