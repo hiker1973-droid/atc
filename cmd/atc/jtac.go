@@ -77,7 +77,7 @@ const (
 	jtacContactMaxAge = 30 * time.Second
 	// jtacWhisperCalls: the net's calls, between its callsign and its IP
 	// names in jtacWhisperPrompt.
-	jtacWhisperCalls = "Raider, Venom, Viper, checking in, request tasking, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
+	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -139,6 +139,15 @@ var (
 	jtacReleaseCallRe = regexp.MustCompile(`\b(pickle|rifle)\b`)
 	jtacIPRe    = regexp.MustCompile(`\b(?:ip|i\.p\.|i p|eye pee)\b`)
 )
+
+var loadDigitRe = regexp.MustCompile(`\d+`)
+
+// hasLoadWords: the answer to "say ordnance and playtime" - a count, a weapon or a time on station.
+func hasLoadWords(lower string) bool {
+	return containsAny(lower, "minute", "playtime", "play time", "ordnance", "ordinance", "gbu", "mk-", "mk8", "mk 8", "mark 8",
+		"laser", "bomb", "rocket", "hellfire", "maverick", "jdam", "cbu", "apkws", "guns", "winchester", "loaded", "times") ||
+		regexp.MustCompile(`\d+`).MatchString(lower)
+}
 
 func isJTACCheckIn(lower string) bool {
 	return isTaskingRequest(lower) || containsAny(lower, "check in", "checking in", "check-in",
@@ -208,7 +217,24 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 
 	// Check-in: pass the 9-line. A flight that skipped Command gets a target
 	// here; one that finished its target and asks again gets the next one.
-	if isJTACCheckIn(lower) {
+	// Operator 2026-11-11: on check-in Hitman first asks for ordnance and
+	// playtime; the pilot's answer is what releases the 9-line.
+	loadAnswer := b.askLoad && cur != nil && cur.loadAsked && !cur.loadDone &&
+		(hasLoadWords(lower) || !isJTACCheckIn(lower))
+	if b.askLoad && isJTACCheckIn(lower) && !loadAnswer && (cur == nil || (cur.stage == jtacAssigned && !cur.loadDone)) {
+		if cur == nil {
+			cur = &taskingAssignment{target: b.pick(key, now)}
+			b.flights[key] = cur
+		}
+		cur.loadAsked = true
+		return say("copy check-in. Say ordnance and playtime.")
+	}
+	pre := ""
+	if loadAnswer {
+		cur.loadDone = true
+		pre = "copy ordnance and playtime. "
+	}
+	if isJTACCheckIn(lower) || loadAnswer {
 		switch {
 		case cur == nil:
 			cur = &taskingAssignment{target: b.pick(key, now)}
@@ -230,12 +256,12 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		// The 9-line goes out in three blocks of three lines, each read back
 		// (operator 2026-11-11; jtac_brief.go). Block 1 here, with the target
 		// introduction.
-		intro := say("target %d, %s.", t.Number, t.Name)
+		intro := say(pre+"target %d, %s.", t.Number, t.Name)
 		switch t.Phase {
 		case 1:
-			intro = say("troops in contact. Target %d, enemy force.", t.Number)
+			intro = say(pre+"troops in contact. Target %d, enemy force.", t.Number)
 		case 2:
-			intro = say("next target %d, %s.", t.Number, t.Name)
+			intro = say(pre+"next target %d, %s.", t.Number, t.Name)
 		}
 		resp := intro + " " + briefBlock(t, 1)
 		if pos, _, ok := pic.Contact(callsign); ok {
@@ -647,6 +673,7 @@ func startJTACs(ctx context.Context, apiKey string, store *tacviewPositions) {
 
 // startJTAC runs one JTAC net working board.
 func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jtacConfig, board *taskingBoard) {
+	board.askLoad = true // check-in asks ordnance + playtime before the 9-line
 	pic := tacviewJTAC{store: store}
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 	tx := func(text string) {

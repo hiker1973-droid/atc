@@ -795,3 +795,28 @@ func readBackAll(b *taskingBoard, cs string, pic jtacPicture) {
 	b.JTACResponse(fmt.Sprintf("Hitman, %s, elevation %d, location %s", cs, t.ElevFt, d.Grid), cs, hitman, pic)
 	b.JTACResponse("Hitman, "+cs+", copy", cs, hitman, pic)
 }
+
+// Check-in asks ordnance and playtime first; the answer releases the 9-line.
+func TestJTACCheckInAsksOrdnancePlaytime(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	b.askLoad = true
+	pic := &fakePicture{}
+	r := b.JTACResponse("Hitman one one, Raider three oh two, checking in", "Raider 302", hitman, pic)
+	if !strings.Contains(strings.ToLower(r), "ordnance and playtime") || strings.Contains(strings.ToLower(r), "target") {
+		t.Fatalf("check-in should ask ordnance + playtime, got %q", r)
+	}
+	// A second check-in call before the answer asks again, no 9-line.
+	r = b.JTACResponse("Hitman, Raider 302, checking in", "Raider 302", hitman, pic)
+	if !strings.Contains(strings.ToLower(r), "ordnance and playtime") {
+		t.Fatalf("repeat check-in should re-ask, got %q", r)
+	}
+	r = b.JTACResponse("Raider 302, four GBU-12, thirty minutes playtime", "Raider 302", hitman, pic)
+	if !strings.Contains(strings.ToLower(r), "target") || !strings.Contains(strings.ToLower(r), "copy ordnance and playtime") {
+		t.Fatalf("answer should release the 9-line, got %q", r)
+	}
+	// Asked once per flight: a later check-in goes straight to tasking.
+	r = b.JTACResponse("Raider 302, request tasking", "Raider 302", hitman, pic)
+	if strings.Contains(strings.ToLower(r), "ordnance and playtime") {
+		t.Fatalf("should not ask twice, got %q", r)
+	}
+}

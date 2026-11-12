@@ -102,6 +102,8 @@ type taskingAssignment struct {
 	bdaDone   bool      // this pass's BDA has gone out
 	offAcked  bool      // this pass's "off" has been answered
 	effectsAsked time.Time // the BDA could not assess and asked the pilot for theirs
+	loadAsked bool // JTAC asked ordnance + playtime at check-in
+	loadDone  bool // and heard the answer
 }
 
 // taskingBoard tracks which flight holds which target.
@@ -117,6 +119,7 @@ type taskingBoard struct {
 	// it hot (jtac.go). Unset, Command clears hot on the readback itself.
 	jtacs    []*jtacNet
 	handoffs map[string]jtacHandoff // flights Command sent to a JTAC, for the readback
+	askLoad  bool                   // JTAC check-in asks ordnance + playtime first
 }
 
 // jtacNet is the JTAC as Command names it on the radio.
