@@ -85,6 +85,11 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.45 (operator 2026-11-13, origin/main 8f20edf): Hitman: "Hitman 2-1-2" / "Hitman 1-2" / "on Raider" mishearings
+resolve to the flight; ordnance with no callsign is answered; line 8 friendly distance corrected once; a call he
+cannot act on gets "say again your readback" then the block repeated; direct attack from the wrong side is told;
+far-out "in" off the attack heading is cleared hot with the heading. Card 13.
+
 v1.44 (operator 2026-11-13, origin/main b4517d0): Hitman: line 6 read a further 12% slower; "Demand 21"
 heard as Hitman; "reporting to IP <name>" = IP inbound; "request BDA" before an attack gets "negative", early
 gets "standby", weapons that landed on another target are reported ("on target 9, not target 5"); "request
@@ -164,7 +169,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.44"
+VER = "v1.45"
 DATE = "13 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -737,12 +742,14 @@ def c12_jtac_flow():
           "lines 7-9.", False)],
         [("Missed it? Ask him to repeat.", True),
          ("\"Hitman, Raider 1, say again\" gives you the block again; \"say again location\" "
-          "(or \"line 6\") gives you the grid.", False)],
+          "(or \"line 6\") gives you the grid. If he cannot make out your call he says \"say again your readback\". "
+          "He also corrects a wrong line 8 friendly distance once.", False)],
         [("Another target:", True),
          ("after \"off\", say \"request tasking\" to Hitman - or ask Command again.", False)],
         [("Re-attack:", True),
          ("\"request direct attack\" sends you at the same target again, unless it is destroyed "
-          "(his BDA, or you call \"target destroyed\"): then you get a new one.", False)],
+          "(his BDA, or you call \"target destroyed\"): then you get a new one. "
+          "He tells you if you are on the wrong side of the attack heading.", False)],
         [("Done?", True),
          ("\"Winchester\" or \"off station\" and he releases you from the net.", False)],
     ])

@@ -1,5 +1,5 @@
 <!--
-Release post for vSFG-7_SkyEye_ATC_Comms_v1.44.pdf + Phraseology Reference v3.4 + Hitman JTAC Comms Flow (13 NOV 2026):
+Release post for vSFG-7_SkyEye_ATC_Comms_v1.45.pdf + Phraseology Reference v3.5 + Hitman JTAC Comms Flow (13 NOV 2026):
 Hitman: Demand fix, request BDA, off-target BDA, direct attack keeps the target, target destroyed, winchester / off station
 (origin/main b4517d0). The v1.43 grid-only post is in git history.
 Paste everything below the line into Discord, then attach the three PDFs.
@@ -18,4 +18,4 @@ From Raider 302's session on Hitman 2-1:
 • He now hears *"Demand 21"* and *"Hit man"* as Hitman, and *"reporting to IP Knife"* counts as IP inbound
 • Line 6 (the grid) is read a little slower again
 
-**Attached:** Comms Packet v1.44 (cards 12-13), Phraseology Reference v3.4, Hitman JTAC Comms Flow (one page).
+**Attached:** Comms Packet v1.45 (cards 12-13), Phraseology Reference v3.5, Hitman JTAC Comms Flow (one page).

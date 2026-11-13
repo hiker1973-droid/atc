@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.4"
+VER = "v3.5"
 DATE = "13 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -137,14 +137,14 @@ RANGE = [
 ]
 JTAC = [
     ("Check in", "checking in  /  request tasking", "target N, <name>; lines 1-3 (IP, heading, distance), read back", "check_in"),
-    ("Readback", "IP <IP>, heading 297, distance 8.5  /  copy", "Readback correct, next three lines; only the grid (line 6) is checked; after lines 7-9: confirmed, report IP inbound", "copy"),
-    ("Say again", "say again  /  say again line 6  /  say again location", "Hitman repeats the block, or the grid", "say_again"),
+    ("Readback", "IP <IP>, heading 297, distance 8.5  /  copy", "Readback correct, next three lines; only the grid (line 6) is checked, and line 8 distance is corrected once; after lines 7-9: confirmed, report IP inbound", "copy"),
+    ("Say again", "say again  /  say again line 6  /  say again location", "Hitman repeats the block, or the grid. A call he cannot read gets: say again your readback", "say_again"),
     ("IP inbound", "IP inbound", "Continue (or where the IP is)", "ip_inbound"),
     ("In", "in from the south  /  in heading 330", "Cleared hot  -  or abort, abort, abort", "in"),
     ("Off", "off  /  off safe", "Egress per line 9", "off"),
     ("BDA", "request BDA", "Effects, then re-attack, correction or home; standby if the bombs are still flying; says if they hit another target", "bda"),
     ("Abort", "abort", "Copy abort, re-attack from the IP", "abort"),
-    ("Direct attack", "request direct attack", "Permission granted, the same target again (a new one if it is destroyed), call in hot", "direct"),
+    ("Direct attack", "request direct attack", "Permission granted, the same target again (a new one if it is destroyed), call in hot; told if you are on the wrong side of the attack heading", "direct"),
     ("Target destroyed", "target destroyed", "Copy, report ready for further tasking", "destroyed"),
     ("Done", "winchester  /  off station", "Released from the net, thanks for the support (BDA first if one is due)", "off_station"),
     ("Radio check", "radio check", "Loud and clear", "radio_check"),

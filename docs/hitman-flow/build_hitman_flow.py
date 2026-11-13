@@ -21,7 +21,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Table, TableStyle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = "SkyEye b4517d0, 13 Nov 2026"
+BUILD = "SkyEye 8f20edf, 13 Nov 2026"
 OUT_NAME = "Hitman JTAC Comms Flow.pdf"
 # Documentation only: the second copy in the folder root went with the 2026-10-21 tidy.
 DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"]
@@ -96,7 +96,7 @@ S.append(section("2. Check in and get the 9-line (three blocks, only the grid is
     "<b>Only line 6, the location, is checked.</b> The other lines need only a readback attempt or a \"copy\". Grid wrong: \"negative, "
     "readback incorrect,\" and line 6 again. Wrong twice: he says it once more, \"continue,\" and passes lines 7-9. "
     "<b>Missed it?</b> \"Say again\" repeats the block; \"say again line 6\" (or \"say again location\" / \"say again grid\") repeats the "
-    "grid. Hitman still checks the run from the Tacview picture.",
+    "grid. If he cannot make out a call he says \"say again your readback\" and then repeats the block. Line 8 is corrected once if the distance is wrong. Hitman still checks the run from the Tacview picture.",
     "<b>Readback tip:</b> don't say \"Hitman\" partway through your readback; a call like that is dropped as "
     "Hitman's own echo. Put Hitman first, or leave his name out."))
 
