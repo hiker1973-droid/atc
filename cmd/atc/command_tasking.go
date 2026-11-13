@@ -107,6 +107,8 @@ type taskingAssignment struct {
 	loadAsked bool // JTAC asked ordnance + playtime at check-in
 	loadDone  bool // and heard the answer
 	briefMiss int  // wrong readbacks of the current 9-line block (jtac_brief.go)
+	missCount int  // calls the net could not act on while this stage was current
+	missStage jtacStage
 }
 
 // taskingBoard tracks which flight holds which target.

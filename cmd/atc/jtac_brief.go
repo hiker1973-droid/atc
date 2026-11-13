@@ -536,3 +536,59 @@ func (b *taskingBoard) soleBriefingReadback(lower string) string {
 	}
 	return key
 }
+
+// missReply answers a call the net could not act on, when it came from a flight
+// that is in the exchange (briefed or later, active in the last 20 minutes) and
+// is more than a word or two of chatter. While the 9-line is being passed the
+// first miss is "say again", later ones repeat the block being read back, so a
+// flight never stalls on silence. cs may be "" (a mangled callsign); then the
+// sole active flight is used. Returns the flight key and the reply, or "".
+func (b *taskingBoard) missReply(cs, text string) (string, string) {
+	if len(strings.Fields(text)) < 7 {
+		return "", ""
+	}
+	key := strings.ToLower(cs)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := b.now()
+	active := func(cur *taskingAssignment) bool {
+		last := cur.issued
+		if cur.clearedAt.After(last) {
+			last = cur.clearedAt
+		}
+		return cur.stage >= jtacBriefed && now.Sub(last) <= 20*time.Minute
+	}
+	cur := b.flights[key]
+	if cur == nil || !active(cur) {
+		// No usable callsign: only when the text is addressed to Hitman and one
+		// flight is mid-brief.
+		lower := strings.ToLower(jtacAddressFixRe.ReplaceAllString(text, "hitman"))
+		if cs != "" || !containsAny(lower, "hitman", "hammer", "hey man") {
+			return "", ""
+		}
+		key, cur = "", nil
+		for k, c := range b.flights {
+			if c.stage >= jtacBriefed && c.stage <= jtacBrief3 && active(c) {
+				if cur != nil {
+					return "", ""
+				}
+				key, cur = k, c
+			}
+		}
+		if cur == nil {
+			return "", ""
+		}
+	}
+	if cur.missStage != cur.stage {
+		cur.missStage, cur.missCount = cur.stage, 0
+	}
+	cur.missCount++
+	if cur.stage >= jtacBriefed && cur.stage <= jtacBrief3 && cur.target < len(b.targets) {
+		if cur.missCount >= 2 {
+			block := int(cur.stage-jtacBriefed) + 1
+			return key, "say again your readback. I'll repeat. " + briefBlock(b.targets[cur.target], block)
+		}
+		return key, "say again your readback."
+	}
+	return key, "say again."
+}

@@ -290,7 +290,17 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 			resp += fmt.Sprintf(" Target bears %s for %d.", spokenBearing(toMagnetic(brg, t.MagVar)), int(nm+0.5))
 		}
 		log.Info().Str("callsign", callsign).Int("target", t.Number).Msg("JTAC: direct attack approved, 9-line skipped")
-		return resp + " Attack heading " + spokenBearing(float64(t.FAHLow)) + " to " + spokenBearing(float64(t.FAHHigh)) + ". Call in hot."
+		resp += " Attack heading " + spokenBearing(float64(t.FAHLow)) + " to " + spokenBearing(float64(t.FAHHigh)) + "."
+		// Heading for the target from the wrong side of the attack heading
+		// (Raider 302, 2026-11-13: told 160-200 while flying 046 at the target):
+		// say it now, not as an abort five miles out.
+		if pos, _, ok := pic.Contact(callsign); ok {
+			brg, _ := bearingRangeFromRef(pos, t.TgtPos[0], t.TgtPos[1])
+			if !inWindow(toMagnetic(brg, t.MagVar), float64(t.FAHLow), float64(t.FAHHigh), 90) {
+				resp += " You are on the wrong side. Set up for the attack heading before you call in."
+			}
+		}
+		return resp + " Call in hot."
 	}
 
 	// Check-in: pass the 9-line. A flight that skipped Command gets a target
@@ -823,6 +833,15 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 					resp = board.JTACResponse(text, cs, c.Spoken, pic)
 				}
 			}
+			if resp == "" {
+				// A real call Hitman could not act on, from a flight in the exchange:
+				// say so rather than stay silent (Raider 302, 2026-11-13: three
+				// misses, no reply).
+				if k, r := board.missReply(cs, text); r != "" {
+					cs = displayCallsign(k)
+					resp = fmt.Sprintf("%s, %s, %s", cs, c.Spoken, r)
+				}
+			}
 			return cs, resp
 		})
 	go runJTACWatch(ctx, board, c.Spoken, pic, tx)
@@ -841,7 +860,13 @@ func jtacWhisperPrompt(srsName string, targets []taskingTarget) string {
 			ips = append(ips, t.IP)
 		}
 	}
-	return strings.Replace(srsName, "-", " ", 1) + ", " + jtacWhisperCalls + ", " + strings.Join(ips, ", ")
+	own := strings.Replace(srsName, "-", " ", 1)
+	// Both nets' names: Whisper mixes up 1-1, 2-1 and "2-1-2" (Day 2026-11-13).
+	other := "Hitman 1-1"
+	if own == other {
+		other = "Hitman 2-1"
+	}
+	return own + ", " + other + ", " + jtacWhisperCalls + ", " + strings.Join(ips, ", ")
 }
 
 // bdaDue returns the flight's BDA once its weapons are down and have settled,

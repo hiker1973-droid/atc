@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -320,5 +321,47 @@ func TestJTACInCallFarOutGetsHeading(t *testing.T) {
 	got := b.JTACResponse("Hitman, Raider 11, in from the south", "Raider 11", hitman, pic)
 	if !strings.Contains(got, "cleared hot") || !strings.Contains(got, "Final attack heading") {
 		t.Errorf("far-out off-heading in call = %q, want cleared hot with the heading", got)
+	}
+}
+
+// A call Hitman cannot act on, from a flight mid-brief, gets "say again", then
+// the block repeated; chatter and unknown flights get nothing.
+func TestJTACMissReply(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 302, checking in", "Raider 302", hitman, pic)
+	text := "Hitman 2-1, Raider 302, standing by for the next transmission please"
+	k, r := b.missReply("Raider 302", text)
+	if k != "raider 302" || !strings.Contains(r, "say again your readback") || strings.Contains(r, "line 1") {
+		t.Fatalf("first miss = %q %q", k, r)
+	}
+	if _, r = b.missReply("Raider 302", text); !strings.Contains(r, "line 1") {
+		t.Fatalf("second miss should repeat the block, got %q", r)
+	}
+	if _, r = b.missReply("Raider 302", "Hitman 2-1, Raider 302, copy."); r != "" {
+		t.Fatalf("chatter answered: %q", r)
+	}
+	if _, r = b.missReply("Raider 999", text); r != "" {
+		t.Fatalf("unknown flight answered: %q", r)
+	}
+	if k, r = b.missReply("", "Hitman 1-2, standing by for the next transmission please"); k != "raider 302" || r == "" {
+		t.Fatalf("no callsign, sole flight: %q %q", k, r)
+	}
+}
+
+// A direct attack from the wrong side of the attack heading says so.
+func TestJTACDirectAttackWrongSide(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	// Place the jet so the target lies opposite the attack heading.
+	mid := float64(tgt.FAHLow+tgt.FAHHigh) / 2
+	pic.place(tgt.TgtPos, math.Mod(mid+180, 360), 20, mid)
+	got := b.JTACResponse("Hitman, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "direct attack") {
+		t.Skipf("direct attack not granted: %q", got)
+	}
+	if !strings.Contains(got, "wrong side") {
+		t.Errorf("wrong-side direct attack not flagged: %q", got)
 	}
 }
