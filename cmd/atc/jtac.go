@@ -77,7 +77,7 @@ const (
 	jtacContactMaxAge = 30 * time.Second
 	// jtacWhisperCalls: the net's calls, between its callsign and its IP
 	// names in jtacWhisperPrompt.
-	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, request direct attack, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, off station, winchester"
+	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, request direct attack, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, target destroyed, off station, winchester"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -143,6 +143,8 @@ var (
 )
 
 var (
+	// jtacTargetDestroyedRe: the pilot's own assessment, "target destroyed".
+	jtacTargetDestroyedRe = regexp.MustCompile(`\btarget (?:is |was |has been )?(?:destroyed|neutrali[sz]ed|down)\b`)
 	// jtacOffStationRe: the flight is done with the net (operator 2026-11-13:
 	// "have Raider or Venom tell Hitman off station or winchester").
 	jtacOffStationRe = regexp.MustCompile(`\b(?:off[ -]station|winchester)\b`)
@@ -250,12 +252,29 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		return say("copy %s. You are released from the net, thanks for the support.", word)
 	}
 
+	// "Target destroyed": the pilot tells Hitman (their own eyes, or the BDA
+	// could not assess). The next direct attack or tasking draws a new target.
+	if cur != nil && cur.stage >= jtacBriefed && jtacTargetDestroyedRe.MatchString(lower) {
+		cur.destroyed = true
+		return say("copy target destroyed. Report ready for further tasking.")
+	}
+
 	// Direct attack: the pilot asks to skip the 9-line. Permission granted, the
 	// target is given, and the flight goes on to the in call (cleared hot with
 	// the usual checks), then the watch and BDA as after a briefed attack.
 	if jtacDirectRe.MatchString(lower) && !(cur != nil && cur.stage >= jtacCleared && cur.stage != jtacOff) {
 		if cur == nil || cur.stage == jtacOff {
-			cur = &taskingAssignment{target: b.pick(key, now)}
+			// A flight that already has a target and asks for a direct attack
+			// is re-attacking it (operator 2026-11-13: Raider 302 was told to
+			// re-attack target 9 and was handed target 5). Only a flight with
+			// none, or one that asked Command for more, draws a new one.
+			target := 0
+			if cur != nil && !cur.redraw && !cur.destroyed && cur.target < len(b.targets) {
+				target = cur.target
+			} else {
+				target = b.pick(key, now)
+			}
+			cur = &taskingAssignment{target: target}
 			b.flights[key] = cur
 		}
 		cur.issued, cur.awaiting, cur.redraw, cur.loadDone = now, false, false, true
@@ -309,7 +328,7 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		case cur.redraw || cur.stage >= jtacCleared && isTaskingRequest(lower):
 			cur.target = b.pick(key, now)
 		}
-		cur.redraw = false
+		cur.redraw, cur.destroyed = false, false
 		cur.issued, cur.awaiting, cur.stage = now, false, jtacBriefed
 		t := b.targets[cur.target]
 		// The 9-line goes out in three blocks of three lines, each read back
@@ -859,6 +878,9 @@ func (b *taskingBoard) bda(cur *taskingAssignment, cs, name string, t taskingTar
 	cur.effectsAsked = time.Time{}
 	if out == bdaUnable {
 		cur.effectsAsked = now
+	}
+	if out == bdaGood {
+		cur.destroyed = true
 	}
 	return text
 }

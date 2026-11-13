@@ -201,3 +201,33 @@ func TestJTACBDAImpactsOffTarget(t *testing.T) {
 		t.Errorf("off-target BDA = %q (five %d nine %d)", got, five.Number, nine.Number)
 	}
 }
+
+// A re-attack by direct attack keeps the flight's target.
+func TestJTACDirectAttackKeepsTarget(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	first := b.flights["raider 11"].target
+	b.flights["raider 11"].stage = jtacOff
+	got := b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	if b.flights["raider 11"].target != first || !strings.Contains(got, "direct attack") {
+		t.Errorf("target %d -> %d, reply %q", first, b.flights["raider 11"].target, got)
+	}
+}
+
+// ...unless the target is destroyed: then a direct attack draws a new one.
+func TestJTACDirectAttackAfterDestroyed(t *testing.T) {
+	b, _ := newTestTaskingBoard(casTICTargets)
+	b.jtacs = []*jtacNet{{Spoken: hitman, FreqMHz: 61.0}}
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	b.flights["raider 11"].stage = jtacOff
+	got := b.JTACResponse("Hitman 1-1, Raider 11, target destroyed", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "copy target destroyed") || !b.flights["raider 11"].destroyed {
+		t.Fatalf("destroyed call = %q", got)
+	}
+	b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	if b.flights["raider 11"].destroyed {
+		t.Error("new assignment should clear the destroyed flag")
+	}
+}

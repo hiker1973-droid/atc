@@ -102,6 +102,7 @@ type taskingAssignment struct {
 	bdaDone   bool      // this pass's BDA has gone out
 	offAcked  bool      // this pass's "off" has been answered
 	effectsAsked time.Time // the BDA could not assess and asked the pilot for theirs
+	destroyed bool // the BDA called the target destroyed, or the pilot did
 	released  bool // said winchester / off station with the BDA still due
 	loadAsked bool // JTAC asked ordnance + playtime at check-in
 	loadDone  bool // and heard the answer

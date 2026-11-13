@@ -761,7 +761,7 @@ func TestJTACCallsignTwoOne(t *testing.T) {
 
 func TestJTACWhisperPrompt(t *testing.T) {
 	got := jtacWhisperPrompt("Hitman-2-1", sectorTargets(caucasusTaskingTargets, "Cherkessk"))
-	if !strings.HasPrefix(got, "Hitman 2-1, Raider,") || !strings.HasSuffix(got, "request BDA, off station, winchester, Indigo, Javelin") {
+	if !strings.HasPrefix(got, "Hitman 2-1, Raider,") || !strings.HasSuffix(got, "request BDA, target destroyed, off station, winchester, Indigo, Javelin") {
 		t.Errorf("prompt = %q", got)
 	}
 }
