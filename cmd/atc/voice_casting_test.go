@@ -68,7 +68,7 @@ func TestTowerAccentCasting(t *testing.T) {
 	if !strings.Contains(styleCommand, "a man with a General American accent") || !strings.Contains(styleCommand, "Stern") {
 		t.Errorf("Command is not a stern American man: %q", styleCommand)
 	}
-	if !strings.Contains(styleJTAC, "Australian man") {
-		t.Errorf("Hitman is not Australian: %q", styleJTAC)
+	if !strings.Contains(styleJTAC, "General American accent") || strings.Contains(styleJTAC, "Australian") {
+		t.Errorf("Hitman is not American: %q", styleJTAC)
 	}
 }

@@ -51,7 +51,7 @@ const (
 	elAlice   = "Xb7hH8MSUJpSbSDYk0k2" // British woman, clear
 	elLily    = "pFZP5JQG7iQjIQuC4Bku" // British woman, confident
 	elCharlie = "IKne3meq5aSn9XLyUdCD" // Australian man
-	elAdam    = "pNInz6obpgDQGcFmaJgB" // American man, dominant, firm (Marshal until 2026-10-15)
+	elAdam    = "pNInz6obpgDQGcFmaJgB" // American man, dominant, firm (Marshal until 2026-10-15; Hitman 1-1 since 2026-11-12)
 	elBrian   = "nPczCjzI2devNBz1zQrb" // American man, deep (Deckboss until round 9)
 	elEric    = "cjVigY5qzO86Huf0OWal" // American man, smooth (Caucasus Deckboss until round 9)
 )
@@ -60,7 +60,7 @@ const (
 // squadron is on Creator since 2026-10-14). An owner can withdraw a voice; the
 // OpenAI fallback then answers until another is picked.
 const (
-	elScotty  = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman)
+	elScotty  = "7QoDxbTwBuOlgOCahTNI" // Australian man, 56, rough (Hitman until 2026-11-12)
 	elLisa    = "bG3bxTbEPR7EZE4M0kcC" // Australian woman, assertive, calm (Senaki)
 	elGround  = "OP6zHc4gr2eULw36mXX5" // Senaki's other shift with Lisa (Tower/Ground/Traffic): round 13 senaki_5, operator 2026-10-16
 	elGideon  = "q1h5HGdnfVxp4TXTJRNN" // English man, rugged, gravelly, Northern (Command until round 10)

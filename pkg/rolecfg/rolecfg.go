@@ -115,7 +115,7 @@ var TowerStation = Station{Key: "tower", Label: "Tower", Owner: OwnerTower, Name
 var Defaults = map[string]string{
 	"command-freq": "0", "command-name": "vSFG-7-Command", "command-voice": "onyx", "elevenlabs-command-voice": "8tsLeAV5vPVuzCCvqbbU",
 	"overlord-name": "Overlord-Actual", "overlord-voice": "ash", "elevenlabs-overlord-voice": "d7KZ4gJXiEWKJV0PMsGG",
-	"jtac-freq": "0", "jtac-name": "Hitman-1-1", "jtac-voice": "ash", "elevenlabs-jtac-voice": "7QoDxbTwBuOlgOCahTNI",
+	"jtac-freq": "0", "jtac-name": "Hitman-1-1", "jtac-voice": "ash", "elevenlabs-jtac-voice": "pNInz6obpgDQGcFmaJgB",
 	"jtac2-freq": "0", "jtac2-name": "Hitman-2-1", "jtac2-voice": "echo", "elevenlabs-jtac2-voice": "9JbYHzFp74No6NSJoI0w",
 	"tanker-freq": "0", "tanker-name": "Texaco-1-1", "tanker-voice": "echo", "elevenlabs-tanker-voice": "cjVigY5qzO86Huf0OWal",
 	"tanker2-freq": "0", "tanker2-name": "Texaco-3-1", "tanker2-voice": "verse", "elevenlabs-tanker2-voice": "nPczCjzI2devNBz1zQrb",

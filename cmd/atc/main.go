@@ -252,7 +252,7 @@ func newRootCommand() *cobra.Command {
 	f.IntVar(&flagElevenStopAt, "elevenlabs-stop-at", 127000, "ElevenLabs credits used this billing period (the account's count) at which every role switches to OpenAI until the period resets; checked every 10 min (operator 2026-10-16: \"flip to open AI once we hit 127k\"; 0 = never)")
 	f.StringVar(&flagElevenLabsModel, "elevenlabs-model", elFlash, "ElevenLabs model (default Flash, half the credits of eleven_multilingual_v2)")
 	f.StringVar(&flagElevenCommandVoice, "elevenlabs-command-voice", elEryn, "ElevenLabs voice ID for Command (default library \"Eryn\", American woman; was Jodi until 2026-11-08, who stays the Departure voice)")
-	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elScotty, "ElevenLabs voice ID for Hitman (default Scotty, library)")
+	f.StringVar(&flagElevenJTACVoice, "elevenlabs-jtac-voice", elAdam, "ElevenLabs voice ID for Hitman (default Adam, American; was Scotty)")
 	f.StringVar(&flagElevenTowerVoice, "elevenlabs-tower-voice", "",
 		"ElevenLabs voice ID for this tower, over the accent default (Lisa / Alice / George); Senaki uses round 13 senaki_6 for Tower, Ground and Traffic")
 	f.StringVar(&flagElevenTowerAltVoice, "elevenlabs-tower-alt-voice", "",
@@ -2081,8 +2081,8 @@ const (
 	// styleJTAC: Hitman 1-1 is a ground party near the target on a manpack
 	// radio, not a controller at a console (operator 2026-10-14: "realistic
 	// ... radio static type feel since it is a JTAC from ground").
-	// Australian man, operator 2026-10-14.
-	styleJTAC = "Speak as a JTAC on the ground, an Australian man with a clear, natural Australian accent, " +
+	// American man since 2026-11-12 (operator: "change hitman to american voice"; was Australian).
+	styleJTAC = "Speak as a JTAC on the ground, a man with a clear, natural General American accent, " +
 		"talking on a manpack radio from a covered position near the target. " +
 		"Low, calm, clipped and deliberate, slightly hushed as if keeping your voice down. Crisp on every number. No emotion."
 	// styleJTAC2: Hitman 2-1, the OpenAI fallback for its American ElevenLabs voice.
