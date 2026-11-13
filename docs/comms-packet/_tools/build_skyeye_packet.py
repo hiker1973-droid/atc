@@ -85,6 +85,10 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.42 (operator 2026-11-12, origin/main af7c392): Hitman reads the 9-line lines 12% slower than the
+rest of his speech (jtacNineLineSlow, cmd/atc/jtac.go), and card 13 spells out asking him to repeat:
+"say again" = the block, "say again line 6" = one line (sayAgainRe, cmd/atc/jtac_brief.go).
+
 v1.41 (operator 2026-11-11, origin/main f1ec141): Hitman asks "say ordnance and playtime" on the first
 check-in and passes the 9-line once you answer; nine sites (each a red-force pass, then its static
 target) on the V1.42 Day / Night missions - 1-1 runs targets 1, 2, 3, 4, 6, 2-1 runs 5, 7, 8, 9; "established
@@ -150,7 +154,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.41"
+VER = "v1.42"
 DATE = "12 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -715,8 +719,12 @@ def c12_jtac_flow():
          ("on your first check-in - answer it and he passes the target.", False)],
         [("Hitman picks the target, at random.", True),
          ("Not one another flight is working, not the one you just did. Hitman reads the 9-line "
-          "in three blocks, lines 1-3, 4-6, 7-9, and you read each back. Wrong readback: he says "
-          "the block again. \"Say again\" or \"say again line 6\" if you miss it.", False)],
+          "in three blocks, lines 1-3, 4-6, 7-9, and you read each back. He reads the lines "
+          "slower than the rest of his talk, so you can copy them. Wrong readback: he says the "
+          "block again.", False)],
+        [("Missed it? Ask him to repeat.", True),
+         ("\"Hitman, Raider 1, say again\" gives you the block again; \"say again line 6\" gives "
+          "you that one line.", False)],
         [("Another target:", True),
          ("after \"off\", say \"request tasking\" to Hitman - or ask Command again.", False)],
     ])

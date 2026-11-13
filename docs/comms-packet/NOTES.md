@@ -7,6 +7,11 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.42 (12 NOV 2026) - slower 9-line, ask Hitman to repeat
+
+Follows origin/main af7c392 (Hitman reads the 9-line lines 12% slower, `jtacNineLineSlow`). Card 13: "slower than the rest of his talk" and
+a separate "Missed it? Ask him to repeat" bullet ("say again" = the block, "say again line 6" = one line). Not heard over SRS at build time.
+
 ## v1.41 (12 NOV 2026) - Hitman ordnance/playtime, nine sites, loosened checks
 
 Follows origin/main f1ec141 (8f1d67e detection on V1.42 Day/Night names, cas_tic_set.go). Card 13: ordnance and playtime
