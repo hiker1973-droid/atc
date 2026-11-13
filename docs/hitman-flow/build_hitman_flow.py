@@ -142,7 +142,7 @@ S.append(section("4. Off target and BDA",
 S.append(section("Radio checks and tips",
     table(["Item", "Detail"], [
         ["Radio check", "\"Radio check\", \"comm check\", \"comcheck\" and \"how copy\" get \"loud and clear\" on both Hitmen and Command."],
-        ["Who is who", "Hitman 1-1 is an Australian voice, Hitman 2-1 an American one. Each only knows his own sector's targets."],
+        ["Who is who", "Both Hitmen are American voices. Each only knows his own sector's targets."],
         ["Your callsign", "Say it with its number (\"Raider 3-0-2\"). Anything after the number is not part of the callsign."],
         ["No answer?", "Wait 3-4 s (recognition + voice), then repeat once. Check FM on 61.0 or 62.0. Report callsign, frequency and time on Discord."],
     ], [1.5, 5.9])))
