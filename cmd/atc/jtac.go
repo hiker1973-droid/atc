@@ -370,10 +370,17 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		if cur.clearedAt.IsZero() && len(imps) == 0 {
 			return say("negative BDA, no attack yet.")
 		}
-		// Asked before the weapons landed (Raider 302, 2026-11-13: BDA 67 s
-		// after pickle got "no impacts observed", and marking the pass done
-		// swallowed the real BDA). Standby; the watch sends it on impact.
-		if len(imps) == 0 && !cur.clearedAt.IsZero() && now.Sub(cur.clearedAt) < bdaFlightTime {
+		// Weapons landed, but not on this target (Raider 302, 2026-11-13: the
+		// 4 GBU-12s hit target 9 while Hitman had him on target 5).
+		if len(imps) == 0 {
+			if off := offTargetImpacts(pic.Impacts(since), callsign, t); len(off) > 0 {
+				cur.bdaDone = true
+				return say("%s", b.offTargetBDA(cur, t, off))
+			}
+		}
+		// Asked before the weapons landed: standby; the watch sends the BDA on
+		// impact instead of marking the pass done with nothing to report.
+		if len(imps) == 0 &&!cur.clearedAt.IsZero() && now.Sub(cur.clearedAt) < bdaFlightTime {
 			return say("standby for BDA, weapons still in the air.")
 		}
 		cur.bdaDone = true
@@ -813,7 +820,23 @@ func (b *taskingBoard) bdaDue(key string, cur *taskingAssignment, name string, p
 	cs := displayCallsign(key)
 	imps := flightImpacts(pic.Impacts(cur.clearedAt), cs, t)
 	if len(imps) == 0 {
-		return ""
+		// Weapons down somewhere else: say so once they have settled.
+		off := offTargetImpacts(pic.Impacts(cur.clearedAt), cs, t)
+		if len(off) == 0 {
+			return ""
+		}
+		last := off[0].At
+		for _, i := range off[1:] {
+			if i.At.After(last) {
+				last = i.At
+			}
+		}
+		if now.Sub(last) < bdaSettle {
+			return ""
+		}
+		cur.bdaDone = true
+		log.Info().Str("callsign", cs).Int("impacts", len(off)).Int("target", t.Number).Msg("JTAC: BDA, impacts off target")
+		return fmt.Sprintf("%s, %s, %s", cs, name, b.offTargetBDA(cur, t, off))
 	}
 	last := imps[0].At
 	for _, i := range imps[1:] {

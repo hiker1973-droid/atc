@@ -392,6 +392,47 @@ func flightImpacts(all []tacviewImpact, callsign string, t taskingTarget) []tacv
 	return out
 }
 
+// offTargetImpacts are the flight's impacts since since that are NOT within
+// bdaImpactRadiusM of t but are within 15 nm of it: the weapons came down on
+// something else (Raider 302 attacked target 9 under a target 5 assignment).
+func offTargetImpacts(all []tacviewImpact, callsign string, t taskingTarget) []tacviewImpact {
+	var out []tacviewImpact
+	for _, i := range all {
+		if i.Shooter != "" && !strings.EqualFold(i.Shooter, callsign) {
+			continue
+		}
+		if d := metresBetween(i.Pos, t.TgtPos); d > bdaImpactRadiusM && d <= 15*1852 {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+// offTargetBDA is the BDA text for weapons that landed away from the flight's
+// target: on another card target when one is there, else its bearing and
+// range from the aim point. The flight is told to re-attack its own target.
+func (b *taskingBoard) offTargetBDA(cur *taskingAssignment, t taskingTarget, imps []tacviewImpact) string {
+	var lon, lat float64
+	for _, i := range imps {
+		lon += i.Pos[0]
+		lat += i.Pos[1]
+	}
+	mean := orb.Point{lon / float64(len(imps)), lat / float64(len(imps))}
+	where := ""
+	for _, o := range b.targets {
+		if o.Number != t.Number && metresBetween(mean, o.TgtPos) <= bdaImpactRadiusM {
+			where = fmt.Sprintf("on target %d, not target %d", o.Number, t.Number)
+			break
+		}
+	}
+	if where == "" {
+		brg, nm := bearingRangeFromRef(t.TgtPos, mean[0], mean[1])
+		where = fmt.Sprintf("%d miles %s of target %d", int(nm+0.5), spokenBearing(toMagnetic(brg, t.MagVar)), t.Number)
+	}
+	return fmt.Sprintf("BDA. Your weapons impacted %s. No effect on target %d. Re-attack target %d, report IP inbound from %s.",
+		where, t.Number, t.Number, t.IP)
+}
+
 func isBDARequest(lower string) bool {
 	return containsAny(lower, "bda", "b.d.a", "b d a", "b-d-a", "bdas", "battle damage", "damage assessment", "say effects", "request effects", "give me effects")
 }

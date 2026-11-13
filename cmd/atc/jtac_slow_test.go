@@ -172,3 +172,32 @@ func TestJTACBDAEarlyRequestStandby(t *testing.T) {
 		t.Errorf("late BDA request = %q", got)
 	}
 }
+
+// Day 2026-11-13: Raider 302's four GBU-12s landed on target 9 while Hitman had
+// him on target 5; the BDA said "no impacts observed". It now says where they hit.
+func TestJTACBDAImpactsOffTarget(t *testing.T) {
+	b, clock := newTestTaskingBoard(casTICTargets)
+	b.jtacs = []*jtacNet{{Spoken: hitman, FreqMHz: 61.0}}
+	var five, nine taskingTarget
+	for _, tg := range casTICTargets {
+		if tg.Phase == 1 && tg.Number == 5 {
+			five = tg
+		}
+		if tg.Phase == 1 && tg.Number == 9 {
+			nine = tg
+		}
+	}
+	cur := &taskingAssignment{target: 0, clearedAt: *clock, stage: jtacCleared}
+	for i, tg := range b.targets {
+		if tg.Number == 5 && tg.Phase == 1 {
+			cur.target = i
+		}
+	}
+	b.flights["raider 302"] = cur
+	pic := &fakePicture{impacts: []tacviewImpact{{Pos: nine.TgtPos, At: clock.Add(40 * time.Second), Shooter: "Raider 302"}}}
+	*clock = clock.Add(75 * time.Second)
+	got := b.JTACResponse("Hitman 2-1, Raider 302, request BDA", "Raider 302", hitman, pic)
+	if !strings.Contains(got, "impacted on target 9, not target 5") || strings.Contains(got, "no impacts") {
+		t.Errorf("off-target BDA = %q (five %d nine %d)", got, five.Number, nine.Number)
+	}
+}
