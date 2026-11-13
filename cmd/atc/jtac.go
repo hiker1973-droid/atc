@@ -626,12 +626,16 @@ var jtacReadyWithRe = regexp.MustCompile(`(?i)^(?:ready with|reader|rider|raider
 // jtacBareNumberRe is a callsign with no name ("Hitman 3-306" -> "3306").
 var jtacBareNumberRe = regexp.MustCompile(`^[\d\s-]+$`)
 
+var jtacOnCallsignRe = regexp.MustCompile(`(?i)(hitman[ -]+(?:\w+[ -]+)?\w+)\s+on\s+([a-z]+),?\s+(\d)`)
+
 // jtacCallsign trims what the generic extractor leaves after a JTAC call's
 // callsign: "Raider 11 in from the north" -> "Raider 11". DCS3 2026-10-17
 // replies opened "and Raider 303", "ready with 303", "Hey man 11" and "3306";
 // a bare number gets no reply rather than being read out as a callsign.
 func jtacCallsign(text string) string {
 	text = jtacAddressFixRe.ReplaceAllString(text, "Hitman")
+	// "Hitman 1-1 on Raider, 3-1-2" (Day 2026-11-13): drop the "on" and the comma.
+	text = jtacOnCallsignRe.ReplaceAllString(text, "$1 $2 $3")
 	cs :=extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
 		"hitman in 1-1", "hitman in one-one", "hitman in one one", "hitman in 2-1", "hitman in two-one", "hitman in two one",
 		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21",

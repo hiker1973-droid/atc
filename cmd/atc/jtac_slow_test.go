@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -229,5 +230,56 @@ func TestJTACDirectAttackAfterDestroyed(t *testing.T) {
 	b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
 	if b.flights["raider 11"].destroyed {
 		t.Error("new assignment should clear the destroyed flag")
+	}
+}
+
+// Whisper heard "Hitman 1-1 on Raider, 3-1-2" (Day 2026-11-13): the callsign
+// must still be Raider 312.
+func TestJTACCallsignSkipsOn(t *testing.T) {
+	if got := jtacCallsign("Hitman 1-1 on Raider, 3-1-2, IP inbound."); got != "Raider 312" {
+		t.Fatalf("callsign = %q, want Raider 312", got)
+	}
+}
+
+// Ordnance with no callsign and no address goes to the flight Hitman asked.
+func TestJTACLoadAnswerNoCallsign(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	b.askLoad = true
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman one one, Raider three one two, checking in", "Raider 312", hitman, pic)
+	text := "8 times GBU-12s, playtime 30 minutes."
+	if r := b.JTACResponse(text, jtacCallsign(text), hitman, pic); r != "" {
+		t.Fatalf("no callsign should not answer directly, got %q", r)
+	}
+	k := b.soleFlight(text)
+	if k == "" {
+		t.Fatal("soleFlight should find the flight that was asked for ordnance")
+	}
+	r := b.JTACResponse(text, displayCallsign(k), hitman, pic)
+	if !strings.Contains(strings.ToLower(r), "copy ordnance and playtime") {
+		t.Fatalf("answer should release the 9-line, got %q", r)
+	}
+}
+
+// Line 8 with the wrong friendly distance is read back once, then accepted.
+func TestJTACLine8WrongDistance(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 302, checking in", "Raider 302", hitman, pic)
+	cur := b.flights["raider 302"]
+	tg := b.targets[cur.target]
+	d := nineData(tg)
+	b.JTACResponse("Hitman, Raider 302, IP "+tg.IP+", heading "+fmt.Sprintf("%03d", tg.RunIn), "Raider 302", hitman, pic)
+	b.JTACResponse("Hitman, Raider 302, elevation "+fmt.Sprint(tg.ElevFt)+", location "+d.Grid, "Raider 302", hitman, pic)
+	if cur.stage != jtacBrief3 {
+		t.Skipf("not at block 3 (stage %v)", cur.stage)
+	}
+	r := b.JTACResponse("Hitman, Raider 302, line 7 no mark, line 8, 9,900 meter friendly, egress", "Raider 302", hitman, pic)
+	if !strings.Contains(strings.ToLower(r), "negative") || !strings.Contains(r, friendMetres(d.Friend)) {
+		t.Fatalf("wrong friendly distance should be corrected, got %q", r)
+	}
+	r = b.JTACResponse("Hitman, Raider 302, line 8, "+friendMetres(d.Friend)+" meters friendly", "Raider 302", hitman, pic)
+	if !strings.Contains(strings.ToLower(r), "confirmed") {
+		t.Fatalf("correct distance should confirm, got %q", r)
 	}
 }

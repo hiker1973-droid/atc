@@ -249,6 +249,14 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 		}
 		return say("negative, readback incorrect. %s Read back location.", briefLine(t, 6)), true
 	}
+	// Line 8: a friendly distance that is not the briefed one is read back once
+	// (Raider 312, 2026-11-13: "1,800 meter friendly" against 1400 was confirmed).
+	if want := friendMetres(nineData(t).Friend); want != "" && cur.briefMiss < 1 {
+		if got := friendMetresHeard(lower); got != "" && got != want {
+			cur.briefMiss++
+			return say("negative, line 8, friendlies %s metres. Read back.", want), true
+		}
+	}
 	cur.stage = jtacReady
 	cur.briefMiss = 0
 	return say("confirmed. Report IP inbound."), true
@@ -287,6 +295,9 @@ func (b *taskingBoard) soleFlight(text string) string {
 		return k
 	}
 	lower := strings.ToLower(jtacAddressFixRe.ReplaceAllString(text, "hitman"))
+	if k := b.soleLoadAsked(lower); k != "" {
+		return k
+	}
 	if !containsAny(lower, "hitman", "hammer", "hey man") {
 		return ""
 	}
@@ -457,4 +468,46 @@ func speakWithSlowNineLine(ctx context.Context, apiKey, resp string, vp voicePro
 		out = joined
 	}
 	return out, nil
+}
+
+var friendNumRe = regexp.MustCompile(`(\d[\d,]{2,5})\s*(?:m|met)`)
+
+// friendMetres is the briefed line 8 distance, digits only ("West 1300 m" -> "1300").
+func friendMetres(friend string) string {
+	for _, f := range strings.Fields(friend) {
+		if len(f) >= 3 && strings.Trim(f, "0123456789") == "" {
+			return f
+		}
+	}
+	return ""
+}
+
+// friendMetresHeard is the distance a readback gave for the friendlies, in
+// metres ("1,800 meter friendly" -> "1800"); "" when none was heard.
+func friendMetresHeard(lower string) string {
+	if m := friendNumRe.FindStringSubmatch(lower); m != nil {
+		return strings.ReplaceAll(m[1], ",", "")
+	}
+	return ""
+}
+
+// soleLoadAsked is the one flight Hitman asked for ordnance and playtime, when
+// lower is that answer with no callsign ("8 times GBU-12s, playtime 30 minutes",
+// Raider 312, 2026-11-13); "" when none or several.
+func (b *taskingBoard) soleLoadAsked(lower string) string {
+	if !b.askLoad || !hasLoadWords(lower) {
+		return ""
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	key := ""
+	for k, cur := range b.flights {
+		if cur.loadAsked && !cur.loadDone && cur.stage == jtacAssigned {
+			if key != "" {
+				return ""
+			}
+			key = k
+		}
+	}
+	return key
 }
