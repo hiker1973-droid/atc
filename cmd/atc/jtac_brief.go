@@ -252,6 +252,15 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 		return say("%s", briefBlock(t, block)), true
 	}
 
+	// Lines 4-6 are not checked (operator 2026-11-12, after Whisper garbled the
+	// grid's northing and Raider 302 was refused four times): any attempt at the
+	// readback, or a plain copy, is "readback correct" and lines 7-9 follow.
+	if block == 2 && (spokenDigitString(lower) != "" || isTaskingAck(lower) || strings.Contains(lower, "read back")) {
+		cur.stage++
+		cur.briefMiss = 0
+		return say("readback correct. %s", briefBlock(t, 3)), true
+	}
+
 	if briefReadbackOK(lower, t, block, cur.briefMiss) {
 		cur.briefMiss = 0
 		if block == 3 {
