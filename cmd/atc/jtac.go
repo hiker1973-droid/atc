@@ -533,6 +533,7 @@ var jtacBareNumberRe = regexp.MustCompile(`^[\d\s-]+$`)
 // a bare number gets no reply rather than being read out as a callsign.
 func jtacCallsign(text string) string {
 	cs := extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
+		"hitman in 1-1", "hitman in one-one", "hitman in one one", "hitman in 2-1", "hitman in two-one", "hitman in two one",
 		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21",
 		"hey man one-one", "hey man one one", "hey man 1-1", "hey man 1 1", "hey man 11",
 		"hey man two-one", "hey man two one", "hey man 2-1", "hey man 2 1", "hey man 21", "hey man",
@@ -697,7 +698,17 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 	go voiceNetLoop(ctx, flagSRSAddr, c.FreqMHz, c.Name, apiKey, flagEAMPassword, c.Voice, flagExternalAudio,
 		jtacWhisperPrompt(c.Name, append(append([]taskingTarget{}, board.targets...), otherTaskingSet()...)), nil, func(text string) (string, string) {
 			cs := jtacCallsign(text)
-			return cs, board.JTACResponse(text, cs, c.Spoken, pic)
+			resp := board.JTACResponse(text, cs, c.Spoken, pic)
+			if resp == "" {
+				// "Hitman 1-1, say again" with no callsign, or one Whisper mangled
+				// ("Raider 3212"): the flight being briefed asked (Day 2026-11-12,
+				// Raider 312 asked four times and was never answered).
+				if k := board.soleBriefing(text); k != "" {
+					cs = displayCallsign(k)
+					resp = board.JTACResponse(text, cs, c.Spoken, pic)
+				}
+			}
+			return cs, resp
 		})
 	go runJTACWatch(ctx, board, c.Spoken, pic, tx)
 	log.Info().Float64("freq", c.FreqMHz).Str("name", c.Name).Str("sector", c.Sector).Int("targets", len(board.targets)).

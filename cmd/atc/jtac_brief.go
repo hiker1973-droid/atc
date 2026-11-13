@@ -166,12 +166,28 @@ func gridDigits(grid string) string {
 }
 
 // briefReadbackOK judges the pilot's readback of block 1-3.
-func briefReadbackOK(lower string, t taskingTarget, block int) bool {
+//
+// miss is how many readbacks of this block were already wrong: from the second
+// try the grid only has to match to the easting (Whisper garbles the northing's
+// five digits: 64761 came back as "6764 61", "642" and "65" on Day 2026-11-12
+// and Raider 302 was refused four times).
+func briefReadbackOK(lower string, t taskingTarget, block, miss int) bool {
 	digits := spokenDigitString(lower)
 	d := nineData(t)
 	switch block {
 	case 1:
-		return strings.Contains(lower, strings.ToLower(t.IP)) && strings.Contains(digits, fmt.Sprintf("%03d", t.RunIn))
+		// The heading is the line that matters. Whisper often loses the IP's
+		// name ("IP, 3-1-2, 8.7 miles"; Raider 312 was refused twice on Day
+		// 2026-11-12), so the name or the distance's last two digits backs it up,
+		// and after one miss the heading alone is taken.
+		if !strings.Contains(digits, fmt.Sprintf("%03d", t.RunIn)) {
+			return false
+		}
+		if miss >= 1 || strings.Contains(lower, strings.ToLower(t.IP)) {
+			return true
+		}
+		dist := strings.ReplaceAll(strconv.FormatFloat(d.DistNm, 'f', 1, 64), ".", "")
+		return len(dist) >= 2 && strings.Contains(digits, dist[len(dist)-2:])
 	case 2:
 		// Pilots say "two zero niner" or "209er" for 2090 ft: the leading three
 		// digits are enough.
@@ -182,7 +198,8 @@ func briefReadbackOK(lower string, t taskingTarget, block int) bool {
 		if !strings.Contains(digits, e) {
 			return false
 		}
-		return gridReadOK(digits, gridDigits(d.Grid))
+		g := gridDigits(d.Grid)
+		return gridReadOK(digits, g) || (miss >= 1 && gridEastingOK(digits, g))
 	default:
 		// Lines 7-9 carry no numbers to check: the friendly direction, the
 		// egress altitude or a plain copy is taken.
@@ -235,7 +252,8 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 		return say("%s", briefBlock(t, block)), true
 	}
 
-	if briefReadbackOK(lower, t, block) {
+	if briefReadbackOK(lower, t, block, cur.briefMiss) {
+		cur.briefMiss = 0
 		if block == 3 {
 			cur.stage = jtacReady
 			return say("confirmed. Report IP inbound."), true
@@ -246,9 +264,57 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 
 	// A readback attempt (numbers, the IP) that was wrong; chatter is ignored.
 	if spokenDigitString(lower) != "" || strings.Contains(lower, strings.ToLower(t.IP)) {
-		return say("negative, readback incorrect. %s", briefBlock(t, block)), true
+		cur.briefMiss++
+		return say("negative, readback incorrect. %s", briefRetry(lower, t, block)), true
 	}
 	return "", true
+}
+
+// soleBriefing is the key of the one flight whose 9-line is being passed, when
+// text is a repeat request addressed to Hitman; "" when none, or several.
+func (b *taskingBoard) soleBriefing(text string) string {
+	lower := strings.ToLower(text)
+	if !strings.Contains(lower, "hitman") && !strings.Contains(lower, "hammer") && !strings.Contains(lower, "hey man") {
+		return ""
+	}
+	if !sayAgainRe.MatchString(lower) {
+		return ""
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	key := ""
+	for k, cur := range b.flights {
+		if cur.stage >= jtacBriefed && cur.stage <= jtacBrief3 {
+			if key != "" {
+				return ""
+			}
+			key = k
+		}
+	}
+	return key
+}
+
+// gridEastingOK: the first four digits of the grid's easting are in the readback.
+func gridEastingOK(digits, g string) bool {
+	return len(g) == 10 && strings.Contains(digits, g[:4])
+}
+
+// briefRetry is what Hitman says again after a wrong readback: block 2 gets only
+// the line that was wrong (the long target line made the pilot start over),
+// every other block the whole block.
+func briefRetry(lower string, t taskingTarget, block int) string {
+	if block != 2 {
+		return briefBlock(t, block)
+	}
+	digits := spokenDigitString(lower)
+	e := strconv.Itoa(t.ElevFt)
+	if len(e) > 3 {
+		e = e[:3]
+	}
+	if !strings.Contains(digits, e) {
+		return briefLine(t, 4) + " Read back lines 4 to 6."
+	}
+	return briefLine(t, 6) + " Read back lines 4 to 6."
 }
 
 // gridReadOK: the full easting and northing, or the usual short readback (four

@@ -134,8 +134,8 @@ func TestJTACFullRun(t *testing.T) {
 		t.Errorf("say again line 6 = %q", got)
 	}
 	// Block 2: wrong grid, then right.
-	if got := b.JTACResponse("Hitman, Raider 11, elevation 2615, location 37T GJ 31916 64000", "Raider 11", hitman, pic); !strings.Contains(got, "negative, readback incorrect. line 4") {
-		t.Errorf("wrong block 2 readback = %q", got)
+	if got := b.JTACResponse("Hitman, Raider 11, elevation 2615, location 37T GJ 31916 64000", "Raider 11", hitman, pic); !strings.Contains(got, "negative, readback incorrect. line 6, location") || strings.Contains(got, "line 4") {
+		t.Errorf("wrong block 2 readback = %q (want only the grid line again)", got)
 	}
 	got = b.JTACResponse("Hitman, Raider 11, elevation two six one five, location three seven Tango Golf Juliet three one niner one six six four five seven four", "Raider 11", hitman, pic)
 	if !strings.Contains(got, "line 7, no mark") && !strings.Contains(got, "line 7, mark") || !strings.Contains(got, "line 9, egress, back to Falcon, angels 15.") {

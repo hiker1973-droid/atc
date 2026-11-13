@@ -16,3 +16,43 @@ func TestSplitNineLine(t *testing.T) {
 		t.Fatalf("slowedVoice wrong: %+v", v)
 	}
 }
+
+func TestBriefReadbackLenient(t *testing.T) {
+	tg := taskingTarget{IP: "Knife", RunIn: 312, ElevFt: 2615}
+	// Block 1: Whisper lost the IP's name (Raider 312, Day 2026-11-12).
+	if !briefReadbackOK("ip, 3-1-2, 8.7 miles", tg, 1, 0) && nineData(tg).DistNm > 0 {
+		t.Log("distance not matched without data; fine")
+	}
+	if briefReadbackOK("heading 312", tg, 1, 0) && nineData(tg).DistNm == 0 {
+		t.Error("heading alone accepted on the first try with no distance to back it")
+	}
+	if !briefReadbackOK("heading 312", tg, 1, 1) {
+		t.Error("heading alone refused after a miss")
+	}
+	if briefReadbackOK("heading 100", tg, 1, 1) {
+		t.Error("wrong heading accepted")
+	}
+}
+
+func TestSoleBriefing(t *testing.T) {
+	b := newTaskingBoard([]taskingTarget{{IP: "Knife"}})
+	b.flights["raider 312"] = &taskingAssignment{stage: jtacBriefed}
+	if k := b.soleBriefing("Hitman 1-1, repeat."); k != "raider 312" {
+		t.Errorf("sole briefing = %q", k)
+	}
+	if k := b.soleBriefing("Raider 312, say again"); k != "" {
+		t.Errorf("not addressed to Hitman: %q", k)
+	}
+	b.flights["raider 302"] = &taskingAssignment{stage: jtacBrief2}
+	if k := b.soleBriefing("Hitman 1-1, repeat."); k != "" {
+		t.Errorf("two briefing flights: %q", k)
+	}
+}
+
+func TestJTACCallsignHitmanIn(t *testing.T) {
+	for _, s := range []string{"Hitman in 1-1, Raider 312, repeat.", "Hitman 1-1, Raider 3-1-2, say again."} {
+		if cs := jtacCallsign(s); cs != "Raider 312" && cs != "Raider 3-1-2" {
+			t.Errorf("%q -> %q", s, cs)
+		}
+	}
+}

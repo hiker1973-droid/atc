@@ -104,6 +104,7 @@ type taskingAssignment struct {
 	effectsAsked time.Time // the BDA could not assess and asked the pilot for theirs
 	loadAsked bool // JTAC asked ordnance + playtime at check-in
 	loadDone  bool // and heard the answer
+	briefMiss int  // wrong readbacks of the current 9-line block (jtac_brief.go)
 }
 
 // taskingBoard tracks which flight holds which target.
