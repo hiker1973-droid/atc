@@ -324,6 +324,12 @@ func stripCallsign(lower, callsign string) string {
 	return re.ReplaceAllString(lower, " ")
 }
 
+// lineSixRe is the location line, through its closing full stop (a grid has none).
+var lineSixRe = regexp.MustCompile(`(?i)line 6,[^.]*\.`)
+
+// jtacLineSixSlow: line 6 is spoken 12% slower again than the other 9-line lines.
+const jtacLineSixSlow = 0.88
+
 var nineLineStartRe = regexp.MustCompile(`(?i)\bline [1-9],`)
 
 // splitNineLine cuts a reply into what comes before the 9-line, the 9-line
@@ -368,7 +374,30 @@ func speakWithSlowNineLine(ctx context.Context, apiKey, resp string, vp voicePro
 	parts := []struct {
 		text string
 		v    voiceProfile
-	}{{pre, vp}, {slow, slowedVoice(vp, vp.lineSlow)}, {post, vp}}
+	}{{pre, vp}}
+	// Line 6, the location, is read a further 12% slower than the rest of the
+	// 9-line (operator 2026-11-13).
+	nl := slowedVoice(vp, vp.lineSlow)
+	if loc := lineSixRe.FindStringIndex(slow); loc != nil {
+		for _, seg := range []struct {
+			t string
+			v voiceProfile
+		}{{slow[:loc[0]], nl}, {slow[loc[0]:loc[1]], slowedVoice(nl, jtacLineSixSlow)}, {slow[loc[1]:], nl}} {
+			parts = append(parts, struct {
+				text string
+				v    voiceProfile
+			}{strings.TrimSpace(seg.t), seg.v})
+		}
+	} else {
+		parts = append(parts, struct {
+			text string
+			v    voiceProfile
+		}{slow, nl})
+	}
+	parts = append(parts, struct {
+		text string
+		v    voiceProfile
+	}{post, vp})
 	var out []byte
 	for _, p := range parts {
 		if p.text == "" {

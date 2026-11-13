@@ -104,3 +104,11 @@ func TestJTACSayAgainLocation(t *testing.T) {
 		}
 	}
 }
+
+func TestLineSixRe(t *testing.T) {
+	_, slow, _ := splitNineLine("Raider 1, line 4, x. line 5, y. line 6, location Golf Juliet, one two, three four. line 7, z. Read back.")
+	loc := lineSixRe.FindStringIndex(slow)
+	if loc == nil || slow[loc[0]:loc[1]] != "line 6, location Golf Juliet, one two, three four." {
+		t.Fatalf("line 6 span: %v in %q", loc, slow)
+	}
+}
