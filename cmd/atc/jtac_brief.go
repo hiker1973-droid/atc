@@ -325,7 +325,7 @@ func stripCallsign(lower, callsign string) string {
 }
 
 // lineSixRe is the location line, through its closing full stop (a grid has none).
-var lineSixRe = regexp.MustCompile(`(?i)line 6,[^.]*\.`)
+var lineSixRe = regexp.MustCompile(`(?i)\bline 6,[^.]*\.`)
 
 // jtacLineSixSlow: line 6 is spoken 12% slower again than the other 9-line lines.
 const jtacLineSixSlow = 0.88
