@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.3"
+VER = "v3.4"
 DATE = "13 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -142,8 +142,11 @@ JTAC = [
     ("IP inbound", "IP inbound", "Continue (or where the IP is)", "ip_inbound"),
     ("In", "in from the south  /  in heading 330", "Cleared hot  -  or abort, abort, abort", "in"),
     ("Off", "off  /  off safe", "Egress per line 9", "off"),
-    ("BDA", "request BDA", "Effects, then re-attack, correction or home", "bda"),
+    ("BDA", "request BDA", "Effects, then re-attack, correction or home; standby if the bombs are still flying; says if they hit another target", "bda"),
     ("Abort", "abort", "Copy abort, re-attack from the IP", "abort"),
+    ("Direct attack", "request direct attack", "Permission granted, the same target again (a new one if it is destroyed), call in hot", "direct"),
+    ("Target destroyed", "target destroyed", "Copy, report ready for further tasking", "destroyed"),
+    ("Done", "winchester  /  off station", "Released from the net, thanks for the support (BDA first if one is due)", "off_station"),
     ("Radio check", "radio check", "Loud and clear", "radio_check"),
 ]
 DECKBOSS = [

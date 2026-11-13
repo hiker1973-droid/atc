@@ -21,7 +21,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Table, TableStyle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = "SkyEye d766c65, 11 Nov 2026"
+BUILD = "SkyEye b4517d0, 13 Nov 2026"
 OUT_NAME = "Hitman JTAC Comms Flow.pdf"
 # Documentation only: the second copy in the folder root went with the 2026-10-21 tidy.
 DESKTOP = [r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"]
@@ -32,9 +32,9 @@ SHADE = colors.HexColor("#e8edf4")
 title = ParagraphStyle("t", parent=ss["Title"], fontSize=16, textColor=NAVY, spaceAfter=0)
 sub = ParagraphStyle("s", parent=ss["Normal"], fontSize=8.2, textColor=colors.HexColor("#555555"), alignment=1, spaceAfter=3)
 h = ParagraphStyle("h", parent=ss["Heading2"], fontSize=10.5, textColor=NAVY, spaceBefore=2, spaceAfter=1.5)
-cell = ParagraphStyle("c", parent=ss["Normal"], fontSize=7.4, leading=8.5)
+cell = ParagraphStyle("c", parent=ss["Normal"], fontSize=7.1, leading=8.0)
 hdr = ParagraphStyle("hd", parent=cell, textColor=colors.white, fontName="Helvetica-Bold")
-note = ParagraphStyle("n", parent=ss["Normal"], fontSize=7.4, leading=8.6, spaceBefore=1)
+note = ParagraphStyle("n", parent=ss["Normal"], fontSize=7.1, leading=8.2, spaceBefore=1)
 
 
 def table(head, rows, widths):
@@ -133,19 +133,19 @@ S.append(section("4. Off target and BDA",
         ["\"Raider 32, <b>bridge dropped</b>\" (or \"good hits\")<br/>\"Raider 32, <b>no effects</b>\"",
          "\"Copy, good effects. Thanks for the help. Report ready for further tasking.\"<br/>"
          "\"Copy, no effects. Re-attack approved, report IP inbound from &lt;IP&gt;.\""],
-        ["\"<b>Request BDA</b>\"", "The same BDA again (before any attack: \"negative BDA, no attack yet\")"],
+        ["\"<b>Request BDA</b>\"", "The BDA again. No attack yet: \"negative BDA\". Bombs flying: \"standby for BDA\". "
+         "Hit another target: \"impacted on target 9, not target 5.\""],
+        ["\"<b>Request direct attack</b>\" / \"<b>target destroyed</b>\"", "Same target again unless destroyed (his BDA, or your "
+         "\"target destroyed\" call: \"copy, ready for further tasking\"), then a new one."],
+        ["\"Raider 32, <b>winchester</b>\" / \"<b>off station</b>\"", "\"Copy winchester. Released from the net, thanks.\" (BDA due: standby, then the BDA)"],
         ["\"Raider 32, <b>abort</b>\"", "\"Copy abort. Report IP inbound from &lt;IP&gt; for re-attack.\""],
     ], [2.3, 5.1]),
     "\"Off\" is answered once per pass. To re-attack, call \"IP inbound\" again. For a new target, \"ready for further "
     "tasking\" or \"request tasking\" to Hitman, or ask Command. The wording varies between passes; the meaning doesn't."))
 
-S.append(section("Radio checks and tips",
-    table(["Item", "Detail"], [
-        ["Radio check", "\"Radio check\", \"comm check\", \"comcheck\" and \"how copy\" get \"loud and clear\" on both Hitmen and Command."],
-        ["Who is who", "Both Hitmen are American voices. Each only knows his own sector's targets."],
-        ["Your callsign", "Say it with its number (\"Raider 3-0-2\"). Anything after the number is not part of the callsign."],
-        ["No answer?", "Wait 3-4 s (recognition + voice), then repeat once. Check FM on 61.0 or 62.0. Report callsign, frequency and time on Discord."],
-    ], [1.5, 5.9])))
+S.append(Paragraph("<b>Radio check</b> (\"radio check\", \"comm check\", \"how copy\"): \"loud and clear\". Each Hitman only knows his own sector's "
+                   "targets. <b>Callsign:</b> say it with its number (\"Raider 3-0-2\"). <b>No answer?</b> Wait 3-4 s, repeat once, check FM on "
+                   "61.0 or 62.0, report callsign, frequency and time on Discord.", note))
 
 out = os.path.join(HERE, OUT_NAME)
 doc = SimpleDocTemplate(out, pagesize=letter, leftMargin=0.55 * inch, rightMargin=0.55 * inch,

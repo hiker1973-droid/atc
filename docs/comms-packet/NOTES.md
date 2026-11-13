@@ -7,6 +7,16 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.44 (13 NOV 2026) - Hitman: request BDA, direct attack, winchester
+
+Follows origin/main b4517d0 (`cmd/atc/jtac.go`, `jtac_bda.go`, `jtac_brief.go`). From Raider 302's Day session: BDA request
+before an attack = "negative", early = "standby", weapons on another target are reported ("on target 9, not target 5",
+`offTargetImpacts`); "request direct attack" keeps the flight's target unless destroyed (BDA good, or the pilot's "target
+destroyed"); "winchester" / "off station" releases the flight; "Demand 21" / "Hit man" = Hitman; "reporting to IP <name>" =
+IP inbound; line 6 read a further 12% slower. Card 12 (Re-attack, Done?) and card 13 ALSO rows. Phraseology v3.4 (Direct
+attack, Target destroyed, Done rows; TestDocPhrases kinds off_station / destroyed / direct). Hitman flow sheet back to one
+page (7.1 pt). Rigs updated the same day.
+
 ## v1.43 (13 NOV 2026) - Hitman checks only the grid
 
 Follows origin/main 3f6d08f (`cmd/atc/jtac_brief.go`). Card 13: steps now "copy 1-3 / read back the grid / copy 7-9",

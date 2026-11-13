@@ -298,6 +298,12 @@ func jtacKind(lower string) string {
 	switch {
 	case containsAny(lower, "radio check"):
 		return "radio_check"
+	case jtacOffStationRe.MatchString(lower):
+		return "off_station"
+	case jtacTargetDestroyedRe.MatchString(lower):
+		return "destroyed"
+	case jtacDirectRe.MatchString(lower):
+		return "direct"
 	case isJTACCheckIn(lower):
 		return "check_in"
 	case isBDARequest(lower):

@@ -85,6 +85,12 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.44 (operator 2026-11-13, origin/main b4517d0): Hitman: line 6 read a further 12% slower; "Demand 21"
+heard as Hitman; "reporting to IP <name>" = IP inbound; "request BDA" before an attack gets "negative", early
+gets "standby", weapons that landed on another target are reported ("on target 9, not target 5"); "request
+direct attack" after a pass keeps the same target unless destroyed; "target destroyed" and "winchester /
+off station" calls (release from the net). Cards 12 + 13.
+
 v1.43 (operator 2026-11-13, origin/main 3f6d08f): Hitman checks only the grid (line 6) on readback; the
 spoken grid drops the zone ("Golf Juliet, ..."); blocks 1 and 3 accept any readback or "copy"; two wrong
 grids -> line 6 once more and "continue"; "say again location / grid" repeats line 6. Card 13 steps + bullets.
@@ -158,7 +164,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.43"
+VER = "v1.44"
 DATE = "13 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -734,6 +740,11 @@ def c12_jtac_flow():
           "(or \"line 6\") gives you the grid.", False)],
         [("Another target:", True),
          ("after \"off\", say \"request tasking\" to Hitman - or ask Command again.", False)],
+        [("Re-attack:", True),
+         ("\"request direct attack\" sends you at the same target again, unless it is destroyed "
+          "(his BDA, or you call \"target destroyed\"): then you get a new one.", False)],
+        [("Done?", True),
+         ("\"Winchester\" or \"off station\" and he releases you from the net.", False)],
     ])
     NK.subtle(c, "JTAC LIVE 60.000 (Hornet COMM 2 CH 15) is for a human JTAC. Hitman never answers there.")
     return save(c, "12_jtac_flow.jpg")
@@ -774,6 +785,9 @@ def c13_jtac_checks():
     ])
     NK.band(c, "ALSO", "any time")
     c.kv([("abort", "copy abort, re-attack from the IP"),
+          ("request BDA", "standby while bombs fly; says if they hit another target"),
+          ("target destroyed", "copy, ready for further tasking"),
+          ("winchester / off station", "released from the net"),
           ("radio check", "loud and clear")])
     return save(c, "13_jtac_checks.jpg")
 

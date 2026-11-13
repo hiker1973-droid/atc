@@ -583,6 +583,30 @@
  },
  {
   "role": "jtac",
+  "say": "Hitman, Raider 1-1, request direct attack.",
+  "tower": "",
+  "want": "direct"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, target destroyed.",
+  "tower": "",
+  "want": "destroyed"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, winchester.",
+  "tower": "",
+  "want": "off_station"
+ },
+ {
+  "role": "jtac",
+  "say": "Hitman, Raider 1-1, off station.",
+  "tower": "",
+  "want": "off_station"
+ },
+ {
+  "role": "jtac",
   "say": "Hitman, Raider 1-1, radio check.",
   "tower": "",
   "want": "radio_check"
