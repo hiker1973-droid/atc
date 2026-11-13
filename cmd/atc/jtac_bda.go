@@ -390,5 +390,5 @@ func flightImpacts(all []tacviewImpact, callsign string, t taskingTarget) []tacv
 }
 
 func isBDARequest(lower string) bool {
-	return containsAny(lower, "bda", "b.d.a", "b d a", "battle damage", "damage assessment", "say effects", "request effects")
+	return containsAny(lower, "bda", "b.d.a", "b d a", "b-d-a", "bdas", "battle damage", "damage assessment", "say effects", "request effects", "give me effects")
 }

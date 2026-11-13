@@ -112,3 +112,41 @@ func TestLineSixRe(t *testing.T) {
 		t.Fatalf("line 6 span: %v in %q", loc, slow)
 	}
 }
+
+// Day 2026-11-13: Whisper heard "Hitman" as "Demand"; "reporting to IP Knife" is an IP call.
+func TestJTACDemandAddress(t *testing.T) {
+	for _, s := range []string{"Demand 21, Raider 302 reporting in, reporting to IP knife.", "Hit man 2-1, Raider 302, in hot."} {
+		if cs := jtacCallsign(s); cs != "Raider 302" && cs != "Raider 3-0-2" {
+			t.Errorf("%q -> %q", s, cs)
+		}
+	}
+	if !isJTACInbound("raider 302 reporting in, reporting to ip knife.") {
+		t.Error("reporting to IP knife is an IP inbound call")
+	}
+}
+
+func TestJTACOffStationAndBDARequest(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	if got := b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic); !strings.Contains(got, "negative BDA, no attack yet") {
+		t.Errorf("BDA before any attack = %q", got)
+	}
+	b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	if _, ok := b.flights["raider 11"]; !ok {
+		t.Fatal("flight not on the board")
+	}
+	got := b.JTACResponse("Hitman 1-1, Raider 11, winchester, off station", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "copy winchester. You are released from the net") {
+		t.Errorf("release = %q", got)
+	}
+	if _, ok := b.flights["raider 11"]; ok {
+		t.Error("flight should be dropped")
+	}
+	b.JTACResponse("Hitman 1-1, Raider 12, request direct attack", "Raider 12", hitman, pic)
+	if k := b.soleFlight("Hitman 21, pickle times two."); k != "raider 12" {
+		t.Errorf("soleFlight = %q", k)
+	}
+	if k := b.soleFlight("Hitman 21, copy."); k != "" {
+		t.Errorf("non-call soleFlight = %q", k)
+	}
+}

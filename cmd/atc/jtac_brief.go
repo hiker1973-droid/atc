@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The JTAC's 9-line in three blocks (operator 2026-11-11): lines 1-3, 4-6,
@@ -273,6 +274,42 @@ func (b *taskingBoard) soleBriefing(text string) string {
 			}
 			key = k
 		}
+	}
+	return key
+}
+
+// soleFlight is the key of the one flight active on this net, for a call
+// addressed to Hitman that carried no usable callsign ("Hitman 21, pickle times
+// two", Day 2026-11-13). The call must be one the exchange acts on; "" when
+// none or several flights are active.
+func (b *taskingBoard) soleFlight(text string) string {
+	if k := b.soleBriefing(text); k != "" {
+		return k
+	}
+	lower := strings.ToLower(jtacAddressFixRe.ReplaceAllString(text, "hitman"))
+	if !containsAny(lower, "hitman", "hammer", "hey man") {
+		return ""
+	}
+	if !(jtacReleaseCallRe.MatchString(lower) || jtacAbortRe.MatchString(lower) || jtacOffRe.MatchString(lower) ||
+		jtacInRe.MatchString(lower) || jtacOffStationRe.MatchString(lower) || isJTACInbound(lower) || isBDARequest(lower)) {
+		return ""
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := b.now()
+	key := ""
+	for k, cur := range b.flights {
+		last := cur.issued
+		if cur.clearedAt.After(last) {
+			last = cur.clearedAt
+		}
+		if cur.stage < jtacBriefed || now.Sub(last) > 20*time.Minute {
+			continue
+		}
+		if key != "" {
+			return ""
+		}
+		key = k
 	}
 	return key
 }

@@ -77,7 +77,7 @@ const (
 	jtacContactMaxAge = 30 * time.Second
 	// jtacWhisperCalls: the net's calls, between its callsign and its IP
 	// names in jtacWhisperPrompt.
-	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, request direct attack, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
+	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, request direct attack, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA, off station, winchester"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -142,6 +142,15 @@ var (
 	jtacIPRe    = regexp.MustCompile(`\b(?:ip|i\.p\.|i p|eye pee)\b`)
 )
 
+var (
+	// jtacOffStationRe: the flight is done with the net (operator 2026-11-13:
+	// "have Raider or Venom tell Hitman off station or winchester").
+	jtacOffStationRe = regexp.MustCompile(`\b(?:off[ -]station|winchester)\b`)
+	// jtacAddressFixRe: Whisper hears "Hitman" as "Demand" (Day 2026-11-13,
+	// "Demand 21, Raider 302 reporting in") or "Hit man".
+	jtacAddressFixRe = regexp.MustCompile(`(?i)\b(?:demand|hit[ -]m[ae]n|hitmen)\b`)
+)
+
 var loadDigitRe = regexp.MustCompile(`\d+`)
 
 // hasLoadWords: the answer to "say ordnance and playtime" - a count, a weapon or a time on station.
@@ -182,6 +191,17 @@ func isJTACInbound(lower string) bool {
 	if isJTACEstablished(lower) {
 		return true
 	}
+	// "Reporting to IP Knife" (Raider 302, 2026-11-13) is an IP inbound call.
+	if strings.Contains(lower, "reporting") {
+		if jtacIPRe.MatchString(lower) {
+			return true
+		}
+		for _, ip := range allTaskingIPs() {
+			if strings.Contains(lower, strings.ToLower(ip)) {
+				return true
+			}
+		}
+	}
 	if !strings.Contains(lower, "inbound") && !containsAny(lower, "leaving the ip", "departing the ip", "leaving ip", "departing ip") {
 		return false
 	}
@@ -215,6 +235,19 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 			return say("negative tasking at this time.")
 		}
 		return ""
+	}
+
+	// Winchester / off station: the flight is done. Released from the net and
+	// its target freed; one whose BDA is still due gets it first.
+	if jtacOffStationRe.MatchString(lower) {
+		word := jtacOffStationRe.FindString(lower)
+		if cur != nil && !cur.bdaDone && !cur.clearedAt.IsZero() && now.Sub(cur.clearedAt) <= bdaWindow {
+			cur.released = true
+			return say("copy %s. Standby for BDA.", word)
+		}
+		delete(b.flights, key)
+		log.Info().Str("callsign", callsign).Str("call", word).Msg("JTAC: flight released, off station")
+		return say("copy %s. You are released from the net, thanks for the support.", word)
 	}
 
 	// Direct attack: the pilot asks to skip the 9-line. Permission granted, the
@@ -300,6 +333,9 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 
 	if cur == nil || cur.stage == jtacAssigned {
 		// Talking to the JTAC without checking in.
+		if isBDARequest(lower) {
+			return say("negative BDA, no attack yet.")
+		}
 		if jtacInRe.MatchString(lower) || isJTACInbound(lower) {
 			return say("negative, no 9-line passed. Check in for tasking.")
 		}
@@ -482,6 +518,11 @@ func (b *taskingBoard) jtacWatch(name string, pic jtacPicture) []string {
 	for key, cur := range b.flights {
 		if text := b.bdaDue(key, cur, name, pic, now); text != "" {
 			out = append(out, text)
+			if cur.released {
+				// Told us winchester / off station before the BDA was due.
+				delete(b.flights, key)
+				continue
+			}
 		}
 		if cur.stage != jtacCleared {
 			continue
@@ -558,7 +599,8 @@ var jtacBareNumberRe = regexp.MustCompile(`^[\d\s-]+$`)
 // replies opened "and Raider 303", "ready with 303", "Hey man 11" and "3306";
 // a bare number gets no reply rather than being read out as a callsign.
 func jtacCallsign(text string) string {
-	cs := extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
+	text = jtacAddressFixRe.ReplaceAllString(text, "Hitman")
+	cs :=extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
 		"hitman in 1-1", "hitman in one-one", "hitman in one one", "hitman in 2-1", "hitman in two-one", "hitman in two one",
 		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21",
 		"hey man one-one", "hey man one one", "hey man 1-1", "hey man 1 1", "hey man 11",
@@ -729,7 +771,7 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 				// "Hitman 1-1, say again" with no callsign, or one Whisper mangled
 				// ("Raider 3212"): the flight being briefed asked (Day 2026-11-12,
 				// Raider 312 asked four times and was never answered).
-				if k := board.soleBriefing(text); k != "" {
+				if k := board.soleFlight(text); k != "" {
 					cs = displayCallsign(k)
 					resp = board.JTACResponse(text, cs, c.Spoken, pic)
 				}
