@@ -381,6 +381,10 @@ var lineSixRe = regexp.MustCompile(`(?i)\bline 6,[^.]*\.`)
 // jtacLineSixSlow: line 6 is spoken 12% slower again than the other 9-line lines.
 const jtacLineSixSlow = 0.88
 
+// jtacLineSixTempo: line 6 is then stretched on the audio to this playback rate
+// (0.70 = 30% slower again, ffmpeg atempo; operator 2026-11-13).
+const jtacLineSixTempo = 0.70
+
 var nineLineStartRe = regexp.MustCompile(`(?i)\bline [1-9],`)
 
 // splitNineLine cuts a reply into what comes before the 9-line, the 9-line
@@ -422,33 +426,23 @@ func speakWithSlowNineLine(ctx context.Context, apiKey, resp string, vp voicePro
 	if slow == "" {
 		return synthesizeSpeech(ctx, apiKey, resp, vp)
 	}
-	parts := []struct {
-		text string
-		v    voiceProfile
-	}{{pre, vp}}
+	type part struct {
+		text  string
+		v     voiceProfile
+		tempo float64 // >0: stretch the clip after synthesis (ffmpeg atempo, pitch kept)
+	}
+	parts := []part{{pre, vp, 0}}
 	// Line 6, the location, is read a further 12% slower than the rest of the
 	// 9-line (operator 2026-11-13).
 	nl := slowedVoice(vp, vp.lineSlow)
 	if loc := lineSixRe.FindStringIndex(slow); loc != nil {
-		for _, seg := range []struct {
-			t string
-			v voiceProfile
-		}{{slow[:loc[0]], nl}, {slow[loc[0]:loc[1]], slowedVoice(nl, jtacLineSixSlow)}, {slow[loc[1]:], nl}} {
-			parts = append(parts, struct {
-				text string
-				v    voiceProfile
-			}{strings.TrimSpace(seg.t), seg.v})
-		}
+		parts = append(parts, part{strings.TrimSpace(slow[:loc[0]]), nl, 0},
+			part{strings.TrimSpace(slow[loc[0]:loc[1]]), slowedVoice(nl, jtacLineSixSlow), jtacLineSixTempo},
+			part{strings.TrimSpace(slow[loc[1]:]), nl, 0})
 	} else {
-		parts = append(parts, struct {
-			text string
-			v    voiceProfile
-		}{slow, nl})
+		parts = append(parts, part{slow, nl, 0})
 	}
-	parts = append(parts, struct {
-		text string
-		v    voiceProfile
-	}{post, vp})
+	parts = append(parts, part{post, vp, 0})
 	var out []byte
 	for _, p := range parts {
 		if p.text == "" {
@@ -458,6 +452,16 @@ func speakWithSlowNineLine(ctx context.Context, apiKey, resp string, vp voicePro
 		if err != nil {
 			log.Warn().Err(err).Msg("9-line split TTS failed - speaking whole reply at normal speed")
 			return synthesizeSpeech(ctx, apiKey, resp, vp)
+		}
+		if p.tempo > 0 && p.tempo != 1 {
+			// ElevenLabs' speed setting is not linear and bottoms out, so line 6
+			// is slowed further on the clip itself (operator 2026-11-13: "another
+			// 30%", the voice setting was not audibly slowing).
+			if slow, err := tempoMP3(clip, p.tempo); err != nil {
+				log.Warn().Err(err).Msg("line 6 stretch failed - speaking it at the voice speed")
+			} else {
+				clip = slow
+			}
 		}
 		if out == nil {
 			out = clip
