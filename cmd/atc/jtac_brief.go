@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -289,4 +291,73 @@ func stripCallsign(lower, callsign string) string {
 		return strings.ReplaceAll(lower, cs, " ")
 	}
 	return re.ReplaceAllString(lower, " ")
+}
+
+var nineLineStartRe = regexp.MustCompile(`(?i)\bline [1-9],`)
+
+// splitNineLine cuts a reply into what comes before the 9-line, the 9-line
+// lines themselves (through the block's "Read back."), and what follows.
+// slow == "" when the reply has no 9-line in it.
+func splitNineLine(resp string) (pre, slow, post string) {
+	loc := nineLineStartRe.FindStringIndex(resp)
+	if loc == nil {
+		return resp, "", ""
+	}
+	end := len(resp)
+	if i := strings.LastIndex(resp, "Read back."); i >= loc[0] {
+		end = i + len("Read back.")
+	}
+	return strings.TrimSpace(resp[:loc[0]]), resp[loc[0]:end], strings.TrimSpace(resp[end:])
+}
+
+// slowedVoice is v with its speech speed scaled by m (ElevenLabs floor 0.7).
+func slowedVoice(v voiceProfile, m float64) voiceProfile {
+	v.lineSlow = 0
+	v.speed *= m
+	if v.eleven.ID != "" {
+		v.eleven.Speed *= m
+		if v.eleven.Speed < 0.7 {
+			v.eleven.Speed = 0.7
+		}
+	}
+	return v
+}
+
+// speakWithSlowNineLine speaks resp with vp; when vp.lineSlow is set the 9-line
+// portion is spoken slower and the pieces joined. Any failure of the split
+// path falls back to the whole reply at the normal speed.
+func speakWithSlowNineLine(ctx context.Context, apiKey, resp string, vp voiceProfile) ([]byte, error) {
+	if vp.lineSlow <= 0 {
+		return synthesizeSpeech(ctx, apiKey, resp, vp)
+	}
+	pre, slow, post := splitNineLine(resp)
+	if slow == "" {
+		return synthesizeSpeech(ctx, apiKey, resp, vp)
+	}
+	parts := []struct {
+		text string
+		v    voiceProfile
+	}{{pre, vp}, {slow, slowedVoice(vp, vp.lineSlow)}, {post, vp}}
+	var out []byte
+	for _, p := range parts {
+		if p.text == "" {
+			continue
+		}
+		clip, err := synthesizeSpeech(ctx, apiKey, p.text, p.v)
+		if err != nil {
+			log.Warn().Err(err).Msg("9-line split TTS failed - speaking whole reply at normal speed")
+			return synthesizeSpeech(ctx, apiKey, resp, vp)
+		}
+		if out == nil {
+			out = clip
+			continue
+		}
+		joined, err := concatMP3WithSilence(out, clip, flagFFmpeg, 0.08)
+		if err != nil {
+			log.Warn().Err(err).Msg("9-line join failed - speaking whole reply at normal speed")
+			return synthesizeSpeech(ctx, apiKey, resp, vp)
+		}
+		out = joined
+	}
+	return out, nil
 }

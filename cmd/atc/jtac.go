@@ -762,8 +762,13 @@ func oneOf(pick func(int) int, opts []string) string { return opts[pick(len(opts
 // manpack, not a controller at a console), jtacSpeedUp over the common speed.
 func jtacVoice() voiceProfile {
 	return voiceProfile{voice: flagJTACVoice, speed: flagTTSSpeed * jtacSpeedUp, instructions: flagVoiceStyleJTAC,
-		eleven: elHard(flagElevenJTACVoice, "Hitman", jtacSpeedUp)}
+		eleven: elHard(flagElevenJTACVoice, "Hitman", jtacSpeedUp), lineSlow: jtacNineLineSlow}
 }
+
+// jtacNineLineSlow: the 9-line lines are read 12% slower than the rest of
+// Hitman's speech (operator 2026-11-12: "slow the speech down 12%, just the 9
+// line portion").
+const jtacNineLineSlow = 0.88
 
 // jtacSpeedUp: Hitman 1-1 8% quicker (operator 2026-10-16: "speed Hitman
 // 1-1 up by 5-10%"; was 1.0). Hitman 2-1 keeps Command's read.
@@ -774,5 +779,5 @@ const jtacSpeedUp = 1.08
 func jtac2Voice() voiceProfile {
 	ev := elCommand(flagElevenJTAC2Voice)
 	ev.Name = "Hitman 2-1"
-	return voiceProfile{voice: flagJTAC2Voice, speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC2, eleven: ev}
+	return voiceProfile{voice: flagJTAC2Voice, speed: flagTTSSpeed, instructions: flagVoiceStyleJTAC2, eleven: ev, lineSlow: jtacNineLineSlow}
 }

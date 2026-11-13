@@ -2052,6 +2052,9 @@ type voiceProfile struct {
 	// eleven, when set and the rig has an ElevenLabs key, speaks the line
 	// instead; the OpenAI voice above is the fallback (tts_elevenlabs.go).
 	eleven elevenVoice
+	// lineSlow, when set (e.g. 0.88), reads the 9-line portion of a reply that
+	// much slower than the rest (jtac_brief.go speakWithSlowNineLine).
+	lineSlow float64
 }
 
 // Delivery briefs per role. A tower controller, a marshal controller, and a

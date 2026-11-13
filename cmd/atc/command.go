@@ -427,7 +427,7 @@ func voiceNetLoop(ctx context.Context, srsAddr string, freqMHz float64, channelN
 							}
 							log.Info().Str("text", text).Str("callsign", cs).Str("channel", channelName).Msg("Command transcribed")
 							broadcastLog("tx", fmt.Sprintf("CMD TX → %q", resp))
-							mp3, err := synthesizeSpeech(ctx, apiKey, resp, vp)
+							mp3, err := speakWithSlowNineLine(ctx, apiKey, resp, vp)
 							if err != nil {
 								log.Error().Err(err).Msg("Command TTS failed")
 								return
