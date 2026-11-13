@@ -73,9 +73,14 @@ func spellOut(s string) string {
 	return strings.Join(out, " ")
 }
 
-// spokenGrid: "37T GJ 31827 70457" -> "three seven Tango, Golf Juliet, three one eight two seven, seven zero four five seven".
+// spokenGrid: "37T GJ 31827 70457" -> "Golf Juliet, three one eight two seven, seven zero four five seven".
+// The zone designator is not spoken (operator 2026-11-13): every range is in
+// 37T; the kneeboard card keeps it.
 func spokenGrid(grid string) string {
 	parts := strings.Fields(grid)
+	if len(parts) >= 3 && len(parts[0]) == 3 && parts[0][0] >= '0' && parts[0][0] <= '9' {
+		parts = parts[1:]
+	}
 	for i, p := range parts {
 		parts[i] = spellOut(p)
 	}
@@ -165,56 +170,10 @@ func gridDigits(grid string) string {
 	return f[len(f)-2] + f[len(f)-1]
 }
 
-// briefReadbackOK judges the pilot's readback of block 1-3.
-//
-// miss is how many readbacks of this block were already wrong: from the second
-// try the grid only has to match to the easting (Whisper garbles the northing's
-// five digits: 64761 came back as "6764 61", "642" and "65" on Day 2026-11-12
-// and Raider 302 was refused four times).
-func briefReadbackOK(lower string, t taskingTarget, block, miss int) bool {
-	digits := spokenDigitString(lower)
-	d := nineData(t)
-	switch block {
-	case 1:
-		// The heading is the line that matters. Whisper often loses the IP's
-		// name ("IP, 3-1-2, 8.7 miles"; Raider 312 was refused twice on Day
-		// 2026-11-12), so the name or the distance's last two digits backs it up,
-		// and after one miss the heading alone is taken.
-		if !strings.Contains(digits, fmt.Sprintf("%03d", t.RunIn)) {
-			return false
-		}
-		if miss >= 1 || strings.Contains(lower, strings.ToLower(t.IP)) {
-			return true
-		}
-		dist := strings.ReplaceAll(strconv.FormatFloat(d.DistNm, 'f', 1, 64), ".", "")
-		return len(dist) >= 2 && strings.Contains(digits, dist[len(dist)-2:])
-	case 2:
-		// Pilots say "two zero niner" or "209er" for 2090 ft: the leading three
-		// digits are enough.
-		e := strconv.Itoa(t.ElevFt)
-		if len(e) > 3 {
-			e = e[:3]
-		}
-		if !strings.Contains(digits, e) {
-			return false
-		}
-		g := gridDigits(d.Grid)
-		return gridReadOK(digits, g) || (miss >= 1 && gridEastingOK(digits, g))
-	default:
-		// Lines 7-9 carry no numbers to check: the friendly direction, the
-		// egress altitude or a plain copy is taken.
-		sq := squash(lower)
-		if d.Friend != "" && strings.Contains(sq, squash(strings.Fields(d.Friend)[0])) {
-			return true
-		}
-		alt := strings.TrimSpace(strings.TrimPrefix(t.Egress, "angels"))
-		return isTaskingAck(lower) || (alt != "" && strings.Contains(digits, alt) && strings.Contains(lower, "angels"))
-	}
-}
-
 var (
-	sayAgainRe  = regexp.MustCompile(`\b(?:say (?:that |it |all )?again|repeat|say the (?:lines|nine|9)|come again)\b`)
-	againLineRe = regexp.MustCompile(`\bline[s]?\s*(\d|one|two|three|four|five|six|seven|eight|nine)\b`)
+	sayAgainRe      = regexp.MustCompile(`\b(?:say (?:that |it |all )?again|repeat|say the (?:lines|nine|9)|come again)\b`)
+	againLocationRe = regexp.MustCompile(`\b(?:location|grid|coordinates)\b`)
+	againLineRe     = regexp.MustCompile(`\bline[s]?\s*(\d|one|two|three|four|five|six|seven|eight|nine)\b`)
 )
 
 // briefPassThrough: calls the briefing leaves to the rest of the exchange.
@@ -238,6 +197,10 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 	block := int(cur.stage-jtacBriefed) + 1
 
 	if sayAgainRe.MatchString(lower) {
+		// "Say again location" / "say again grid" is line 6.
+		if againLocationRe.MatchString(lower) {
+			return say("%s", briefLine(t, 6)), true
+		}
 		if m := againLineRe.FindStringSubmatch(lower); m != nil {
 			n := 0
 			if v, err := strconv.Atoi(m[1]); err == nil {
@@ -252,31 +215,42 @@ func (b *taskingBoard) briefStep(cur *taskingAssignment, lower, callsign string,
 		return say("%s", briefBlock(t, block)), true
 	}
 
-	// Lines 4-6 are not checked (operator 2026-11-12, after Whisper garbled the
-	// grid's northing and Raider 302 was refused four times): any attempt at the
-	// readback, or a plain copy, is "readback correct" and lines 7-9 follow.
-	if block == 2 && (spokenDigitString(lower) != "" || isTaskingAck(lower) || strings.Contains(lower, "read back")) {
-		cur.stage++
-		cur.briefMiss = 0
-		return say("readback correct. %s", briefBlock(t, 3)), true
+	// Only line 6, the location, is checked (operator 2026-11-13). Any attempt at
+	// a readback of the other blocks, or a plain copy, is "readback correct".
+	digits := spokenDigitString(lower)
+	attempt := digits != "" || isTaskingAck(lower) || strings.Contains(lower, "read back") || strings.Contains(lower, strings.ToLower(t.IP))
+	if d := nineData(t); !attempt && block == 3 && d.Friend != "" {
+		attempt = strings.Contains(squash(lower), squash(strings.Fields(d.Friend)[0]))
+	}
+	if !attempt {
+		return "", true // chatter
 	}
 
-	if briefReadbackOK(lower, t, block, cur.briefMiss) {
+	switch block {
+	case 1:
+		cur.stage++
 		cur.briefMiss = 0
-		if block == 3 {
-			cur.stage = jtacReady
-			return say("confirmed. Report IP inbound."), true
+		return say("readback correct. %s", briefBlock(t, 2)), true
+	case 2:
+		g := gridDigits(nineData(t).Grid)
+		if g == "" || gridReadOK(digits, g) || (cur.briefMiss >= 1 && gridEastingOK(digits, g)) {
+			cur.stage++
+			cur.briefMiss = 0
+			return say("readback correct. %s", briefBlock(t, 3)), true
 		}
-		cur.stage++
-		return say("%s", briefBlock(t, block+1)), true
-	}
-
-	// A readback attempt (numbers, the IP) that was wrong; chatter is ignored.
-	if spokenDigitString(lower) != "" || strings.Contains(lower, strings.ToLower(t.IP)) {
 		cur.briefMiss++
-		return say("negative, readback incorrect. %s", briefRetry(lower, t, block)), true
+		if cur.briefMiss >= 2 {
+			// Whisper garbles the northing (Raider 302 was refused four times on
+			// Day 2026-11-12): say the location once more and move on.
+			cur.stage++
+			cur.briefMiss = 0
+			return say("negative. %s Continue. %s", briefLine(t, 6), briefBlock(t, 3)), true
+		}
+		return say("negative, readback incorrect. %s Read back location.", briefLine(t, 6)), true
 	}
-	return "", true
+	cur.stage = jtacReady
+	cur.briefMiss = 0
+	return say("confirmed. Report IP inbound."), true
 }
 
 // soleBriefing is the key of the one flight whose 9-line is being passed, when
@@ -306,24 +280,6 @@ func (b *taskingBoard) soleBriefing(text string) string {
 // gridEastingOK: the first four digits of the grid's easting are in the readback.
 func gridEastingOK(digits, g string) bool {
 	return len(g) == 10 && strings.Contains(digits, g[:4])
-}
-
-// briefRetry is what Hitman says again after a wrong readback: block 2 gets only
-// the line that was wrong (the long target line made the pilot start over),
-// every other block the whole block.
-func briefRetry(lower string, t taskingTarget, block int) string {
-	if block != 2 {
-		return briefBlock(t, block)
-	}
-	digits := spokenDigitString(lower)
-	e := strconv.Itoa(t.ElevFt)
-	if len(e) > 3 {
-		e = e[:3]
-	}
-	if !strings.Contains(digits, e) {
-		return briefLine(t, 4) + " Read back lines 4 to 6."
-	}
-	return briefLine(t, 6) + " Read back lines 4 to 6."
 }
 
 // gridReadOK: the full easting and northing, or the usual short readback (four

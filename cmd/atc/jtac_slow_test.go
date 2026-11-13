@@ -20,20 +20,9 @@ func TestSplitNineLine(t *testing.T) {
 	}
 }
 
-func TestBriefReadbackLenient(t *testing.T) {
-	tg := taskingTarget{IP: "Knife", RunIn: 312, ElevFt: 2615}
-	// Block 1: Whisper lost the IP's name (Raider 312, Day 2026-11-12).
-	if !briefReadbackOK("ip, 3-1-2, 8.7 miles", tg, 1, 0) && nineData(tg).DistNm > 0 {
-		t.Log("distance not matched without data; fine")
-	}
-	if briefReadbackOK("heading 312", tg, 1, 0) && nineData(tg).DistNm == 0 {
-		t.Error("heading alone accepted on the first try with no distance to back it")
-	}
-	if !briefReadbackOK("heading 312", tg, 1, 1) {
-		t.Error("heading alone refused after a miss")
-	}
-	if briefReadbackOK("heading 100", tg, 1, 1) {
-		t.Error("wrong heading accepted")
+func TestSpokenGridDropsZone(t *testing.T) {
+	if got := spokenGrid("37T GJ 31827 70457"); got != "Golf Juliet, three one eight two seven, seven zero four five seven" {
+		t.Errorf("spokenGrid = %q", got)
 	}
 }
 
@@ -74,5 +63,44 @@ func TestJTACDirectAttack(t *testing.T) {
 	pic.place(tgt.TgtPos, 169, 5, 349)
 	if got := b.JTACResponse("Hitman, Raider 11, in hot", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, cleared hot." {
 		t.Errorf("in hot after direct attack = %q", got)
+	}
+}
+
+// Two wrong location readbacks: Hitman says line 6 once more and moves on to
+// lines 7-9 instead of holding the flight (operator 2026-11-13).
+func TestJTACLocationMissCap(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	pic.place(tgt.IPPos, 0, 1, 90)
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic) // block 1
+	if got := b.JTACResponse("Hitman, Raider 11, location Golf Juliet 11111 22222", "Raider 11", hitman, pic); !strings.Contains(got, "negative, readback incorrect. line 6") {
+		t.Fatalf("first miss = %q", got)
+	}
+	got := b.JTACResponse("Hitman, Raider 11, location Golf Juliet 11111 22222", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "Continue. line 7") && !strings.Contains(got, "Continue. line 7, no mark") {
+		t.Fatalf("second miss = %q", got)
+	}
+	if got := b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic); !strings.Contains(got, "confirmed. Report IP inbound.") {
+		t.Errorf("block 3 = %q", got)
+	}
+}
+
+// "Say again location" / "grid" repeats line 6 only.
+func TestJTACSayAgainLocation(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.Response("Command, Raider 11, request tasking", "Raider 11", "Command")
+	pic.place(tgt.IPPos, 0, 1, 90)
+	b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
+	b.JTACResponse("Hitman, Raider 11, copy", "Raider 11", hitman, pic)
+	for _, call := range []string{"say again location", "say again the grid", "repeat location"} {
+		got := b.JTACResponse("Hitman, Raider 11, "+call, "Raider 11", hitman, pic)
+		if !strings.Contains(got, "line 6, location Golf Juliet") || strings.Contains(got, "line 4") {
+			t.Errorf("%q = %q", call, got)
+		}
 	}
 }

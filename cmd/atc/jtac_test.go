@@ -113,28 +113,30 @@ func TestJTACFullRun(t *testing.T) {
 		t.Errorf("echoed brief = %q, want no reply", got)
 	}
 
-	// A wrong readback gets the block again; chatter gets nothing.
-	if got := b.JTACResponse("Hitman, Raider 11, IP Falcon, heading 359", "Raider 11", hitman, pic); !strings.HasPrefix(got, "Raider 11, Hitman one one, negative, readback incorrect. line 1, IP Falcon.") {
-		t.Errorf("wrong readback = %q", got)
-	}
+	// Chatter gets nothing.
 	if got := b.JTACResponse("Hitman, Raider 11, stand by", "Raider 11", hitman, pic); got != "" {
 		t.Errorf("chatter = %q, want no reply", got)
 	}
 
-	// Block 1 read back correctly: lines 4-6.
-	got = b.JTACResponse("Hitman, Raider 11, IP Falcon, heading 349, distance 8.7", "Raider 11", hitman, pic)
-	if !strings.Contains(got, "line 4, elevation two six one five feet MSL. line 5, target, Road bridge") || !strings.HasSuffix(got, "Read back.") {
+	// Block 1 is not checked (only line 6 is): any readback is correct, lines 4-6 follow.
+	got = b.JTACResponse("Hitman, Raider 11, IP Falcon, heading 359, distance 8.7", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "readback correct. line 4, elevation two six one five feet MSL. line 5, target, Road bridge") || !strings.HasSuffix(got, "Read back.") {
 		t.Errorf("block 2 = %q", got)
 	}
 	// The pilot can ask for it again, or for one line.
 	if got := b.JTACResponse("Hitman, Raider 11, say again", "Raider 11", hitman, pic); !strings.Contains(got, "line 4, elevation") {
 		t.Errorf("say again = %q", got)
 	}
-	if got := b.JTACResponse("Hitman, Raider 11, say again line 6", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, line 6, location three seven Tango, Golf Juliet, three one niner one six, six four five seven four." {
+	if got := b.JTACResponse("Hitman, Raider 11, say again line 6", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, line 6, location Golf Juliet, three one niner one six, six four five seven four." {
 		t.Errorf("say again line 6 = %q", got)
 	}
-	// Block 2 is not checked: whatever the pilot reads back is "readback correct".
-	got = b.JTACResponse("Hitman, Raider 11, elevation 2615, location 37T GJ 31916 64000", "Raider 11", hitman, pic)
+	// Block 2: only the location is checked. A wrong one gets line 6 again;
+	// elevation and target are never checked.
+	got = b.JTACResponse("Hitman, Raider 11, elevation 9999, location Golf Juliet 31916 12345", "Raider 11", hitman, pic)
+	if !strings.HasPrefix(got, "Raider 11, Hitman one one, negative, readback incorrect. line 6, location Golf Juliet") {
+		t.Errorf("wrong location = %q", got)
+	}
+	got = b.JTACResponse("Hitman, Raider 11, location Golf Juliet 31916 64574", "Raider 11", hitman, pic)
 	if !strings.Contains(got, "readback correct. line 7") {
 		t.Errorf("block 2 readback = %q", got)
 	}
