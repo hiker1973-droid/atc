@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSplitNineLine(t *testing.T) {
@@ -148,5 +149,26 @@ func TestJTACOffStationAndBDARequest(t *testing.T) {
 	}
 	if k := b.soleFlight("Hitman 21, copy."); k != "" {
 		t.Errorf("non-call soleFlight = %q", k)
+	}
+}
+
+// Raider 302 asked for BDA 67 s after pickle: standby, and the pass stays open.
+func TestJTACBDAEarlyRequestStandby(t *testing.T) {
+	b, clock := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	pic.place(tgt.TgtPos, 169, 20, 349)
+	b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	pic.place(tgt.TgtPos, 169, 5, 349)
+	b.JTACResponse("Hitman 1-1, Raider 11, in hot", "Raider 11", hitman, pic)
+	*clock = clock.Add(60 * time.Second)
+	got := b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "standby for BDA") || b.flights["raider 11"].bdaDone {
+		t.Errorf("early BDA request = %q (bdaDone %v)", got, b.flights["raider 11"].bdaDone)
+	}
+	*clock = clock.Add(90 * time.Second)
+	got = b.JTACResponse("Hitman 1-1, Raider 11, request BDA", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "BDA") || strings.Contains(got, "standby") {
+		t.Errorf("late BDA request = %q", got)
 	}
 }

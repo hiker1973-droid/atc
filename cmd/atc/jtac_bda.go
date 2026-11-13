@@ -29,6 +29,9 @@ const (
 	bdaSettle = 15 * time.Second
 	// bdaWindow: a pass's BDA is due within this long of cleared hot.
 	bdaWindow = 10 * time.Minute
+	// bdaFlightTime: a BDA asked for sooner than this after cleared hot, with
+	// no impact yet, is told to standby - the weapons may still be flying.
+	bdaFlightTime = 2 * time.Minute
 	// bdaImpactRadiusM: an impact further than this from the aim point is not
 	// on this target.
 	bdaImpactRadiusM = 2000.0

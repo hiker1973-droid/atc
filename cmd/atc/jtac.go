@@ -370,6 +370,12 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 		if cur.clearedAt.IsZero() && len(imps) == 0 {
 			return say("negative BDA, no attack yet.")
 		}
+		// Asked before the weapons landed (Raider 302, 2026-11-13: BDA 67 s
+		// after pickle got "no impacts observed", and marking the pass done
+		// swallowed the real BDA). Standby; the watch sends it on impact.
+		if len(imps) == 0 && !cur.clearedAt.IsZero() && now.Sub(cur.clearedAt) < bdaFlightTime {
+			return say("standby for BDA, weapons still in the air.")
+		}
 		cur.bdaDone = true
 		return b.bda(cur, callsign, name, t, pic, imps, now)
 
