@@ -288,7 +288,7 @@ def c02_freqs():
         [("SkyEye Paddles is %s - dial it." % PADDLES_F, True),
          ("Black Sea and Syria. LSO 128.100 on the cards is for a human LSO.", False)],
     ])
-    NK.subtle(c, "Voices: towers British or Australian  ·  Command, Marshal, Deckboss American  ·  Hitman 1-1 and 2-1 American.")
+    NK.subtle(c, "Voices: towers British or Australian  ·  Command, Marshal, Deckboss, Hitman American.")
     return save(c, "02_freqs.jpg")
 
 
