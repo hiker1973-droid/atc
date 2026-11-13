@@ -283,3 +283,42 @@ func TestJTACLine8WrongDistance(t *testing.T) {
 		t.Fatalf("correct distance should confirm, got %q", r)
 	}
 }
+
+// "Hitman 2-1-2, Raider 3-0-2" / "Hitman 1-2, Raider 3-0-2": the digits after
+// Hitman mean nothing (Day 2026-11-13, Raider 302).
+func TestJTACGarbledAddressDigits(t *testing.T) {
+	for _, in := range []string{
+		"Hitman 2-1-2, Raider 3-0-2, Kilo Quebec, 6-8-3-6-4-0-7-8-4-2.",
+		"Hitman 1-2, Raider 3-0-2, elevation 1-9-0-5.",
+		"Hitman 2-1, Raider 3-0-2, copy.",
+	} {
+		if got := jtacCallsign(in); got != "Raider 302" {
+			t.Errorf("jtacCallsign(%q) = %q, want Raider 302", in, got)
+		}
+	}
+}
+
+// A readback with no callsign at all goes to the flight being briefed.
+func TestJTACReadbackNoCallsign(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 302, checking in", "Raider 302", hitman, pic)
+	text := "Hitman 1-2, elevation 1-9-0-5, two tanks, Kilo Quebec, 7-6-8-5-3."
+	if k := b.soleFlight(text); k != "raider 302" {
+		t.Fatalf("soleFlight = %q, want raider 302", k)
+	}
+}
+
+// An in call far out and off the attack heading is cleared hot with the heading.
+func TestJTACInCallFarOutGetsHeading(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	b.JTACResponse("Hitman, Raider 11, checking in", "Raider 11", hitman, pic)
+	readBackAll(b, "Raider 11", pic)
+	pic.place(tgt.TgtPos, 169, 11, 61)
+	got := b.JTACResponse("Hitman, Raider 11, in from the south", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "cleared hot") || !strings.Contains(got, "Final attack heading") {
+		t.Errorf("far-out off-heading in call = %q, want cleared hot with the heading", got)
+	}
+}

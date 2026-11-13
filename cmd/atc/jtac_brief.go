@@ -298,6 +298,9 @@ func (b *taskingBoard) soleFlight(text string) string {
 	if k := b.soleLoadAsked(lower); k != "" {
 		return k
 	}
+	if k := b.soleBriefingReadback(lower); k != "" {
+		return k
+	}
 	if !containsAny(lower, "hitman", "hammer", "hey man") {
 		return ""
 	}
@@ -503,6 +506,28 @@ func (b *taskingBoard) soleLoadAsked(lower string) string {
 	key := ""
 	for k, cur := range b.flights {
 		if cur.loadAsked && !cur.loadDone && cur.stage == jtacAssigned {
+			if key != "" {
+				return ""
+			}
+			key = k
+		}
+	}
+	return key
+}
+
+// soleBriefingReadback is the one flight whose 9-line is being passed, when the
+// call is addressed to Hitman and carries digits or a location but no usable
+// callsign ("Hitman 1-2, elevation 1-9-0-5, two tanks, Kilo Quebec...", Raider
+// 302, 2026-11-13); "" when none, or several.
+func (b *taskingBoard) soleBriefingReadback(lower string) string {
+	if !containsAny(lower, "hitman", "hammer", "hey man") || spokenDigitString(lower) == "" {
+		return ""
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	key := ""
+	for k, cur := range b.flights {
+		if cur.stage >= jtacBriefed && cur.stage <= jtacBrief3 {
 			if key != "" {
 				return ""
 			}

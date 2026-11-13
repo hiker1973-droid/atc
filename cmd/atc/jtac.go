@@ -511,6 +511,11 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 			return say("abort, abort, abort. Too close. Re-attack from %s.", t.IP)
 		}
 		b.clear(cur, now)
+		// Far out and not on the attack heading (Raider 302 was cleared hot at 9 nm
+		// flying 046 against 160-200 and aborted at 5 nm): cleared, but told.
+		if nm > jtacWatchHdgNm && !inWindow(mag, float64(t.FAHLow), float64(t.FAHHigh), jtacInSlackDeg) {
+			return say("cleared hot. Final attack heading %s to %s.", spokenBearing(float64(t.FAHLow)), spokenBearing(float64(t.FAHHigh)))
+		}
 		return say("cleared hot.")
 
 	}
@@ -626,6 +631,8 @@ var jtacReadyWithRe = regexp.MustCompile(`(?i)^(?:ready with|reader|rider|raider
 // jtacBareNumberRe is a callsign with no name ("Hitman 3-306" -> "3306").
 var jtacBareNumberRe = regexp.MustCompile(`^[\d\s-]+$`)
 
+var jtacAddressDigitsRe = regexp.MustCompile(`(?i)hitman[ -]+[0-9](?:[ -][0-9])*[ ]*,[ ]*([a-z]+[ ,]*[0-9])`)
+
 var jtacOnCallsignRe = regexp.MustCompile(`(?i)(hitman[ -]+(?:\w+[ -]+)?\w+)\s+on\s+([a-z]+),?\s+(\d)`)
 
 // jtacCallsign trims what the generic extractor leaves after a JTAC call's
@@ -636,6 +643,10 @@ func jtacCallsign(text string) string {
 	text = jtacAddressFixRe.ReplaceAllString(text, "Hitman")
 	// "Hitman 1-1 on Raider, 3-1-2" (Day 2026-11-13): drop the "on" and the comma.
 	text = jtacOnCallsignRe.ReplaceAllString(text, "$1 $2 $3")
+	// "Hitman 2-1-2, Raider 3-0-2" / "Hitman 1-2, Raider..." (Day 2026-11-13, Raider 302
+	// lost four readbacks): the net is set by frequency, so the digits in the
+	// address mean nothing; drop them when a callsign follows.
+	text = jtacAddressDigitsRe.ReplaceAllString(text, "Hitman, $1")
 	cs :=extractCallsignSkippingAddress(text, "hitman one-one", "hitman one one", "hitman 1-1", "hitman 1 1", "hitman 11",
 		"hitman in 1-1", "hitman in one-one", "hitman in one one", "hitman in 2-1", "hitman in two-one", "hitman in two one",
 		"hitman two-one", "hitman two one", "hitman 2-1", "hitman 2 1", "hitman 21",
