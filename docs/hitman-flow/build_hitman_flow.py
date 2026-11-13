@@ -77,7 +77,7 @@ S.append(section("1. Command (282.000): get handed to a Hitman",
     ], [3.3, 4.1]),
     "Command does not pick the target; Hitman does. With no targets: \"negative tasking at this time.\""))
 
-S.append(section("2. Check in and get the 9-line (three blocks, each read back)",
+S.append(section("2. Check in and get the 9-line (three blocks, only the grid is checked)",
     table(["Pilot", "Hitman"], [
         ["\"Hitman one one, Raider 32, <b>checking in</b>\"<br/>(or \"ready for 9-line\", \"request tasking\")",
          "\"Raider 32, Hitman one one, copy check-in. <b>Say ordnance and playtime.</b>\" (first check-in only; no target yet)"],
@@ -85,15 +85,18 @@ S.append(section("2. Check in and get the 9-line (three blocks, each read back)"
          "\"Raider 32, Hitman one one, copy ordnance and playtime. <b>Target 2, &lt;name&gt;.</b> Line 1, IP &lt;IP&gt;. Line 2, heading &lt;hdg&gt;. "
          "Line 3, distance &lt;nm&gt; miles. <b>Read back.</b>\"<br/>"
          "More than 5 nm from the IP, he adds: \"&lt;IP&gt; bears 270 for 18.\""],
-        ["<b>Lines 1-3:</b> \"Hitman, Raider 32, IP &lt;IP&gt;, heading &lt;hdg&gt;, distance &lt;nm&gt;\"",
-         "\"Line 4, elevation... Line 5, target... Line 6, location (the grid, read digit by digit). <b>Read back.</b>\""],
-        ["<b>Lines 4-6:</b> \"Hitman, Raider 32, elevation &lt;ft&gt;, location &lt;grid&gt;\"",
-         "\"Line 7, mark... Line 8, friendlies... Line 9, egress, back to &lt;IP&gt;, &lt;altitude&gt;. <b>Read back.</b>\""],
+        ["<b>Lines 1-3:</b> \"Hitman, Raider 32, IP &lt;IP&gt;, heading &lt;hdg&gt;, distance &lt;nm&gt;\" (or just \"copy\")",
+         "\"Readback correct. Line 4, elevation... Line 5, target... Line 6, location (two letters, then ten digits, read digit by digit). "
+         "<b>Read back.</b>\""],
+        ["<b>Lines 4-6:</b> \"Hitman, Raider 32, <b>location &lt;two letters, ten digits&gt;</b>\" (the grid is the one line he checks)",
+         "\"Readback correct. Line 7, mark... Line 8, friendlies... Line 9, egress, back to &lt;IP&gt;, &lt;altitude&gt;. <b>Read back.</b>\""],
         ["<b>Lines 7-9:</b> \"Hitman, Raider 32, copy\" (or the friendlies / egress)",
          "\"Raider 32, Hitman one one, <b>confirmed.</b> Report IP inbound.\""],
     ], [3.3, 4.1]),
-    "<b>Wrong readback:</b> \"negative, readback incorrect\" and the same block again. <b>Missed it?</b> \"Say again\" repeats "
-    "the block; \"say again line 6\" repeats one line. Hitman still checks the run from the Tacview picture.",
+    "<b>Only line 6, the location, is checked.</b> The other lines need only a readback attempt or a \"copy\". Grid wrong: \"negative, "
+    "readback incorrect,\" and line 6 again. Wrong twice: he says it once more, \"continue,\" and passes lines 7-9. "
+    "<b>Missed it?</b> \"Say again\" repeats the block; \"say again line 6\" (or \"say again location\" / \"say again grid\") repeats the "
+    "grid. Hitman still checks the run from the Tacview picture.",
     "<b>Readback tip:</b> don't say \"Hitman\" partway through your readback; a call like that is dropped as "
     "Hitman's own echo. Put Hitman first, or leave his name out."))
 

@@ -7,6 +7,14 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.43 (13 NOV 2026) - Hitman checks only the grid
+
+Follows origin/main 3f6d08f (`cmd/atc/jtac_brief.go`). Card 13: steps now "copy 1-3 / read back the grid / copy 7-9",
+a "Grid wrong?" bullet (line 6 again; wrong twice -> once more and "continue"), and "say again location" (or "line 6").
+The spoken grid drops the zone ("Golf Juliet, ..."); the kneeboard card keeps 37T. Phraseology v3.3 (Hitman rows +
+example exchange) and the Hitman JTAC Comms Flow sheet follow; Discord post rewritten. Not heard over SRS at build time;
+live after each rig's Update. Build the packet WITHOUT `python -I` (it imports `fit_kneeboards` from `_tools`).
+
 ## v1.42 (12 NOV 2026) - slower 9-line, ask Hitman to repeat
 
 Follows origin/main af7c392 (Hitman reads the 9-line lines 12% slower, `jtacNineLineSlow`). Card 13: "slower than the rest of his talk" and

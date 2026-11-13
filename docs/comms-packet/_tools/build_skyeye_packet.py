@@ -85,6 +85,10 @@ Kneeboard/FA-18C_hornet and Kneeboard/F-16C_50 under Saved Games/DCS).
 v1.36 (operator 2026-10-22): Paddles' abeam reply is now "Paddles contact, 302, Hornet in the
 groove, at three-quarters of a mile call the ball." (card 10; kneeboard page 2 shows channels).
 
+v1.43 (operator 2026-11-13, origin/main 3f6d08f): Hitman checks only the grid (line 6) on readback; the
+spoken grid drops the zone ("Golf Juliet, ..."); blocks 1 and 3 accept any readback or "copy"; two wrong
+grids -> line 6 once more and "continue"; "say again location / grid" repeats line 6. Card 13 steps + bullets.
+
 v1.42 (operator 2026-11-12, origin/main af7c392): Hitman reads the 9-line lines 12% slower than the
 rest of his speech (jtacNineLineSlow, cmd/atc/jtac.go), and card 13 spells out asking him to repeat:
 "say again" = the block, "say again line 6" = one line (sayAgainRe, cmd/atc/jtac_brief.go).
@@ -154,8 +158,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.42"
-DATE = "12 NOV 2026"   # release date of VER - change it together with VER
+VER = "v1.43"
+DATE = "13 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -703,9 +707,9 @@ def c12_jtac_flow():
         ("COMMAND", "request tasking  ->  contact Hitman 1-1 or 2-1"),
         ("CHECK IN", "checking in  ->  say ordnance and playtime"),
         ("ORDNANCE", "4 GBU-12, 30 minutes  ->  target + lines 1-3"),
-        ("LINES 4-6", "read back 1-3  ->  elevation, target, grid"),
-        ("LINES 7-9", "read back 4-6  ->  mark, friendlies, egress"),
-        ("COPY", "read back 7-9  ->  confirmed, report IP inbound"),
+        ("LINES 4-6", "copy 1-3  ->  elevation, target, grid"),
+        ("LINES 7-9", "read back the grid  ->  mark, friendlies, egress"),
+        ("COPY", "copy 7-9  ->  confirmed, report IP inbound"),
         ("AT THE IP", "established IP <name>  ->  run-in heading"),
         ("IN", "in from the <dir>  ->  cleared hot, or abort"),
         ("OFF", "off  ->  egress per line 9"),
@@ -719,12 +723,15 @@ def c12_jtac_flow():
          ("on your first check-in - answer it and he passes the target.", False)],
         [("Hitman picks the target, at random.", True),
          ("Not one another flight is working, not the one you just did. Hitman reads the 9-line "
-          "in three blocks, lines 1-3, 4-6, 7-9, and you read each back. He reads the lines "
-          "slower than the rest of his talk, so you can copy them. Wrong readback: he says the "
-          "block again.", False)],
+          "in three blocks, lines 1-3, 4-6, 7-9. He reads the lines slower than the rest of his "
+          "talk, so you can copy them. Only the grid, line 6, is checked: read it back, two "
+          "letters then ten digits. Everything else, a \"copy\" will do.", False)],
+        [("Grid wrong?", True),
+         ("He says line 6 again. Wrong twice: he says it once more, \"continue\", and gives you "
+          "lines 7-9.", False)],
         [("Missed it? Ask him to repeat.", True),
-         ("\"Hitman, Raider 1, say again\" gives you the block again; \"say again line 6\" gives "
-          "you that one line.", False)],
+         ("\"Hitman, Raider 1, say again\" gives you the block again; \"say again location\" "
+          "(or \"line 6\") gives you the grid.", False)],
         [("Another target:", True),
          ("after \"off\", say \"request tasking\" to Hitman - or ask Command again.", False)],
     ])

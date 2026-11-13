@@ -535,6 +535,12 @@
  },
  {
   "role": "jtac",
+  "say": "Hitman, Raider 1-1, say again location.",
+  "tower": "",
+  "want": "say_again"
+ },
+ {
+  "role": "jtac",
   "say": "Hitman, Raider 1-1, IP inbound.",
   "tower": "",
   "want": "ip_inbound"
