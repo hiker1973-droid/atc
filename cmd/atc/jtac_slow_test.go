@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSplitNineLine(t *testing.T) {
 	pre, slow, post := splitNineLine("Raider 1, target 3, armour. line 1, IP Alpha. line 2, heading zero nine zero. line 3, distance two zero miles. Read back.")
@@ -54,5 +57,22 @@ func TestJTACCallsignHitmanIn(t *testing.T) {
 		if cs := jtacCallsign(s); cs != "Raider 312" && cs != "Raider 3-1-2" {
 			t.Errorf("%q -> %q", s, cs)
 		}
+	}
+}
+
+// "Request direct attack": permission granted with no 9-line, then in hot is
+// cleared with the usual checks (operator 2026-11-12).
+func TestJTACDirectAttack(t *testing.T) {
+	b, _ := newJTACBoard(t)
+	tgt := caucasusTaskingTargets[0]
+	pic := &fakePicture{}
+	pic.place(tgt.TgtPos, 169, 20, 349)
+	got := b.JTACResponse("Hitman 1-1, Raider 11, request direct attack", "Raider 11", hitman, pic)
+	if !strings.Contains(got, "permission granted, direct attack. Target 1,") || !strings.HasSuffix(got, "Call in hot.") || strings.Contains(got, "line 1") {
+		t.Fatalf("direct attack = %q", got)
+	}
+	pic.place(tgt.TgtPos, 169, 5, 349)
+	if got := b.JTACResponse("Hitman, Raider 11, in hot", "Raider 11", hitman, pic); got != "Raider 11, Hitman one one, cleared hot." {
+		t.Errorf("in hot after direct attack = %q", got)
 	}
 }

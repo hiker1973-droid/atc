@@ -77,7 +77,7 @@ const (
 	jtacContactMaxAge = 30 * time.Second
 	// jtacWhisperCalls: the net's calls, between its callsign and its IP
 	// names in jtacWhisperPrompt.
-	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
+	jtacWhisperCalls = "Raider, Venom, Viper, checking in, ordnance, playtime, minutes, GBU, Mark 82, laser guided, four, six, request tasking, request direct attack, ready for 9-line, say again, copy, IP inbound, in from the north, in heading, pickle, rifle, off, abort, request BDA"
 )
 
 // jtacPicture is what the JTAC needs from Tacview. *tacviewPositions is the
@@ -133,6 +133,8 @@ var (
 	// "in from the north", "in hot", "in heading 330", "rolling in", "Raider 11 in".
 	jtacInRe    = regexp.MustCompile(`(?:^|[\s,])in(?:\s+(?:from|hot|heading|on|the|with)\b|[\s,.!]*$)|\brolling in\b`)
 	jtacOffRe   = regexp.MustCompile(`\boff\b`)
+	// "request direct attack" (operator 2026-11-12): permission to skip the 9-line.
+	jtacDirectRe = regexp.MustCompile(`\b(?:direct|immediate) attack\b`)
 	jtacAbortRe = regexp.MustCompile(`\babort`)
 	// jtacReleaseCallRe: the pilot's release call, "pickle" for bombs, "rifle"
 	// for a guided missile ("Hitman 1-1, Raider 302, pickle times 4").
@@ -213,6 +215,30 @@ func (b *taskingBoard) JTACResponse(text, callsign, name string, pic jtacPicture
 			return say("negative tasking at this time.")
 		}
 		return ""
+	}
+
+	// Direct attack: the pilot asks to skip the 9-line. Permission granted, the
+	// target is given, and the flight goes on to the in call (cleared hot with
+	// the usual checks), then the watch and BDA as after a briefed attack.
+	if jtacDirectRe.MatchString(lower) && !(cur != nil && cur.stage >= jtacCleared && cur.stage != jtacOff) {
+		if cur == nil || cur.stage == jtacOff {
+			cur = &taskingAssignment{target: b.pick(key, now)}
+			b.flights[key] = cur
+		}
+		cur.issued, cur.awaiting, cur.redraw, cur.loadDone = now, false, false, true
+		cur.stage, cur.briefMiss = jtacInbound, 0
+		t := b.targets[cur.target]
+		what := t.Name
+		if t.Phase == 1 {
+			what = "enemy force"
+		}
+		resp := say("permission granted, direct attack. Target %d, %s.", t.Number, what)
+		if pos, _, ok := pic.Contact(callsign); ok {
+			brg, nm := bearingRangeFromRef(pos, t.TgtPos[0], t.TgtPos[1])
+			resp += fmt.Sprintf(" Target bears %s for %d.", spokenBearing(toMagnetic(brg, t.MagVar)), int(nm+0.5))
+		}
+		log.Info().Str("callsign", callsign).Int("target", t.Number).Msg("JTAC: direct attack approved, 9-line skipped")
+		return resp + " Attack heading " + spokenBearing(float64(t.FAHLow)) + " to " + spokenBearing(float64(t.FAHHigh)) + ". Call in hot."
 	}
 
 	// Check-in: pass the 9-line. A flight that skipped Command gets a target
