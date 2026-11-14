@@ -15,7 +15,7 @@ func TheatreKey(name string) string {
 		return "iraq"
 	case "syria", "sy", "easternmed", "eastern-med", "eastern med", "emed":
 		return "syria"
-	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
+	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic", "kola-foothold", "kolafoothold", "kola-fh", "kolafh":
 		return "kola"
 	}
 	return "pg"
@@ -30,6 +30,11 @@ func TheatreOfICAO(icao string) string {
 			if af.ICAO == icao {
 				return t
 			}
+		}
+	}
+	for _, af := range KolaFoothold { // Foothold Kola's extra field (Andoya) is in no other list
+		if af.ICAO == icao {
+			return "kola"
 		}
 	}
 	return "pg"

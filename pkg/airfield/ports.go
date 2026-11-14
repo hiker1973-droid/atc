@@ -58,4 +58,6 @@ var DashboardPorts = map[string]int{
 	"ENDU": 6052,
 	"ENNA": 6053,
 	"EFRO": 6054,
+	// Andoya (Foothold Kola only; started by start_towers_kola_foothold.bat).
+	"ENAN": 6055,
 }

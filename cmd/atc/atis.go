@@ -575,7 +575,7 @@ func atisSecondLangForMap(m string) (string, bool) {
 		// so there is no single local language and every Syria station sets its
 		// own Lang. Arabic here only covers a station added without one.
 		return "Arabic", true
-	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
+	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic", "kola-foothold", "kolafoothold", "kola-fh", "kolafh":
 		// FALLBACK ONLY. The fields are in Norway and Finland, so every Kola station
 		// sets its own Lang. Norwegian here only covers a station added without one.
 		return "Norwegian", true
@@ -706,6 +706,16 @@ func atisStationsForMap(m string) []*atisStation {
 				TACAN: "VOR DME 112.60. NDB 351.",
 				ILS: "ILS 110.10 runway 16. ILS 109.50 runway 17. ILS 110.70 runway 03.", Advisory: advisory},
 		}
+	case "kola-foothold", "kolafoothold", "kola-fh", "kolafh":
+		// Foothold Kola (operator 2026-11-14): Andoya, blue's home field, plus the four White Night
+		// fields. start_atis_kola_foothold.bat narrows this with --atis-stations. Andoya ATIS is
+		// tower minus two MHz like the others. beacons.lua: VOR/DME AND 112.20, TACAN OYA 28 -- no ILS.
+		return append([]*atisStation{
+			{Name: "Andoya ATIS", FreqMHz: 248.600, Voice: "coral", ICAO: "ENAN",
+				Style: styleATISAccent("Norwegian"),
+				Lang:  "Norwegian", // Norway
+				TACAN: "TACAN 28X. VOR DME 112.20.", Advisory: advisory},
+		}, atisStationsForMap("kola")...)
 	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
 		// Operation WHITE NIGHT. English plus the field's own language (operator
 		// 2026-10-09): Norwegian at the three Norwegian fields, Finnish at Rovaniemi.

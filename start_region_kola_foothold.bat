@@ -1,0 +1,23 @@
+@echo off
+:: vSFG-7 -- FOOTHOLD KOLA region launcher (operator 2026-11-14). NOT wired into the launcher dashboard: run this by hand.
+:: ATIS (5 fields) -> Towers (Andoya, Bodo, Bardufoss, Banak, Rovaniemi) -> Command -> Marshal (306.300) -> Deckboss (128.600)
+:: -> Paddles (128.300) -> GCI Darkstar (264.000). The carrier roles and the GCI are the White Night Kola scripts, unchanged:
+:: the Foothold Kola cards print the same frequencies. The AI E-3As in the mission sit on 276/277 as the GCI's radar.
+:: Does NOT start the launcher. Set SKYEYE_MIZ to the Foothold Kola mission .miz (or install the mission-watch hook, see
+:: cmd/atc/mizwatch.go) before running, or ATIS/tower weather will not follow the weather rotation.
+cd /d %~dp0
+echo [vSFG-7] Launching Foothold Kola ATIS...
+call "%~dp0start_atis_kola_foothold.bat"
+echo [vSFG-7] Launching Foothold Kola Towers...
+call "%~dp0start_towers_kola_foothold.bat"
+echo [vSFG-7] Launching Command...
+call "%~dp0start_command_kola_foothold.bat"
+echo [vSFG-7] Launching Marshal (306.300)...
+call "%~dp0start_marshal_kola.bat"
+echo [vSFG-7] Launching Deckboss (128.600)...
+call "%~dp0start_deckboss_kola.bat"
+echo [vSFG-7] Launching Paddles (128.300)...
+call "%~dp0start_lso_kola.bat"
+echo [vSFG-7] Launching GCI Darkstar (264.000)...
+call "%~dp0start_gci_kola.bat"
+echo [vSFG-7] Foothold Kola region launched.

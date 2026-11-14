@@ -88,3 +88,25 @@ explicitly (Syria shipped relying on the default and handed pilots to the wrong 
 - TTS will read "Bodo" as written; the Norwegian pass will say Bodø.
 - The SRS client is still coalition 2 only.
 - No `configs/*.yaml` were added — the newer theatres (Caucasus) run without them.
+
+## 5. Foothold Kola (added 2026-11-14)
+
+The Foothold Kola mission (`Missions\KOLA\Foothold Kola`, v1.4+, Leka's Ko 6.5.3 with the vSFG-7 layer) uses the same Kola scripts plus a
+Foothold roster. **White Night's Bodo-only scripts and tests are untouched.**
+
+| Piece | What |
+|---|---|
+| Fields | Andoya ENAN 250.600 / 248.600 (new, port 6055), Bodo, Bardufoss, Banak, Rovaniemi (as section 1) |
+| Map name | `--map kola-foothold` (aliases `kolafoothold`, `kola-fh`, `kolafh`): `FieldsForMap` = the five (Command's handoff scan), `atisStationsForMap` = Andoya + the four; `TheatreKey` = `kola` |
+| Scripts | `start_region_kola_foothold.bat` = `start_atis_kola_foothold.bat` + `start_towers_kola_foothold.bat` + `start_command_kola_foothold.bat` + the unchanged `start_marshal/deckboss/lso/gci_kola.bat` |
+| Carrier + GCI | Marshal 306.3, Deckboss 128.6, Paddles 128.3, Command 282.0, GCI **Darkstar 264.0**: the Foothold cards print these. The mission's two AI E-3As are on 276 / 277 (radar for the GCI), nothing else answers on 264 |
+| Dashboard | **Not wired.** The launcher's Kola theatre still starts `start_region_kola.bat` (Bodo only); run the Foothold region bat by hand |
+
+- 🔴 **ENAN is DERIVED, not surveyed** (the ME was closed): centre = the DCS airbase reference point, axis = the terrain taxi network's runway edge
+  (true 149.8), length 2,500 m assumed, thresholds = centre +/- 1,250 m, magvar 6.3 E (DCS 2015 model), runway 14/32 -> 143 / 323 magnetic, elevation 22 ft.
+  No ILS (beacons.lua: VOR/DME AND 112.20, TACAN OYA 28, mode X assumed). Verify against the ME before any hold-short gate. Break directions are placeholders.
+- 🔴 **The Foothold Kola mission is dated 2015 ON PURPOSE**: every Kola field's magvar here is the 2015 DCS value (White Night's year); a 2025 mission
+  would make SkyEye announce magnetic wind and BRC about 3 degrees high.
+- ATIS = tower minus two MHz and is on no preset; the Foothold cards print it for the five SkyEye fields.
+- Weather follows the loaded mission only through `SKYEYE_MIZ` / the mission-watch hook (`cmd/atc/mizwatch.go`); the rig must have one of them.
+- Not flown. Binaries are not built from this branch.

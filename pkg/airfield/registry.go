@@ -16,6 +16,7 @@ var registry = map[string]*Airfield{
 	"LTAJ": LTAJ, "LCRA": LCRA, "LCPH": LCPH, "OJHR": OJHR, // Syria / Eastern Med
 	"OSLK": OSLK, "OLBA": OLBA, // Syria / Eastern Med divert fields (not on the card)
 	"ENBO": ENBO, "ENDU": ENDU, "ENNA": ENNA, "EFRO": EFRO, // Kola (Operation WHITE NIGHT)
+	"ENAN": ENAN, // Kola (Foothold Kola)
 }
 
 // ByICAO returns the airfield for an ICAO (case-insensitive), or nil if unknown.
@@ -57,6 +58,10 @@ var (
 	// above) and ATIS entries; to bring one up, uncomment it in start_towers_kola.bat, add
 	// it to --atis-stations in start_atis_kola.bat, AND add it here.
 	Kola = []*Airfield{ENBO}
+	// KolaFoothold is the Foothold Kola roster (operator 2026-11-14): blue's two home fields, Andoya and Bodo,
+	// plus the three fields already defined for White Night. Reached only through --map kola-foothold (the
+	// FOOTHOLD scripts, start_*_kola_foothold.bat), so White Night's Bodo-only Kola slice above is unchanged.
+	KolaFoothold = []*Airfield{ENAN, ENBO, ENDU, ENNA, EFRO}
 )
 
 // FieldsForMap returns the tower fields for a map name (default: Persian Gulf).
@@ -76,6 +81,8 @@ func FieldsForMap(name string) []*Airfield {
 		return Iraq
 	case "syria", "sy", "easternmed", "eastern-med", "eastern med", "emed":
 		return Syria
+	case "kola-foothold", "kolafoothold", "kola-fh", "kolafh":
+		return KolaFoothold
 	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
 		return Kola
 	default:
