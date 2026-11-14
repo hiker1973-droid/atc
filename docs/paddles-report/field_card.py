@@ -26,7 +26,7 @@ NM_FT = 6076.12
 GS = 3.0
 AimM = 300.0  # the aim point, metres past the threshold (pkg/fieldgrade AimM)
 W, H = 840, 500
-RINGS = (1.5, 1.0, 0.5, 0.25)
+RINGS = (1.0, 0.5, 0.25)
 NM_MIN = 0.35  # the axis runs this far past the threshold, down the runway
 GRADE_COL = {"OK": ("#2ea043", "#fff"), "_OK_": ("#2ea043", "#fff"), "(OK)": ("#d4a72c", "#000"), "B": ("#d1832b", "#000"),
              "C": ("#d1832b", "#000"), "WO": ("#8b949e", "#000"), "CUT": ("#da3633", "#fff")}
@@ -39,7 +39,7 @@ def badge_colours(grade):
 
 YEL, GRN, RED, WHITE, MUTED = "#e8b400", "#2ea043", "#f85149", "#f0f6fc", "#8b949e"  # same as pass_cards.py
 HAND = 'font-family="Arial, Helvetica, sans-serif" font-style="italic"'
-MILES = ((0.25, "1/4 NM"), (0.5, "1/2 NM"), (0.75, "3/4 NM"), (1.0, "1 NM"), (1.5, "1.5 NM"))
+MILES = ((0.25, "1/4 NM"), (0.5, "1/2 NM"), (0.75, "3/4 NM"), (1.0, "1 NM"))
 SLOPES = ((0.5, YEL, "high"), (0.0, GRN, "on slope"), (-0.7, RED, "low"))  # degrees off the 3 deg path: the Hornet card's three lines
 LINEUPS = ((0.4, GRN), (0.75, YEL), (1.5, RED))  # degrees either side of the centreline, as on the Hornet card
 
@@ -71,7 +71,7 @@ def _at(trk, nm):
     return best[1:] if best and best[0] < 0.3 else None
 
 
-def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False, gs=None, aim_m=None):
+def side_view(trk, td_past_m, nm_max=1.15, ft_max=720, coarse=False, gs=None, aim_m=None):
     """Height above the runway against distance, with the Hornet card's three slope lines (3 deg +0.5 / 0 / -0.7,
     from the aim point) and the mile arcs."""
     L, R, T, B = 60, W - 24, 24, H - 50
@@ -106,7 +106,7 @@ def side_view(trk, td_past_m, nm_max=1.65, ft_max=720, coarse=False, gs=None, ai
     return "".join(o)
 
 
-def lineup_view(trk, td_right_m, td_past_m, nm_max=1.65):
+def lineup_view(trk, td_right_m, td_past_m, nm_max=1.15):
     """From above: the centreline, the Hornet card's lineup lines (0.4 / 0.75 / 1.5 deg each side) and the mile arcs."""
     L, R, M = 60, W - 24, H // 2 - 10
     k = 2.0  # pixels per metre across, stretched so the lineup lines are readable

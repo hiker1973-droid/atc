@@ -311,7 +311,6 @@ var Segments = []struct {
 	Name     string
 	From, To float64
 }{
-	{"X", 1.5 * nm, 1.0 * nm},
 	{"IM", 1.0 * nm, 0.5 * nm},
 	{"IC", 0.5 * nm, 0.25 * nm},
 	{"AR", 0.25 * nm, 0},
