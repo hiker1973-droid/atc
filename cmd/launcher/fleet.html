@@ -243,6 +243,7 @@ function rigCard(r) {
       <span class="rig-name" title="rig id: ${esc(r.name)}">${esc(r.label || r.name)}</span>
       <span class="rig-host">${esc(r.host)}:${r.port}</span>
       ${verChip}
+      ${r.name !== 'host' && !r.self ? `<a class="upd-btn" href="http://${esc(r.host)}:9876/auth/login" target="_blank" rel="noopener" style="text-decoration:none" title="DCSServerBot web GUI on ${esc(r.host)} (LAN only)">DCSSB GUI ↗</a>` : ''}
       ${r.launcherUp ? `<button class="upd-btn" onclick="updateRig('${esc(r.name)}', ${r.self ? 'true' : 'false'})" ${UPD[r.name] && UPD[r.name].busy ? 'disabled' : ''} title="git pull, build, restart the running theatre, then the launcher">⟳ Update</button>` : ''}
       <span class="badge ${cls}">${badge}</span>
     </div>
