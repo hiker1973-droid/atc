@@ -27,6 +27,9 @@ type nineLineData struct {
 }
 
 func nineKey(t taskingTarget) string {
+	if t.Nine != "" {
+		return t.Nine
+	}
 	return fmt.Sprintf("%d/%d/%s", t.Number, t.Phase, strings.ToLower(t.Name))
 }
 
@@ -34,6 +37,9 @@ func nineKey(t taskingTarget) string {
 // the generated data does not have.
 func nineData(t taskingTarget) nineLineData {
 	d := jtacNineLines[nineKey(t)]
+	if t.Nine != "" {
+		d = kolaNineLines[t.Nine]
+	}
 	if d.Desc == "" {
 		d.Desc = t.Spoken
 	}

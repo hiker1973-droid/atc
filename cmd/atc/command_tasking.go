@@ -36,6 +36,7 @@ type taskingTarget struct {
 	Phase  int    // 0 = single 9-line; 1 = the RED force (troops in contact); 2 = the static target, flown after phase 1
 	BDAKey int    // key into casTICBDA when non-zero; else caucasusBDA[Number]
 	Spoken string // phase 1: the target as the JTAC says it ("2 tanks, 1 truck, dug in, 200 metres south of the heli farp")
+	Nine   string // key into kolaNineLines; "" = jtacNineLines["number/phase/name"] (kola_targets.go)
 }
 
 // caucasusTaskingTargets mirrors the 9-line pages of the vSFG-7 Caucasus
@@ -76,6 +77,10 @@ func taskingTargetsForMap(mapName string) []taskingTarget {
 			return casTICTargets
 		}
 		return caucasusTaskingTargets
+	case "kola":
+		if kolaTrainingLoaded() {
+			return kolaTaskingTargets
+		}
 	}
 	return nil
 }

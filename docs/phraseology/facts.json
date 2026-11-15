@@ -348,6 +348,8 @@
   "key": "kola",
   "title": "Kola",
   "command": 282,
+  "jtac": 61,
+  "jtac2": 62,
   "deckboss": 128.6,
   "marshal": 306.3,
   "lso": 128.3,

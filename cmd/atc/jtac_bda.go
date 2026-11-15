@@ -125,6 +125,9 @@ var caucasusBDA = map[int]bdaTarget{
 
 // bdaTargetFor is the placed-object table of this 9-line.
 func bdaTargetFor(t taskingTarget) bdaTarget {
+	if bt, ok := kolaBDA[t.BDAKey]; ok {
+		return bt
+	}
 	if t.BDAKey != 0 {
 		return casTICBDA[t.BDAKey]
 	}

@@ -92,7 +92,7 @@ func watchTaskingSet(ctx context.Context, board *taskingBoard) {
 func allTaskingIPs() []string {
 	seen := map[string]bool{}
 	var out []string
-	for _, set := range [][]taskingTarget{caucasusTaskingTargets, casTICTargets} {
+	for _, set := range [][]taskingTarget{caucasusTaskingTargets, casTICTargets, kolaTaskingTargets} {
 		for _, t := range set {
 			if !seen[t.IP] {
 				seen[t.IP] = true
@@ -119,4 +119,23 @@ func otherTaskingSet() []taskingTarget {
 		return caucasusTaskingTargets
 	}
 	return casTICTargets
+}
+
+// kolaTrainingMissionName reports whether a .miz path is the Kola Training mission
+// (vSFG-7_Training_Mission_KO ...), the one the Kola Hitman targets (kola_targets.go) belong to.
+func kolaTrainingMissionName(path string) bool {
+	return strings.Contains(strings.ToLower(filepath.Base(path)), "training_mission_ko")
+}
+
+// kolaTrainingLoaded: on --map kola Hitman has targets only while the loaded mission is Kola
+// Training. No mission known (no watch file, no --miz-path) counts as Kola Training, because the
+// operator turned Hitman on for it; another Kola mission (White Night) gets "negative tasking".
+func kolaTrainingLoaded() bool {
+	if p := readMissionPointer(flagMizWatchFile); p != "" {
+		return kolaTrainingMissionName(p)
+	}
+	if flagMizPath != "" {
+		return kolaTrainingMissionName(flagMizPath)
+	}
+	return true
 }
