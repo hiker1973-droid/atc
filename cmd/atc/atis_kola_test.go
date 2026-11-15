@@ -15,6 +15,8 @@ func TestKolaATISLanguages(t *testing.T) {
 		"ENDU": "Norwegian", // Bardufoss, Norway
 		"ENNA": "Norwegian", // Banak, Norway
 		"EFRO": "Finnish",   // Rovaniemi, Finland
+		"ENAN": "Norwegian", // Andoya, Norway (Kola Training)
+		"ENEV": "Norwegian", // Evenes, Norway (Kola Training)
 	}
 	stations := atisStationsForMap("kola")
 	if len(stations) != len(want) {
@@ -45,7 +47,7 @@ func TestKolaATISLanguages(t *testing.T) {
 // start_atis_kola.bat runs only the field in play. The filter must leave exactly the
 // live tower set on the air, and that set must be what Command hands pilots to.
 func TestKolaATISFilterMatchesLiveTowers(t *testing.T) {
-	kept := filterATISStations(atisStationsForMap("kola"), "ENBO")
+	kept := filterATISStations(atisStationsForMap("kola"), "ENBO,ENAN,ENEV")
 	live := airfield.FieldsForMap("kola")
 	if len(kept) != len(live) {
 		t.Fatalf("filter kept %d stations, live tower set has %d", len(kept), len(live))
@@ -66,6 +68,8 @@ func TestKolaILSRunways(t *testing.T) {
 		"ENDU": "ILS 108.70 runway 28.",
 		"ENNA": "ILS 108.30 runway 34.",
 		"EFRO": "ILS 111.70 runway 21.",
+		"ENAN": "",                         // Andoya: VOR/DME and TACAN only
+		"ENEV": "ILS 108.90 runway 17.",    // localizer at the 35 end
 	}
 	for _, st := range atisStationsForMap("kola") {
 		if st.ILS != want[st.ICAO] {

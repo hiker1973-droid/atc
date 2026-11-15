@@ -708,14 +708,19 @@ func atisStationsForMap(m string) []*atisStation {
 		}
 	case "kola-foothold", "kolafoothold", "kola-fh", "kolafh":
 		// Foothold Kola (operator 2026-11-14): Andoya, blue's home field, plus the four White Night
-		// fields. start_atis_kola_foothold.bat narrows this with --atis-stations. Andoya ATIS is
-		// tower minus two MHz like the others. beacons.lua: VOR/DME AND 112.20, TACAN OYA 28 -- no ILS.
-		return append([]*atisStation{
-			{Name: "Andoya ATIS", FreqMHz: 248.600, Voice: "coral", ICAO: "ENAN",
-				Style: styleATISAccent("Norwegian"),
-				Lang:  "Norwegian", // Norway
-				TACAN: "TACAN 28X. VOR DME 112.20.", Advisory: advisory},
-		}, atisStationsForMap("kola")...)
+		// fields. Andoya is part of the Kola set now (Kola Training, 2026-11-14), so this is that set
+		// without Evenes; start_atis_kola_foothold.bat narrows it further with --atis-stations.
+		var fh, rest []*atisStation
+		for _, st := range atisStationsForMap("kola") {
+			switch st.ICAO {
+			case "ENAN":
+				fh = append(fh, st) // Andoya first, the Foothold tower order
+			case "ENEV":
+			default:
+				rest = append(rest, st)
+			}
+		}
+		return append(fh, rest...)
 	case "kola", "ko", "kolapeninsula", "kola-peninsula", "arctic":
 		// Operation WHITE NIGHT. English plus the field's own language (operator
 		// 2026-10-09): Norwegian at the three Norwegian fields, Finnish at Rovaniemi.
@@ -731,6 +736,17 @@ func atisStationsForMap(m string) []*atisStation {
 				Style: styleATISAccent("Norwegian"),
 				Lang:  "Norwegian", // Norway
 				TACAN: "TACAN 45X. VOR DME 117.55.", ILS: "ILS 110.30 runway 07. ILS 108.70 runway 25.", Advisory: advisory},
+			// Kola Training (operator 2026-11-14): Andoya and Evenes with Bodo. Andoya beacons.lua: VOR/DME AND
+			// 112.20, TACAN OYA 28, no ILS. Evenes: ILS 108.90 runway 17 (localizer at the 35 end), VOR/DME EVD
+			// 117.35, TACAN 67X. ATIS is tower minus two MHz.
+			{Name: "Andoya ATIS", FreqMHz: 248.600, Voice: "coral", ICAO: "ENAN",
+				Style: styleATISAccent("Norwegian"),
+				Lang:  "Norwegian", // Norway
+				TACAN: "TACAN 28X. VOR DME 112.20.", Advisory: advisory},
+			{Name: "Evenes ATIS", FreqMHz: 248.800, Voice: "fable", ICAO: "ENEV",
+				Style: styleATISAccent("Norwegian"),
+				Lang:  "Norwegian", // Norway
+				TACAN: "TACAN 67X. VOR DME 117.35.", ILS: "ILS 108.90 runway 17.", Advisory: advisory},
 			{Name: "Bardufoss ATIS", FreqMHz: 248.650, Voice: "shimmer", ICAO: "ENDU",
 				Style: styleATISAccent("Norwegian"),
 				Lang:  "Norwegian", // Norway

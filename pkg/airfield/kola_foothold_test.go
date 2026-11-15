@@ -31,8 +31,8 @@ func TestKolaFootholdFields(t *testing.T) {
 			t.Errorf("TheatreKey(%q) = %q, want kola", alias, TheatreKey(alias))
 		}
 	}
-	if n := len(FieldsForMap("kola")); n != 1 {
-		t.Errorf("the White Night Kola slice grew to %d fields; it must stay Bodo only", n)
+	if n := len(FieldsForMap("kola")); n != 3 {
+		t.Errorf("the Kola slice has %d fields; Kola Training runs Bodo, Andoya and Evenes", n)
 	}
 	if TheatreOfICAO("ENAN") != "kola" {
 		t.Errorf("TheatreOfICAO(ENAN) = %q, want kola", TheatreOfICAO("ENAN"))

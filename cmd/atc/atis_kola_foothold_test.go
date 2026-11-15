@@ -39,8 +39,8 @@ func TestKolaFootholdATIS(t *testing.T) {
 			}
 		}
 	}
-	if n := len(atisStationsForMap("kola")); n != 4 {
-		t.Errorf("the White Night Kola ATIS set changed to %d stations; it must stay 4", n)
+	if n := len(atisStationsForMap("kola")); n != 6 {
+		t.Errorf("the Kola ATIS set has %d stations; want 6 (the four White Night fields plus Andoya and Evenes)", n)
 	}
 }
 

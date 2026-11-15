@@ -14,6 +14,8 @@ func TestKolaLiveFields(t *testing.T) {
 		tower, atis float64
 	}{
 		{"ENBO", 251.150, 249.150},
+		{"ENAN", 250.600, 248.600}, // Kola Training (2026-11-14): Bodo, Andoya, Evenes
+		{"ENEV", 250.800, 248.800},
 	}
 	for _, alias := range []string{"kola", "KO", " Kola "} {
 		got := FieldsForMap(alias)
@@ -44,6 +46,7 @@ func TestKolaFieldData(t *testing.T) {
 		hdgB   float64
 	}{
 		{ENBO, 33, 5.0, "07", 73, "25", 253},
+		{ENEV, 85, 6.5, "17", 171, "35", 351},
 		{ENDU, 234, 7.7, "28", 281, "10", 101},
 		{ENNA, 17, 11.6, "34", 344, "16", 164},
 		{EFRO, 636, 10.8, "21", 207, "03", 27},

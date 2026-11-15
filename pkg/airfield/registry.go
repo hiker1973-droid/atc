@@ -16,7 +16,8 @@ var registry = map[string]*Airfield{
 	"LTAJ": LTAJ, "LCRA": LCRA, "LCPH": LCPH, "OJHR": OJHR, // Syria / Eastern Med
 	"OSLK": OSLK, "OLBA": OLBA, // Syria / Eastern Med divert fields (not on the card)
 	"ENBO": ENBO, "ENDU": ENDU, "ENNA": ENNA, "EFRO": EFRO, // Kola (Operation WHITE NIGHT)
-	"ENAN": ENAN, // Kola (Foothold Kola)
+	"ENAN": ENAN, // Kola (Foothold Kola, Kola Training)
+	"ENEV": ENEV, // Kola (Kola Training)
 }
 
 // ByICAO returns the airfield for an ICAO (case-insensitive), or nil if unknown.
@@ -57,7 +58,7 @@ var (
 	// call a tower nobody is running. ENDU, ENNA and EFRO keep their definitions (registry
 	// above) and ATIS entries; to bring one up, uncomment it in start_towers_kola.bat, add
 	// it to --atis-stations in start_atis_kola.bat, AND add it here.
-	Kola = []*Airfield{ENBO}
+	Kola = []*Airfield{ENBO, ENAN, ENEV} // Kola Training (operator 2026-11-14): Bodo, Andoya, Evenes
 	// KolaFoothold is the Foothold Kola roster (operator 2026-11-14): blue's two home fields, Andoya and Bodo,
 	// plus the three fields already defined for White Night. Reached only through --map kola-foothold (the
 	// FOOTHOLD scripts, start_*_kola_foothold.bat), so White Night's Bodo-only Kola slice above is unchanged.

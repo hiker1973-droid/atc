@@ -21,4 +21,4 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: --map kola selects the Kola ATIS set (Bodo, Bardufoss, Banak in English + Norwegian;
 :: Rovaniemi in English + Finnish). --atis-stations narrows it to the field in play --
 :: add an ICAO here when its tower is switched on in start_towers_kola.bat.
-start "vSFG-7 ATIS (Kola)" cmd /c "%~dp0atc.exe --atis-only --map kola --atis-stations ENBO --srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%"
+start "vSFG-7 ATIS (Kola)" cmd /c "%~dp0atc.exe --atis-only --map kola --atis-stations ENBO,ENAN,ENEV--srs-addr %SRS% --eam-password %EAM% %MIZ_FLAG% --log-level %LOG%"

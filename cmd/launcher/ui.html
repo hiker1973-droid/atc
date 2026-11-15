@@ -797,11 +797,13 @@ const THEATRES = {
     label: 'Kola', primaryLabel: 'Bodo (ENBO)', atisRole: 'vSFG-7 ATIS (Kola)',
     towers: [
       { icao: 'ENBO', label: 'Bodo', freq: '251.150', port: 6051, role: 'Bodo Tower' },
+      { icao: 'ENAN', label: 'Andoya', freq: '250.600', port: 6055, role: 'Andoya Tower' },
+      { icao: 'ENEV', label: 'Evenes', freq: '250.800', port: 6056, role: 'Evenes Tower' },
       // Bardufoss (ENDU 6052), Banak (ENNA 6053) and Rovaniemi (EFRO 6054) are parked --
       // see start_towers_kola.bat. Add the row here when its mission comes up.
     ],
-    // The field in play + Marshal (6004) + Deckboss (6005) on the shared carrier ports.
-    wxPorts: [6051, 6004, 6005],
+    // The fields in play + Marshal (6004) + Deckboss (6005) on the shared carrier ports.
+    wxPorts: [6051, 6055, 6056, 6004, 6005],
     // CVN-72 in the Vestfjord. Marshal 306.300 and Deckboss 128.600 follow the
     // standing operator rulings (2026-09-20 / 2026-09-15); these target the _kola bats.
     combos: [

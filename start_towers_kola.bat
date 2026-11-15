@@ -37,6 +37,15 @@ echo [vSFG-7] Starting Kola ATC system...
 start "Bodo Tower" cmd /c "%~dp0atc.exe --airfield ENBO --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6051 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
+:: KOLA TRAINING (operator 2026-11-14): Bodo + Andoya + Evenes are the three fields in play.
+:: Andoya Tower -- ENAN, 250.600, dashboard 6055
+start "Andoya Tower" cmd /c "%~dp0atc.exe --airfield ENAN --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice coral --dashboard-port 6055 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+%SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
+
+:: Evenes Tower -- ENEV, 250.800, dashboard 6056
+start "Evenes Tower" cmd /c "%~dp0atc.exe --airfield ENEV --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice fable --dashboard-port 6056 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+%SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
+
 :: Bardufoss Tower -- ENDU, 250.650, dashboard 6052   [PARKED]
 :: start "Bardufoss Tower" cmd /c "%~dp0atc.exe --airfield ENDU --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6052 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 :: %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul

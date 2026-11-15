@@ -357,12 +357,27 @@
   "gci_name": "Darkstar",
   "towers": [
    {
+    "name": "Andoya Tower",
+    "icao": "ENAN",
+    "freq": 250.6
+   },
+   {
     "name": "Bodo Tower",
     "icao": "ENBO",
     "freq": 251.15
+   },
+   {
+    "name": "Evenes Tower",
+    "icao": "ENEV",
+    "freq": 250.8
    }
   ],
   "atis": [
+   {
+    "name": "Andoya ATIS",
+    "icao": "ENAN",
+    "freq": 248.6
+   },
    {
     "name": "Bodo ATIS",
     "icao": "ENBO",

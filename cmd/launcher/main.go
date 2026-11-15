@@ -1352,6 +1352,7 @@ var proxyPorts = map[int]bool{
 	6045: true, 6046: true, 6047: true, 6048: true,
 	6049: true, 6050: true,
 	6051: true, 6052: true, 6053: true, 6054: true,
+	6055: true, 6056: true, // Andoya, Evenes (Kola Training)
 }
 
 // handleTowerProxy reverse-proxies /tower/<port>/<rest> to http://127.0.0.1:<port>/<rest>
