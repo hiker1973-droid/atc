@@ -33,6 +33,7 @@ const (
 	OwnerGCI        = "gci"
 	OwnerATIS       = "atis"
 	OwnerScudwatch  = "scudwatch"
+	OwnerGuard      = "guard" // --guard-only
 	OwnerTower      = "tower"
 )
 
@@ -284,6 +285,8 @@ func OwnerOf(flags map[string]string) string {
 		return OwnerLSO
 	case truthy(flags, "gci-only"):
 		return OwnerGCI
+	case truthy(flags, "guard-only"):
+		return OwnerGuard
 	case nonzero(flags["deckboss-freq"]):
 		return OwnerDeckboss
 	}

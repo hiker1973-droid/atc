@@ -23,6 +23,9 @@ call "%~dp0start_deckboss_kola.bat"
 echo [vSFG-7] Launching GCI Darkstar (264.000)...
 call "%~dp0start_gci_kola.bat"
 
+echo [vSFG-7] Launching Guard (243.000)...
+call "%~dp0start_guard_kola.bat"
+
 echo [vSFG-7] Launching Dashboard...
 call "%~dp0start_launcher.bat"
 

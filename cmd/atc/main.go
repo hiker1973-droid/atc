@@ -366,6 +366,7 @@ func newRootCommand() *cobra.Command {
 		"Bullseye reference for Scudwatch announcements as 'lat,lon' (default: airfield center)")
 	registerLSOFlags(f)
 	registerGCIFlags(f)
+	registerGuardFlags(f)
 	registerApproachGradeFlags(f)
 	registerTankerFlags(f)
 	registerJTACNetFlags(f)
@@ -451,6 +452,8 @@ func run(cmd *cobra.Command, args []string) error {
 		logSlug = "lso"
 	case flagGCIOnly:
 		logSlug = "gci"
+	case flagGuardOnly:
+		logSlug = "guard"
 	case logSlug == "":
 		logSlug = "misc"
 	}
@@ -526,6 +529,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagMarshalOnly   { mode = "marshal-only" }
 	if flagLSOOnly       { mode = "lso-only" }
 	if flagGCIOnly       { mode = "gci-only" }
+	if flagGuardOnly     { mode = "guard-only" }
 	if flagDeckbossFreq != "0" && flagDeckbossFreq != "" { mode = "deckboss" }
 	log.Info().Str("mode", mode).Str("srs", flagSRSAddr).Msg("vsfg7-atc starting")
 	if mode == "tower" {
@@ -549,7 +553,7 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Error().Str("key", key).Msg("this role is already running - second copy exiting")
 		return fmt.Errorf("already running: %s", key)
 	}
-	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly && !flagLSOOnly && !flagGCIOnly {
+	if !flagCommandOnly && !flagATISOnly && !flagScudwatchOnly && !flagMarshalOnly && !flagLSOOnly && !flagGCIOnly && !flagGuardOnly {
 		log.Info().
 			Str("airfield", af.ICAO).
 			Str("callsign", callsign).
@@ -584,6 +588,9 @@ func run(cmd *cobra.Command, args []string) error {
 	if flagGCIOnly {
 		runGCI(ctx, apiKey)
 		return nil
+	}
+	if flagGuardOnly {
+		return runGuard(ctx, apiKey)
 	}
 
 	// Apply runway-slot override before any AirfieldState is constructed so

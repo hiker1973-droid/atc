@@ -28,4 +28,7 @@ call "%~dp0start_lso_kola.bat"
 echo [vSFG-7] Launching GCI Darkstar (264.000)...
 call "%~dp0start_gci_kola.bat"
 
+echo [vSFG-7] Launching Guard (243.000)...
+call "%~dp0start_guard_kola.bat"
+
 echo [vSFG-7] Kola region launched.
