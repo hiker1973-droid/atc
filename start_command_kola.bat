@@ -29,7 +29,9 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 :: --handoff-marshal-freq 306.3: our Marshal (start_marshal_kola.bat). Without the
 :: flag the default happens to be 306.3 too, but Syria shipped relying on a default
 :: and handed pilots to the wrong Marshal -- so it is stated here.
-:: Hitman 1-1 (61.000 FM, North-Lapland: targets 1,2,7) + Hitman 2-1 (62.000 FM, South-Lapland: 3,4,5,6) = the AI JTAC,
-:: Kola Training only. Targets: cmd\atc\kola_targets.go, generated from the Kola Training mission (KOLA\Kola Training\_build\gen_hitman_go_ko.py).
-:: Another Kola mission (White Night) gets "negative tasking". On/off per theatre: launcher Settings > Roles (not an env var).
-start "vSFG-7 Command (Kola)" cmd /c "%~dp0atc.exe --command-only --map kola --command-gci-name Darkstar --command-gci-freq 264.0 --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --jtac-freq 61.0 --jtac-voice ash --jtac-sector North-Lapland --jtac2-freq 62.0 --jtac2-sector South-Lapland --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"
+:: ASSASSIN 1-1 (61.000 FM, North-Lapland: targets 1,2,7) + ASSASSIN 1-2 (62.000 FM, South-Lapland: 3,4,5,6) = the AI target assigner
+:: (operator 2026-11-14, "they just assign targets"): --jtac-assign-only names the nets Assassin and drops the 9-line / clearance / BDA flow
+:: (cmd\atc\jtac_assign.go). Kola Training only. Targets: cmd\atc\kola_targets.go, generated from the Kola Training mission
+:: (KOLA\Kola Training\_build\gen_hitman_go_ko.py). Another Kola mission (White Night) gets "negative tasking".
+:: On/off per theatre: launcher Settings > Roles (not an env var).
+start "vSFG-7 Command (Kola)" cmd /c "%~dp0atc.exe --command-only --map kola --command-gci-name Darkstar --command-gci-freq 264.0 --command-freq 282.0 --command-name vSFG-7-Command --command-voice onyx --jtac-assign-only --jtac-freq 61.0 --jtac-voice ash --jtac-sector North-Lapland --jtac2-freq 62.0 --jtac2-sector South-Lapland --handoff-marshal-freq 306.3 --srs-addr %SRS% --eam-password %EAM% %TACVIEW_FLAG% %MIZ_FLAG% --pprof-port 7770 --log-level %LOG%"

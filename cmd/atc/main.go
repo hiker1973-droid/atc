@@ -228,6 +228,7 @@ func newRootCommand() *cobra.Command {
 	f.StringVar(&flagVoiceStyleJTAC, "voice-style-jtac", styleJTAC, "TTS delivery instructions for the JTAC (empty=none)")
 	// Hitman 2-1 (operator 2026-10-16: "Lets do Hitman on 62.00"), split by
 	// sector: with both JTACs up, each runs one range_north sector.
+	f.BoolVar(&flagJTACAssignOnly, "jtac-assign-only", false, "With --jtac-freq: the JTAC nets only ASSIGN targets (Assassin, Kola Training): no 9-line, clearance or BDA")
 	f.StringVar(&flagJTACSector, "jtac-sector", "Kuban Valley", "With --jtac2-freq: the range sector Hitman 1-1 runs (targets 1-3 on Caucasus)")
 	f.Float64Var(&flagJTAC2Freq, "jtac2-freq", 0,
 		"With --jtac-freq: run a second JTAC on this frequency in MHz, e.g. 62.0; each JTAC then runs one sector and Command picks the one with a free target. 0=disabled")

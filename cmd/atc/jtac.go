@@ -726,6 +726,12 @@ func jtacConfigs() []jtacConfig {
 	if flagJTAC2Freq > 0 {
 		cfgs = append(cfgs, jtacConfig{FreqMHz: flagJTAC2Freq, Name: flagJTAC2Name, Spoken: flagJTAC2Spoken, Sector: flagJTAC2Sector, Voice: jtac2Voice()})
 	}
+	if flagJTACAssignOnly { // Assassin 1-1 / 1-2 (jtac_assign.go)
+		cfgs[0].Name, cfgs[0].Spoken = "Assassin-1-1", "Assassin one one"
+		if len(cfgs) > 1 {
+			cfgs[1].Name, cfgs[1].Spoken = "Assassin-1-2", "Assassin one two"
+		}
+	}
 	for _, spec := range flagJTACNets {
 		c, err := parseJTACNet(spec)
 		if err != nil {
@@ -804,7 +810,7 @@ func startJTACs(ctx context.Context, apiKey string, store *tacviewPositions) {
 
 // startJTAC runs one JTAC net working board.
 func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jtacConfig, board *taskingBoard) {
-	board.askLoad = true // check-in asks ordnance + playtime before the 9-line
+	board.askLoad = !flagJTACAssignOnly // check-in asks ordnance + playtime before the 9-line (not on an assign-only net)
 	pic := tacviewJTAC{store: store}
 	srsHost, srsPort, _ := net.SplitHostPort(flagSRSAddr)
 	tx := func(text string) {
@@ -822,6 +828,17 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 	}
 	go voiceNetLoop(ctx, flagSRSAddr, c.FreqMHz, c.Name, apiKey, flagEAMPassword, c.Voice, flagExternalAudio,
 		jtacWhisperPrompt(c.Name, append(append([]taskingTarget{}, board.targets...), otherTaskingSet()...)), nil, func(text string) (string, string) {
+			if flagJTACAssignOnly {
+				cs := assassinCallsign(text)
+				resp := board.AssignResponse(text, cs, c.Spoken)
+				if resp == "" {
+					if k := board.soleFlight(text); k != "" {
+						cs = displayCallsign(k)
+						resp = board.AssignResponse(text, cs, c.Spoken)
+					}
+				}
+				return cs, resp
+			}
 			cs := jtacCallsign(text)
 			resp := board.JTACResponse(text, cs, c.Spoken, pic)
 			if resp == "" {
@@ -844,7 +861,9 @@ func startJTAC(ctx context.Context, apiKey string, store *tacviewPositions, c jt
 			}
 			return cs, resp
 		})
-	go runJTACWatch(ctx, board, c.Spoken, pic, tx)
+	if !flagJTACAssignOnly {
+		go runJTACWatch(ctx, board, c.Spoken, pic, tx)
+	}
 	log.Info().Float64("freq", c.FreqMHz).Str("name", c.Name).Str("sector", c.Sector).Int("targets", len(board.targets)).
 		Bool("tacview", store != nil).Msg("JTAC net starting")
 }
