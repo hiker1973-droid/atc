@@ -171,6 +171,7 @@ type tacviewPositions struct {
 	info     map[string]tacviewContactInfo
 	bullseye map[string]orb.Point // coalition → bullseye (Navaid+Static+Bullseye objects)
 	weapons  []tacviewWeapon      // recent releases, oldest first
+	contacts map[string]*tacviewContact // guard_contacts.go: every aircraft and ground unit by object id
 
 	// tacview_ground.go
 	ground     map[string]*tacviewGround // object id → ground object
@@ -369,6 +370,7 @@ type miniObject struct {
 	hasHdg               bool
 	pilot, name, typ, co string
 	color                string
+	group                string // ACMI Group= (the DCS group name)
 	weaponNoted          bool
 	parent               string    // ACMI Parent= (a weapon's launcher), object id
 	shooter              string    // store key of the jet a weapon came off
@@ -428,6 +430,7 @@ func (p *miniTacviewParser) handleLine(line string) {
 		// Object destroyed — remove from the store if we keyed it.
 		id := strings.TrimPrefix(line, "-")
 		p.died(id)
+		p.store.RemoveContact(id)
 		if key, ok := p.keys[id]; ok {
 			p.store.Remove(key)
 		}
@@ -519,6 +522,8 @@ func (p *miniTacviewParser) handleLine(line string) {
 			o.color = v
 		case "Parent":
 			o.parent = v
+		case "Group":
+			o.group = v
 		}
 	}
 	if !o.hasLon || !o.hasLat {
@@ -547,6 +552,7 @@ func (p *miniTacviewParser) handleLine(line string) {
 		o.last = pt
 		return
 	}
+	p.store.SetContact(newContact(id, o, pt))
 	if isGroundType(o.typ) {
 		p.store.SetGround(id, pt, o.name)
 		return
