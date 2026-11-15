@@ -71,7 +71,7 @@ func TestKolaJTACBrief(t *testing.T) {
 	}
 	b.Response("Command, Raider 11, copy", "Raider 11", "Command")
 	got := b.JTACResponse("Hitman 1-1, Raider 11, checking in", "Raider 11", hitman, pic)
-	if !strings.Contains(got, "Aurora") && !strings.Contains(got, "ordnance") {
+	if !strings.Contains(got, "Alpha") && !strings.Contains(got, "ordnance") {
 		t.Fatalf("check-in = %q", got)
 	}
 }
