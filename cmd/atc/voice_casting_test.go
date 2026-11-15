@@ -36,8 +36,8 @@ func TestATISEnglishAccents(t *testing.T) {
 				}
 				continue
 			}
-			if !strings.Contains(got, accentBritish) && !strings.Contains(got, accentAustralian) {
-				t.Errorf("%s (%s) English read has no British/Australian accent: %q", st.Name, st.ICAO, got)
+			if want := fieldAccent(st.ICAO); !strings.Contains(got, want) {
+				t.Errorf("%s (%s) English read has no %s accent: %q", st.Name, st.ICAO, want, got)
 			}
 			if st.Style != "" && atisVoiceFor(st).instructions != st.Style {
 				t.Errorf("%s: second-language voice lost the station style", st.Name)
@@ -70,5 +70,34 @@ func TestTowerAccentCasting(t *testing.T) {
 	}
 	if !strings.Contains(styleJTAC, "General American accent") || strings.Contains(styleJTAC, "Australian") {
 		t.Errorf("Hitman is not American: %q", styleJTAC)
+	}
+}
+
+// Operator 2026-11-15: a field speaks English in its country's accent.
+func TestCountryAccents(t *testing.T) {
+	want := map[string]string{
+		"UGSB": accentGeorgian, "XRMF": accentRussian, "EDDF": accentGerman, "ETAR": accentAmerican,
+		"LTAJ": accentTurkish, "LTAG": accentAmerican, "LLRD": accentIsraeli, "LCPH": accentGreek,
+		"LCRA": accentBritish, "ORBD": accentArabic, "OJMF": accentArabic, "ENBO": accentNorwegian, "EFRO": accentFinnish,
+	}
+	for icao, a := range want {
+		if got := fieldAccent(icao); got != a {
+			t.Errorf("fieldAccent(%s) = %s, want %s", icao, got, a)
+		}
+	}
+	if got := fieldAccent("UG5X"); got != accentBritish && got != accentAustralian {
+		t.Errorf("Senaki changed from its cast: %s", got)
+	}
+	if got := fieldAccent("ZZZZ"); got != accentBritish && got != accentAustralian {
+		t.Errorf("unknown field: %s", got)
+	}
+	if v := elevenTowerVoice(accentTurkish, true); v.ID == "" || v.ID == elGeorge {
+		t.Errorf("Turkish man has no country voice: %+v", v)
+	}
+	if v := elevenTowerVoice(accentGeorgian, false); v.ID != elAlice {
+		t.Errorf("Georgian woman should fall to Alice: %+v", v)
+	}
+	if got := towerStyleFor("LTAJ", "onyx"); !strings.Contains(got, "Turkish accent") {
+		t.Errorf("Turkish tower style: %q", got)
 	}
 }

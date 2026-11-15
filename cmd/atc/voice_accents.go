@@ -22,7 +22,45 @@ import (
 const (
 	accentBritish    = "British"
 	accentAustralian = "Australian"
+	accentAmerican   = "American"
+	accentGeorgian   = "Georgian"
+	accentRussian    = "Russian"
+	accentGerman     = "German"
+	accentTurkish    = "Turkish"
+	accentArabic     = "Arabic"
+	accentIsraeli    = "Israeli"
+	accentGreek      = "Greek"
+	accentNorwegian  = "Norwegian"
+	accentFinnish    = "Finnish"
 )
+
+// Country accents, operator 2026-11-15 ("do the country accents for ours"):
+// a field speaks English with the accent of the country it sits in. This
+// replaces the 2026-10-14 British / Australian alternation for every field
+// with a country row below; fields with no row (and Senaki, whose Lisa /
+// senaki_5 shifts are the operator's pick) keep the old hash.
+var countryAccentByICAO = map[string]string{
+	// Exact fields first: the US bases and the RAF sovereign base inside the
+	// countries whose prefix would otherwise claim them.
+	"LTAG": accentAmerican, // Incirlik
+	"LCRA": accentBritish,  // Akrotiri, RAF
+	"ETAR": accentAmerican, // Ramstein
+	"ETAD": accentAmerican, // Spangdahlem
+	"UG5X": "",             // Senaki: Lisa / senaki_5, left as cast
+	"XRMF": accentRussian,  // Mozdok
+}
+
+// countryAccentByPrefix is the ICAO region prefix's country.
+var countryAccentByPrefix = map[string]string{
+	"UG": accentGeorgian,
+	"ED": accentGerman,
+	"EN": accentNorwegian,
+	"EF": accentFinnish,
+	"LT": accentTurkish,
+	"LL": accentIsraeli,
+	"LC": accentGreek,
+	"OR": accentArabic, "OJ": accentArabic, "OL": accentArabic, "OS": accentArabic, "OM": accentArabic,
+}
 
 // maleVoices are the OpenAI TTS voices that read as a man; the rest
 // (nova, shimmer, coral, sage, alloy, marin) read as a woman.
@@ -32,6 +70,23 @@ func voiceIsMale(voice string) bool { return maleVoices[strings.ToLower(voice)] 
 
 // fieldAccent is the field's fixed accent.
 func fieldAccent(icao string) string {
+	icao = strings.ToUpper(strings.TrimSpace(icao))
+	if a, ok := countryAccentByICAO[icao]; ok {
+		if a != "" {
+			return a
+		}
+		return hashAccent(icao)
+	}
+	if len(icao) >= 2 {
+		if a, ok := countryAccentByPrefix[icao[:2]]; ok {
+			return a
+		}
+	}
+	return hashAccent(icao)
+}
+
+// hashAccent is the 2026-10-14 cast: British or Australian, fixed per field.
+func hashAccent(icao string) string {
 	h := fnv.New32a()
 	h.Write([]byte(strings.ToUpper(strings.TrimSpace(icao))))
 	if h.Sum32()%2 == 0 {
@@ -45,10 +100,24 @@ func accentPhrase(accent string, male bool) string {
 	if male {
 		who = "a man"
 	}
-	if accent == accentAustralian {
+	switch accent {
+	case accentAustralian:
 		return who + " with a clear, natural Australian accent"
+	case accentAmerican:
+		return who + " with a clear General American accent"
+	case accentGeorgian, accentRussian, accentGerman, accentTurkish, accentArabic,
+		accentIsraeli, accentGreek, accentNorwegian, accentFinnish:
+		// A native speaker of that country reading English: clearly accented
+		// but easy to understand on a noisy radio.
+		return who + " with a clear, natural " + accent + " accent, a native of " + accentCountry[accent] + " speaking English, easy to understand"
 	}
 	return who + " with a crisp southern British (Received Pronunciation) accent"
+}
+
+var accentCountry = map[string]string{
+	accentGeorgian: "Georgia", accentRussian: "Russia", accentGerman: "Germany", accentTurkish: "Turkey",
+	accentArabic: "the Middle East", accentIsraeli: "Israel", accentGreek: "Greece",
+	accentNorwegian: "Norway", accentFinnish: "Finland",
 }
 
 // departureSignOff is the tower's farewell on its departure handoff call, in
@@ -95,6 +164,9 @@ func atisEnglishVoice(st *atisStation) voiceProfile {
 // Australian women are Lisa (library voice, picked for Senaki on the Creator
 // plan), British women Alice, men George. No tower uses Hitman's voice.
 func elevenTowerVoice(accent string, male bool) elevenVoice {
+	if v, ok := countryVoices[accentGender{accent, male}]; ok {
+		return elTower(v.id, v.name)
+	}
 	switch {
 	case male:
 		return elTower(elGeorge, "George")
@@ -102,6 +174,37 @@ func elevenTowerVoice(accent string, male bool) elevenVoice {
 		return elTower(elLisa, "Lisa")
 	}
 	return elTower(elAlice, "Alice")
+}
+
+// countryVoices are ElevenLabs library voices that speak English with the
+// country's accent (picked from the shared-voice library by accent, 2026-11-15;
+// not yet auditioned over SRS). A country with no voice of that gender
+// (Georgian, Israeli and Norwegian women) falls to the British / Australian
+// voice, and an owner withdrawing a voice falls to OpenAI like any other role.
+type accentGender struct {
+	accent string
+	male   bool
+}
+type countryVoice struct{ id, name string }
+
+var countryVoices = map[accentGender]countryVoice{
+	{accentAmerican, true}:  {elEric, "Eric"},
+	{accentAmerican, false}: {elDeparture11, "Jodi"},
+	{accentRussian, true}:   {"IGRoDkfYV2Frq7Ly0PRu", "Maxim"},
+	{accentRussian, false}:  {"UV6yBNpEWyJBMHdNQx6U", "Anna"},
+	{accentGerman, true}:    {"77oOXh74EdB2OgGQFHcG", "Christoph"},
+	{accentGerman, false}:   {"Z0r0nsdjMqaOiXkRUHRX", "Susanne"},
+	{accentTurkish, true}:   {"5L0OEG0zknJVXGx75T6N", "Atlas"},
+	{accentTurkish, false}:  {"4Eq5uDjZLBd4UhQpKwuP", "Artemis"},
+	{accentArabic, true}:    {"7UsSKSrq1KQIERpStCBd", "Rayan"},
+	{accentArabic, false}:   {"YykvWD3tb84K50ewNzsi", "Salma"},
+	{accentGreek, true}:     {"cir0mbQgrFs79o0HZw73", "Mike"},
+	{accentGreek, false}:    {"1gkXJMvrzBWAwt0XqBaa", "Eleni"},
+	{accentFinnish, true}:   {"72W7QSsY6RzGSUhdueKs", "Bjorn"},
+	{accentFinnish, false}:  {"WtzwR2kNGVNuaTGaYLfK", "Liis"},
+	{accentGeorgian, true}:  {"2oMnzJn2otqHVjyCboYJ", "Giorgi"},
+	{accentIsraeli, true}:   {"8sZ9Z3Jy28CGLLCmKEHn", "Viktor"},
+	{accentNorwegian, true}: {"s6U9BTPmhNGeAfGdcn5K", "Terry"},
 }
 
 // towerProfile is the tower's full voice: OpenAI voice + accent instructions,

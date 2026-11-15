@@ -47,8 +47,9 @@ func TestTowerShiftStartsOnTheClock(t *testing.T) {
 
 // No alternate voice (every field but Senaki): always the field's own.
 func TestTowerShiftOffWithoutAlternate(t *testing.T) {
-	defer func(a, f, v string) { flagElevenTowerAltVoice, flagAirfield, flagTTSVoice = a, f, v }(flagElevenTowerAltVoice, flagAirfield, flagTTSVoice)
-	flagAirfield, flagTTSVoice, flagVoiceStyleTower = "UGKS", "alloy", styleTower
+	defer func(a, f, v, e string) { flagElevenTowerAltVoice, flagAirfield, flagTTSVoice, flagElevenTowerVoice = a, f, v, e }(flagElevenTowerAltVoice, flagAirfield, flagTTSVoice, flagElevenTowerVoice)
+	flagElevenTowerVoice = elLisa // Senaki's start script names Lisa; the country table leaves the field alone
+	flagAirfield, flagTTSVoice, flagVoiceStyleTower = "UG5X", "alloy", styleTower
 	flagElevenTowerAltVoice = ""
 	tm, _ := time.Parse("2006-01-02 15:04", "2026-10-15 10:30")
 	if p := towerShiftProfile("alloy", tm); p.eleven.ID != elLisa {
