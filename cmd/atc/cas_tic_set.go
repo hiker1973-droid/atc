@@ -20,6 +20,9 @@ import (
 
 var casTICOn atomic.Bool
 
+// kolaTrainingOn is the last Kola Training state the watcher saw (kolaTrainingLoaded).
+var kolaTrainingOn atomic.Bool
+
 // casTICMissionName reports whether a .miz path is the CAS-LGB TIC mission.
 func casTICMissionName(path string) bool {
 	base := strings.ToLower(filepath.Base(path))
@@ -68,10 +71,12 @@ func watchTaskingSet(ctx context.Context, board *taskingBoard) {
 		case <-tk.C:
 		}
 		on := currentMissionIsCASTIC()
-		if on == casTICOn.Load() {
+		kola := kolaTrainingLoaded()
+		if on == casTICOn.Load() && kola == kolaTrainingOn.Load() {
 			continue
 		}
 		casTICOn.Store(on)
+		kolaTrainingOn.Store(kola)
 		all := taskingTargetsForMap(flagMap)
 		board.setTargets(all)
 		for _, n := range board.jtacs {
