@@ -353,6 +353,39 @@
   "deckboss": 128.6,
   "marshal": 306.3,
   "lso": 128.3,
+  "tankers": [
+   {
+    "name": "Texaco 1-1",
+    "freq": 252.1
+   },
+   {
+    "name": "Texaco 2-1",
+    "freq": 252.2
+   },
+   {
+    "name": "Texaco 3-1",
+    "freq": 252.3
+   },
+   {
+    "name": "Shell 1-1",
+    "freq": 253.1,
+    "boom": true
+   },
+   {
+    "name": "Shell 2-1",
+    "freq": 253.2,
+    "boom": true
+   },
+   {
+    "name": "Shell 3-1",
+    "freq": 253.3,
+    "boom": true
+   },
+   {
+    "name": "Mauler 1-1",
+    "freq": 252.6
+   }
+  ],
   "gci": 264,
   "gci_name": "Darkstar",
   "towers": [
