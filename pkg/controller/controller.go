@@ -1629,7 +1629,11 @@ func ParseIntent(text string, towerCallsign string) *ATCRequest {
 		// active" got "say again" — a taxi request with no "taxi" in it.
 		"permission to the active", "permission to active", "permission to taxi"):
 		req.Type = RequestTaxiClear
-	case containsAny(lower, "on final", "final", "request landing", "cleared to land", "full stop") ||
+	case containsAny(lower, "on final", "final", "request landing", "cleared to land", "full stop",
+		// Senaki 2026-11-15: "Raider 312, request to land" (x2) and "wishes
+		// to land" all got "say again" -- only "request landing" matched.
+		"request to land", "requests to land", "requesting to land", "request land",
+		"wish to land", "wishes to land", "wishing to land") ||
 		req.Option != composer.OptionNone:
 		// A bare "request touch and go" / "low approach" / "the option" is a
 		// landing request; landingClearance picks the wording from req.Option.
