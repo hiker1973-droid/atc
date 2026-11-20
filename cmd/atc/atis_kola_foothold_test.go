@@ -27,7 +27,11 @@ func TestKolaFootholdATIS(t *testing.T) {
 				t.Errorf("unexpected Foothold Kola ATIS station %q (%s)", st.Name, st.ICAO)
 				continue
 			}
-			if lang, on := atisSecondLang(st, m); !on || lang != w {
+			if st.ICAO == "ENBO" { // Bodo: English only since 2026-11-19
+				if _, on := atisSecondLang(st, m); on {
+					t.Errorf("ENBO should have no second language")
+				}
+			} else if lang, on := atisSecondLang(st, m); !on || lang != w {
 				t.Errorf("%s second language = (%q, %v), want (%q, true)", st.ICAO, lang, on, w)
 			}
 			af := airfield.ByICAO(st.ICAO)

@@ -168,6 +168,9 @@ func elevenTowerVoice(accent string, male bool) elevenVoice {
 		return elTower(v.id, v.name)
 	}
 	switch {
+	case accent == accentNorwegian:
+		// Operator 2026-11-19: Kola has no Lisa; Norwegian fields speak in Terry.
+		return elTower(countryVoices[accentGender{accentNorwegian, true}].id, "Terry")
 	case male:
 		return elTower(elGeorge, "George")
 	case accent == accentAustralian:

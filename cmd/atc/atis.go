@@ -734,7 +734,7 @@ func atisStationsForMap(m string) []*atisStation {
 		return []*atisStation{
 			{Name: "Bodo ATIS", FreqMHz: 249.150, Voice: "nova", ICAO: "ENBO",
 				Style: styleATISAccent("Norwegian"),
-				Lang:  "Norwegian", // Norway
+				Lang:  "English", // operator 2026-11-19: English only, Norwegian accent
 				TACAN: "TACAN 45X. VOR DME 117.55.", ILS: "ILS 110.30 runway 07. ILS 108.70 runway 25.", Advisory: advisory},
 			// Kola Training (operator 2026-11-14): Andoya and Evenes with Bodo. Andoya beacons.lua: VOR/DME AND
 			// 112.20, TACAN OYA 28, no ILS. Evenes: ILS 108.90 runway 17 (localizer at the 35 end), VOR/DME EVD

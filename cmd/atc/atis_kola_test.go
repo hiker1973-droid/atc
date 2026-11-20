@@ -11,7 +11,7 @@ import (
 // theatre default would read Norwegian over a Finnish field.
 func TestKolaATISLanguages(t *testing.T) {
 	want := map[string]string{
-		"ENBO": "Norwegian", // Bodo, Norway
+		"ENBO": "English",   // Bodo: English only
 		"ENDU": "Norwegian", // Bardufoss, Norway
 		"ENNA": "Norwegian", // Banak, Norway
 		"EFRO": "Finnish",   // Rovaniemi, Finland
@@ -28,7 +28,11 @@ func TestKolaATISLanguages(t *testing.T) {
 			t.Errorf("unexpected Kola ATIS station %q (%s)", st.Name, st.ICAO)
 			continue
 		}
-		if lang, on := atisSecondLang(st, "kola"); !on || lang != w {
+		if w == "English" { // Bodo: English only since 2026-11-19
+			if _, on := atisSecondLang(st, "kola"); on {
+				t.Errorf("%s should have no second language", st.ICAO)
+			}
+		} else if lang, on := atisSecondLang(st, "kola"); !on || lang != w {
 			t.Errorf("%s second language = (%q, %v), want (%q, true)", st.ICAO, lang, on, w)
 		}
 		af := airfield.ByICAO(st.ICAO)

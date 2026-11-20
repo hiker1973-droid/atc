@@ -2208,6 +2208,11 @@ func groundProfile(towerVoice string) voiceProfile {
 func departureProfile(towerVoice string) voiceProfile {
 	p := towerProfile(towerVoice)
 	p.eleven = elTower(flagElevenDepartVoice, "Departure")
+	// Operator 2026-11-19: Norwegian (Kola) fields' Departure speaks in Terry too,
+	// unless the Departure voice was set by hand.
+	if flagElevenDepartVoice == elDeparture11 && fieldAccent(flagAirfield) == accentNorwegian {
+		p.eleven = elTower(countryVoices[accentGender{accentNorwegian, true}].id, "Terry")
+	}
 	return p
 }
 
