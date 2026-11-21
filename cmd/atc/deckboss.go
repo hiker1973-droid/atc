@@ -45,6 +45,10 @@ var deckbossAddrPrefixes = []string{"deckboss", "deck boss", "duck boss", "duckb
 func deckbossCallsign(text string) string {
 	cs := joinCallsignDigits(extractCallsignSkippingAddress(text, deckbossAddrPrefixes...))
 	f := strings.Fields(cs)
+	// A bare modex - "Deckboss, 302, ready" - is a Raider.
+	if bare := strings.NewReplacer(" ", "", "-", "").Replace(cs); len(bare) == 3 && isAllDigits(bare) {
+		return "Raider " + bare
+	}
 	if n := len(f); n >= 2 && isAllDigits(f[n-1]) {
 		f = f[n-2:]
 		if strings.EqualFold(f[0], "ready") {
