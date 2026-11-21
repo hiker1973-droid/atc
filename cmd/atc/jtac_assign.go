@@ -25,6 +25,8 @@ var (
 	assignAnotherRe = regexp.MustCompile(`\b(?:another|next|new|different|more)\b.{0,20}\b(?:target|tasking|task)\b|\b(?:target|tasking|task)\b.{0,12}\b(?:another|next|new|different)\b`)
 	// assignAgainRe: repeat the assignment.
 	assignAgainRe = regexp.MustCompile(`\b(?:say again|repeat|say the target|say target|confirm target|what(?:'s| is) my target|say my target)\b`)
+	assignBDARe   = regexp.MustCompile(`\bbda\b|battle damage|\bhow (?:did|was)\b`)
+	assignAckRe   = regexp.MustCompile(`^[\w ,.\-]{0,40}\b(?:copy|roger|wilco|understood)\W*$`)
 	// assignDoneRe: the flight reports the target done.
 	assignDoneRe = regexp.MustCompile(`\b(?:target|tasking|mission) complete\b|\bcomplete\b.{0,8}\btarget\b|\bwork(?:ed)? the target\b|\bbingo\b|\brtb\b|\breturning to base\b`)
 )
@@ -99,6 +101,16 @@ func (b *taskingBoard) AssignResponse(text, callsign, name string) string {
 			return say("%s", assignLine(b.targets[cur.target])) // checking in again: same target
 		}
 		return assign(b.pick(key, now))
+	case cur != nil:
+		// Any other call from a flight holding an assignment (range calls, "copy", BDA, "inbound", "pickle"): never leave it
+		// unanswered (2026-11-21, Raider 302 got silence for 8 calls and thought the net was dead).
+		switch {
+		case assignBDARe.MatchString(lower):
+			return say("Assassin only assigns targets, no BDA. Report target complete when done.")
+		case assignAckRe.MatchString(lower):
+			return say("copy.")
+		}
+		return say("copy. Report target complete when done.")
 	}
 	return ""
 }

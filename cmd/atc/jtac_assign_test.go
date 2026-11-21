@@ -45,3 +45,21 @@ func TestAssassinAssignsOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestAssassinNeverSilent(t *testing.T) {
+	b, _ := newTestTaskingBoard(kolaTaskingTargets)
+	const as = "Assassin one one"
+	cs := "Raider 11"
+	b.AssignResponse("Raider 11, checking in", cs, as)
+	for _, c := range []string{"Raider 11, 17 miles out", "Raider 11, inbound", "Raider 11, pickle times two"} {
+		if got := b.AssignResponse(c, cs, as); !strings.Contains(got, "target complete") {
+			t.Errorf("%q = %q", c, got)
+		}
+	}
+	if got := b.AssignResponse("Raider 11, request BDA", cs, as); !strings.Contains(got, "no BDA") {
+		t.Errorf("bda = %q", got)
+	}
+	if got := b.AssignResponse("Raider 11, copy", cs, as); !strings.HasSuffix(got, "copy.") {
+		t.Errorf("copy = %q", got)
+	}
+}
