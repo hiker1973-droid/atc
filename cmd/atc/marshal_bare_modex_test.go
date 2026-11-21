@@ -15,3 +15,15 @@ func TestMarshalBareModexImpliesRaider(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalOverheadIsEstablished(t *testing.T) {
+	for _, in := range []string{
+		"union marshal, raider 302, overhead",
+		"union marshal, 302 overhead, state 5.5",
+		"union marshal, raider 303 overhead, angels 2",
+	} {
+		if got := classifyMarshalCall(in, extractFuelStateMarshal(in)); got != marshalEstablished {
+			t.Errorf("%q: intent %d, want established", in, got)
+		}
+	}
+}

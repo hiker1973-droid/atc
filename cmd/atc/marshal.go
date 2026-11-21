@@ -230,7 +230,7 @@ var case3ReadbackRe = regexp.MustCompile(`\b(?:approach time|commence at|push ti
 //
 // "Raider 303 overhead, angels 2" (Day 2026-10-20 19:02:00, an intent miss) is
 // the same report.
-var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b|\bentering (?:the )?stack\b|\boverhead\b.*\bangels?\b`)
+var establishedRe = regexp.MustCompile(`\bestablish(?:ed)?\b|\bentering (?:the )?stack\b|\boverhead\b`)
 
 // brcWordRe catches a BRC question however it's phrased: "BRC", "B R C",
 // "B.R.C.", and Whisper's "VRC".
@@ -1073,9 +1073,53 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		}
 
 	case marshalReadback:
-		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal: readback, no reply")
+		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal: readback")
+		if reply, ok := marshalReadbackReply(strings.ToLower(text), callsign, stack, comp, atcCtrl); ok {
+			transmit(reply)
+		}
 
 	default:
 		log.Info().Str("callsign", callsign).Str("text", text).Msg("Marshal intent miss")
 	}
+}
+
+// brcReadbackValueRe: the three-digit heading of a BRC readback.
+var brcReadbackValueRe = regexp.MustCompile(`\b(?:brc|vrc)\b,? (?:is )?(\d{3})\b`)
+
+// marshalReadbackReply checks a pilot's BRC / marshal-angels readback against
+// what Marshal gave: BRC within 3 degrees of the carrier's current BRC, angels
+// equal to the stack assignment. Only what the pilot read back is checked; a
+// readback with no BRC heading (Case III, plain "copy") gets no reply.
+func marshalReadbackReply(lower, callsign string, stack *state.MarshalStack, comp *composer.ATCComposer, atcCtrl *controller.ATCController) (string, bool) {
+	m := brcReadbackValueRe.FindStringSubmatch(lower)
+	if m == nil {
+		return "", false
+	}
+	said, _ := strconv.Atoi(m[1])
+	brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
+	wrongBRC := -1.0
+	if brc >= 0 {
+		d := math.Abs(float64(said) - brc)
+		if d > 180 {
+			d = 360 - d
+		}
+		if d > 3 {
+			wrongBRC = brc
+		}
+	}
+	wrongAngels := 0
+	if am := angelsInCallRe.FindStringSubmatch(lower); am != nil {
+		if ac, ok := stack.GetAircraft(callsign); ok && ac.Angels > 0 {
+			if n, _ := strconv.Atoi(am[1]); n != ac.Angels {
+				wrongAngels = ac.Angels
+			}
+		}
+	}
+	say := stackTXCallsign(stack, callsign)
+	if wrongBRC < 0 && wrongAngels == 0 {
+		log.Info().Str("callsign", callsign).Int("saidBRC", said).Float64("brcMag", brc).Msg("Marshal: readback correct")
+		return comp.MarshalReadbackCorrect(say), true
+	}
+	log.Info().Str("callsign", callsign).Int("saidBRC", said).Float64("brcMag", brc).Int("angels", wrongAngels).Msg("Marshal: readback wrong")
+	return comp.MarshalReadbackWrong(say, wrongBRC, wrongAngels), true
 }

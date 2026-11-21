@@ -1267,7 +1267,7 @@ func (c *ATCComposer) MarshalMarkingMom(callsign string, position, stackAngels i
 	// BRC phrase — omitted if carrier heading unknown
 	brcStr := ""
 	if brc >= 0 {
-		brcStr = fmt.Sprintf(", BRC %03.0f", brc)
+		brcStr = ", BRC " + brcSpeech(brc)
 	}
 
 	// Radar readback phrase from carrier — only if Tacview shows the caller
@@ -1314,7 +1314,7 @@ func (c *ATCComposer) MarshalMarkingMomCase3(callsign string, stackAngels, assig
 
 	brcStr := ""
 	if brc >= 0 {
-		brcStr = fmt.Sprintf(", BRC %03.0f", brc)
+		brcStr = ", BRC " + brcSpeech(brc)
 	}
 
 	radarStr := ""
@@ -1355,7 +1355,7 @@ func (c *ATCComposer) MarshalCopyCommencingCase3(callsign string, fuelState floa
 	fb := spellDigits3(finalBearing)
 	brcStr := ""
 	if brcDeg >= 0 {
-		brcStr = fmt.Sprintf(", confirm BRC %s", spellDigits3(brcDeg))
+		brcStr = ", confirm BRC " + brcSpeech(float64(brcDeg))
 	}
 	rc := ""
 	if radar {
@@ -1490,7 +1490,7 @@ func (c *ATCComposer) MarshalSayBRC(callsign string, brc float64) string {
 			fmt.Sprintf("%s, " + c.towerCallsign + ", standby — no radar contact on mother.", callsign),
 		})
 	}
-	brcStr := fmt.Sprintf("%03.0f", brc)
+	brcStr := brcSpeech(brc)
 	return pick([]string{
 		fmt.Sprintf("%s, " + c.towerCallsign + ", mother's BRC is %s.", callsign, brcStr),
 		fmt.Sprintf("%s, " + c.towerCallsign + ", BRC %s.", callsign, brcStr),
@@ -1642,7 +1642,7 @@ func (c *ATCComposer) MarshalRecoveryBRC(brc float64) string {
 	if brc < 0 {
 		return ""
 	}
-	return fmt.Sprintf("%s, all aircraft, BRC %03.0f.", c.towerCallsign, brc)
+	return fmt.Sprintf("%s, all aircraft, BRC %s.", c.towerCallsign, brcSpeech(brc))
 }
 
 // SpeedWarning warns an aircraft exceeding 350kt within 10nm — 3 variations.
@@ -1929,4 +1929,33 @@ func spellFrequency(mhz float64) string {
 	// military controllers say point, and every other role on this rig is
 	// US-military flavoured.
 	return wholeSpoken + " point " + fracSpoken
+}
+
+// MarshalReadbackCorrect confirms a pilot's BRC / marshal readback.
+func (c *ATCComposer) MarshalReadbackCorrect(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, %s, readback correct.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, readback correct, report see you at ten.", callsign, c.towerCallsign),
+	})
+}
+
+// MarshalReadbackWrong corrects a pilot's readback. brc < 0 / angels <= 0 mean
+// that item was right (or not read back) and is left out.
+func (c *ATCComposer) MarshalReadbackWrong(callsign string, brc float64, angels int) string {
+	var parts []string
+	if brc >= 0 {
+		parts = append(parts, "BRC "+brcSpeech(brc))
+	}
+	if angels > 0 {
+		parts = append(parts, "marshal at angels "+numberWord(angels))
+	}
+	return fmt.Sprintf("%s, %s, negative, %s.", callsign, c.towerCallsign, strings.Join(parts, ", "))
+}
+
+// brcSpeech spells a BRC one digit at a time with a short pause between each,
+// "zero, nine, six", so the TTS reads it slowly enough to copy down.
+func brcSpeech(brc float64) string {
+	deg := int(math.Round(brc))
+	deg = ((deg % 360) + 360) % 360
+	return strings.Join(strings.Fields(bearingWord(deg)), ", ")
 }
