@@ -933,7 +933,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		} else if atcCtrl.IsDeckClear() && marshalCharlie.nextCharlie(stack.GetAll(), time.Now()) == callsign {
 			stack.SetPhase(callsign, "charlie")
 			marshalCharlie.given(time.Now())
-			transmit(comp.MarshalSignalCharlie(say))
+			transmit(comp.MarshalSignalCharlie(say, atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))))
 		} else {
 			transmit(comp.MarshalEstablishedAck(say, angels, position))
 		}

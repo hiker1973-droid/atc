@@ -1560,12 +1560,19 @@ func (c *ATCComposer) MarshalAckDME(callsign string, distNm int, radar bool, fue
 	})
 }
 
-// MarshalSignalCharlie — deck is clear, cleared to commence.
-func (c *ATCComposer) MarshalSignalCharlie(callsign string) string {
+// MarshalSignalCharlie - deck is clear, cleared to commence. States the signal
+// and the current BRC; brc < 0 (carrier off scope) leaves the BRC out.
+func (c *ATCComposer) MarshalSignalCharlie(callsign string, brc float64) string {
+	if brc < 0 {
+		return pick([]string{
+			fmt.Sprintf("%s, %s, your signal is Charlie.", callsign, c.towerCallsign),
+			fmt.Sprintf("%s, %s, signal Charlie.", callsign, c.towerCallsign),
+		})
+	}
+	b := brcSpeech(brc)
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", signal Charlie.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", you have Charlie.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", Charlie.", callsign),
+		fmt.Sprintf("%s, %s, your signal is Charlie, current BRC %s.", callsign, c.towerCallsign, b),
+		fmt.Sprintf("%s, %s, signal Charlie, BRC %s.", callsign, c.towerCallsign, b),
 	})
 }
 
@@ -1576,15 +1583,15 @@ func (c *ATCComposer) MarshalCopyCommencing(callsign string, fuelState float64) 
 	if fuelState > 0 {
 		s := fmt.Sprintf("%.1f", fuelState)
 		return pick([]string{
-			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s, check in three mile initial.", callsign, s),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, report three mile initial.", callsign, s),
-			fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, state %s, call three mile initial.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, state %s, switch to LSO, call three mile initial.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, state %s, contact LSO, report three mile initial.", callsign, s),
+			fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, state %s, switch LSO, call three mile initial.", callsign, s),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, check in three mile initial.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, report three mile initial.", callsign),
-		fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, call three mile initial.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", copy commencing, switch to LSO, call three mile initial.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", commencing, contact LSO, report three mile initial.", callsign),
+		fmt.Sprintf("%s, " + c.towerCallsign + ", roger commencing, switch LSO, call three mile initial.", callsign),
 	})
 }
 

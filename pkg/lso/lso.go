@@ -153,7 +153,7 @@ type Call string
 const (
 	CallRogerBall    Call = "Roger ball."
 	CallClara        Call = "Paddles contact, keep it coming."
-	CallCallTheBall  Call = "Call the ball."
+	CallCallTheBall  Call = "Hornet in the groove, three-quarters of a mile, call the ball." // operator 2026-11-21
 	CallHigh         Call = "You're high."
 	CallHighBring    Call = "You're high, bring it down." // high for more than 3 s
 	CallLittleHigh   Call = "A little high."
@@ -213,7 +213,7 @@ const (
 	waveOffLowM     = 3.0    // or this far below the glideslope (the hook clears the ramp by ~4.3 m)
 	callsFromM      = 1500.0 // deviation calls from ~0.8 nm (earlier after a ball call)
 	callsUntilM     = 70.0   // nothing but wave off over the ramp
-	callTheBallM    = 1100.0
+	callTheBallM    = 1389.0 // 3/4 nm: the call says "three-quarters of a mile"
 	foulDeckM       = 463.0           // 1/4 nm: a foul deck here is a wave-off (operator 2026-10-18)
 	redDeckFor      = 3 * time.Minute // a "red deck" with no "green deck" lapses after this
 	gapMin          = 2 * time.Second

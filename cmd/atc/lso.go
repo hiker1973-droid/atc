@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"math"
 	"net"
 	"regexp"
@@ -387,7 +388,20 @@ func (f *lsoFeed) heard(text string) (string, string) {
 		if cs == "" {
 			return "", ""
 		}
-		// Wording: operator 2026-10-22.
+		// Wording: operator 2026-11-21 (wind over the deck down the angle),
+		// falling back to the 2026-10-22 groove call without ship or wind data.
+		f.lock()
+		shipKts, shipHdg := f.tr.ShipKts(), f.tr.ShipHeading()
+		f.unlock()
+		if f.context != nil {
+			wctx := f.context()
+			wd, ok1 := wctx["windDir"].(float64)
+			wk, ok2 := wctx["windKts"].(float64)
+			if ok1 && ok2 && shipKts > 1 {
+				down, cross := lsoDeckWind(shipKts, shipHdg, wd, wk)
+				return cs, lsoAbeamWindReply(cs, down, cross)
+			}
+		}
 		return cs, lsoAbeamReply(cs)
 	case lsoCheckInRe.MatchString(text):
 		// Case III: the jet comes from Marshal at three miles and checks in
@@ -429,6 +443,42 @@ var lsoCheckInRe = regexp.MustCompile(`(?i)\b(?:(?:three|3)[\s-]*miles?(?:\s+ini
 // lsoCheckInReply is Paddles' answer to a Case III check-in.
 func lsoCheckInReply(cs string) string {
 	return "Paddles contact, " + cs + ", call the ball at three-quarters of a mile."
+}
+
+// lsoAngleDeg is the angled deck's offset to port of the ship's heading.
+const lsoAngleDeg = 9.0
+
+// lsoDeckWind is the wind over the deck along the angled deck: knots down the
+// angle (headwind, positive = into the face) and knots across it (positive =
+// from starboard). Wind is the "from" direction and speed; the ship's own
+// motion adds Vs*cos(9) down the angle and Vs*sin(9) from starboard.
+func lsoDeckWind(shipKts, shipHdg, windFrom, windKts float64) (down, cross float64) {
+	axis := shipHdg - lsoAngleDeg
+	rel := (windFrom - axis) * math.Pi / 180
+	ang := lsoAngleDeg * math.Pi / 180
+	down = windKts*math.Cos(rel) + shipKts*math.Cos(ang)
+	cross = windKts*math.Sin(rel) + shipKts*math.Sin(ang)
+	return
+}
+
+// lsoAbeamWindReply: "100, Paddles contact, you've got 22 knots down the
+// angle, 4 from starboard."
+func lsoAbeamWindReply(cs string, down, cross float64) string {
+	side := "starboard"
+	if cross < 0 {
+		side, cross = "port", -cross
+	}
+	return fmt.Sprintf("%s, Paddles contact, you've got %s knots down the angle, %s from %s.",
+		cs, lsoKtsWords(down), lsoKtsWords(cross), side)
+}
+
+// lsoKtsWords: a whole number of knots, digits for the TTS.
+func lsoKtsWords(v float64) string {
+	n := int(math.Round(v))
+	if n < 0 {
+		n = 0
+	}
+	return strconv.Itoa(n)
 }
 
 // lsoAbeamReply is Paddles' answer to "302 abeam" (operator 2026-10-22:
