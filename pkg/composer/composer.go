@@ -924,13 +924,13 @@ func (c *ATCComposer) MarshalCheckIn(callsign string, angels, distNm, bearingDeg
 		dist := milesToWord(distNm)
 		brg := bearingWord(bearingDeg)
 		return pick([]string{
-			fmt.Sprintf("%s, %s, radar contact, angels %s, %s from mother, bearing %s, say marking mom's and state.", callsign, c.towerCallsign, ang, dist, brg),
-			fmt.Sprintf("%s, %s, radar contact, %s on the %s from mother, angels %s, report marking mom's and state.", callsign, c.towerCallsign, dist, brg, ang),
+			fmt.Sprintf("%s, %s, copy check-in, radar contact, angels %s, %s from mother, bearing %s, say marking mom's and state.", callsign, c.towerCallsign, ang, dist, brg),
+			fmt.Sprintf("%s, %s, copy check-in, radar contact, %s on the %s from mother, angels %s, report marking mom's and state.", callsign, c.towerCallsign, dist, brg, ang),
 		})
 	}
 	return pick([]string{
-		fmt.Sprintf("%s, %s, go ahead with marking mom's and state.", callsign, c.towerCallsign),
-		fmt.Sprintf("%s, %s, loud and clear, say marking mom's and state.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy check-in, go ahead with marking mom's and state.", callsign, c.towerCallsign),
+		fmt.Sprintf("%s, %s, copy check-in, loud and clear, say marking mom's and state.", callsign, c.towerCallsign),
 	})
 }
 
