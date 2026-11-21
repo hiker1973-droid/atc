@@ -165,8 +165,17 @@ func marshalCallsignFromText(text string) string {
 		word := strings.ToUpper(m[1][:1]) + m[1][1:]
 		return word + " " + digits
 	}
+	// A bare modex straight after the address - "Union Marshal, 302, established"
+	// - is a Raider: the squadron callsign word is implied.
+	if m := bareModexLeadRe.FindStringSubmatch(rest); m != nil {
+		return "Raider " + m[1] + m[2] + m[3]
+	}
 	return ""
 }
+
+// bareModexLeadRe: a three-digit modex that opens the call after the Marshal
+// address, not followed by more digits or a decimal ("350.5", "3000").
+var bareModexLeadRe = regexp.MustCompile(`^\W*(\d)[\s-]?(\d)[\s-]?(\d)\b(?:[^.\d]|$)`)
 
 // marshalIntent is what a Marshal call asks for.
 type marshalIntent int
