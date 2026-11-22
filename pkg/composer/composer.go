@@ -919,19 +919,12 @@ func (c *ATCComposer) MarshalRadarCheckNoContact(callsign string) string {
 // caller and asks for marking mom's and state. Deliberately no stack slot: a
 // check-in alone doesn't say whether the jet is recovering.
 func (c *ATCComposer) MarshalCheckIn(callsign string, angels, distNm, bearingDeg int, radarFound bool) string {
+	// Operator 2026-11-21: a bare check-in gets "copy checkin" plus the radar
+	// position, with no prompt for marking mom's.
 	if radarFound {
-		ang := numberWord(angels)
-		dist := milesToWord(distNm)
-		brg := bearingWord(bearingDeg)
-		return pick([]string{
-			fmt.Sprintf("%s, %s, copy check-in, radar contact, angels %s, %s from mother, bearing %s, say marking mom's and state.", callsign, c.towerCallsign, ang, dist, brg),
-			fmt.Sprintf("%s, %s, copy check-in, radar contact, %s on the %s from mother, angels %s, report marking mom's and state.", callsign, c.towerCallsign, dist, brg, ang),
-		})
+		return fmt.Sprintf("%s, %s, copy checkin, radar contact, angels %s, %s from mother, bearing %s.", callsign, c.towerCallsign, numberWord(angels), milesToWord(distNm), bearingWord(bearingDeg))
 	}
-	return pick([]string{
-		fmt.Sprintf("%s, %s, copy check-in, go ahead with marking mom's and state.", callsign, c.towerCallsign),
-		fmt.Sprintf("%s, %s, copy check-in, loud and clear, say marking mom's and state.", callsign, c.towerCallsign),
-	})
+	return fmt.Sprintf("%s, %s, copy checkin.", callsign, c.towerCallsign)
 }
 
 // SequencedInitialAck — Tacview-aware initial ack with named traffic ahead.
