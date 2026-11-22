@@ -28,7 +28,7 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.6"
+VER = "v3.7"
 DATE = "21 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
@@ -169,7 +169,7 @@ MARSHAL = [
     ("Commencing", "commencing", "Switch to LSO, call three mile initial", "commencing"),
     ("Push time (Case III)", "request push time", "Expected approach time MM (a new one if yours has passed)", "push_time"),
     ("Platform (Case III)", "platform", "Final bearing NNN; at three miles Marshal hands you to Paddles", "platform"),
-    ("Needles (Case III)", "needles up and left  /  negative needles", "Roger needles  /  roger negative needles, fly bullseye", "needles"),
+    ("Needles (Case III)", "needles up and left  /  negative needles", "Concur, fly mode two  /  roger negative needles, fly bullseye", "needles"),
     ("Coupled (Case III)", "coupled  /  command control", "Roger coupled  /  roger command control", "coupled"),
     ("Initial", "initial", "Contact paddles, good luck", "initial"),
     ("Clear (departure)", "clear seven miles", "Push Command 282.0", "clear"),
@@ -677,8 +677,8 @@ def build():
         "Marking moms gets a holding fix and a push time: marshal on the NNN, DD DME, angels N, expected approach time is MM. "
         "The stack starts at angels 6; the DME is angels + 15 (angels 6 at 21 DME).",
         "Commencing: descend to platform 5,000, final bearing NNN. Call \"platform\" passing 5,000 ft. "
-        "At three miles Marshal says \"contact paddles, call the ball\": switch and make the ball call at three-quarters.",
-        "Needles, coupled and command control reports get a \"roger\"; negative needles gets \"fly bullseye\". "
+        "At eight miles Marshal says \"final radar contact, dirty up, fly bullseye\"; at six \"ACLS lock on, say needles\"; at three \"approaching glide path, contact paddles, call the ball\": switch and make the ball call at three-quarters.",
+        "Needles get \"concur, fly mode two\"; coupled and command control get a \"roger\"; negative needles gets \"fly bullseye\". "
         "Calls after commencing may start with your modex alone.",
         "Marshal radial = final bearing + 180. Final bearing = BRC - 9. All magnetic."])
 

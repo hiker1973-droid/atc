@@ -160,25 +160,20 @@ The zone name is derived from `marshalCallsign` ("Union Marshal" → "Union"), s
 
 ---
 
-## 5. Commencing approach → call 3-mile initial for paddles
+## 5. Commencing approach → switch to LSO (Case I / II)
 
 **Triggers:** `commencing`
 
-Commencing is the ack that the pilot is leaving the stack and starting
-the approach. Marshal acks, instructs the pilot to check in at the
-3-mile initial, and flags that the §6 `initial` call is the actual
-paddles handoff. The pilot is still on Marshal freq until they call
-`initial` at 3nm — see §6.
+Marshal acks and sends the pilot to the LSO frequency; the pilot calls the
+3-mile initial **on Paddles**, which answers "Paddles contact, <cs>, call the
+ball at three-quarters of a mile" (CQ Case I deck: "Switch LSO").
 
 **If pilot also reports state:**
-1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, check in three mile initial.`
-2. `{CALLSIGN}, Marshal, commencing, state {STATE}, report three mile initial.`
-3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, call three mile initial.`
+1. `{CALLSIGN}, Marshal, copy commencing, state {STATE}, switch to LSO, call three mile initial.`
+2. `{CALLSIGN}, Marshal, commencing, state {STATE}, contact LSO, report three mile initial.`
+3. `{CALLSIGN}, Marshal, roger commencing, state {STATE}, switch LSO, call three mile initial.`
 
-**Without state:**
-1. `{CALLSIGN}, Marshal, copy commencing, check in three mile initial.`
-2. `{CALLSIGN}, Marshal, commencing, report three mile initial.`
-3. `{CALLSIGN}, Marshal, roger commencing, call three mile initial.`
+**Without state:** the same three, without `state {STATE},`.
 
 ---
 
@@ -186,9 +181,8 @@ paddles handoff. The pilot is still on Marshal freq until they call
 
 **Triggers:** `initial`
 
-The 3-mile initial call is the actual paddles handoff. After the §5
-`commencing` ack, the pilot continues the approach and calls `initial`
-at 3nm — Marshal hands off to paddles here. No TACAN button cited
+Normally the pilot makes the 3-mile initial call on the Paddles frequency (§5).
+If one is still made to Marshal, Marshal hands off to paddles here. No TACAN button cited
 (prior version had `push button 72`; dropped since pilots know to
 switch and the explicit number was unnecessary friction).
 
@@ -317,6 +311,21 @@ A "confirm BRC {BRC}" clause is appended after final bearing so the pilot reads 
 1. `{CALLSIGN}, Marshal, copy commencing, descend to platform five thousand, final bearing {FB}, confirm BRC {BRC}, report platform.`
 2. `{CALLSIGN}, Marshal, commencing, platform five thousand, final bearing {FB}, confirm BRC {BRC}, report platform.`
 3. `{CALLSIGN}, Marshal, roger commencing, descend platform, final bearing {FB}, confirm BRC {BRC}, call platform.`
+
+### Case 3 approach calls from the Tacview picture (CQ Case III deck, 2026-11-22)
+
+`watchCase3Paddles` (`cmd/atc/marshal_case3.go`) calls these as a commenced jet closes, one per range, no pilot call needed:
+- **8 miles** (`MarshalCase3DirtyUp`): `{CS}, Marshal, final radar contact, eight miles, dirty up, fly bullseye.`
+- **6 miles** (`MarshalCase3Lock`): `{CS}, Marshal, ACLS lock on, six miles, say needles.`
+- **Needles report** (`MarshalNeedlesAck`): `{CS}, Marshal, concur, fly mode two.` Negative needles: `roger negative needles, fly bullseye.`
+- **3 miles** (`MarshalCase3Paddles`): `{CS}, Marshal, three miles, approaching glide path, contact paddles, call the ball.`
+- **Abeam in the bolter pattern** (`MarshalCase3Abeam`): `..., roger abeam, four miles past abeam turn final, final bearing {FB}, intercept needles.`
+
+### Case 1 stack altitude sharing
+
+Case 1/2 allow up to 4 stack entries at one altitude (CQ Case I deck: 4 flights); Case 3 stays one jet per
+altitude. A Tacview contact blocks an altitude only beyond the stack's own jets there
+(`AssignMarshalAngelsShared`, `marshalPerAltitude`).
 
 ### §5a Platform (`MarshalAtPlatform`)
 

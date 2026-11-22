@@ -7,6 +7,13 @@ Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range 
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
 
+## v1.47 (22 NOV 2026) - Case III approach calls, shared Case I stack
+
+Follows origin/main 6d6caf2 (pushed, NOT deployed, not heard over SRS). Card 6: 8 miles "final radar contact, dirty up, fly bullseye",
+new 6 miles "ACLS lock on, say needles", 3 miles "approaching glide path, contact paddles, call the ball", abeam adds "intercept needles".
+Card 9 example exchange to match. Phraseology v3.7 (needles reply "concur, fly mode two"); Case III Comms flow sheet; marshal_responses.md
+(Case I commencing was already "switch to LSO"). Paddles: wave-off 2 points, --B no-grade bolter (not on the packet). 31 pages, as before.
+
 ## v1.46 (21 NOV 2026) - Marshal / Paddles wording, 2e8dd69 + 32cb397
 
 Follows origin/main 32cb397 (**pushed, NOT deployed**: Day 0b440f0, Night + Foothold 7f8a5b8; none of it is on a rig,

@@ -288,17 +288,18 @@ def page2(gap=0):
         ("OR SAY", "302, checking in, 15 miles"),
         ("HEAR", "302, Union Marshal, radar contact, 15 DME, continue."),
     ], [("Slow to 2,000 fpm.", "Level at 1,200 ft by 10 miles, on the final bearing by 12.")])
-    p.step("F", P["orange"], "8 MILES: MARSHAL CALLS DIRTY UP", [
-        ("HEAR", "302, Union Marshal, eight miles, dirty up."),
+    p.step("F", P["orange"], "8 MILES: FINAL RADAR CONTACT, DIRTY UP", [
+        ("HEAR", "302, Union Marshal, final radar contact, eight miles, dirty up, fly bullseye."),
     ], [("Gear, full flaps, hook.", "On speed by 6 miles at 1,200 ft. No reply needed.")])
-    p.step("G", P["purple"], "NEEDLES (ACLS) - IF YOU HAVE THEM", [
+    p.step("G", P["purple"], "6 MILES: ACLS LOCK ON - SAY NEEDLES", [
+        ("HEAR", "302, Union Marshal, ACLS lock on, six miles, say needles."),
         ("SAY", "302, needles up and left"),
-        ("HEAR", "302, Union Marshal, roger needles."),
+        ("HEAR", "302, Union Marshal, concur, fly mode two."),
         ("OR SAY", "302, negative needles"),
         ("HEAR", "302, Union Marshal, roger negative needles, fly bullseye.   (fly the ICLS)"),
     ], [("Coupled / command control:", "\"302, coupled\" gets \"roger coupled.\" Optional calls.")])
     p.step("H", P["blue"], "3 MILES: MARSHAL HANDS YOU TO PADDLES", [
-        ("HEAR", "302, Union Marshal, three miles, contact paddles, call the ball."),
+        ("HEAR", "302, Union Marshal, three miles, approaching glide path, contact paddles, call the ball."),
     ], [("Switch COMM 2 to 128.300.", "No three-mile initial call in Case III. Keep Marshal on COMM 1.")])
     p.step("J", P["blue"], "3/4 MILE: BALL CALL TO PADDLES", [
         ("SAY", "302, Hornet ball, 5.0"),

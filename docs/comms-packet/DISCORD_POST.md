@@ -1,21 +1,18 @@
 <!--
-Release post for vSFG-7_SkyEye_ATC_Comms_v1.46.pdf + Phraseology Reference v3.6 + Paddles LSO Comms Flow (21 NOV 2026):
-Marshal / Paddles wording (origin/main 32cb397). Gate MET 2026-11-21: all three rigs (Day, Night, Foothold) are on 32cb397.
-Not yet heard over SRS. The v1.45 Hitman post is in git history.
-Paste everything below the line into Discord, then attach the three PDFs.
+Release post for vSFG-7_SkyEye_ATC_Comms_v1.47.pdf + Phraseology Reference v3.7 + Case III Comms flow sheet (22 NOV 2026):
+Case III approach calls, shared Case I stack (origin/main 6d6caf2). NOT deployed to the rigs yet; not heard over SRS.
+Operator 2026-11-22: do not tag VMFA 225 or 421st FS. The v1.46 carrier recovery post is in git history.
+Paste everything below the line into Discord, then attach the PDFs.
 -->
 ---
-@VMFA 225 Vikings @421st FS Black Widows
+**Carrier recovery update - Case III** 🌙
 
-**Carrier recovery update** 🛬
+• **8 miles**: *"final radar contact, eight miles, dirty up, fly bullseye"*
+• **6 miles** (new): *"ACLS lock on, six miles, say needles"* - tell Marshal what your needles are doing
+• **Needles** get *"concur, fly mode two"*
+• **3 miles**: *"approaching glide path, contact Paddles, call the ball"* - switch to Paddles 128.3 and make the ball call at 3/4
+• **Bolter pattern**: after "abeam" Marshal says *"turn final, final bearing ..., intercept needles"*
+• **Case I stack**: up to four flights can hold at the same angels, as in the CQ deck
+• **Paddles grades**: wave-off is 2 points, and a bolter from a no-grade pass is **--B**
 
-• **Just your number works** - "Marshal, 302, ..." and "Deckboss, 302, ..." are taken as Raider 302
-• **"Checking in"** is answered "copy check-in", then your range and bearing
-• **Read the BRC back** ("Marshal, Raider 302, BRC 275, angels 2") and Marshal says **"readback correct"** - or **"negative"** with the right BRC / angels
-• **BRC is said digit by digit** - "two, seven, five" - slower, so you can copy it
-• **"Overhead"** counts as established, same as "entering stack"
-• **Charlie** now comes with the BRC: *"your signal is Charlie, current BRC two, seven, five"*
-• **Commencing** (Case I / II): Marshal sends you to the **LSO** - switch to Paddles 128.3 and call the **three mile initial** there
-• **Paddles at the abeam** gives you the **wind over the deck**: *"you've got 22 knots down the angle, 4 from starboard"*. At 3/4 mile: *"Hornet in the groove, three-quarters of a mile, call the ball"*
-
-**Attached:** Comms Packet v1.46 (cards 5, 7, 8, 9, 10), Phraseology Reference v3.6, Paddles LSO Comms Flow (one page).
+**Attached:** Comms Packet v1.47 (cards 6, 9), Phraseology Reference v3.7, Case III Comms flow sheet.

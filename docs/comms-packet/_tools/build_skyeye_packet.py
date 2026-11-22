@@ -114,6 +114,12 @@ v1.40 (operator 2026-11-11): Hitman passes the 9-line in three blocks of three l
 each read back by the pilot; wrong readback = the block again; "say again" / "say again line 6";
 "confirmed. Report IP inbound." after the third (card 13; cmd/atc/jtac_brief.go).
 
+v1.47 (operator 2026-11-22, CQ Case I / Case III and LSO training decks) follows origin/main 6d6caf2:
+Case III approach calls - "final radar contact, eight miles, dirty up, fly bullseye", "ACLS lock on,
+six miles, say needles", "concur, fly mode two", "approaching glide path" with the 3-mile Paddles
+handoff, "intercept needles" after abeam in the bolter pattern (cards 6, 9). Case I stack altitudes
+are shared by up to 4 entries. Paddles grades: wave-off 2 points, --B no-grade bolter.
+
 v1.39 (operator 2026-10-27, "update the comms packet") follows origin/main 9de1eb0 (Readback
 ATC 0.3.2): Case III approach times ten minutes apart, "radar contact" on commencing, Marshal's
 "eight miles, dirty up", and the Case III bolter / wave-off pattern - climb to 1,200, turn
@@ -169,7 +175,7 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.46"
+VER = "v1.47"
 DATE = "21 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
@@ -428,12 +434,13 @@ def c06_marshal_case3():
         ("", "platform 5,000, final bearing NNN,"),
         ("", "confirm BRC NNN, report platform."),
         ("PLATFORM", "Passing 5,000 ft. Reply: final bearing NNN."),
-        ("8 MILES", "Marshal: eight miles, dirty up. No reply."),
-        ("3 MILES", "Marshal: contact paddles, call the ball. Switch and"),
-        ("", "make the ball call at three-quarters. No initial call."),
+        ("8 MILES", "Marshal: final radar contact, dirty up, fly bullseye."),
+        ("6 MILES", "Marshal: ACLS lock on, say needles."),
+        ("3 MILES", "Marshal: glide path, contact paddles, call the"),
+        ("", "ball. Switch; ball call at three-quarters."),
         ("BOLTER", "Marshal: climb to 1,200, at 4 miles turn"),
         ("", "downwind, report abeam. Abeam: turn final,"),
-        ("", "Paddles again at 3 miles."),
+        ("", "intercept needles. Paddles again at 3 miles."),
     ], split=280)
     c.bullets([
         [("Marshal radial = final bearing + 180.  Final bearing = BRC - 9.", True),
@@ -574,9 +581,11 @@ def c09_marshal_calls_case3():
         ("YOU", "Marshal, Raider 1, platform."),
         ("MARSHAL", "Raider 1, Union Marshal, copy platform,"),
         ("", "final bearing two six six."),
-        ("8 MILES", "Raider 1, Union Marshal, eight miles, dirty up."),
-        ("3 MILES", "Raider 1, Union Marshal, three miles,"),
-        ("", "contact paddles, call the ball."),
+        ("8 MILES", "Raider 1, Union Marshal, final radar contact, eight"),
+        ("", "miles, dirty up, fly bullseye."),
+        ("6 MILES", "Raider 1, Union Marshal, ACLS lock on, six miles, say needles."),
+        ("3 MILES", "Raider 1, Union Marshal, three miles, approaching"),
+        ("", "glide path, contact paddles, call the ball."),
     ], split=150)
     NK.band(c, "BOLTER / WAVE-OFF", "Marshal sees it, or you call it")
     NK.steps(c, [
