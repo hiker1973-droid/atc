@@ -147,7 +147,7 @@ func TestCase3ApproachPattern(t *testing.T) {
 	}{
 		{5, 18, 264, case3SayNothing},
 		{2, 8, 264, case3SayDirty},
-		{1, 6, 264, case3SayNothing},
+		{1, 6, 264, case3SayLock},
 		{1, 3, 264, case3SayPaddles},
 		{0, 1, 264, case3SayNothing},
 		{0, 0, 264, case3SayNothing}, // touched down, went round
@@ -195,5 +195,13 @@ func TestCase3BolterCalled(t *testing.T) {
 	}
 	if got := j.step(1, 2, 84, now); got != case3SayNothing {
 		t.Errorf("radar repeated the bolter pattern: %d", got)
+	}
+}
+
+// Case I lets up to four stack entries share an altitude; a stranger in the
+// band blocks it, and Case 3 stays one jet per altitude.
+func TestMarshalPerAltitude(t *testing.T) {
+	if marshalPerAltitude(state.CaseThree) != 1 || marshalPerAltitude(state.CaseOne) != 4 {
+		t.Fatal("per-altitude caps wrong")
 	}
 }

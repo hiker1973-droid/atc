@@ -1390,16 +1390,25 @@ func (c *ATCComposer) MarshalAtPlatform(callsign string, finalBearing int, sayPa
 // picture: in Case 3 nobody calls a three-mile initial.
 func (c *ATCComposer) MarshalCase3Paddles(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, contact paddles, call the ball.", callsign),
-		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, switch paddles, call the ball at three-quarters.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, approaching glide path, contact paddles, call the ball.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", three miles, approaching glide path, switch paddles, call the ball at three-quarters.", callsign),
 	})
 }
 
 // MarshalCase3DirtyUp is the Case 3 call at eight miles on final.
 func (c *ATCComposer) MarshalCase3DirtyUp(callsign string) string {
 	return pick([]string{
-		fmt.Sprintf("%s, "+c.towerCallsign+", eight miles, dirty up.", callsign),
-		fmt.Sprintf("%s, "+c.towerCallsign+", eight miles, dirty up, continue.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", final radar contact, eight miles, dirty up, fly bullseye.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", eight miles, final radar contact, dirty up, fly bullseye.", callsign),
+	})
+}
+
+// MarshalCase3Lock is the Case 3 call at six miles: ACLS locked on, asking
+// for the needles (CQ Case III deck).
+func (c *ATCComposer) MarshalCase3Lock(callsign string) string {
+	return pick([]string{
+		fmt.Sprintf("%s, "+c.towerCallsign+", ACLS lock on, six miles, say needles.", callsign),
+		fmt.Sprintf("%s, "+c.towerCallsign+", six miles, ACLS lock on, say needles.", callsign),
 	})
 }
 
@@ -1416,7 +1425,7 @@ func (c *ATCComposer) MarshalCase3Bolter(callsign, what string) string {
 // MarshalCase3Abeam answers "abeam" in the bolter pattern: back to final at
 // four miles past abeam, and Paddles again at three miles.
 func (c *ATCComposer) MarshalCase3Abeam(callsign string, finalBearing int) string {
-	return fmt.Sprintf("%s, "+c.towerCallsign+", roger abeam, four miles past abeam turn final, final bearing %s.", callsign, spellDigits3(finalBearing))
+	return fmt.Sprintf("%s, "+c.towerCallsign+", roger abeam, four miles past abeam turn final, final bearing %s, intercept needles.", callsign, spellDigits3(finalBearing))
 }
 
 // MarshalNeedlesAck answers a Case 3 needles report; negative needles flies
@@ -1425,7 +1434,7 @@ func (c *ATCComposer) MarshalNeedlesAck(callsign string, negative bool) string {
 	if negative {
 		return fmt.Sprintf("%s, "+c.towerCallsign+", roger negative needles, fly bullseye.", callsign)
 	}
-	return fmt.Sprintf("%s, "+c.towerCallsign+", roger needles.", callsign)
+	return fmt.Sprintf("%s, "+c.towerCallsign+", concur, fly mode two.", callsign)
 }
 
 // MarshalApproachAck acknowledges "coupled" / "command control".

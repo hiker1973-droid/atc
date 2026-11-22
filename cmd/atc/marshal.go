@@ -406,6 +406,16 @@ func marshalZoneName() string {
 	return ""
 }
 
+// marshalPerAltitude is how many stack entries may share an altitude: the CQ
+// Case I deck allows up to 4 flights at one angels; Case 3 stacks are 1,000 ft
+// apart, one jet each.
+func marshalPerAltitude(c state.RecoveryCase) int {
+	if c == state.CaseThree {
+		return 1
+	}
+	return 4
+}
+
 // marshalAngelsBand is the stack's altitude band for the recovery case:
 // angels 2-9 overhead in Case 1 and 2, angels 6 and up in Case 3.
 func marshalAngelsBand(c state.RecoveryCase) (lo, hi int) {
@@ -812,7 +822,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		recCase := atcCtrl.GetRecoveryCase()
 		lo, hi := marshalAngelsBand(recCase)
 		reserved := stack.ReservedAngels(callsign)
-		stackAngels := atcCtrl.AssignMarshalAngels(lo, hi, reserved)
+		stackAngels := atcCtrl.AssignMarshalAngelsShared(lo, hi, reserved, marshalPerAltitude(recCase))
 		stack.SetAngels(callsign, stackAngels)
 		brc := atcCtrl.ToMagnetic(atcCtrl.GetCarrierBRCFor(callsign))
 		rAng, rDist, rBrg, rFound := atcCtrl.LookupCallerRelativeToCarrier(callsign)
@@ -906,7 +916,7 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 				angels, _ = strconv.Atoi(m[1])
 			}
 			if lo, hi := marshalAngelsBand(atcCtrl.GetRecoveryCase()); angels < lo || angels > hi {
-				angels = atcCtrl.AssignMarshalAngels(lo, hi, stack.ReservedAngels(callsign))
+				angels = atcCtrl.AssignMarshalAngelsShared(lo, hi, stack.ReservedAngels(callsign), marshalPerAltitude(atcCtrl.GetRecoveryCase()))
 			}
 			stack.SetAngels(callsign, angels)
 			log.Info().Str("callsign", callsign).Int("angels", angels).Msg("Marshal: established without marking mom's - added to the stack")

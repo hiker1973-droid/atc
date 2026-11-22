@@ -2709,13 +2709,26 @@ func (c *ATCController) CallerCarrierPosition(callsign string) (lat, lon float64
 // passed in by the caller) or if Tacview shows any aircraft within 50nm of the carrier
 // at that rounded altitude. Falls back to maxAngels when every slot is taken.
 func (c *ATCController) AssignMarshalAngels(minAngels, maxAngels int, reservedAngels []int) int {
+	return c.AssignMarshalAngelsShared(minAngels, maxAngels, reservedAngels, 1)
+}
+
+// AssignMarshalAngelsShared is AssignMarshalAngels where up to perAltitude stack
+// entries may share an altitude (Case I: the CQ deck allows 4 flights at one
+// angels). Tacview contacts at an altitude only block it beyond the stack's own
+// jets there: more contacts than reservations means someone else is up there.
+// perAltitude 1 is the one-jet-per-altitude rule.
+func (c *ATCController) AssignMarshalAngelsShared(minAngels, maxAngels int, reservedAngels []int, perAltitude int) int {
 	if minAngels > maxAngels {
 		return maxAngels
 	}
-	occupied := make(map[int]bool)
-	for _, a := range reservedAngels {
-		occupied[a] = true
+	if perAltitude < 1 {
+		perAltitude = 1
 	}
+	reserved := make(map[int]int)
+	for _, a := range reservedAngels {
+		reserved[a]++
+	}
+	seen := make(map[int]int)
 	if carLon, carLat, found := c.GetCarrierPosition(); found {
 		carrierPt := orb.Point{carLon, carLat}
 		c.allPositionsMu.RLock()
@@ -2726,13 +2739,12 @@ func (c *ATCController) AssignMarshalAngels(minAngels, maxAngels int, reservedAn
 			if haversineNm(orb.Point{contact.Lon, contact.Lat}, carrierPt) > 50 {
 				continue
 			}
-			angels := int(math.Round(contact.AltFt / 1000.0))
-			occupied[angels] = true
+			seen[int(math.Round(contact.AltFt/1000.0))]++
 		}
 		c.allPositionsMu.RUnlock()
 	}
 	for a := minAngels; a <= maxAngels; a++ {
-		if !occupied[a] {
+		if reserved[a] < perAltitude && seen[a] <= reserved[a] {
 			return a
 		}
 	}

@@ -60,7 +60,7 @@ small = ParagraphStyle("sm", parent=cell, alignment=1, textColor=GREY)
 # LSO grade points (the usual squadron scale). A foul-deck wave-off is not the
 # pilot's: no points.
 POINTS = OrderedDict([("_OK_", 5.0), ("OK", 4.0), ("(OK)", 3.0), ("B", 2.5), ("---", 2.0), ("--", 2.0),
-                      ("WO", 1.0), ("C", 0.0)])
+                      ("WO", 2.0), ("--B", 2.0), ("WOP", 2.0), ("WOT", 1.0), ("C", 0.0)])
 SEGMENTS = ["X", "IM", "IC", "AR"]
 
 # Greenie board squares (operator 2026-10-18: "add the greenie board to the

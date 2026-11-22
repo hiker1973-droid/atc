@@ -178,6 +178,6 @@ func ParseGrade(comment string) Grade {
 // GradePoints is the usual squadron scale (docs/paddles-report); a foul-deck
 // wave-off is not scored.
 func GradePoints(g string) (float64, bool) {
-	p, ok := map[string]float64{"_OK_": 5, "OK": 4, "(OK)": 3, "B": 2.5, "---": 2, "WO": 1, "C": 0}[g]
+	p, ok := map[string]float64{"_OK_": 5, "OK": 4, "(OK)": 3, "B": 2.5, "--B": 2, "---": 2, "WO": 2, "WOP": 2, "WOT": 1, "C": 0}[g]
 	return p, ok
 }

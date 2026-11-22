@@ -1108,6 +1108,11 @@ func (t *Tracker) Grade(p *Pass) string {
 		}
 		return with("WO", "")
 	case outcome == "bolter":
+		// CQ LSO deck: a bolter from a pass that would have been no grade is
+		// "--B" (2 points), not "B" (2.5).
+		if majors >= majorsNoGrade {
+			return with("--B", "")
+		}
 		return with("B", "")
 	case outcome == "trap":
 	default:

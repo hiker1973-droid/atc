@@ -86,7 +86,8 @@ func case3HoldEAT(stack *state.MarshalStack, callsign string, position int, eat,
 const (
 	caseThreeApproachFor = 20 * time.Minute // commencing to the deck, with room for a wave-off
 	caseThreePaddlesNm   = 3                // the handoff range
-	caseThreeDirtyNm     = 8                // "dirty up"
+	caseThreeDirtyNm     = 8                // "final radar contact", "dirty up"
+	caseThreeLockNm      = 6                // "ACLS lock on, say needles"
 	caseThreeTick        = 3 * time.Second
 	caseThreeTrapTicks   = 4 // ticks on the deck at 0 nm, angels 0: trapped
 )
@@ -105,6 +106,7 @@ type case3Jet struct {
 	since     time.Time
 	phase     case3Phase
 	dirtySaid bool
+	lockSaid  bool
 	astern    int // true bearing from the ship at the handoff, -1 unknown
 	closest   int // nearest range since the handoff
 	onDeck    int // ticks in a row at 0 nm, angels 0
@@ -117,6 +119,7 @@ type case3Say int
 const (
 	case3SayNothing case3Say = iota
 	case3SayDirty
+	case3SayLock
 	case3SayPaddles
 	case3SayBolter
 	case3Trapped
@@ -133,6 +136,10 @@ func (j *case3Jet) step(angels, dist, brg int, now time.Time) case3Say {
 		if !j.dirtySaid && dist <= caseThreeDirtyNm {
 			j.dirtySaid = true
 			return case3SayDirty
+		}
+		if j.dirtySaid && !j.lockSaid && dist <= caseThreeLockNm {
+			j.lockSaid = true
+			return case3SayLock
 		}
 	case case3Pattern:
 		// Back on final: inside 3 miles and astern, not abeam on the 2-mile
@@ -266,7 +273,8 @@ func case3AsternTrue(brcTrue float64) int {
 	return ((int(math.Round(brcTrue))-marshalFinalBearingOffset+180)%360 + 360) % 360
 }
 
-// watchCase3Paddles calls "dirty up" at 8 miles, hands each commenced Case III
+// watchCase3Paddles calls final radar contact and "dirty up" at 8 miles, ACLS
+// lock on at 6 (CQ Case III deck), hands each commenced Case III
 // jet to Paddles as it reaches caseThreePaddlesNm on the Tacview picture, and
 // gives the bolter pattern to one seen going round again.
 func watchCase3Paddles(ctx context.Context, comp *composer.ATCComposer, transmit func(string), atcCtrl *controller.ATCController) {
@@ -294,6 +302,9 @@ func watchCase3Paddles(ctx context.Context, comp *composer.ATCComposer, transmit
 			case case3SayDirty:
 				log.Info().Str("callsign", cs).Int("distNm", dist).Int("bearingTrue", brg).Msg("Marshal: Case 3 at eight miles - dirty up")
 				calls = append(calls, comp.MarshalCase3DirtyUp(j.say))
+			case case3SayLock:
+				log.Info().Str("callsign", cs).Int("distNm", dist).Msg("Marshal: Case 3 at six miles - ACLS lock on, say needles")
+				calls = append(calls, comp.MarshalCase3Lock(j.say))
 			case case3SayPaddles:
 				log.Info().Str("callsign", cs).Int("distNm", dist).Int("bearingTrue", brg).Msg("Marshal: Case 3 at three miles - handing to Paddles")
 				calls = append(calls, comp.MarshalCase3Paddles(j.say))
