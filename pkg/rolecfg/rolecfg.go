@@ -121,9 +121,9 @@ var Defaults = map[string]string{
 	"tanker-freq": "0", "tanker-name": "Texaco-1-1", "tanker-voice": "echo", "elevenlabs-tanker-voice": "cjVigY5qzO86Huf0OWal",
 	"tanker2-freq": "0", "tanker2-name": "Texaco-3-1", "tanker2-voice": "verse", "elevenlabs-tanker2-voice": "nPczCjzI2devNBz1zQrb",
 	"gci-freq": "264", "gci-callsign": "Darkstar", "gci-voice": "shimmer", "elevenlabs-gci-voice": "vChnJZ1Cu89g2XXumPfT",
-	"marshal-freq": "0", "marshal-voice": "ballad", "elevenlabs-marshal-voice": "6PBHdlpKVQ70t6tnDUYF",
-	"deckboss-freq": "0", "deckboss-voice": "shimmer", "elevenlabs-deckboss-voice": "ljX1ZrXuDIIRVcmiVSyR",
-	"lso-freq": "128.3", "lso-name": "Paddles", "lso-voice": "ash", "elevenlabs-paddles-voice": "KvaCHcJoMXfOzwtsULOZ",
+	"marshal-freq": "0", "marshal-voice": "ballad", "elevenlabs-marshal-voice": "ljX1ZrXuDIIRVcmiVSyR",
+	"deckboss-freq": "0", "deckboss-voice": "shimmer", "elevenlabs-deckboss-voice": "CwhRBWXzGAHq8TQ4Fs17",
+	"lso-freq": "128.3", "lso-name": "Paddles", "lso-voice": "ash", "elevenlabs-paddles-voice": "d7KZ4gJXiEWKJV0PMsGG",
 	"tts-voice": "nova", "elevenlabs-tower-voice": "", "tts-speed": "1.2",
 }
 

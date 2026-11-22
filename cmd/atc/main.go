@@ -264,9 +264,9 @@ func newRootCommand() *cobra.Command {
 		"ElevenLabs voice ID for the tower's Departure position - the 7-mile handoff call (default round 11 voice 4, library)")
 	f.StringVar(&flagElevenGroundVoice, "elevenlabs-ground-voice", "",
 		"ElevenLabs voice ID for the tower's Ground position (parking spots, taxi routes, at Senaki); \"\" = the tower's own voice (operator 2026-10-16: Ground, Tower and Traffic one voice)")
-	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elRolando, "ElevenLabs voice ID for Marshal (default Rolando, library)")
-	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elDeckboss11,
-		"ElevenLabs voice ID for Deckboss (default round 11 voice 5, library; every theatre)")
+	f.StringVar(&flagElevenMarshalVoice, "elevenlabs-marshal-voice", elDeckboss11, "ElevenLabs voice ID for Marshal (default Michael, operator 2026-11-22; was Rolando)")
+	f.StringVar(&flagElevenDeckbossVoice, "elevenlabs-deckboss-voice", elRoger,
+		"ElevenLabs voice ID for Deckboss (default Roger, operator 2026-11-22; every theatre)")
 	f.StringVar(&flagJTACRadioIntensity, "jtac-radio-intensity", "field",
 		"Radio effect for the JTAC: light, medium, heavy, extreme, or field (a manpack FM set on the ground: narrow band, heavy hiss)")
 	f.BoolVar(&flagATISBroadcast, "atis-broadcast", false,

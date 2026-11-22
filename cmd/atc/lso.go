@@ -49,8 +49,8 @@ func registerLSOFlags(f *flag.FlagSet) {
 	f.Float64Var(&flagLSOFreq, "lso-freq", 128.3, "Paddles frequency in MHz")
 	f.StringVar(&flagLSOName, "lso-name", "Paddles", "Paddles SRS client name")
 	f.StringVar(&flagLSOVoice, "lso-voice", "ash", "Paddles OpenAI TTS voice (the fallback when ElevenLabs is off)")
-	f.StringVar(&flagElevenPaddlesVoice, "elevenlabs-paddles-voice", elHank,
-		`ElevenLabs voice ID for Paddles (default Hank; "" = OpenAI only)`)
+	f.StringVar(&flagElevenPaddlesVoice, "elevenlabs-paddles-voice", elBrad,
+		`ElevenLabs voice ID for Paddles (default Brad, operator 2026-11-22; was Hank; "" = OpenAI only)`)
 	f.Float64Var(&flagLSOLateral, "lso-landing-lateral-m", -4,
 		"Landing point offset from the carrier centreline in metres, starboard positive (calibrate from logged traps)")
 	f.Float64Var(&flagLSODeckbossFreq, "lso-deckboss-freq", 128.6,
