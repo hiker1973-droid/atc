@@ -5,7 +5,7 @@ Operator 2026-11-22: do not tag VMFA 225 or 421st FS. The v1.46 carrier recovery
 Paste everything below the line into Discord, then attach the PDFs.
 -->
 ---
-**Carrier recovery update - Case III** 🌙
+**AI ATC updates**
 
 • **8 miles**: *"final radar contact, eight miles, dirty up, fly bullseye"*
 • **6 miles** (new): *"ACLS lock on, six miles, say needles"* - tell Marshal what your needles are doing
