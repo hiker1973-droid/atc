@@ -1,11 +1,30 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 25 OCT 2026.  v1.38.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
+**Built 21 NOV 2026.  v1.46.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
 `vSFG-7_SkyEye_ATC_Comms_v1.35.pdf` — cover + 29 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
+
+## v1.46 (21 NOV 2026) - Marshal / Paddles wording, 2e8dd69 + 32cb397
+
+Follows origin/main 32cb397 (**pushed, NOT deployed**: Day 0b440f0, Night + Foothold 7f8a5b8; none of it is on a rig,
+none heard over SRS). Operator's calls on the carrier recovery, Marshal then Paddles:
+- A bare number after the address is a Raider: "Marshal, 302, ..." and "Deckboss, 302, ..." = Raider 302.
+- Check-in reply opens "copy check-in". "Overhead" alone is an established call (as "entering stack").
+- BRC read back ("BRC 275, angels 2") is checked: "readback correct", or "negative, BRC ..., marshal at angels ..."
+  (3 deg slack; angels vs the stack assignment; a call with no 3-digit BRC, e.g. Case III, gets no reply).
+- BRC is spoken digit by digit with pauses ("two, seven, five") everywhere (composer brcSpeech).
+- Charlie: "your signal is Charlie, current BRC two, seven, five".
+- Case I / II commencing: "switch to LSO, call three mile initial"; the initial is then called on Paddles, which answers
+  "Paddles contact, <cs>, call the ball at three-quarters of a mile".
+- Paddles abeam reply = wind over the deck down the 9 deg angle ("302, Paddles contact, you've got 22 knots down the angle,
+  4 from starboard"; falls back to the old groove call with no ship speed / wind). "Hornet in the groove, three-quarters of a
+  mile, call the ball." now fires at 0.75 nm (was "Call the ball." at 0.6 nm).
+Cards 5, 7, 8, 9, 10 updated (card 5 bullet "After commencing, switch to Paddles"); phraseology v3.6 (BRC readback row,
+overhead alternative, new Charlie / commencing / abeam replies; docs_test.go maps "readback" and reads "down the angle" as
+abeam); Paddles LSO Comms Flow sheet (abeam, 0.75 nm). Card 6 (Case III) unchanged. Build without `python -I`.
 
 ## v1.44 (13 NOV 2026) - Hitman: request BDA, direct attack, winchester
 

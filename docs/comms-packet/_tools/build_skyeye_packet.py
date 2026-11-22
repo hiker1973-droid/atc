@@ -169,8 +169,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.45"
-DATE = "13 NOV 2026"   # release date of VER - change it together with VER
+VER = "v1.46"
+DATE = "21 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -375,9 +375,10 @@ def c05_marshal_case1():
         ("SEE YOU AT 10", "Reply: visual at ten, say state."),
         ("STATE", "Marshal, Raider 1, state 5.2 - under 2.0 is priority."),
         ("ESTABLISHED", "Marshal, Raider 1, established angels 3"),
-        ("", "Reply: signal Charlie - or your stack position, hold."),
-        ("COMMENCING", "Reply: call three mile initial."),
-        ("INITIAL", "At 3 nm. Reply: contact paddles, good luck."),
+        ("", "(\"overhead\" works too). Reply: your signal is"),
+        ("", "Charlie + BRC - or your stack position, hold."),
+        ("COMMENCING", "Reply: switch to LSO, call three mile initial."),
+        ("INITIAL", "At 3 nm, to Paddles (card 10)."),
     ], split=280)
     NK.band(c, "THE STACK")
     c.bullets([
@@ -386,7 +387,7 @@ def c05_marshal_case1():
           "in the stack and any contact within 50 nm at that altitude.", False)],
         [("When someone commences, the stack steps down silently.", True),
          ("There is no radio call for it - keep flying your assigned angels.", False)],
-        [("After initial, switch to Paddles.", True),
+        [("After commencing, switch to Paddles.", True),
          ("Black Sea and Syria: SkyEye Paddles on %s, card 10. Gulf: fly the ball and trap." % PADDLES_F, False)],
     ])
     NK.band(c, "ANY TIME")
@@ -394,7 +395,11 @@ def c05_marshal_case1():
         [("\"Marshal, Raider 1, say BRC\"", True),
          ("- mother's BRC, magnetic. \"request BRC\" and a bare \"BRC\" work too.", False)],
         [("\"Marshal, Raider 1, checking in\"", True),
-         ("- your range and bearing from mother, then marking moms please.", False)],
+         ("- \"copy check-in\", your range and bearing from mother, then marking moms please.", False)],
+        [("Read the BRC back: \"Marshal, Raider 1, BRC 275, angels 2\"", True),
+         ("- \"readback correct\", or \"negative, BRC ...\" with the right figure.", False)],
+        [("Just your number works:", True),
+         ("\"Marshal, 302, ...\" is Raider 302.", False)],
     ])
     NK.subtle(c, "Word-for-word calls and replies: cards 7 - 9.")
     return save(c, "05_marshal_case1.jpg")
@@ -458,10 +463,10 @@ def c07_marshal_calls_inbound():
     NK.band(c, "CHECKING IN", "optional first call")
     NK.steps(c, [
         ("YOU", "Marshal, Raider 1, checking in."),
-        ("MARSHAL", "Raider 1, Union Marshal, radar contact, angels 12,"),
-        ("", "30 miles from mother, bearing three four zero,"),
-        ("", "say marking mom's and state."),
-        ("NO RADAR", "Raider 1, Union Marshal, go ahead with"),
+        ("MARSHAL", "Raider 1, Union Marshal, copy check-in, radar contact,"),
+        ("", "angels 12, 30 miles from mother, bearing three four"),
+        ("", "zero, say marking mom's and state."),
+        ("NO RADAR", "Raider 1, Union Marshal, copy check-in, go ahead with"),
         ("", "marking mom's and state."),
     ], split=150)
     NK.band(c, "MARKING MOMS", "Case I and Case II")
@@ -472,7 +477,7 @@ def c07_marshal_calls_inbound():
         ("", "range 30 miles, bearing three four zero from mother,"),
         ("", "mother's weather ceiling unrestricted,"),
         ("", "visibility ten plus, expect Case One recovery,"),
-        ("", "BRC 275, altimeter two niner niner two,"),
+        ("", "BRC two, seven, five, altimeter two niner niner two,"),
         ("", "Marshal at angels two, report see me at ten."),
         ("2+ IN STACK", "The reply ends: Stack has 2 aircraft."),
         ("NO RADAR", "The radar contact part is left out."),
@@ -480,7 +485,7 @@ def c07_marshal_calls_inbound():
     NK.band(c, "BRC", "any time")
     NK.steps(c, [
         ("YOU", "Marshal, Raider 1, say BRC."),
-        ("MARSHAL", "Raider 1, Union Marshal, mother's BRC is 275."),
+        ("MARSHAL", "Raider 1, Union Marshal, mother's BRC is two, seven, five."),
         ("NO CARRIER", "Raider 1, Union Marshal, BRC unknown, mother off scope."),
     ], split=150)
     NK.band(c, "RADAR CHECK AND RADIO CHECK")
@@ -514,14 +519,17 @@ def c08_marshal_calls_stack():
     NK.band(c, "THE STACK", "to the trap")
     NK.steps(c, [
         ("YOU", "Marshal, Raider 1, established angels two."),
-        ("DECK CLEAR", "Raider 1, Union Marshal, signal Charlie."),
+        ("", "(\"overhead\" is the same call.)"),
+        ("DECK CLEAR", "Raider 1, Union Marshal, your signal is Charlie,"),
+        ("", "current BRC two, seven, five."),
         ("DECK BUSY", "Raider 1, Union Marshal, entering stack at angels two,"),
         ("", "position one, hold for Charlie."),
         ("YOU", "Marshal, Raider 1, commencing, state 4.0."),
         ("MARSHAL", "Raider 1, Union Marshal, copy commencing, state 4.0,"),
-        ("", "check in three mile initial."),
-        ("YOU", "Marshal, Raider 1, initial."),
-        ("MARSHAL", "Raider 1, Union Marshal, contact paddles, good luck."),
+        ("", "switch to LSO, call three mile initial."),
+        ("YOU", "On Paddles: Raider 1, three mile initial."),
+        ("PADDLES", "Paddles contact, Raider 1, call the ball at"),
+        ("", "three-quarters of a mile."),
     ], split=150)
     NK.band(c, "OFF THE BOAT", "after Deckboss pushes you")
     NK.steps(c, [
@@ -562,7 +570,7 @@ def c09_marshal_calls_case3():
         ("YOU", "Marshal, Raider 1, commencing."),
         ("MARSHAL", "Raider 1, Union Marshal, copy commencing, radar contact,"),
         ("", "descend to platform five thousand, final bearing"),
-        ("", "two six six, confirm BRC two seven five, report platform."),
+        ("", "two six six, confirm BRC two, seven, five, report platform."),
         ("YOU", "Marshal, Raider 1, platform."),
         ("MARSHAL", "Raider 1, Union Marshal, copy platform,"),
         ("", "final bearing two six six."),
@@ -600,12 +608,13 @@ def c10_paddles():
     NK.band(c, "ABEAM AND THE BALL CALL", "after Marshal's \"contact paddles\"")
     NK.steps(c, [
         ("ABEAM", "302 abeam."),
-        ("PADDLES", "Paddles contact, 302, Hornet in the groove,"),
-        ("", "at three-quarters of a mile call the ball."),
+        ("PADDLES", "302, Paddles contact, you've got 22 knots down"),
+        ("", "the angle, 4 from starboard.  (wind over the deck)"),
+        ("AT 0.75 NM", "Hornet in the groove, three-quarters of a mile,"),
+        ("", "call the ball."),
         ("YOU", "302, Hornet ball, 5.5."),
         ("PADDLES", "Roger ball."),
         ("CLARA", "302, Clara, 5.0.  ->  Paddles contact, keep it coming."),
-        ("NO CALL", "By 0.6 nm: Call the ball."),
         ("RADIO CHECK", "Paddles, Raider 302, radio check.  ->  loud and clear."),
     ], split=150)
     NK.band(c, "IN THE GROOVE", "he calls, you fly")

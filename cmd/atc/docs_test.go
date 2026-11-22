@@ -275,7 +275,7 @@ func lsoDocKind(f *lsoFeed, said *[]lso.Call, say string) string {
 		return "green_deck"
 	case strings.Contains(resp, "call the ball at three-quarters"):
 		return "check_in"
-	case strings.Contains(resp, "call the ball"):
+	case strings.Contains(resp, "call the ball"), strings.Contains(resp, "down the angle"):
 		return "abeam"
 	case strings.Contains(resp, "call abeam"):
 		return "break"
@@ -291,7 +291,7 @@ var marshalIntents = map[string]marshalIntent{
 	"dme": marshalDME, "state": marshalState, "established": marshalEstablished, "commencing": marshalCommencing,
 	"platform": marshalPlatform, "pushing_command": marshalPushCommand, "initial": marshalInitial,
 	"check_in": marshalCheckIn, "needles": marshalNeedles, "coupled": marshalACLSReport,
-	"push_time": marshalPushTime,
+	"push_time": marshalPushTime, "readback": marshalReadback,
 }
 
 func jtacKind(lower string) string {

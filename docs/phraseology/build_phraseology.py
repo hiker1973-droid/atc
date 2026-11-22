@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.5"
-DATE = "13 NOV 2026"          # change together with VER
+VER = "v3.6"
+DATE = "21 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -158,14 +158,15 @@ DECKBOSS = [
     ("Radio check", "radio check", "Loud and clear", "radio_check"),
 ]
 MARSHAL = [
-    ("Check in", "checking in", "Range and bearing, say marking moms", "check_in"),
-    ("Marking moms", "marking moms, angels 12, state 6.5", "Weather, case, BRC, Marshal at angels N", "marking_moms"),
+    ("Check in", "checking in", "Copy check-in, range and bearing, say marking moms", "check_in"),
+    ("Marking moms", "marking moms, angels 12, state 6.5", "Weather, case, BRC (digit by digit), Marshal at angels N", "marking_moms"),
+    ("BRC readback", "BRC 275, Marshal at angels 2", "Readback correct - or negative, with the right BRC / angels", "readback"),
     ("BRC", "say BRC", "Mother's BRC, magnetic", "brc"),
     ("DME report", "20 DME", "Radar contact, continue", "dme"),
     ("Inbound 10 nm", "see you at ten", "Visual at ten, say state", "see_you_at_ten"),
     ("Fuel state", "state 5.2", "Copy state; under 2.0 expedite", "state"),
-    ("Established", "established angels 2", "Signal Charlie, or hold", "established"),
-    ("Commencing", "commencing", "Check in three mile initial", "commencing"),
+    ("Established", "established angels 2  /  overhead", "Your signal is Charlie, current BRC - or hold", "established"),
+    ("Commencing", "commencing", "Switch to LSO, call three mile initial", "commencing"),
     ("Push time (Case III)", "request push time", "Expected approach time MM (a new one if yours has passed)", "push_time"),
     ("Platform (Case III)", "platform", "Final bearing NNN; at three miles Marshal hands you to Paddles", "platform"),
     ("Needles (Case III)", "needles up and left  /  negative needles", "Roger needles  /  roger negative needles, fly bullseye", "needles"),
@@ -182,7 +183,7 @@ PADDLES = [
     ("Radio check", "radio check", "Loud and clear", "radio_check"),
     ("In the break", "in the break", "Roger, call abeam", "break"),
     ("Case III check-in", "three-mile initial", "Paddles contact, call the ball at three-quarters of a mile", "check_in"),
-    ("Abeam (the 180)", "abeam", "Paddles contact, Hornet in the groove, at three-quarters of a mile call the ball", "abeam"),
+    ("Abeam (the 180)", "abeam", "Paddles contact, you've got 22 knots down the angle, 4 from starboard (wind over the deck)", "abeam"),
     ("Ball call", "Hornet ball, 5.5  /  three-quarter mile, 5.4", "Roger ball", "ball"),
     ("No ball in sight", "Clara, 5.0", "Paddles contact, keep it coming", "clara"),
     ("After the trap", "red deck", "No reply - the deck is foul, the next jet is waved off at 1/4 nm", "red_deck"),
@@ -663,7 +664,7 @@ def build():
     # 8. Marshal
     d.h1("8. Marshal - %s MHz (Carrier Recovery)" % f3(TH["pg"]["marshal"]))
     d.para("Manages the recovery stack. Marshal ignores a call that does not start with \"Marshal\" or has no number "
-           "in your callsign. The case (I, II or III) is set from time and weather.")
+           "in your callsign (a bare number, \"Marshal, 302, ...\", is taken as Raider 302). The BRC is said digit by digit. The case (I, II or III) is set from time and weather.")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("marshal", MARSHAL, "Marshal"), (0.2, 0.4, 0.4))
     d.dialogue([("Pilot", "Marshal, Raider 1-1, marking moms 340 for 30, angels 12, state 6.5."),
@@ -671,7 +672,7 @@ def build():
                             "from mother, expect Case One recovery, BRC 275, altimeter two niner niner two, Marshal at angels two, "
                             "report see me at ten."),
                 ("Pilot", "Marshal, Raider 1-1, established angels two."),
-                ("Marshal", "Raider 1-1, Union Marshal, signal Charlie.")])
+                ("Marshal", "Raider 1-1, Union Marshal, your signal is Charlie, current BRC two, seven, five.")])
     d.callout("Case III (night, or ceiling under 1,500 ft / visibility under 3 nm)", [
         "Marking moms gets a holding fix and a push time: marshal on the NNN, DD DME, angels N, expected approach time is MM. "
         "The stack starts at angels 6; the DME is angels + 15 (angels 6 at 21 DME).",
@@ -685,12 +686,13 @@ def build():
     cau = TH["caucasus"]
     d.h1("9. Paddles - %s MHz (LSO)" % f3(cau["lso"]))
     d.para("SkyEye's LSO on CVN-72 Abe (Black Sea Day / Night and Foothold Syria). Hornet COMM 2 CH 4. Marshal sends "
-           "you here at the initial, or in Case III at three miles (\"contact paddles\"). Paddles talks you down the glideslope from Tacview: you fly, "
+           "you here after commencing (Case I: call the three mile initial), or in Case III at three miles (\"contact paddles\"). Paddles talks you down the glideslope from Tacview: you fly, "
            "he calls. Give your modex or full callsign; the examples use Raider 302.")
     d.table(("Intent", "Say something like", "Response"),
             table_rows("lso", PADDLES, "Paddles", cs="Raider 302"), (0.22, 0.38, 0.40))
     d.dialogue([("Pilot", "Paddles, Raider 302, abeam."),
-                ("Paddles", "Paddles contact, Raider 302, Hornet in the groove, at three-quarters of a mile call the ball."),
+                ("Paddles", "Raider 302, Paddles contact, you've got 22 knots down the angle, 4 from starboard."),
+                ("Paddles", "Hornet in the groove, three-quarters of a mile, call the ball."),
                 ("Pilot", "302, Hornet ball, 5.5."),
                 ("Paddles", "Roger ball."),
                 ("Paddles", "You're high, bring it down."),
@@ -701,7 +703,7 @@ def build():
         "Calls start about 0.8 nm (1.3 nm after your ball call): a little high, you're high, you're low - power, "
         "POWER, right for lineup, come left, you're fast / slow (Hornet AoA). After your ball call, a call every second "
         "while you are off.",
-        "No ball call by about 0.6 nm: \"call the ball\". Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
+        "At 0.75 nm: \"Hornet in the groove, three-quarters of a mile, call the ball\". Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
         "Foul deck at 1/4 nm (no green deck from the jet ahead, or Tacview shows the landing area foul): "
         "\"302, foul deck, wave off, wave off, proceed to bolter pattern\". A red deck lapses after 3 minutes."])
 
