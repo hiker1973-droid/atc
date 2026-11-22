@@ -1,7 +1,7 @@
 <!--
 Release post for vSFG-7_SkyEye_ATC_Comms_v1.46.pdf + Phraseology Reference v3.6 + Paddles LSO Comms Flow (21 NOV 2026):
-Marshal / Paddles wording (origin/main 32cb397). DO NOT POST YET: none of this is on a rig (Day 0b440f0, Night + Foothold
-7f8a5b8) - post after each rig's Update. The v1.45 Hitman post is in git history.
+Marshal / Paddles wording (origin/main 32cb397). Gate MET 2026-11-21: all three rigs (Day, Night, Foothold) are on 32cb397.
+Not yet heard over SRS. The v1.45 Hitman post is in git history.
 Paste everything below the line into Discord, then attach the three PDFs.
 -->
 ---
