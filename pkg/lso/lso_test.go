@@ -181,6 +181,20 @@ func TestNoBallCallIsPrompted(t *testing.T) {
 	}
 }
 
+// A deviation call just before 3/4 mile holds the 2 s gap; the ball prompt must
+// still be said once the gap is up (Raider 302, Day 2026-11-22 12:38).
+func TestBallPromptSurvivesALineupCallJustBefore(t *testing.T) {
+	calls, _ := flight{gsErr: zero, luErr: func(a float64) float64 {
+		if a > 1380 {
+			return 3.5
+		}
+		return 0
+	}, finish: "trap"}.run(t)
+	if !has(calls, CallCallTheBall) {
+		t.Errorf("calls = %v, want %q after the lineup call", calls, CallCallTheBall)
+	}
+}
+
 func TestHighStart(t *testing.T) {
 	calls, _ := flight{gsErr: func(a float64) float64 {
 		if a > 900 {

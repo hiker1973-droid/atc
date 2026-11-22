@@ -632,8 +632,12 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		start = grooveStartM
 	}
 	if !p.askedBall && p.ballAt.IsZero() && g.astern < callTheBallM {
-		p.askedBall = true
+		// Latch only once it is said: a deviation call a moment earlier holds the
+		// 2 s gap, say() returns "", and a latch set first lost the prompt for
+		// the whole pass (Raider 302, Day 2026-11-22 12:38, "Right for lineup"
+		// at 1.5 nm swallowed "Hornet in the groove").
 		if c := t.say(p, CallCallTheBall, s.at); c != "" {
+			p.askedBall = true
 			return c
 		}
 	}
