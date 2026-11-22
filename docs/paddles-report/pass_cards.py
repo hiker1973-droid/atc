@@ -477,6 +477,19 @@ def post_cards(hook, log_passes, days):
     state = {"posted": []} if first else json.load(open(STATE_FILE, encoding="utf-8"))
     posted = set(state["posted"])
     ids = state.get("ids", {})
+    # A card posted under the stale Tacview name (before DCS's own grade named the real pilot, see greenie_post.reassign_by_dcs)
+    # is replaced: delete it so the pass is not carded twice (2026-11-22: Odyssey's wave off + bolter first carded as Jedi's).
+    for p in log_passes:
+        if p.get("logcs") and p.get("rig"):
+            old_key = "%s|%s|%s" % (p["rig"], p["t"].isoformat(), p["logcs"].lower())
+            old_id = ids.pop(old_key, None)
+            if old_id:
+                try:
+                    import urllib.request
+                    urllib.request.urlopen(urllib.request.Request("%s/messages/%s" % (hook, old_id), method="DELETE", headers={"User-Agent": "ReadbackGreenie/1"}), timeout=30)
+                except Exception:  # noqa: BLE001 - already gone, or the hook is down: the new card still posts
+                    pass
+            posted.discard(old_key)
     todo = [p for p in sorted(log_passes, key=lambda p: p["t"]) if p.get("rig") and pass_key(p) not in posted]
     if first:
         posted.update(pass_key(p) for p in todo)
