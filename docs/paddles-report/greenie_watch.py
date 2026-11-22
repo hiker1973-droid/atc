@@ -14,9 +14,9 @@ and Night rigs; on a new one it waits a few seconds (the "Approach track" line f
 field_card.py --post, a card for each Venom / Raider landing to the field cards channel.
 
 Two more jobs ride on the same loop: twenty minutes after the last pass of a recovery it posts the
-recovery summary (recovery_summary.py --post), and on Sunday after 20:00 it posts the weekly report
-(weekly_report.py --post) once, as a new message in the greenie board's channel, and refreshes the
-rolling 30-day monthly report (weekly_report.py --monthly --post), one message edited in place, and
+recovery summary (recovery_summary.py --post), and once an hour it refreshes the weekly report
+(weekly_report.py --post) and the rolling 30-day monthly report (weekly_report.py --monthly --post), each one
+message edited in place (operator 2026-11-22: hourly); on Sunday after 20:00 it still
 posts the Marshal report (marshal_report.py --post) and the pattern report (pattern_report.py --post).
 
 Run:  pythonw -I docs/paddles-report/greenie_watch.py
@@ -94,6 +94,7 @@ def weekly_due(now):
 def main():
     seen, field_seen = {}, {}
     last_pass, pending = 0.0, False
+    last_hour = ""
     day = dt.date.today().isoformat()
     while True:
         today = dt.date.today().isoformat()
@@ -133,10 +134,13 @@ def main():
         if week:
             import json
             json.dump({"last": week}, open(WEEK_FILE, "w", encoding="utf-8"))  # first, so a failed post is not retried every 15 s
-            run("weekly_report.py", "--post")
-            run("weekly_report.py", "--monthly", "--post")  # the rolling 30 days, edited in place
             run("marshal_report.py", "--post")  # how Marshal worked this week
             run("pattern_report.py", "--post")  # how the squadron flew the pattern (past 30 days)
+        hour = dt.datetime.now().strftime("%Y-%m-%d-%H")
+        if hour != last_hour:  # once an hour (and at start-up): the weekly and monthly reports, each one message edited in place
+            last_hour = hour
+            run("weekly_report.py", "--post")
+            run("weekly_report.py", "--monthly", "--post")  # the rolling 30 days
         time.sleep(POLL_S)
 
 

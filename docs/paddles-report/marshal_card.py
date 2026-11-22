@@ -122,7 +122,7 @@ def stack_view(rec, mates, brc, name, carrier=None):
     s.append(pc.text(nx + 36 * math.sin(a), ny - 36 * math.cos(a) + 5, "N", 14, MUTED, "middle"))
     # the carrier: hull, island and angled deck, turned to its BRC
     rot = (brc if brc is not None else 0) + off - 270
-    s.append('<g transform="translate(%d %d) scale(0.45) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
+    s.append('<g transform="translate(%d %d) scale(0.20) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
     if brc is not None:
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
     if PLANNED:  # the tracking guide, faded: the hold racetrack on the radial, the way in and its steps (commence, platform, dirty up, Paddles)
@@ -240,7 +240,7 @@ def case1_stack_view(rec, brc, name, carrier=None):
     s.append('<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#8b949e" stroke-width="2"/>' % (nx, ny, nx + 26 * math.sin(a), ny - 26 * math.cos(a)))
     s.append(pc.text(nx + 36 * math.sin(a), ny - 36 * math.cos(a) + 5, "N", 14, MUTED, "middle"))
     rot = (brc if brc is not None else 0) + off - 270
-    s.append('<g transform="translate(%d %d) scale(0.45) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
+    s.append('<g transform="translate(%d %d) scale(0.20) translate(%d %d) rotate(%.1f %d %d)">%s</g>' % (cx, cy, -cx, -cy, rot, cx, cy, pc.carrier_top(cx, cy, None)))
     if brc is not None:
         s.append(pc.text(cx, cy - 34, "BRC %03d" % (round(brc) % 360 or 360), 14, "#e6edf3", "middle", 'font-weight="bold"'))
     if fix:
