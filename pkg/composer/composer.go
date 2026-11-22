@@ -1961,10 +1961,12 @@ func (c *ATCComposer) MarshalReadbackWrong(callsign string, brc float64, angels 
 	return fmt.Sprintf("%s, %s, negative, %s.", callsign, c.towerCallsign, strings.Join(parts, ", "))
 }
 
-// brcSpeech spells a BRC one digit at a time with a short pause between each,
-// "zero, nine, six", so the TTS reads it slowly enough to copy down.
+// brcSpeech spells a BRC one digit at a time with a pause between each,
+// "zero... nine... six", so the TTS reads it slowly enough to copy down. An
+// ellipsis holds longer than a comma (operator 2026-11-22, "slow down the
+// speech when saying BRC"); a comma was the pause before.
 func brcSpeech(brc float64) string {
 	deg := int(math.Round(brc))
 	deg = ((deg % 360) + 360) % 360
-	return strings.Join(strings.Fields(bearingWord(deg)), ", ")
+	return strings.Join(strings.Fields(bearingWord(deg)), "... ")
 }
