@@ -322,7 +322,20 @@ type Tracker struct {
 	// hist is every jet's last few minutes relative to the ship, for the
 	// Case I pattern (pattern.go).
 	hist map[string][]patSample
+	// earlyBalls are ball calls heard before any pass was tracking (the jet was still outside the groove, or off Tacview):
+	// the pass that starts a moment later is his, and Paddles does not ask him for the ball again (Raider 302, Day 2026-11-22
+	// 17:34:54 "Hornet ball" rogered, then "Hornet in the groove, call the ball" at 17:35:18).
+	earlyBalls []earlyBall
 }
+
+type earlyBall struct {
+	modex string
+	clara bool
+	at    time.Time
+}
+
+// earlyBallWindow is how long a ball call heard before the pass starts still counts for it.
+const earlyBallWindow = 90 * time.Second
 
 // NewTracker returns a Tracker with p.
 func NewTracker(p Params) *Tracker {
@@ -428,6 +441,9 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 		}
 		pass = &Pass{Callsign: callsign, Model: model, Started: smp.At, lastSaid: make(map[Call]time.Time), minAstern: g.astern}
 		t.passes[callsign] = pass
+		if e, ok := t.takeEarlyBall(callsign, smp.At); ok {
+			pass.ballAt, pass.clara = e.at, e.clara
+		}
 		if t.OnPass != nil {
 			t.OnPass(callsign)
 		}
@@ -486,10 +502,31 @@ func (t *Tracker) BallCall(modex string, clara bool, now time.Time) Call {
 		}
 		match.calls = append(match.calls, fmt.Sprintf("%s %.1fs", what, now.Sub(match.Started).Seconds()))
 	}
+	if match == nil {
+		t.earlyBalls = append(t.earlyBalls, earlyBall{modex, clara, now})
+		if len(t.earlyBalls) > 8 {
+			t.earlyBalls = t.earlyBalls[len(t.earlyBalls)-8:]
+		}
+	}
 	if clara {
 		return CallClara
 	}
 	return CallRogerBall
+}
+
+// takeEarlyBall returns the ball call this jet made just before its pass began, if any, and forgets it.
+func (t *Tracker) takeEarlyBall(callsign string, now time.Time) (earlyBall, bool) {
+	for i := len(t.earlyBalls) - 1; i >= 0; i-- {
+		e := t.earlyBalls[i]
+		if now.Sub(e.at) > earlyBallWindow {
+			continue
+		}
+		if e.modex == "" || strings.Contains(strings.ReplaceAll(callsign, " ", ""), e.modex) {
+			t.earlyBalls = append(t.earlyBalls[:i], t.earlyBalls[i+1:]...)
+			return e, true
+		}
+	}
+	return earlyBall{}, false
 }
 
 // smoothed is the median glideslope and lineup of the last three samples, so

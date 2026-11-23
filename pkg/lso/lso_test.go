@@ -16,6 +16,8 @@ type flight struct {
 	// after the landing point: "trap" stops, "bolter" carries on.
 	finish string
 	ball   bool
+	// earlyBall: the pilot called the ball 25 s before the pass is tracked.
+	earlyBall bool
 	// foulFrom, when set, fouls the deck once the jet is this close (m astern).
 	foulFrom float64
 	// redDeck: the jet ahead called "red deck" before this one started;
@@ -58,6 +60,9 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 	ballDone, greenDone := false, false
 	if f.redDeck {
 		tr.SetRedDeck(true, t0.Add(-20*time.Second))
+	}
+	if f.earlyBall {
+		calls = append(calls, tr.BallCall("302", false, t0.Add(-25*time.Second)))
 	}
 	for i := 0; i < 400; i++ {
 		now := t0.Add(time.Duration(float64(i) * dt * float64(time.Second)))
@@ -192,6 +197,13 @@ func TestBallPromptSurvivesALineupCallJustBefore(t *testing.T) {
 	}, finish: "trap"}.run(t)
 	if !has(calls, CallCallTheBall) {
 		t.Errorf("calls = %v, want %q after the lineup call", calls, CallCallTheBall)
+	}
+}
+
+func TestNoBallPromptAfterAnEarlyBallCall(t *testing.T) {
+	calls, _ := flight{gsErr: zero, luErr: zero, finish: "trap", earlyBall: true}.run(t)
+	if has(calls, CallCallTheBall) {
+		t.Errorf("calls = %v, want no %q: the pilot called the ball before the pass began", calls, CallCallTheBall)
 	}
 }
 
