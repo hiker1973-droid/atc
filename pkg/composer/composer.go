@@ -1942,10 +1942,8 @@ func spellFrequency(mhz float64) string {
 
 // MarshalReadbackCorrect confirms a pilot's BRC / marshal readback.
 func (c *ATCComposer) MarshalReadbackCorrect(callsign string) string {
-	return pick([]string{
-		fmt.Sprintf("%s, %s, readback correct.", callsign, c.towerCallsign),
-		fmt.Sprintf("%s, %s, readback correct, report see you at ten.", callsign, c.towerCallsign),
-	})
+	// Just "readback correct" (operator 2026-11-22): no "report see you at ten" tacked on.
+	return fmt.Sprintf("%s, %s, readback correct.", callsign, c.towerCallsign)
 }
 
 // MarshalReadbackWrong corrects a pilot's readback. brc < 0 / angels <= 0 mean
