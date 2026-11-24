@@ -1,11 +1,20 @@
 # vSFG-7 SkyEye ATC Comms Packet — builder notes
 
-**Built 21 NOV 2026.  v1.46.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
+**Built 24 NOV 2026.  v1.48.  Product = one full-screen 16:9 PDF, 30 pages, plus the same 29 cards as DCS kneeboard pages (an OMM mod).**
 `vSFG-7_SkyEye_ATC_Comms_v1.35.pdf` — cover + 29 cards: How it works · Frequencies ·
 Deckboss · Deckboss calls · Marshal Case I · Marshal Case III · Marshal calls 1 · 2 · 3 ·
 Paddles · Off the boat · Command · Hitman 1-1 / 2-1 · Cleared hot? · Range areas ·
 Overlord Actual · Texaco · Darkstar · GCI calls · **Combat calls** · A full sortie · Airfield ATC ·
 Tower radios · Syria towers · Departure · Arrival · Tower calls · **Multi-ship** · No answer?
+
+## v1.48 (24 NOV 2026) - section check-in, BRC-only readback
+
+Follows origin/main 27ca680 (deployed to all three rigs 2026-11-24 09:12; not heard over SRS). Marshal: a section checks in
+together - lead calls "Raider 302, holding hands with 303 (, 304 ...), marking moms ..." and Marshal opens "Raider 302, copy
+holding hands with Raider 303, ..." before the usual reply. Readback is the flight lead's only (wingman readbacks ignored) and is
+graded on the BRC alone: "readback correct", or "readback incorrect, BRC ..., marshal at angels ..." (stack altitude repeated
+whenever the BRC is wrong; angels are no longer graded). Card 5 bullet, card 7 (SECTION + READBACK rows). Phraseology v3.8
+(section row, readback wording). 31 pages, as before.
 
 ## v1.47 (22 NOV 2026) - Case III approach calls, shared Case I stack
 
@@ -20,7 +29,7 @@ Follows origin/main 32cb397 (**pushed, NOT deployed**: Day 0b440f0, Night + Foot
 none heard over SRS). Operator's calls on the carrier recovery, Marshal then Paddles:
 - A bare number after the address is a Raider: "Marshal, 302, ..." and "Deckboss, 302, ..." = Raider 302.
 - Check-in reply opens "copy check-in". "Overhead" alone is an established call (as "entering stack").
-- BRC read back ("BRC 275, angels 2") is checked: "readback correct", or "readback incorrect, BRC ..., marshal at angels ..." (graded on BRC only; wingmen not graded)
+- BRC read back ("BRC 275, angels 2") is checked: "readback correct", or "negative, BRC ..., marshal at angels ..." (superseded in v1.48)
   (3 deg slack; angels vs the stack assignment; a call with no 3-digit BRC, e.g. Case III, gets no reply).
 - BRC is spoken digit by digit with pauses ("two, seven, five") everywhere (composer brcSpeech).
 - Charlie: "your signal is Charlie, current BRC two, seven, five".

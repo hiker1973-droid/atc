@@ -114,6 +114,11 @@ v1.40 (operator 2026-11-11): Hitman passes the 9-line in three blocks of three l
 each read back by the pilot; wrong readback = the block again; "say again" / "say again line 6";
 "confirmed. Report IP inbound." after the third (card 13; cmd/atc/jtac_brief.go).
 
+v1.48 (operator 2026-11-24) follows origin/main 27ca680: a section checks in together - the lead calls
+"Raider 302 holding hands with 303 (, 304 ...), marking moms ..." and Marshal opens "Raider 302, copy holding
+hands with Raider 303, ..." before the usual reply. Readback is the lead's only (wingmen ignored), graded on
+the BRC alone: "readback correct", or "readback incorrect, BRC ..., marshal at angels ..." (cards 5, 7).
+
 v1.47 (operator 2026-11-22, CQ Case I / Case III and LSO training decks) follows origin/main 6d6caf2:
 Case III approach calls - "final radar contact, eight miles, dirty up, fly bullseye", "ACLS lock on,
 six miles, say needles", "concur, fly mode two", "approaching glide path" with the 3-mile Paddles
@@ -175,8 +180,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.47"
-DATE = "21 NOV 2026"   # release date of VER - change it together with VER
+VER = "v1.48"
+DATE = "24 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -403,7 +408,8 @@ def c05_marshal_case1():
         [("\"Marshal, Raider 1, checking in\"", True),
          ("- \"copy check-in\", your range and bearing from mother, then marking moms please.", False)],
         [("Read the BRC back: \"Marshal, Raider 1, BRC 275, angels 2\"", True),
-         ("- \"readback correct\", or \"negative, BRC ...\" with the right figure.", False)],
+         ("- \"readback correct\", or \"readback incorrect\" with the right BRC and stack angels. "
+          "Flight lead only; BRC is what is checked.", False)],
         [("Just your number works:", True),
          ("\"Marshal, 302, ...\" is Raider 302.", False)],
     ])
@@ -488,12 +494,16 @@ def c07_marshal_calls_inbound():
         ("", "Marshal at angels two, report see me at ten."),
         ("2+ IN STACK", "The reply ends: Stack has 2 aircraft."),
         ("NO RADAR", "The radar contact part is left out."),
+        ("SECTION", "Marshal, Raider 302, holding hands with 303, marking moms ..."),
+        ("MARSHAL", "Raider 302, copy holding hands with Raider 303, then as above."),
     ], split=150)
     NK.band(c, "BRC", "any time")
     NK.steps(c, [
         ("YOU", "Marshal, Raider 1, say BRC."),
         ("MARSHAL", "Raider 1, Union Marshal, mother's BRC is two, seven, five."),
         ("NO CARRIER", "Raider 1, Union Marshal, BRC unknown, mother off scope."),
+        ("READBACK", "Flight lead: BRC 275, angels 2. Marshal: readback correct, or"),
+        ("", "readback incorrect, BRC ..., marshal at angels ..."),
     ], split=150)
     NK.band(c, "RADAR CHECK AND RADIO CHECK")
     NK.steps(c, [

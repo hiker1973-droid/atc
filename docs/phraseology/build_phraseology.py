@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.7"
-DATE = "21 NOV 2026"          # change together with VER
+VER = "v3.8"
+DATE = "24 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -160,7 +160,8 @@ DECKBOSS = [
 MARSHAL = [
     ("Check in", "checking in", "Copy check-in, range and bearing, say marking moms", "check_in"),
     ("Marking moms", "marking moms, angels 12, state 6.5", "Weather, case, BRC (digit by digit), Marshal at angels N", "marking_moms"),
-    ("BRC readback", "BRC 275, Marshal at angels 2", "Readback correct - or negative, with the right BRC / angels", "readback"),
+    ("BRC readback", "BRC 275, Marshal at angels 2", "Readback correct - or readback incorrect, with the right BRC and stack angels (flight lead only, BRC is graded)", "readback"),
+    ("Section check-in", "Raider 302, holding hands with 303, marking moms, angels 12, state 6.5", "Copy holding hands with Raider 303, then the marking moms reply to the flight", "marking_moms"),
     ("BRC", "say BRC", "Mother's BRC, magnetic", "brc"),
     ("DME report", "20 DME", "Radar contact, continue", "dme"),
     ("Inbound 10 nm", "see you at ten", "Visual at ten, say state", "see_you_at_ten"),

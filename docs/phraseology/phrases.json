@@ -679,6 +679,12 @@
  },
  {
   "role": "marshal",
+  "say": "Marshal, Raider 1-1, Raider 302, holding hands with 303, marking moms, angels 12, state 6.5.",
+  "tower": "",
+  "want": "marking_moms"
+ },
+ {
+  "role": "marshal",
   "say": "Marshal, Raider 1-1, say BRC.",
   "tower": "",
   "want": "brc"
