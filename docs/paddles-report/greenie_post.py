@@ -42,6 +42,7 @@ MARSHAL_WEBHOOK_FILE = os.path.join(os.path.expanduser("~"), "readback-marshal-c
 PILOTS_FILE = os.path.join(os.path.expanduser("~"), "readback-pilots.csv")
 OVERRIDES_FILE = os.path.join(os.path.expanduser("~"), "readback-grade-overrides.csv")
 MANUAL_FILE = os.path.join(os.path.expanduser("~"), "readback-manual-passes.csv")
+CASE_FILE = os.path.join(os.path.expanduser("~"), "readback-case-overrides.csv")  # date, callsign, case (III / I), note: the pilot flew another case than Marshal logged
 MESSAGE_FILE = os.path.join(os.path.expanduser("~"), "readback-greenie-message.txt")
 RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
 SHOWN = 15  # squares per pilot, newest on the left
@@ -172,6 +173,16 @@ def load_passes(end):
                 if (p["t"].date().isoformat() == r[0] and p["callsign"].lower() == r[1].lower()
                         and str(p.get("wire") or "") == r[2]):
                     p["grade"] = r[3]
+    # Case corrections: readback-case-overrides.csv (date, callsign, case, note) for every pass that pilot made that day.
+    if os.path.exists(CASE_FILE):
+        for r in csv.reader(open(CASE_FILE, encoding="utf-8-sig", newline="")):
+            r = [x.strip() for x in r] + ["", "", "", ""]
+            if r[0].lower() == "date" or not r[0]:
+                continue
+            for p in passes:
+                if p["t"].date().isoformat() == r[0] and p["callsign"].lower() == r[1].lower():
+                    p["case"] = r[2].upper()
+                    p["case3"] = p["case"] in ("III", "3")
     return passes
 
 
