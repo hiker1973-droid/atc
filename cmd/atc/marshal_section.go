@@ -92,3 +92,29 @@ func stackTXCallsign(stack *state.MarshalStack, cs string) string {
 	}
 	return cs
 }
+
+// isSectionWingman: the call came from a jet that checked in as a section's
+// wingman, by callsign or by the bare modex of a call with no callsign. Only
+// the flight lead reads back (operator 2026-11-24).
+func isSectionWingman(stack *state.MarshalStack, callsign, lower string) bool {
+	modex := ""
+	if callsign == "" {
+		if m := bareModexRe.FindStringSubmatch(lower); m != nil {
+			modex = m[1] + m[2] + m[3]
+		}
+	}
+	for _, ac := range stack.GetAll() {
+		if callsign != "" && ac.Callsign == callsign {
+			return false
+		}
+		for _, w := range ac.Wingmen {
+			if callsign != "" && w == callsign {
+				return true
+			}
+			if _, n := splitCallsign(w); modex != "" && n == modex {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -770,6 +770,10 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 	}
 	intent := classifyMarshalCall(lower, fuelState)
 	if marshalResolvesAlias(intent) {
+		if intent == marshalReadback && isSectionWingman(stack, callsign, lower) {
+			log.Info().Str("callsign", callsign).Msg("Marshal: wingman readback - only the flight lead reads back")
+			return
+		}
 		callsign = resolveStackCallsign(callsign, lower, stack) // marshal_alias.go
 	}
 	callsign = fixMarshalCallsign(callsign, intent, stack, time.Now()) // marshal_recent.go
@@ -816,6 +820,11 @@ func handleMarshalCall(text, callsign string, stack *state.MarshalStack, comp *c
 		if wing := marshalWingmen(text, callsign); len(wing) > 0 {
 			joinSection(stack, callsign, wing)
 			say = stackTXCallsign(stack, callsign)
+			// Marshal copies the section before the usual call (operator
+			// 2026-11-24): "Raider 302 copy holding hands with Raider 303, ...".
+			ack := fmt.Sprintf("%s, copy holding hands with %s. ", callsign, strings.Join(wing, ", "))
+			inner := transmit
+			transmit = func(s string) { inner(ack + s) }
 		}
 		// Pull live recovery case from state so phraseology stays in sync with
 		// any mid-recovery transition the watcher already announced.
@@ -1117,19 +1126,16 @@ func marshalReadbackReply(lower, callsign string, stack *state.MarshalStack, com
 			wrongBRC = brc
 		}
 	}
-	wrongAngels := 0
-	if am := angelsInCallRe.FindStringSubmatch(lower); am != nil {
-		if ac, ok := stack.GetAircraft(callsign); ok && ac.Angels > 0 {
-			if n, _ := strconv.Atoi(am[1]); n != ac.Angels {
-				wrongAngels = ac.Angels
-			}
-		}
-	}
 	say := stackTXCallsign(stack, callsign)
-	if wrongBRC < 0 && wrongAngels == 0 {
+	if wrongBRC < 0 {
 		log.Info().Str("callsign", callsign).Int("saidBRC", said).Float64("brcMag", brc).Msg("Marshal: readback correct")
 		return comp.MarshalReadbackCorrect(say), true
 	}
-	log.Info().Str("callsign", callsign).Int("saidBRC", said).Float64("brcMag", brc).Int("angels", wrongAngels).Msg("Marshal: readback wrong")
-	return comp.MarshalReadbackWrong(say, wrongBRC, wrongAngels), true
+	log.Info().Str("callsign", callsign).Int("saidBRC", said).Float64("brcMag", brc).Msg("Marshal: readback wrong")
+	// Graded on the BRC alone; the correction repeats BRC and the stack angels.
+	angels := 0
+	if ac, ok := stack.GetAircraft(callsign); ok {
+		angels = ac.Angels
+	}
+	return comp.MarshalReadbackWrong(say, wrongBRC, angels), true
 }

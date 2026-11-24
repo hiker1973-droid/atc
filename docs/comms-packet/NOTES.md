@@ -20,7 +20,7 @@ Follows origin/main 32cb397 (**pushed, NOT deployed**: Day 0b440f0, Night + Foot
 none heard over SRS). Operator's calls on the carrier recovery, Marshal then Paddles:
 - A bare number after the address is a Raider: "Marshal, 302, ..." and "Deckboss, 302, ..." = Raider 302.
 - Check-in reply opens "copy check-in". "Overhead" alone is an established call (as "entering stack").
-- BRC read back ("BRC 275, angels 2") is checked: "readback correct", or "negative, BRC ..., marshal at angels ..."
+- BRC read back ("BRC 275, angels 2") is checked: "readback correct", or "readback incorrect, BRC ..., marshal at angels ..." (graded on BRC only; wingmen not graded)
   (3 deg slack; angels vs the stack assignment; a call with no 3-digit BRC, e.g. Case III, gets no reply).
 - BRC is spoken digit by digit with pauses ("two, seven, five") everywhere (composer brcSpeech).
 - Charlie: "your signal is Charlie, current BRC two, seven, five".

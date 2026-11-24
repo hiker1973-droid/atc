@@ -1956,7 +1956,7 @@ func (c *ATCComposer) MarshalReadbackWrong(callsign string, brc float64, angels 
 	if angels > 0 {
 		parts = append(parts, "marshal at angels "+numberWord(angels))
 	}
-	return fmt.Sprintf("%s, %s, negative, %s.", callsign, c.towerCallsign, strings.Join(parts, ", "))
+	return fmt.Sprintf("%s, %s, readback incorrect, %s.", callsign, c.towerCallsign, strings.Join(parts, ", "))
 }
 
 // brcSpeech spells a BRC one digit at a time with a pause between each,
