@@ -409,6 +409,12 @@ func (n *tankerNet) Response(text, cs string) string {
 		// one jet on the tanker said it. A call that names the tanker and no
 		// callsign still gets "say again your callsign".
 		if strings.Contains(lower, strings.ToLower(n.Short)) || strings.Contains(lower, "tanker") {
+			// The DCS tanker's own calls ("Texaco 3-1 ready pre-contact", "move in
+			// behind for portside basket", Kola 2026-11-24 10:32) open with its
+			// callsign and carry no pilot's: say nothing, not "say again".
+			if tankerOwnCallRe.MatchString(lower) {
+				return ""
+			}
 			return fmt.Sprintf("Station calling %s, say again your callsign.", n.Spoken)
 		}
 		if cs = n.onlyFlight(now); cs == "" {
@@ -594,7 +600,7 @@ func (n *tankerNet) boomResponse(lower, cs string, f *tankerFlight, boom, preCon
 func tankerCallsign(text string) string {
 	// "Texaco 3-1, one flight of F-18, Raider 302, ..." took "one" as the
 	// callsign (Day 2026-10-19 19:35): drop the flight description first.
-	text = tankerFlightDescRe.ReplaceAllString(text, "$1")
+	text = tankerFlightDescRe.ReplaceAllString(text, "$1$2")
 	cs := extractCallsignSkippingAddress(text, "texaco one-one", "texaco one one", "texaco 1-1", "texaco 1 1", "texaco 11",
 		"texaco three-one", "texaco three one", "texaco 3-1", "texaco 3 1", "texaco 31",
 		"texaco two-one", "texaco two one", "texaco 2-1", "texaco 2 1", "texaco 21",
@@ -624,7 +630,14 @@ func tankerCallsign(text string) string {
 
 // tankerFlightDescRe: ", one flight of F-18," / ", flight of 2," / ", two Hornets,"
 // ahead of the callsign.
-var tankerFlightDescRe = regexp.MustCompile(`(?i)(,\s*)(?:(?:one|two|three|four|a|\d)\s+(?:flights?\s+of|ships?\s+of|hornets?\b|f-?1[68]s?\b|vipers?\b|jets?\b)|flights?\s+of)[^,]*,\s*`)
+// A description with no comma before the callsign ("one flight F-18 Raider 302,
+// 30 miles out", Kola 2026-11-24 10:26) is dropped up to the callsign, which a
+// comma-to-comma match would have swallowed.
+var tankerFlightDescRe = regexp.MustCompile(`(?i)(,\s*)(?:(?:one|two|three|four|a|\d)\s+(?:flights?\b|ships?\s+of|hornets?\b|f-?1[68]s?\b|vipers?\b|jets?\b)|flights?\s+of)\s*(?:(?:of\s+)?(?:\d+\s+)?(?:f-?1[68]s?|hornets?|vipers?|jets?)\s*,\s*|(?:(?:of\s+)?(?:\d+\s+)?(?:f-?1[68]s?|hornets?|vipers?|jets?)\s+)?([a-z]+[\s-]*\d)|[^,]*,\s*)`)
+
+// tankerOwnCallRe: the words of a tanker's own flow calls (the DCS tanker on the
+// same net), never a pilot's check-in.
+var tankerOwnCallRe = regexp.MustCompile(`\b(pre-?\s?contact|basket|drogue|move in|observation|reform)\b`)
 
 // startTankers runs every configured tanker net.
 func startTankers(ctx context.Context, apiKey string, store *tacviewPositions) {

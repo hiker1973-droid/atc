@@ -262,3 +262,25 @@ func TestTankerBoomFlow(t *testing.T) {
 			"Venom 11, Shell, copy, cleared to depart. Fortuna super te, Viking."},
 	})
 }
+
+// Kola 2026-11-24, Raider 302 on Texaco 3-1: "one flight F-18 Raider 302" (no
+// comma) swallowed the callsign, and the DCS tanker's own calls got "say again
+// your callsign".
+func TestTankerKola1124(t *testing.T) {
+	for in, want := range map[string]string{
+		"Texaco 3-1, one flight F-18 Raider 302, 30 miles out, intent to refuel.": "Raider 302",
+		"Texaco 3-1, one flight of F-18, Raider 302, 30 miles out.":               "Raider 302",
+		"Texaco 3-1, one flight F-18, Raider 302, 30 miles out.":                  "Raider 302",
+		"Texaco 3-1, two Hornets Raider 302, 15 miles, intent to refuel.":         "Raider 302",
+	} {
+		if got := tankerCallsign(in); got != want {
+			t.Errorf("%q: callsign %q want %q", in, got, want)
+		}
+	}
+	tn := testTanker()
+	for _, c := range []string{"Texaco 1-1 ready pre-contact.", "Texaco 1-1, move in behind for portside basket."} {
+		if got := tn.Response(c, tankerCallsign(c)); got != "" {
+			t.Errorf("%q: tanker's own call answered: %q", c, got)
+		}
+	}
+}
