@@ -284,3 +284,28 @@ func TestTankerKola1124(t *testing.T) {
 		}
 	}
 }
+
+// Kola 2026-11-24: "Shell 31" for Texaco 3-1 was dropped, and "Raider 3-0" (Raider
+// 302 clipped) was answered as "Raider 30".
+func TestTankerShellAndClippedCallsign(t *testing.T) {
+	tn := testTanker() // Texaco
+	got := tn.fixAddress("Shell 31, one flight F-18 Raider 302, 36-mile initial, intent to refuel.")
+	if !strings.HasPrefix(got, "Texaco 31,") {
+		t.Fatalf("address: %q", got)
+	}
+	if tn.fixAddress("Texaco 3-1, Raider 302") != "Texaco 3-1, Raider 302" {
+		t.Error("own name changed")
+	}
+	if r := tn.Response(got, tankerCallsign(got)); !strings.HasPrefix(r, "Raider 302, Texaco") {
+		t.Errorf("check-in: %q", r)
+	}
+	call := "Texaco 3-1, Raider 3-0, request 6,000 pounds."
+	if r := tn.Response(call, tankerCallsign(call)); !strings.HasPrefix(r, "Raider 302, Texaco") {
+		t.Errorf("clipped callsign: %q", r)
+	}
+	// A different jet that fits nothing keeps its callsign.
+	call = "Texaco 3-1, Raider 55, request 6,000 pounds."
+	if r := tn.Response(call, tankerCallsign(call)); strings.HasPrefix(r, "Raider 302") {
+		t.Errorf("wrongly merged: %q", r)
+	}
+}

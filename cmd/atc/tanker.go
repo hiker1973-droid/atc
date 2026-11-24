@@ -396,6 +396,64 @@ func (n *tankerNet) onlyFlight(now time.Time) string {
 	return only
 }
 
+// tankerNameRe: the tanker name at the start of a call.
+var tankerNameRe = regexp.MustCompile(`(?i)^(\W*)(shell|texaco)\b`)
+
+// fixAddress puts this net's own name on a call that opened with the other
+// tanker's: Whisper heard "Shell 31, one flight F-18 Raider 302, ..." on Texaco
+// 3-1 (Kola 2026-11-24 10:25) and the call was dropped. A net only hears its own
+// frequency, so the name can only be this net's.
+func (n *tankerNet) fixAddress(text string) string {
+	m := tankerNameRe.FindStringSubmatch(text)
+	if m == nil || strings.EqualFold(m[2], n.Short) {
+		return text
+	}
+	if !strings.EqualFold(n.Short, "shell") && !strings.EqualFold(n.Short, "texaco") {
+		return text
+	}
+	return m[1] + n.Short + text[len(m[0]):]
+}
+
+// resolveFlight maps a callsign Whisper clipped ("Raider 3-0" for Raider 302,
+// Kola 2026-11-24 10:26) onto the one flight on this net it can be: same
+// callsign word, and the digits heard are in order in the modex. A callsign of
+// three digits or more is taken as heard. Caller holds n.mu.
+func (n *tankerNet) resolveFlight(cs string, now time.Time) string {
+	word, num := splitCallsign(cs)
+	if word == "" || len(num) == 0 || len(num) >= 3 || !isAllDigits(num) {
+		return cs
+	}
+	match := ""
+	for known, f := range n.flights {
+		if now.Sub(f.at) > tankerFlightAge {
+			continue
+		}
+		w, kn := splitCallsign(known)
+		if !strings.EqualFold(w, word) || len(kn) <= len(num) || !digitsInOrder(num, kn) {
+			continue
+		}
+		if match != "" {
+			return cs // two flights fit: don't guess
+		}
+		match = known
+	}
+	if match == "" {
+		return cs
+	}
+	return match
+}
+
+// digitsInOrder: every digit of part appears in whole, in order.
+func digitsInOrder(part, whole string) bool {
+	i := 0
+	for _, r := range whole {
+		if i < len(part) && byte(r) == part[i] {
+			i++
+		}
+	}
+	return i == len(part)
+}
+
 var otherBasket = map[string]string{"port": "starboard", "starboard": "port"}
 
 // Response is the tanker's reply to one call ("" = nothing to say).
@@ -404,6 +462,7 @@ func (n *tankerNet) Response(text, cs string) string {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	now := n.now()
+	cs = n.resolveFlight(cs, now)
 	if cs == "" {
 		// "Ready pre-contact." with no callsign (Day 2026-10-19 19:38): the
 		// one jet on the tanker said it. A call that names the tanker and no
@@ -692,6 +751,7 @@ func startTanker(ctx context.Context, apiKey string, store *tacviewPositions, cf
 		"ready pre-contact, satisfied, moving to starboard reform, checking out, resuming navigation, pushing 282"
 	go voiceNetLoop(ctx, flagSRSAddr, cfg.FreqMHz, cfg.Name, apiKey, flagEAMPassword, cfg.Voice, flagExternalAudio,
 		prompt, nil, func(text string) (string, string) {
+			text = tn.fixAddress(text)
 			cs := tankerCallsign(text)
 			return cs, tn.Response(text, cs)
 		})
