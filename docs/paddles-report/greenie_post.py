@@ -166,13 +166,15 @@ def load_passes(end):
     # LSO corrections: readback-grade-overrides.csv (date, callsign, wire, grade, note).
     if os.path.exists(OVERRIDES_FILE):
         for r in csv.reader(open(OVERRIDES_FILE, encoding="utf-8-sig", newline="")):
-            r = [x.strip() for x in r] + ["", "", "", ""]
+            r = [x.strip() for x in r] + ["", "", "", "", ""]
             if r[0].lower() == "date" or not r[0]:
                 continue
             for p in passes:
                 if (p["t"].date().isoformat() == r[0] and p["callsign"].lower() == r[1].lower()
                         and str(p.get("wire") or "") == r[2]):
                     p["grade"] = r[3]
+                    if r[5].isdigit():  # optional 6th column: the wire DCS gave, when ours was an estimate
+                        p["wire"] = int(r[5])
     # Case corrections: readback-case-overrides.csv (date, callsign, case, note) for every pass that pilot made that day.
     if os.path.exists(CASE_FILE):
         for r in csv.reader(open(CASE_FILE, encoding="utf-8-sig", newline="")):
