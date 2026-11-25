@@ -471,6 +471,21 @@ body{margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c
         "track from Paddles" if not coarse else "coarse card")
 
 
+HOLD_S = 10 * 60  # as long as greenie_post.reassign_by_dcs looks back for the trap that names a bolter's / wave-off's pilot
+
+
+def held(p, passes, now=None):
+    """A wave-off or bolter gets no DCS grade of its own: the pilot is named by the trap that follows it (DCS's landing grade),
+    up to ten minutes later, and until then the log carries Tacview's name, which can be stale (2026-11-22: Odyssey's wave off
+    and bolter carded as Jedi's). So its card waits for a later trap on the rig, or for the ten minutes to pass."""
+    if p.get("outcome") not in ("wave off", "bolter"):
+        return False
+    now = now or dt.datetime.now(p["t"].tzinfo)
+    if (now - p["t"]).total_seconds() >= HOLD_S:
+        return False
+    return not any(q.get("rig") == p.get("rig") and q["outcome"] == "trap" and q["t"] > p["t"] for q in passes)
+
+
 def post_cards(hook, log_passes, days):
     """Post a card for each pass not yet posted (the first run only marks what is already logged)."""
     first = not os.path.exists(STATE_FILE)
@@ -481,6 +496,7 @@ def post_cards(hook, log_passes, days):
     if first:
         posted.update(pass_key(p) for p in todo)
         todo = []
+    todo = [p for p in todo if not held(p, log_passes)]
     names = {cs: label for cs, label, _, _ in gp.roster()}
     canon = {a: cs for cs, _, _, al in gp.roster() for a in al if cs}
     tracks = read_logged(days, "Paddles: pass track", "track") if todo else []

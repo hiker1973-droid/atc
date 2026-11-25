@@ -117,6 +117,10 @@ def main():
             last_pass, pending = time.time(), True
         if pending and time.time() - last_pass >= MARSHAL_S:
             # (the recovery summary post to the Trap house was dropped 2026-11-06, operator: not needed)
+            try:
+                refresh()  # the wave-off / bolter cards held for DCS to name the pilot (pass_cards.held) post now
+            except (subprocess.SubprocessError, OSError):
+                pass
             run("marshal_card.py", "--post-new")  # a Marshal card for each finished approach
             pending = False
         field_fresh = False
