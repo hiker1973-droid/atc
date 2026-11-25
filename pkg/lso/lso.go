@@ -1059,11 +1059,11 @@ func (t *Tracker) segMeans(p *Pass) []segMeans {
 // Grade thresholds (operator 2026-11-06, "loosen the grading up a bit so it's
 // easier to get a green OK"): this many big errors still earns an OK, one more
 // is "(OK)", and this many or more is "---". 2026-11-09 "tighten it just a bit":
-// 4 -> 3. Was 0 / 3 (any big error was
+// 4 -> 3; 2026-11-24 "loosen the grading" (Kola traps): 1 / 3 -> 2 / 4. Was 0 / 3 (any big error was
 // "(OK)", three was "---"), matched to seven DCS grades on 2026-10-17/18.
 const (
-	majorsStillOK = 1
-	majorsNoGrade = 3
+	majorsStillOK = 2
+	majorsNoGrade = 4
 )
 
 func (t *Tracker) Grade(p *Pass) string {
