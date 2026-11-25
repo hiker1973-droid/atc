@@ -326,6 +326,8 @@ type Tracker struct {
 	// the pass that starts a moment later is his, and Paddles does not ask him for the ball again (Raider 302, Day 2026-11-22
 	// 17:34:54 "Hornet ball" rogered, then "Hornet in the groove, call the ball" at 17:35:18).
 	earlyBalls []earlyBall
+	// finishedAt is when each jet's last pass ended: a ball call just after it is not for the next pass.
+	finishedAt map[string]time.Time
 }
 
 type earlyBall struct {
@@ -336,6 +338,14 @@ type earlyBall struct {
 
 // earlyBallWindow is how long a ball call heard before the pass starts still counts for it.
 const earlyBallWindow = 90 * time.Second
+
+// afterPassBallS is how long after a pass ends a ball call naming that jet is ignored (a late or wingman call).
+const afterPassBallS = 20 * time.Second
+
+// promptMinAstern is how close in "call the ball" is still worth saying: inside this the jet is about to land.
+const promptMinAstern = 400.0
+
+func modexOf(callsign string) string { return strings.ReplaceAll(callsign, " ", "") }
 
 // NewTracker returns a Tracker with p.
 func NewTracker(p Params) *Tracker {
@@ -462,6 +472,18 @@ func (t *Tracker) Update(callsign, model string, s Ship, smp Sample) Call {
 // Expire ends passes that stopped getting samples (jet left Tacview, crashed,
 // or the feed dropped).
 func (t *Tracker) Expire(now time.Time) {
+	keep := t.earlyBalls[:0]
+	for _, e := range t.earlyBalls {
+		if now.Sub(e.at) <= earlyBallWindow {
+			keep = append(keep, e)
+		}
+	}
+	t.earlyBalls = keep
+	for cs, at := range t.finishedAt {
+		if now.Sub(at) > afterPassBallS {
+			delete(t.finishedAt, cs)
+		}
+	}
 	for cs, h := range t.hist {
 		if len(h) == 0 || now.Sub(h[len(h)-1].at) > patternKeep {
 			delete(t.hist, cs) // gone without a pass
@@ -502,7 +524,7 @@ func (t *Tracker) BallCall(modex string, clara bool, now time.Time) Call {
 		}
 		match.calls = append(match.calls, fmt.Sprintf("%s %.1fs", what, now.Sub(match.Started).Seconds()))
 	}
-	if match == nil {
+	if match == nil && modex != "" && !t.justFinished(modex, now) {
 		t.earlyBalls = append(t.earlyBalls, earlyBall{modex, clara, now})
 		if len(t.earlyBalls) > 8 {
 			t.earlyBalls = t.earlyBalls[len(t.earlyBalls)-8:]
@@ -514,6 +536,16 @@ func (t *Tracker) BallCall(modex string, clara bool, now time.Time) Call {
 	return CallRogerBall
 }
 
+// justFinished reports whether a jet matching modex ended its pass within afterPassBallS.
+func (t *Tracker) justFinished(modex string, now time.Time) bool {
+	for cs, at := range t.finishedAt {
+		if strings.HasSuffix(modexOf(cs), modex) && now.Sub(at) < afterPassBallS {
+			return true
+		}
+	}
+	return false
+}
+
 // takeEarlyBall returns the ball call this jet made just before its pass began, if any, and forgets it.
 func (t *Tracker) takeEarlyBall(callsign string, now time.Time) (earlyBall, bool) {
 	for i := len(t.earlyBalls) - 1; i >= 0; i-- {
@@ -521,7 +553,7 @@ func (t *Tracker) takeEarlyBall(callsign string, now time.Time) (earlyBall, bool
 		if now.Sub(e.at) > earlyBallWindow {
 			continue
 		}
-		if e.modex == "" || strings.Contains(strings.ReplaceAll(callsign, " ", ""), e.modex) {
+		if e.modex != "" && strings.HasSuffix(modexOf(callsign), e.modex) {
 			t.earlyBalls = append(t.earlyBalls[:i], t.earlyBalls[i+1:]...)
 			return e, true
 		}
@@ -668,7 +700,7 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 	if !p.ballAt.IsZero() {
 		start = grooveStartM
 	}
-	if !p.askedBall && p.ballAt.IsZero() && g.astern < callTheBallM {
+	if !p.askedBall && p.ballAt.IsZero() && g.astern < callTheBallM && g.astern > promptMinAstern {
 		// Latch only once it is said: a deviation call a moment earlier holds the
 		// 2 s gap, say() returns "", and a latch set first lost the prompt for
 		// the whole pass (Raider 302, Day 2026-11-22 12:38, "Right for lineup"
@@ -851,6 +883,12 @@ const arRefM = 200.0
 
 func (t *Tracker) finish(p *Pass) {
 	delete(t.passes, p.Callsign)
+	if len(p.samples) > 0 {
+		if t.finishedAt == nil {
+			t.finishedAt = make(map[string]time.Time)
+		}
+		t.finishedAt[p.Callsign] = p.samples[len(p.samples)-1].at
+	}
 	delete(t.prev, p.Callsign)
 	if p.outcome == "trap" && len(p.samples) > 0 {
 		t.lastTrap, t.lastTrapAt = p.Callsign, p.samples[len(p.samples)-1].at

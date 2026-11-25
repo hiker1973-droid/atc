@@ -477,19 +477,6 @@ def post_cards(hook, log_passes, days):
     state = {"posted": []} if first else json.load(open(STATE_FILE, encoding="utf-8"))
     posted = set(state["posted"])
     ids = state.get("ids", {})
-    # A card posted under the stale Tacview name (before DCS's own grade named the real pilot, see greenie_post.reassign_by_dcs)
-    # is replaced: delete it so the pass is not carded twice (2026-11-22: Odyssey's wave off + bolter first carded as Jedi's).
-    for p in log_passes:
-        if p.get("logcs") and p.get("rig"):
-            old_key = "%s|%s|%s" % (p["rig"], p["t"].isoformat(), p["logcs"].lower())
-            old_id = ids.pop(old_key, None)
-            if old_id:
-                try:
-                    import urllib.request
-                    urllib.request.urlopen(urllib.request.Request("%s/messages/%s" % (hook, old_id), method="DELETE", headers={"User-Agent": "ReadbackGreenie/1"}), timeout=30)
-                except Exception:  # noqa: BLE001 - already gone, or the hook is down: the new card still posts
-                    pass
-            posted.discard(old_key)
     todo = [p for p in sorted(log_passes, key=lambda p: p["t"]) if p.get("rig") and pass_key(p) not in posted]
     if first:
         posted.update(pass_key(p) for p in todo)
@@ -517,8 +504,31 @@ def post_cards(hook, log_passes, days):
         posted.add(pass_key(p))
         n += 1
         time.sleep(1.0)
+    # A card posted under the stale Tacview name (before DCS's own grade named the real pilot, see greenie_post.reassign_by_dcs)
+    # is deleted once the pass has its card under the right name, so it is not carded twice (2026-11-22: Odyssey's wave off
+    # + bolter first carded as Jedi's). A failed delete keeps the id, so the next run tries again.
+    for p in log_passes:
+        if p.get("logcs") and p.get("rig") and p["logcs"].lower() != p["callsign"].lower() and pass_key(p) in posted:
+            old_key = pass_key(dict(p, callsign=p["logcs"]))
+            old_id = ids.get(old_key)
+            if old_id and delete_message(hook, old_id):
+                ids.pop(old_key, None)
+                posted.discard(old_key)
     json.dump({"posted": sorted(posted)[-2000:], "ids": dict(list(ids.items())[-500:])}, open(STATE_FILE, "w", encoding="utf-8"))
     return n
+
+
+def delete_message(hook, mid):
+    """Delete a webhook message. True when it is gone (deleted, or already not there); False when it should be tried again."""
+    import urllib.error
+    import urllib.request
+    try:
+        urllib.request.urlopen(urllib.request.Request("%s/messages/%s" % (hook, mid), method="DELETE", headers={"User-Agent": "ReadbackGreenie/1"}), timeout=30)
+        return True
+    except urllib.error.HTTPError as e:
+        return e.code == 404
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 def repost_last(hook, log_passes, days, n=3, outcomes=("trap",)):
@@ -532,10 +542,7 @@ def repost_last(hook, log_passes, days, n=3, outcomes=("trap",)):
     for p in last:
         old = ids.get(pass_key(p))
         if old:
-            try:
-                urllib.request.urlopen(urllib.request.Request("%s/messages/%s" % (hook, old), method="DELETE", headers={"User-Agent": "ReadbackGreenie/1"}), timeout=30)
-            except urllib.error.HTTPError:
-                pass
+            delete_message(hook, old)
         state["posted"] = [k for k in state["posted"] if k != pass_key(p)]
     json.dump(state, open(STATE_FILE, "w", encoding="utf-8"))
     return post_cards(hook, last, days)

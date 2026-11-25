@@ -207,6 +207,28 @@ func TestNoBallPromptAfterAnEarlyBallCall(t *testing.T) {
 	}
 }
 
+func TestEarlyBallWithoutModexIsNotKept(t *testing.T) {
+	tr := NewTracker(NimitzParams())
+	tr.BallCall("", false, time.Now())
+	if len(tr.earlyBalls) != 0 {
+		t.Errorf("earlyBalls = %v, want none for a call with no modex", tr.earlyBalls)
+	}
+}
+
+func TestBallCallJustAfterAPassIsNotKept(t *testing.T) {
+	tr := NewTracker(NimitzParams())
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	tr.finishedAt = map[string]time.Time{"Raider 302": now.Add(-5 * time.Second)}
+	tr.BallCall("302", false, now)
+	if len(tr.earlyBalls) != 0 {
+		t.Errorf("earlyBalls = %v, want none: the call followed his finished pass", tr.earlyBalls)
+	}
+	tr.BallCall("305", false, now)
+	if len(tr.earlyBalls) != 1 {
+		t.Errorf("earlyBalls = %v, want the other jet's call kept", tr.earlyBalls)
+	}
+}
+
 func TestHighStart(t *testing.T) {
 	calls, _ := flight{gsErr: func(a float64) float64 {
 		if a > 900 {
