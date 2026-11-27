@@ -132,8 +132,11 @@ func elPaddles(id string) elevenVoice {
 // since we have overhead", picked the premium sample in round 17). Flash
 // barely honoured the slower speed; the premium read came out ~7% longer.
 // Deckboss is low traffic, so the doubled credits are tens a day.
+// Tempo 1.10 since 2026-11-27 (operator: "speed up deckboss speech by 10%
+// (you can leave BRC where it is at)"): exact ffmpeg speed-up, pitch kept;
+// speakWithSlowBRC renders the BRC digits without it.
 func elDeckboss(id string) elevenVoice {
-	return elevenVoice{ID: id, Name: "Deckboss", Stability: 0.35, Style: 0.5, Speed: 1.05, Model: "eleven_multilingual_v2"}
+	return elevenVoice{ID: id, Name: "Deckboss", Stability: 0.35, Style: 0.5, Speed: 1.05, Model: "eleven_multilingual_v2", Tempo: 1.10}
 }
 
 const (

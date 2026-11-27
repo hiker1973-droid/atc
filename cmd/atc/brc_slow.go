@@ -38,7 +38,11 @@ func speakWithSlowBRC(ctx context.Context, apiKey, text string, vp voiceProfile)
 		if seg == "" {
 			continue
 		}
-		clip, err := synthesizeSpeech(ctx, apiKey, seg, vp)
+		segVP := vp
+		if i == 1 {
+			segVP.eleven.Tempo = 0 // the BRC keeps its own pace (Deckboss Tempo 1.10 is for the rest of the line)
+		}
+		clip, err := synthesizeSpeech(ctx, apiKey, seg, segVP)
 		if err != nil {
 			log.Warn().Err(err).Msg("BRC split TTS failed - speaking whole line at normal speed")
 			return synthesizeSpeech(ctx, apiKey, text, vp)
