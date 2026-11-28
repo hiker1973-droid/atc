@@ -213,7 +213,11 @@ const (
 	waveOffLowM     = 3.0    // or this far below the glideslope (the hook clears the ramp by ~4.3 m)
 	callsFromM      = 1500.0 // deviation calls from ~0.8 nm (earlier after a ball call)
 	callsUntilM     = 70.0   // nothing but wave off over the ramp
-	callTheBallM    = 1667.0 // 0.9 nm (operator 2026-11-27 "do it at .9 miles"; was 3/4 nm). Roger ball, then the calls guide him in
+	// callTheBallM: 1.0 nm (operator 2026-11-27; was 3/4 nm, briefly 0.9). At ~111 kt
+	// closure the prompt, his ball call and "roger ball" take ~7.5 s, so the ball
+	// call lands ~0.8 nm. Roger ball, then the calls guide him in.
+	callTheBallM = 1852.0
+	ballWaitFor  = 8 * time.Second // corrections held this long after the prompt for his ball call
 	foulDeckM       = 463.0           // 1/4 nm: a foul deck here is a wave-off (operator 2026-10-18)
 	redDeckFor      = 3 * time.Minute // a "red deck" with no "green deck" lapses after this
 	gapMin          = 2 * time.Second
@@ -718,6 +722,13 @@ func (t *Tracker) decide(p *Pass, s passSample) Call {
 		p.highSince = time.Time{}
 	}
 	if g.astern > start {
+		return ""
+	}
+	// After "Hornet in the groove ... call the ball" the net is the pilot's: no
+	// corrections until his ball call (or ballWaitFor with none), so one doesn't
+	// step on it. Power in close still goes out (wave-off is decided above).
+	if p.askedBall && p.ballAt.IsZero() && s.at.Sub(p.lastSaid[CallCallTheBall]) < ballWaitFor &&
+		!(gs < -0.6 && g.astern < 1100) {
 		return ""
 	}
 	lastPower := latest(p.lastSaid, CallPower, CallPowerUrgent, CallPowerSink, CallLowPower)

@@ -83,7 +83,7 @@ func (f flight) run(t *testing.T) (calls []Call, summary string) {
 			height = deckLevelM
 		}
 		lat, lon, alt := world(p, ship, astern, right, height)
-		if f.ball && !ballDone && astern < 1700 { // just outside the 0.9 nm prompt
+		if f.ball && !ballDone && astern < 1900 { // just outside the 1.0 nm prompt
 			ballDone = true
 			calls = append(calls, tr.BallCall("302", false, now))
 		}
