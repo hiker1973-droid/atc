@@ -704,7 +704,7 @@ def build():
         "Calls start about 0.8 nm (1.3 nm after your ball call): a little high, you're high, you're low - power, "
         "POWER, right for lineup, come left, you're fast / slow (Hornet AoA). After your ball call, a call every second "
         "while you are off.",
-        "At 0.75 nm: \"Hornet in the groove, three-quarters of a mile, call the ball\". Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
+        "At 0.9 nm: \"Hornet in the groove, three-quarters of a mile, call the ball\" (wait for it: a ball call before it means no prompt). Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
         "Foul deck at 1/4 nm (no green deck from the jet ahead, or Tacview shows the landing area foul): "
         "\"302, foul deck, wave off, wave off, proceed to bolter pattern\". A red deck lapses after 3 minutes."])
 
