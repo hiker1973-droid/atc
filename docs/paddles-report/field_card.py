@@ -177,7 +177,7 @@ def remark_words(grade):
     return ("; ".join(out) + ".").capitalize() if out else "Good pass."
 
 
-def from_log(summary, track=""):
+def from_log(summary, track="", field="Senaki"):
     """Build the card's inputs from an "Approach graded" summary and, if the rig logged one, an "Approach track" string.
     Without a track the path is drawn through the four segment averages (r["coarse"])."""
     m = re.match(r"(.+?) \((.+?)\): rwy (\S+) (.+?), grade (.+?)(?:,|;)", summary)
@@ -195,7 +195,7 @@ def from_log(summary, track=""):
                 math.tan(math.radians(g["lu"] or 0.0)) * mid[g["name"]] * 1852) for g in segs]
         trk.append((-int(td.group(1)) / 1852.0, 0.0, float(td.group(2))))
     names = {"FA-18C_hornet": "F/A-18C", "F-16C_50": "F-16C", "F-16C": "F-16C"}
-    r = {"field": "Senaki", "map": "Caucasus", "model": names.get(model, model.replace("_", " ")), "runway": rwy,
+    r = {"field": field, "map": "Caucasus", "model": names.get(model, model.replace("_", " ")), "runway": rwy,
          "outcome": outcome, "grade": grade, "td_past": int(td.group(1)), "td_right": int(td.group(2)), "td_sink": int(td.group(3)),
          "remark": remark_words(grade), "segs": segs, "coarse": not track, "gs": gs, "aim": aim}
     return cs, r, trk
@@ -228,6 +228,8 @@ FIELD_STATE_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards.j
 FIELD_IDS_FILE = os.path.join(os.path.expanduser("~"), "readback-field-cards-ids.json")             # pass key -> the card's Discord message id
 FIELD_FLIGHTS = ("Venom", "Raider")
 FIELD_RIGS = (("Day", "192.168.1.220"), ("Night", "192.168.1.221"))
+# The towers that grade landings (start_towers_caucasus.bat --approach-grade); Kobuleti + Batumi since 2026-11-27.
+FIELD_TOWERS = ("Senaki", "Kobuleti", "Batumi")
 
 
 def pilot_names():
@@ -243,14 +245,18 @@ def pilot_names():
 
 
 def day_passes(date):
-    """(time, callsign, summary, track, weather) for each graded Venom / Raider landing in the Senaki Tower day logs of the rigs."""
+    """(time, callsign, summary, track, weather, field) for each graded Venom / Raider landing in the grading towers' day logs of the rigs."""
     out = []
     for rig, host in FIELD_RIGS:
+      for field in FIELD_TOWERS:
         try:
-            url = "http://%s:7000/api/day-log?name=%s&date=%s" % (host, urllib.parse.quote("Senaki Tower"), date)
-            lines = urllib.request.urlopen(url, timeout=60).read().decode("utf-8", "replace").splitlines()
+            url = "http://%s:7000/api/day-log?name=%s&date=%s" % (host, urllib.parse.quote(field + " Tower"), date)
+            body = urllib.request.urlopen(url, timeout=60)
+            if "html" in body.headers.get("Content-Type", ""):
+                continue
+            lines = body.read().decode("utf-8", "replace").splitlines()
         except OSError as e:
-            print("%s: no Senaki Tower log (%s)" % (rig, e))
+            print("%s: no %s Tower log (%s)" % (rig, field, e))
             continue
         recs = []
         for line in lines:
@@ -266,7 +272,7 @@ def day_passes(date):
                 x = next((x for x in tracks if x["callsign"] == j["callsign"] and
                           abs((dt.datetime.fromisoformat(x["time"]) - t).total_seconds()) < 5), {})
                 wx = {k: x[k] for k in ("windDir", "windKts", "ceilingFt", "visNm", "altInHg", "isNight") if k in x}
-                out.append((j["time"], j["callsign"], j["summary"], x.get("track", ""), wx))
+                out.append((j["time"], j["callsign"], j["summary"], x.get("track", ""), wx, field))
     return sorted(out)
 
 
@@ -296,20 +302,20 @@ def post_field_cards(date, dry=False):
         done = set()
     names = pilot_names()
     n = 0
-    for when, cs, summary, track, wx in day_passes(date):
+    for when, cs, summary, track, wx, field in day_passes(date):
         key = "%s|%s" % (when, cs)
         if key in done:
             continue
-        _, r, trk = from_log(summary, track)
+        _, r, trk = from_log(summary, track, field)
         r["wx"] = wx
         t = dt.datetime.fromisoformat(when)
         title = "%s | %s" % (cs, names[cs.lower()]) if cs.lower() in names else cs
-        foot = "Senaki field landings - graded to the %s standard - " % r["model"] + ("segment averages only: logged before tracks" if r["coarse"] else "track from the tower")
+        foot = field + " field landings - graded to the %s standard - " % r["model"] + ("segment averages only: logged before tracks" if r["coarse"] else "track from the tower")
         png = gp.screenshot(card_html(r, trk, title, t.strftime("%A %B %d, %Y %H:%M:%S") + " (real time)", foot), 960, 1730)
         if dry:
             open(os.path.join(os.path.expanduser("~"), "field-card-%s.png" % cs.replace(" ", "")), "wb").write(png)
         else:
-            post_card(hook, png, "**%s** - Senaki rwy %s: %s" % (title, r["runway"], r["grade"]), key)
+            post_card(hook, png, "**%s** - %s rwy %s: %s" % (title, field, r["runway"], r["grade"]), key)
             done.add(key)
             json.dump(sorted(done), open(FIELD_STATE_FILE, "w"))
         n += 1

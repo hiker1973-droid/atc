@@ -27,6 +27,24 @@ func TestGradeFieldSenaki(t *testing.T) {
 	}
 }
 
+// Kobuleti and Batumi (graded since 2026-11-27): lat/lon courses are the DCS
+// runway heading plus ~6 deg of Caucasus grid convergence, as at Senaki.
+func TestGradeFieldKobuletiBatumi(t *testing.T) {
+	for _, c := range []struct {
+		af       *airfield.Airfield
+		end      string
+		lo, hi   float64
+	}{{airfield.UG5X, "07", 74, 77}, {airfield.UGSB, "13", 129.5, 132.5}} {
+		f := gradeField(c.af)
+		if len(f.Ends) != 2 || f.Ends[0].Name != c.end {
+			t.Fatalf("%s ends %+v", c.af.Name, f.Ends)
+		}
+		if g := f.Ends[0].CourseDeg; g < c.lo || g > c.hi {
+			t.Errorf("%s %s course %.1f", c.af.Name, c.end, g)
+		}
+	}
+}
+
 // FIELD_REPLAY=<acmi> replays a Tacview recording through the Senaki grader.
 func TestFieldReplay(t *testing.T) {
 	path := os.Getenv("FIELD_REPLAY")

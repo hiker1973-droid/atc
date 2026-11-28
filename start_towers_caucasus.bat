@@ -33,12 +33,12 @@ if defined SKYEYE_MIZ set MIZ_FLAG=--miz-path "%SKYEYE_MIZ%"
 
 echo [vSFG-7] Starting Caucasus (Black Sea) ATC system...
 
-:: Batumi Tower — UGSB, 260.0, dashboard 6011
-start "Batumi Tower" cmd /c "%~dp0atc.exe --airfield UGSB --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6011 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: Batumi Tower — UGSB, 260.0, dashboard 6011 (field landings graded since 2026-11-27)
+start "Batumi Tower" cmd /c "%~dp0atc.exe --airfield UGSB --approach-grade --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice nova --dashboard-port 6011 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
-:: Kobuleti Tower — UG5X, 262.0, dashboard 6012
-start "Kobuleti Tower" cmd /c "%~dp0atc.exe --airfield UG5X --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6012 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
+:: Kobuleti Tower — UG5X, 262.0, dashboard 6012 (field landings graded since 2026-11-27)
+start "Kobuleti Tower" cmd /c "%~dp0atc.exe --airfield UG5X --approach-grade --srs-addr %SRS% --eam-password %EAM% --tacview-addr %TACVIEW% --tts-voice shimmer --dashboard-port 6012 --runway-rotation=false %MIZ_FLAG% --log-level %LOG%"
 %SystemRoot%\System32\timeout.exe /t 5 /nobreak >nul
 
 :: Senaki Tower — UGKS, 261.0, dashboard 6013

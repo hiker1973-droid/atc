@@ -9,7 +9,7 @@ pass's track, pattern and context lines are written too, then runs
 greenie_post.py --refresh, which redraws the board, edits the Discord message and
 posts a card for each new pass. The hourly task stays as the backstop.
 
-Field landings ride on it too: every poll it counts the "Approach graded" lines in the Senaki Tower day log of the Day
+Field landings ride on it too: every poll it counts the "Approach graded" lines in the Senaki, Kobuleti and Batumi Tower day logs of the Day
 and Night rigs; on a new one it waits a few seconds (the "Approach track" line follows) and runs
 field_card.py --post, a card for each Venom / Raider landing to the field cards channel.
 
@@ -53,16 +53,22 @@ def count(host, day):
     return body.count(MARK)
 
 
+FIELD_TOWERS = ("Senaki", "Kobuleti", "Batumi")  # towers run with --approach-grade (Kobuleti + Batumi since 2026-11-27)
+
+
 def field_count(host, day):
-    """The number of graded field landings in this rig's Senaki Tower log for the day, or None if the rig didn't answer."""
-    try:
-        with urllib.request.urlopen("http://%s:7000/api/day-log?name=Senaki%%20Tower&date=%s" % (host, day), timeout=20) as r:
-            body = r.read()
-            if "html" in r.headers.get("Content-Type", ""):
-                return None
-    except (urllib.error.URLError, OSError):
-        return None
-    return body.count(FIELD_MARK)
+    """The number of graded field landings in this rig's grading towers' logs for the day, or None if no tower log answered."""
+    total = None
+    for field in FIELD_TOWERS:
+        try:
+            with urllib.request.urlopen("http://%s:7000/api/day-log?name=%s%%20Tower&date=%s" % (host, field, day), timeout=20) as r:
+                body = r.read()
+                if "html" in r.headers.get("Content-Type", ""):
+                    continue
+        except (urllib.error.URLError, OSError):
+            continue
+        total = (total or 0) + body.count(FIELD_MARK)
+    return total
 
 
 def refresh():

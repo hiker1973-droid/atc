@@ -453,10 +453,10 @@ def pattern_section(passes):
 
 
 def field_section(fields):
-    """Senaki field landings (pkg/fieldgrade): report only, being tried out."""
-    out = [Paragraph("Field landings - Senaki (test)", h)]
+    """Senaki / Kobuleti / Batumi field landings (pkg/fieldgrade): report only, being tried out."""
+    out = [Paragraph("Field landings - Senaki, Kobuleti, Batumi (test)", h)]
     if not fields:
-        return out + [Paragraph("No graded landings at Senaki.", note)]
+        return out + [Paragraph("No graded landings at Senaki, Kobuleti or Batumi.", note)]
     rows = []
     for f in fields:
         g = f["grade"]

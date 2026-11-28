@@ -21,8 +21,8 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 RIGS = [("Day", "192.168.1.220"), ("Night", "192.168.1.221"), ("Foothold", "192.168.1.222")]
 # Field landings are graded by these towers (start_towers_caucasus.bat
-# --approach-grade); Foothold is Syria, no Senaki.
-FIELD_ROLES = [("Day", "Senaki Tower"), ("Night", "Senaki Tower")]
+# --approach-grade; Kobuleti + Batumi since 2026-11-27); Foothold is Syria, none.
+FIELD_ROLES = [(rig, f + " Tower") for rig in ("Day", "Night") for f in ("Senaki", "Kobuleti", "Batumi")]
 # One Reports folder (operator 2026-10-21): Reports\YYYY-MM\YYYY-MM-DD <Kind>.pdf,
 # raw data under Reports\_data\<kind>.
 REPORTS = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Reports"
@@ -79,7 +79,7 @@ def main():
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             f.write(body)
-        logs += ["--field-log", "%s=%s" % (rig, path)]
+        logs += ["--field-log", "%s %s=%s" % (rig, role.replace(" Tower", ""), path)]  # "Day Kobuleti" under the time
     cmd = [sys.executable, "-I", os.path.join(HERE, "build_paddles_report.py"), "--date", a.date,
            "--out", data, "--no-copy", "--board-dir", data,
            "--summary-dir", os.path.join(a.out, "_summary")] + logs
