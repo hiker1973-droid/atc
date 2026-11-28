@@ -88,7 +88,7 @@ S.append(section("3. The ball call (about 3/4 nm, on the glideslope)",
         ["\"<b>302, Hornet ball, 5.5</b>\" (modex, type, fuel state)",
          "\"<b>Roger ball.</b>\""],
         ["\"<b>302, Clara, 5.0</b>\" (ball not in sight)", "\"Paddles contact, keep it coming.\""],
-        ["<i>At 0.9 nm</i>", "\"<b>Hornet in the groove, three-quarters of a mile, call the ball.</b>\""],
+        ["<i>At 1 nm (no calls until your ball call)</i>","\"<b>Hornet in the groove, three-quarters of a mile, call the ball.</b>\""],
     ], [3.3, 4.1]),
     "Any type works: Hornet, Super Hornet, Rhino, Tomcat, Viper, Goshawk ball. Say the modex first: with two jets "
     "in the groove it is how Paddles knows whose ball it is."))

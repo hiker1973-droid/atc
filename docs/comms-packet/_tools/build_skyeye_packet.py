@@ -114,6 +114,11 @@ v1.40 (operator 2026-11-11): Hitman passes the 9-line in three blocks of three l
 each read back by the pilot; wrong readback = the block again; "say again" / "say again line 6";
 "confirmed. Report IP inbound." after the third (card 13; cmd/atc/jtac_brief.go).
 
+v1.49 (operator 2026-11-27) follows origin/main 13246f7: Paddles says "Hornet in the groove, three-quarters
+of a mile, call the ball" at 1.0 nm (was 0.75 nm); wait for it - a ball call before it means no prompt; Paddles
+holds its corrections (not power) until the ball call, up to 8 s; then "Roger ball" and the groove calls (card 10;
+pkg/lso callTheBallM, ballWaitFor).
+
 v1.48 (operator 2026-11-24) follows origin/main 27ca680: a section checks in together - the lead calls
 "Raider 302 holding hands with 303 (, 304 ...), marking moms ..." and Marshal opens "Raider 302, copy holding
 hands with Raider 303, ..." before the usual reply. Readback is the lead's only (wingmen ignored), graded on
@@ -180,8 +185,8 @@ CARDS = os.path.join(CACHE, "cards")      # kneeboard renders, only used to feed
 LOGO = os.path.join(os.path.dirname(PACKET), "vsfg7_patch.png")
 NK.set_logo(LOGO, "circle")
 
-VER = "v1.48"
-DATE = "24 NOV 2026"   # release date of VER - change it together with VER
+VER = "v1.49"
+DATE = "27 NOV 2026"   # release date of VER - change it together with VER
 STAMP = "%s  ·  %s" % (VER, DATE)
 
 EYE_ALL = "vSFG-7  ·  SKYEYE ATC  ·  HORNET + VIPER"
@@ -629,7 +634,7 @@ def c10_paddles():
         ("ABEAM", "302 abeam."),
         ("PADDLES", "302, Paddles contact, you've got 22 knots down"),
         ("", "the angle, 4 from starboard.  (wind over the deck)"),
-        ("AT 0.75 NM", "Hornet in the groove, three-quarters of a mile,"),
+        ("AT 1 NM", "Hornet in the groove, three-quarters of a mile,"),
         ("", "call the ball."),
         ("YOU", "302, Hornet ball, 5.5."),
         ("PADDLES", "Roger ball."),

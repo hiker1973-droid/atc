@@ -28,8 +28,8 @@ import pymupdf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-VER = "v3.8"
-DATE = "24 NOV 2026"          # change together with VER
+VER = "v3.9"
+DATE = "27 NOV 2026"          # change together with VER
 OUT_NAME = "vSFG7_ATC_Phraseology_%s.pdf" % VER
 DESKTOP_COPY = r"C:\Users\afhin\OneDrive\Desktop\SKYEYE ATC Dev\Documentation"
 # vSFG-7 patch (operator 2026-10-22: "use this logo and update anything we have future").
@@ -704,7 +704,7 @@ def build():
         "Calls start about 0.8 nm (1.3 nm after your ball call): a little high, you're high, you're low - power, "
         "POWER, right for lineup, come left, you're fast / slow (Hornet AoA). After your ball call, a call every second "
         "while you are off.",
-        "At 0.9 nm: \"Hornet in the groove, three-quarters of a mile, call the ball\" (wait for it: a ball call before it means no prompt). Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
+        "At 1 nm: \"Hornet in the groove, three-quarters of a mile, call the ball\" (wait for it: a ball call before it means no prompt). Paddles stays quiet until your ball call (8 s at most; power still comes). Wave off, wave off, wave off: mandatory - power, climb straight ahead.",
         "Foul deck at 1/4 nm (no green deck from the jet ahead, or Tacview shows the landing area foul): "
         "\"302, foul deck, wave off, wave off, proceed to bolter pattern\". A red deck lapses after 3 minutes."])
 
